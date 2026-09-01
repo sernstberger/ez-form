@@ -1,4 +1,4 @@
-import { render, renderHook, screen } from '@testing-library/react'
+import { render, renderHook, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form, type FormMethods } from './Form'
@@ -68,6 +68,22 @@ describe('Form', () => {
       </Form>,
     )
     expect(screen.getByLabelText('Email')).toBeDisabled()
+  })
+
+  it('disables the fields while onSubmit is pending, then re-enables them', async () => {
+    const user = userEvent.setup()
+    let resolve!: () => void
+    const onSubmit = vi.fn(() => new Promise<void>((r) => (resolve = r)))
+    render(
+      <Form schema={schema} defaultValues={{ email: 'a@b.co' }} onSubmit={onSubmit}>
+        <TextField name="email" label="Email" />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    await waitFor(() => expect(screen.getByLabelText('Email')).toBeDisabled())
+    resolve()
+    await waitFor(() => expect(screen.getByLabelText('Email')).toBeEnabled())
   })
 })
 

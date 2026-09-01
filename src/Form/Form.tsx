@@ -1,4 +1,4 @@
-import type { FormHTMLAttributes, ReactNode } from 'react'
+import { useState, type FormHTMLAttributes, type ReactNode } from 'react'
 import {
   FormProvider,
   useForm,
@@ -26,7 +26,10 @@ export interface FormProps<TIn extends FieldValues, TOut>
   mode?: Mode
   /**
    * Disables every field in the form (hookform's form-level `disabled`).
-   * Unlike a field-level `disabled`, values are still submitted.
+   * Like a native form, hookform excludes disabled fields from the submit
+   * payload while the form is disabled; re-enabling restores them. Fields are
+   * also disabled automatically while `onSubmit` is pending (the values for
+   * that submit are already captured, so they are unaffected).
    */
   disabled?: boolean
   children: ReactNode
@@ -37,15 +40,20 @@ export function Form<TIn extends FieldValues, TOut>({
   onSubmit,
   defaultValues,
   mode = 'onSubmit',
-  disabled,
+  disabled = false,
   children,
   ...formProps
 }: FormProps<TIn, TOut>) {
+  // Local flag rather than formState.isSubmitting: useForm hands this component
+  // a React-state snapshot of formState, so the new value is not readable before
+  // the useForm call on the render where it changes. hookform applies the
+  // `disabled` option reactively (control._disableForm in an effect).
+  const [submitting, setSubmitting] = useState(false)
   const methods = useForm<TIn, unknown, TOut>({
     resolver: zodResolver(schema),
     defaultValues,
     mode,
-    disabled,
+    disabled: disabled || submitting,
   })
 
   return (
@@ -53,7 +61,14 @@ export function Form<TIn extends FieldValues, TOut>({
       <form
         noValidate
         {...formProps}
-        onSubmit={methods.handleSubmit((values) => onSubmit(values, methods))}
+        onSubmit={methods.handleSubmit(async (values) => {
+          setSubmitting(true)
+          try {
+            await onSubmit(values, methods)
+          } finally {
+            setSubmitting(false)
+          }
+        })}
       >
         {children}
       </form>

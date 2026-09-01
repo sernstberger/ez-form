@@ -41,12 +41,12 @@ and throw a clear message).
 
 | Export | Wraps | Props | Behavior |
 |---|---|---|---|
-| `Form<TIn extends FieldValues, TOut>` | `useForm` + `FormProvider` + `<form>` | `schema: z.ZodType<TOut, TIn>`, `onSubmit(values: TOut, form: FormMethods<TIn, TOut>): void \| Promise<void>`, `defaultValues?: DefaultValues<TIn>`, `mode?: Mode`, `disabled?: boolean`, `children`, remaining props spread onto `<form>` | `noValidate` set on the form so browser validation does not preempt zod. `FormMethods<TIn, TOut> = UseFormReturn<TIn, unknown, TOut>` is the same object `useFormContext()` returns, handed to `onSubmit` so the owner can `reset`/`setError`. `disabled` maps to `useForm({ disabled })`: every field disables, values are still submitted |
+| `Form<TIn extends FieldValues, TOut>` | `useForm` + `FormProvider` + `<form>` | `schema: z.ZodType<TOut, TIn>`, `onSubmit(values: TOut, form: FormMethods<TIn, TOut>): void \| Promise<void>`, `defaultValues?: DefaultValues<TIn>`, `mode?: Mode`, `disabled?: boolean`, `children`, remaining props spread onto `<form>` | `noValidate` set on the form so browser validation does not preempt zod. `FormMethods<TIn, TOut> = UseFormReturn<TIn, unknown, TOut>` is the same object `useFormContext()` returns, handed to `onSubmit` so the owner can `reset`/`setError`. `disabled` maps to `useForm({ disabled })`: every field disables (and `SubmitButton`), and hookform excludes form-disabled fields from the submit payload while disabled, like a native form. `Form` also disables every field while `onSubmit` is pending (a local `submitting` flag OR'd into `useForm({ disabled })`; the pending submit's values are already captured) |
 | `TextField` | MUI `TextField` | `name: string` + `TextFieldProps` minus `name`, `value`, `error`, `inputRef` | On error: `error={true}`, `helperText=error.message`. Otherwise consumer `helperText`. Consumer `onChange`/`onBlur` run after hookform's |
 | `Select` | MUI `TextField select` | `name`, `options: readonly { value: string \| number; label: string }[]` + same MUI passthrough as TextField | Renders `MenuItem` per option. Single select only |
 | `Checkbox` | `FormControl` + `FormControlLabel` + MUI `Checkbox` | `name`, `label: ReactNode`, `helperText?`, `required?` + `CheckboxProps` minus `name`, `checked` | `checked = !!field.value`, `onChange → e.target.checked` (consumer `onChange(e, checked)` runs after). Error shown in `FormHelperText` with an id; the input gets `aria-describedby`, `aria-invalid`, the RHF ref via `slotProps.input` (merged with the consumer's using `mergeSlotProps`); `required` goes to `FormControlLabel` |
 | `Switch` | same as Checkbox with MUI `Switch` | same as Checkbox | shares `useBooleanField` internal hook; MUI 9 sets `role="switch"` |
-| `SubmitButton` | MUI `Button` | `ButtonProps` minus `type` | `type="submit"`, `variant="contained"` default, MUI `loading` (which disables) while `isSubmitting`; consumer `disabled` passed through |
+| `SubmitButton` | MUI `Button` | `ButtonProps` minus `type` | `type="submit"`, `variant="contained"` default, MUI `loading` (which disables) while `isSubmitting`, disabled while `formState.disabled`; consumer `disabled` passed through |
 
 Only these six symbols are exported from `src/index.ts`, plus their prop types and the `FormMethods` type alias.
 
@@ -108,18 +108,18 @@ Vitest runs with `restoreMocks: true`; the per-component "throws outside `<Form>
 
 - **Field prop rule.** Omit from the MUI props only what the binding owns: `name`, `value`/`checked`, `error`, and the ref prop. Everything else (`onChange`, `onBlur`, `helperText`, `disabled`, `required`, `id`, `slotProps`) is accepted and merged; hookform's handler runs first, the consumer's after.
 - **A11y wiring is the error-announcement strategy** (no live region). Every field hands RHF the real `<input>` ref, so `shouldFocusError` focuses the first invalid field on submit; the input carries `aria-invalid` and `aria-describedby` pointing at the helper text, which the screen reader then reads. MUI `TextField` does this itself (ids from `React.useId`, SSR-stable). `Checkbox`/`Switch` do it by hand: `useBooleanField` mints a `helperTextId` with `useId`, `FormHelperText` gets that id, and `slotProps.input` (merged with the consumer's via `mergeSlotProps`) carries `ref`, `aria-invalid`, `aria-describedby`. `required` is passed to `FormControlLabel` explicitly because it does not read `FormControl` context.
-- **`disabled` semantics.** A consumer's field-level `disabled` is UI-only and is never passed to `useController({ disabled })`, which would strip the value on submit and make a required field fail its own schema. Form-level disabling is `<Form disabled>` → `useForm({ disabled })`, which disables every field and still submits values.
+- **`disabled` semantics.** A consumer's field-level `disabled` is UI-only and is never passed to `useController({ disabled })`, which would strip the value on submit and make a required field fail its own schema. Form-level disabling is `<Form disabled>` → `useForm({ disabled })`, which disables every field and `SubmitButton`; while the form is disabled, react-hook-form (7.87, verified) excludes those fields from the `handleSubmit` payload, mirroring native forms, and re-enabling restores them. `Form` also disables every field while `onSubmit` is pending: the payload for that submit is captured before `onSubmit` runs, so it is complete, and the next submit is complete too. Disabling a focused input blurs it; that is expected.
 - **zod 4 idioms.** `z.email({ error })` (an error map can tell empty from malformed via `iss.input`), `error:` not `message:`, `z.boolean().refine(Boolean, { error })` for must-be-true, and no `as never` in `defaultValues`; omit the key instead (`DefaultValues` is `DeepPartial`; fields render `undefined` as empty). Numeric text fields need `z.coerce.number()` because the input hands zod a string.
 
 ## Stories (v1)
 
 - `Form/Basic` — signup form with all five components, logs values on submit
 - `Form/ValidationErrors` — submit empty, every field shows its zod message
-- `Form/AsyncSubmit` — onSubmit awaits 1s, SubmitButton disables
+- `Form/AsyncSubmit` — onSubmit awaits 1.5s, every field disables and SubmitButton shows a spinner
 - One `Default` story per field, plus `WithError` for TextField
 
 ## Success criteria
 
 - `pnpm build` produces `dist/index.js` and `dist/index.d.ts`; installing the tarball into a fresh Vite app and rendering `Form/Basic` works.
-- `pnpm test` green; Form test proves: empty submit shows zod messages, valid submit calls `onSubmit` with parsed values, button disabled during async submit.
+- `pnpm test` green; Form test proves: empty submit shows zod messages, valid submit calls `onSubmit` with parsed values and the form methods, fields and button disabled during async submit.
 - `pnpm storybook` shows all stories without console errors.
