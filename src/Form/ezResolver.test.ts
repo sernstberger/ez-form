@@ -138,6 +138,22 @@ describe('ezResolver', () => {
     expect(result.errors).toEqual({ address: { street: { type: 'required', message: 'Street is required.' } } })
   })
 
+  it('applies minLength/maxLength/pattern to string values only, like hookform', async () => {
+    const schema = z.object({ v: z.unknown() })
+    const check = (value: unknown, r: FieldRules) => run(schema, { v: value }, { v: rules(r, 'Value') })
+    expect((await check(123, { pattern: /^[a-z]+$/ })).errors).toEqual({})
+    expect((await check(['a'], { minLength: 3 })).errors).toEqual({})
+    expect((await check({ a: 1 }, { maxLength: 2 })).errors).toEqual({})
+    expect((await check('123', { pattern: /^[a-z]+$/ })).errors).toEqual({ v: { type: 'pattern', message: 'Value is invalid.' } })
+    expect((await check('ab', { minLength: 3 })).errors).toEqual({ v: { type: 'minLength', message: 'Value must be at least 3 characters.' } })
+    expect((await check('abc', { maxLength: 2 })).errors).toEqual({ v: { type: 'maxLength', message: 'Value must be at most 2 characters.' } })
+  })
+
+  it('skips fields that are not mounted', async () => {
+    const result = await run(text, { nick: '' }, { nick: { ...rules({ required: true }, 'Nickname'), mount: false } })
+    expect(result.errors).toEqual({})
+  })
+
   it("accepts bare hookform rules from a consumer's own useController", async () => {
     const result = await run(text, { nick: '' }, { nick: { required: true } })
     expect(result.errors).toEqual({ nick: { type: 'required', message: 'This field is required.' } })

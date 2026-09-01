@@ -63,6 +63,18 @@ function withMessage<T extends number | string | RegExp>(
   return { value: rule, message: message(rule) }
 }
 
+function normalizeRequired(
+  required: FieldRules['required'],
+  label: string,
+): ValidationValueMessage<boolean> | undefined {
+  const fallback = defaultMessages.required(label)
+  if (required === undefined || required === false) return undefined
+  if (required === true) return { value: true, message: fallback }
+  if (typeof required === 'string') return { value: true, message: required || fallback }
+  if (!required.value) return undefined
+  return { value: true, message: required.message || fallback }
+}
+
 function wrapValidate(fn: Validate<unknown, FieldValues>, fallback: string): Validate<unknown, FieldValues> {
   return async (value, values) => {
     const result = await fn(value, values)
@@ -75,13 +87,7 @@ export function normalizeRules<TValue>(rules: FieldRules<TValue>, label?: string
   const l = label ?? FALLBACK_LABEL
   const out: NormalizedRules = {}
 
-  const { required } = rules
-  if (required === true) out.required = { value: true, message: defaultMessages.required(l) }
-  else if (typeof required === 'string') out.required = { value: true, message: required || defaultMessages.required(l) }
-  else if (isValueMessage(required ?? false) && required && typeof required === 'object' && required.value) {
-    out.required = { value: true, message: required.message || defaultMessages.required(l) }
-  }
-
+  out.required = normalizeRequired(rules.required, l)
   out.min = withMessage(rules.min, (v) => defaultMessages.min(l, v))
   out.max = withMessage(rules.max, (v) => defaultMessages.max(l, v))
   out.minLength = withMessage(rules.minLength, (v) => defaultMessages.minLength(l, v))

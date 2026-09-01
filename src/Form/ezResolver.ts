@@ -35,6 +35,8 @@ function outOfRange(value: unknown, bound: number | string, direction: 'min' | '
 /**
  * Runs hookform-shaped rules in hookform's order; the first failure wins.
  * Empty values (`undefined | null | '' | false | []`) only fail `required`.
+ * `minLength`/`maxLength`/`pattern` apply to string values only (hookform's
+ * `validateField` guards all three with `isString`).
  */
 export async function validateRules(
   rules: NormalizedRules,
@@ -50,17 +52,18 @@ export async function validateRules(
   if (rules.max && outOfRange(value, rules.max.value as number | string, 'max')) {
     return { type: 'max', message: rules.max.message }
   }
-  const length = String(value).length
-  if (rules.maxLength && length > (rules.maxLength.value as number)) {
-    return { type: 'maxLength', message: rules.maxLength.message }
-  }
-  if (rules.minLength && length < (rules.minLength.value as number)) {
-    return { type: 'minLength', message: rules.minLength.message }
-  }
-  if (rules.pattern && typeof value === 'string') {
-    const regex = rules.pattern.value as RegExp
-    regex.lastIndex = 0
-    if (!regex.test(value)) return { type: 'pattern', message: rules.pattern.message }
+  if (typeof value === 'string') {
+    if (rules.maxLength && value.length > (rules.maxLength.value as number)) {
+      return { type: 'maxLength', message: rules.maxLength.message }
+    }
+    if (rules.minLength && value.length < (rules.minLength.value as number)) {
+      return { type: 'minLength', message: rules.minLength.message }
+    }
+    if (rules.pattern) {
+      const regex = rules.pattern.value as RegExp
+      regex.lastIndex = 0
+      if (!regex.test(value)) return { type: 'pattern', message: rules.pattern.message }
+    }
   }
   if (rules.validate) {
     const entries =
@@ -100,7 +103,7 @@ export function ezResolver<TIn extends FieldValues, TOut>(
     for (const name of options.names ?? []) {
       // options.fields is nested by path (hookform's getResolverOptions uses set), hence get.
       const field: Field['_f'] | undefined = get(options.fields, name)
-      if (!field) continue
+      if (!field || field.mount === false) continue
       const error = await validateRules(normalizeRules(field), get(values, name), values)
       if (error) {
         set(errors, name, error)
