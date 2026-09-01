@@ -5,6 +5,7 @@ import FormControlLabel from '@mui/material/FormControlLabel'
 import FormHelperText from '@mui/material/FormHelperText'
 import type { RefCallBack } from 'react-hook-form'
 import { useBooleanField } from './useBooleanField'
+import { mergeDisabled } from './mergeDisabled'
 import type { BooleanFieldRules } from '../rules'
 
 /** Handler shapes shared by MUI Checkbox and Switch (both come from SwitchBase). */
@@ -59,7 +60,11 @@ export function BooleanFieldControl({
   const text = f.errorMessage ?? helperText
 
   return (
-    <FormControl error={f.invalid} disabled={disabled ?? f.disabled} required={f.required}>
+    <FormControl
+      error={f.invalid}
+      disabled={mergeDisabled(disabled, f.disabled)}
+      required={f.required}
+    >
       <FormControlLabel
         label={label}
         required={f.required}

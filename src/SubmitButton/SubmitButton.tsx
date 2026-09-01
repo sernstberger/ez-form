@@ -1,6 +1,7 @@
 import Button, { type ButtonProps } from '@mui/material/Button'
 import { useFormState } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
+import { mergeDisabled } from '../fields/mergeDisabled'
 
 export type SubmitButtonProps = Omit<ButtonProps, 'type'>
 
@@ -17,7 +18,7 @@ export function SubmitButton({
     <Button
       type="submit"
       variant={variant}
-      disabled={disabled || formDisabled}
+      disabled={mergeDisabled(disabled, formDisabled)}
       loading={isSubmitting}
       {...rest}
     >

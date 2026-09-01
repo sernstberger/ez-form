@@ -92,7 +92,7 @@ describe('Form', () => {
   })
 })
 
-describe('Form accessibility', () => {
+describe('Form with all five components', () => {
   const signup = z.object({
     name: z.string(),
     email: z.email(),
@@ -122,6 +122,28 @@ describe('Form accessibility', () => {
       </Form>,
     )
   }
+
+  it('locks every field and the submit button under <Form disabled>, even with disabled={false}', () => {
+    render(
+      <Form
+        schema={signup}
+        defaultValues={{ name: '', email: '', tos: false, newsletter: false }}
+        onSubmit={() => {}}
+        disabled
+      >
+        <TextField name="name" label="Name" disabled={false} />
+        <Select name="role" label="Role" options={roles} disabled={false} />
+        <Checkbox name="tos" label="I accept the terms" disabled={false} />
+        <Switch name="newsletter" label="Send me the newsletter" disabled={false} />
+        <SubmitButton disabled={false}>Create account</SubmitButton>
+      </Form>,
+    )
+    expect(screen.getByRole('textbox', { name: 'Name' })).toBeDisabled()
+    expect(screen.getByRole('combobox', { name: 'Role' })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('checkbox', { name: 'I accept the terms' })).toBeDisabled()
+    expect(screen.getByRole('switch', { name: 'Send me the newsletter' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Create account' })).toBeDisabled()
+  })
 
   it('has no accessibility violations at rest', async () => {
     const { container } = renderSignup()

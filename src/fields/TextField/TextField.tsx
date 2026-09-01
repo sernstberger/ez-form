@@ -1,5 +1,6 @@
 import MuiTextField, { type TextFieldProps as MuiTextFieldProps } from '@mui/material/TextField'
 import { useEzField } from '../useEzField'
+import { mergeDisabled } from '../mergeDisabled'
 import type { FieldRules } from '../../rules'
 
 /**
@@ -61,7 +62,7 @@ export function TextField({
         fieldOnBlur()
         onBlur?.(e)
       }}
-      disabled={disabled ?? fieldDisabled}
+      disabled={mergeDisabled(disabled, fieldDisabled)}
       required={isRequired}
       inputRef={ref}
       error={fieldState.invalid}
