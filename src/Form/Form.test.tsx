@@ -51,7 +51,6 @@ describe('useEzFormContext', () => {
     expect(() => renderHook(() => useEzFormContext('Probe'))).toThrow(
       'ez-form: <Probe> must be rendered inside <Form>',
     )
-    vi.restoreAllMocks()
   })
 
   it('returns the form methods inside <Form>', () => {

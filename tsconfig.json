@@ -8,8 +8,8 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "isolatedModules": true,
+    "verbatimModuleSyntax": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true,
     "noEmit": true,
     "types": ["vitest/globals"]
   },

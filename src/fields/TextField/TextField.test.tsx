@@ -53,6 +53,5 @@ describe('TextField', () => {
     expect(() => render(<TextField name="x" />)).toThrow(
       'ez-form: <TextField> must be rendered inside <Form>',
     )
-    vi.restoreAllMocks()
   })
 })
