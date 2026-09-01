@@ -17,13 +17,22 @@ const roles = [
 
 const onSubmit = fn()
 
+/**
+ * One <Form> per story: the meta decorator reads the schema and defaults from
+ * `parameters.form`, so stories never add a second (nested) Form decorator.
+ */
 const meta = {
   title: 'Fields/Autocomplete',
   component: Autocomplete,
   args: { name: 'role', label: 'Role', options: roles },
+  parameters: { form: { schema, defaultValues: {} } },
   decorators: [
-    (Story) => (
-      <Form schema={schema} defaultValues={{}} onSubmit={onSubmit}>
+    (Story, { parameters }) => (
+      <Form
+        schema={parameters.form.schema}
+        defaultValues={parameters.form.defaultValues}
+        onSubmit={onSubmit}
+      >
         <Stack spacing={2} sx={{ width: 360 }}>
           <Story />
           <SubmitButton />
@@ -43,16 +52,7 @@ export const Disabled: Story = { args: { disabled: true } }
 const multiSchema = z.object({ roles: z.array(z.string()).min(1, 'Pick at least one') })
 
 export const Multiple: Story = {
-  decorators: [
-    (Story) => (
-      <Form schema={multiSchema} defaultValues={{ roles: [] }} onSubmit={onSubmit}>
-        <Stack spacing={2} sx={{ width: 360 }}>
-          <Story />
-          <SubmitButton />
-        </Stack>
-      </Form>
-    ),
-  ],
+  parameters: { form: { schema: multiSchema, defaultValues: { roles: [] } } },
   args: { name: 'roles', label: 'Roles', multiple: true },
 }
 
@@ -60,22 +60,13 @@ const freeSchema = z.object({ role: z.string().min(1, 'Type or pick a role') })
 
 export const FreeSolo: Story = {
   parameters: {
+    form: { schema: freeSchema, defaultValues: { role: '' } },
     docs: {
       description: {
         story: 'Typed text is stored as-is; `autoSelect` commits it on blur as well as on Enter.',
       },
     },
   },
-  decorators: [
-    (Story) => (
-      <Form schema={freeSchema} defaultValues={{ role: '' }} onSubmit={onSubmit}>
-        <Stack spacing={2} sx={{ width: 360 }}>
-          <Story />
-          <SubmitButton />
-        </Stack>
-      </Form>
-    ),
-  ],
   args: { freeSolo: true, autoSelect: true },
 }
 
@@ -83,22 +74,13 @@ const objectSchema = z.object({ role: z.object({ value: z.string(), label: z.str
 
 export const ObjectValue: Story = {
   parameters: {
+    form: { schema: objectSchema, defaultValues: {} },
     docs: {
       description: {
         story: '`getOptionValue={(o) => o}` stores the whole option; the schema is a `z.object`.',
       },
     },
   },
-  decorators: [
-    (Story) => (
-      <Form schema={objectSchema} defaultValues={{}} onSubmit={onSubmit}>
-        <Stack spacing={2} sx={{ width: 360 }}>
-          <Story />
-          <SubmitButton />
-        </Stack>
-      </Form>
-    ),
-  ],
   args: { getOptionValue: (o) => o },
 }
 
@@ -152,6 +134,7 @@ function AddressField() {
 
 export const AsyncOptions: Story = {
   parameters: {
+    form: { schema: addressSchema, defaultValues: { address: '' } },
     docs: {
       description: {
         story:
@@ -159,12 +142,5 @@ export const AsyncOptions: Story = {
       },
     },
   },
-  render: () => (
-    <Form schema={addressSchema} defaultValues={{ address: '' }} onSubmit={onSubmit}>
-      <Stack spacing={2} sx={{ width: 360 }}>
-        <AddressField />
-        <SubmitButton />
-      </Stack>
-    </Form>
-  ),
+  render: () => <AddressField />,
 }
