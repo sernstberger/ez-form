@@ -3,10 +3,20 @@ import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../../Form'
 import { Checkbox } from './Checkbox'
-import { expectNoA11yViolations } from '../../test/axe'
+import { describeFieldContract } from '../../test/describeFieldContract'
 
 const schema = z.object({
   tos: z.boolean().refine(Boolean, { error: 'You must accept the terms' }),
+})
+
+describeFieldContract({
+  componentName: 'Checkbox',
+  label: 'Accept terms',
+  schema,
+  defaultValues: { tos: false },
+  render: (props) => <Checkbox name="tos" label="Accept terms" {...props} />,
+  getControl: () => screen.getByRole('checkbox', { name: 'Accept terms' }),
+  interact: (user) => user.click(screen.getByRole('checkbox', { name: 'Accept terms' })),
 })
 
 describe('Checkbox', () => {
@@ -69,19 +79,6 @@ describe('Checkbox', () => {
     expect(screen.queryByText('You must accept the terms')).not.toBeInTheDocument()
   })
 
-  it('calls a consumer onChange with the new checked state after updating the form', async () => {
-    const user = userEvent.setup()
-    const onChange = vi.fn()
-    render(
-      <Form schema={schema} defaultValues={{ tos: false }} onSubmit={() => {}}>
-        <Checkbox name="tos" label="Accept terms" onChange={onChange} />
-      </Form>,
-    )
-    await user.click(screen.getByRole('checkbox', { name: 'Accept terms' }))
-    expect(onChange).toHaveBeenCalledWith(expect.anything(), true)
-    expect(screen.getByRole('checkbox', { name: 'Accept terms' })).toBeChecked()
-  })
-
   it('runs a consumer validate rule when submitted unchecked', async () => {
     const user = userEvent.setup()
     render(
@@ -109,38 +106,5 @@ describe('Checkbox', () => {
     const box = screen.getByRole('checkbox', { name: 'Accept terms' })
     expect(box).toHaveAttribute('title', 'Tick to continue')
     expect(box).toHaveAccessibleDescription('Required to continue')
-  })
-
-  it('has no accessibility violations', async () => {
-    const user = userEvent.setup()
-    const { container } = render(
-      <Form schema={schema} defaultValues={{ tos: false }} onSubmit={() => {}}>
-        <Checkbox name="tos" label="Accept terms" helperText="Required to continue" required />
-        <button type="submit">Go</button>
-      </Form>,
-    )
-    await user.click(screen.getByRole('button', { name: 'Go' }))
-    expect(await screen.findByText('Accept terms is required.')).toBeInTheDocument()
-    await expectNoA11yViolations(container)
-  })
-
-  it('announces the error text as an alert', async () => {
-    const user = userEvent.setup()
-    render(
-      <Form schema={schema} defaultValues={{ tos: false }} onSubmit={() => {}}>
-        <Checkbox name="tos" label="Accept terms" helperText="Required to continue" />
-        <button type="submit">Go</button>
-      </Form>,
-    )
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Go' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('You must accept the terms')
-  })
-
-  it('throws outside <Form>', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect(() => render(<Checkbox name="x" label="x" />)).toThrow(
-      'ez-form: <Checkbox> must be rendered inside <Form>',
-    )
   })
 })

@@ -3,10 +3,20 @@ import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../../Form'
 import { TextField } from './TextField'
-import { expectNoA11yViolations } from '../../test/axe'
+import { describeFieldContract } from '../../test/describeFieldContract'
 
 const schema = z.object({
   email: z.email({ error: (iss) => (iss.input === '' ? 'Email is required' : 'Invalid email') }),
+})
+
+describeFieldContract({
+  componentName: 'TextField',
+  label: 'Email',
+  schema,
+  defaultValues: { email: '' },
+  render: (props) => <TextField name="email" label="Email" {...props} />,
+  getControl: () => screen.getByRole('textbox', { name: 'Email' }),
+  interact: (user) => user.type(screen.getByRole('textbox', { name: 'Email' }), 'a'),
 })
 
 function renderForm(onSubmit = vi.fn(), helperText?: string) {
@@ -47,19 +57,6 @@ describe('TextField', () => {
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(await screen.findByText('Email is required')).toBeInTheDocument()
     expect(screen.queryByText('We never share it')).not.toBeInTheDocument()
-  })
-
-  it('calls a consumer onChange after updating the form value', async () => {
-    const user = userEvent.setup()
-    const onChange = vi.fn()
-    render(
-      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
-        <TextField name="email" label="Email" onChange={onChange} />
-      </Form>,
-    )
-    await user.type(screen.getByLabelText('Email'), 'a')
-    expect(onChange).toHaveBeenCalledTimes(1)
-    expect(screen.getByLabelText('Email')).toHaveValue('a')
   })
 
   it('shows "<label> is required." when required and left empty', async () => {
@@ -136,34 +133,5 @@ describe('TextField', () => {
     await user.type(screen.getByRole('textbox', { name: 'Email' }), 'a@b.co')
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(onSubmit).toHaveBeenCalledWith({ email: 'a@b.co' }, expect.anything())
-  })
-
-  it('has no accessibility violations', async () => {
-    const user = userEvent.setup()
-    const { container } = render(
-      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
-        <TextField name="email" label="Email" helperText="We never share it" required />
-        <button type="submit">Go</button>
-      </Form>,
-    )
-    await user.click(screen.getByRole('button', { name: 'Go' }))
-    expect(await screen.findByText('Email is required.')).toBeInTheDocument()
-    await expectNoA11yViolations(container)
-  })
-
-  it('announces the error text as an alert and keeps consumer helper text quiet', async () => {
-    const user = userEvent.setup()
-    renderForm(vi.fn(), 'We never share it')
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Go' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Email is required')
-    expect(screen.getByLabelText('Email')).toHaveAccessibleDescription('Email is required')
-  })
-
-  it('throws outside <Form>', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect(() => render(<TextField name="x" />)).toThrow(
-      'ez-form: <TextField> must be rendered inside <Form>',
-    )
   })
 })

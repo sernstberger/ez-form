@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { Form } from '../../Form'
 import { Select } from './Select'
 import { expectNoA11yViolations } from '../../test/axe'
+import { describeFieldContract } from '../../test/describeFieldContract'
 
 const schema = z.object({
   role: z.enum(['admin', 'user'], { error: 'Pick a role' }),
@@ -14,6 +15,22 @@ const options = [
   { value: 'admin', label: 'Admin' },
   { value: 'user', label: 'User' },
 ] as const
+
+describeFieldContract({
+  // Select is a thin wrapper over TextField (`<TextField select>`), so the
+  // "outside <Form>" guard fires from useEzField with componentName 'TextField'.
+  componentName: 'TextField',
+  label: 'Role',
+  schema,
+  defaultValues: {},
+  render: (props) => <Select name="role" label="Role" options={options} {...props} />,
+  getControl: () => screen.getByRole('combobox', { name: 'Role' }),
+  expectDisabled: (control) => expect(control).toHaveAttribute('aria-disabled', 'true'),
+  interact: async (user) => {
+    await user.click(screen.getByRole('combobox', { name: 'Role' }))
+    await user.click(await screen.findByRole('option', { name: 'User' }))
+  },
+})
 
 // No `role` default: `DefaultValues` is DeepPartial and Select renders `undefined` as the empty state.
 describe('Select', () => {
@@ -67,23 +84,6 @@ describe('Select', () => {
     expect(screen.getByRole('combobox', { name: 'Role' })).toHaveAccessibleDescription('Pick one')
   })
 
-  it('calls a consumer onChange after updating the form value', async () => {
-    const user = userEvent.setup()
-    const onChange = vi.fn()
-    const onSubmit = vi.fn()
-    render(
-      <Form schema={schema} defaultValues={{}} onSubmit={onSubmit}>
-        <Select name="role" label="Role" options={options} onChange={onChange} />
-        <button type="submit">Go</button>
-      </Form>,
-    )
-    await user.click(screen.getByRole('combobox', { name: 'Role' }))
-    await user.click(await screen.findByRole('option', { name: 'Admin' }))
-    expect(onChange).toHaveBeenCalledTimes(1)
-    await user.click(screen.getByRole('button', { name: 'Go' }))
-    expect(onSubmit).toHaveBeenCalledWith({ role: 'admin' }, expect.anything())
-  })
-
   it('types validate over the option value, including numeric options', async () => {
     const user = userEvent.setup()
     const levels = z.object({ level: z.number() })
@@ -106,19 +106,6 @@ describe('Select', () => {
     await user.click(await screen.findByRole('option', { name: 'Two' }))
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(await screen.findByText('Not two')).toBeInTheDocument()
-  })
-
-  it('has no accessibility violations', async () => {
-    const user = userEvent.setup()
-    const { container } = render(
-      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
-        <Select name="role" label="Role" options={options} helperText="Pick one" required />
-        <button type="submit">Go</button>
-      </Form>,
-    )
-    await user.click(screen.getByRole('button', { name: 'Go' }))
-    expect(await screen.findByText('Role is required.')).toBeInTheDocument()
-    await expectNoA11yViolations(container)
   })
 
   it('has no accessibility violations with the listbox open', async () => {
