@@ -17,9 +17,7 @@ const options = [
 ] as const
 
 describeFieldContract({
-  // Select is a thin wrapper over TextField (`<TextField select>`), so the
-  // "outside <Form>" guard fires from useEzField with componentName 'TextField'.
-  componentName: 'TextField',
+  componentName: 'Select',
   label: 'Role',
   schema,
   defaultValues: {},

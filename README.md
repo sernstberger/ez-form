@@ -63,8 +63,6 @@ Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >
 
 Every field shows its zod message as helper text (linked to the input with `aria-describedby`; the first invalid field is focused on submit). The error text is a live region (`role="alert"`), so it is announced in `onChange`/`onBlur` modes as well. Fields must be rendered inside `<Form>`. Consumer `onChange`/`onBlur` handlers run after the form's own.
 
-`Select`'s error message (when used outside `<Form>`) names `<TextField>`, since `Select` wraps it.
-
 Need `reset`, `setError`, `watch`? `onSubmit` receives the form methods as its second argument (the same object `useFormContext()` returns), so the component that owns the form can handle server errors or reset after success:
 
 ```tsx
@@ -116,7 +114,7 @@ Every field also takes hookform-style rules as props. A bare value gets a messag
 | rule                      | fields                          | default message                                                                       |
 | ------------------------- | -------------------------------- | ------------------------------------------------------------------------------------- |
 | `required`                | all                               | `<label> is required.` (also renders the asterisk)                                    |
-| `min` / `max`             | TextField, Select, NumberField    | `<label> must be at least/most <value>.` Numbers, or date strings (compared as dates) |
+| `min` / `max`             | TextField, Select, Autocomplete, NumberField | `<label> must be at least/most <value>.` Numbers, or date strings (compared as dates) |
 | `minLength` / `maxLength` | TextField, Select, Autocomplete   | `<label> must be at least/most <value> characters.`                                   |
 | `pattern`                 | TextField, Select, Autocomplete   | `<label> is invalid.`                                                                 |
 | `validate`                | all                               | a returned string; `false` gives `<label> is invalid.`                                |

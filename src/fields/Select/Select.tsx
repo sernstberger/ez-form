@@ -1,4 +1,5 @@
 import MenuItem from '@mui/material/MenuItem'
+import { useEzFormContext } from '../../useEzFormContext'
 import { TextField, type TextFieldProps } from '../TextField'
 import type { Option } from '../Option'
 import type { FieldRules } from '../../rules'
@@ -12,6 +13,8 @@ export type SelectProps = Omit<TextFieldProps, 'select' | 'children' | keyof Fie
   }
 
 export function Select({ options, ...rest }: SelectProps) {
+  // Ahead of TextField's own guard, so the "outside <Form>" error names <Select>.
+  useEzFormContext('Select')
   return (
     <TextField select {...rest}>
       {options.map((o) => (

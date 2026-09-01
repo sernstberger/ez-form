@@ -10,13 +10,22 @@ const schema = z.object({ age: z.number({ error: 'Enter your age' }) })
 
 const onSubmit = fn()
 
+/**
+ * One <Form> per story: the meta decorator reads the schema and defaults from
+ * `parameters.form`, so stories never add a second (nested) Form decorator.
+ */
 const meta = {
   title: 'Fields/NumberField',
   component: NumberField,
   args: { name: 'age', label: 'Age' },
+  parameters: { form: { schema, defaultValues: {} } },
   decorators: [
-    (Story) => (
-      <Form schema={schema} defaultValues={{}} onSubmit={onSubmit}>
+    (Story, { parameters }) => (
+      <Form
+        schema={parameters.form.schema}
+        defaultValues={parameters.form.defaultValues}
+        onSubmit={onSubmit}
+      >
         <Stack spacing={2} sx={{ width: 360 }}>
           <Story />
           <SubmitButton />
@@ -58,6 +67,7 @@ const priceSchema = z.object({ price: z.number().min(0) })
 
 export const Formatted: Story = {
   parameters: {
+    form: { schema: priceSchema, defaultValues: { price: 19.99 } },
     docs: {
       description: {
         story:
@@ -65,16 +75,6 @@ export const Formatted: Story = {
       },
     },
   },
-  decorators: [
-    (Story) => (
-      <Form schema={priceSchema} defaultValues={{ price: 19.99 }} onSubmit={onSubmit}>
-        <Stack spacing={2} sx={{ width: 360 }}>
-          <Story />
-          <SubmitButton />
-        </Stack>
-      </Form>
-    ),
-  ],
   args: {
     name: 'price',
     label: 'Price',

@@ -18,6 +18,11 @@ export type NumberFieldProps = Omit<
   | 'max'
   | 'render'
   | 'children'
+  // Root's own div-level focus handlers and its hidden-input ref: re-declared
+  // below over the visible <input>, which is what a consumer means by these.
+  | 'onBlur'
+  | 'onFocus'
+  | 'inputRef'
 > & {
   name: string
   label?: ReactNode
@@ -26,7 +31,9 @@ export type NumberFieldProps = Omit<
   disabled?: boolean
   /** Runs after the form's own handler. */
   onValueChange?: BaseNumberField.Root.Props['onValueChange']
+  /** Runs after the form's own handler. On the visible input, not Root's div. */
   onBlur?: FocusEventHandler<HTMLInputElement>
+  onFocus?: FocusEventHandler<HTMLInputElement>
   /**
    * One prop for both: the bound the stepper stops at and the validation
    * message (`<label> must be at least <value>.`). Typed input may go past it
@@ -54,6 +61,7 @@ export function NumberField({
   validate,
   onValueChange,
   onBlur,
+  onFocus,
   allowOutOfRange = true,
   ...rest
 }: NumberFieldProps) {
@@ -88,6 +96,7 @@ export function NumberField({
           f.field.onBlur()
           onBlur?.(e)
         },
+        onFocus,
       }}
     />
   )

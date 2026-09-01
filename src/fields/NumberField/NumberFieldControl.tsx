@@ -38,6 +38,7 @@ export interface NumberFieldInputProps {
   'aria-invalid'?: true
   'aria-describedby'?: string
   onBlur?: FocusEventHandler<HTMLInputElement>
+  onFocus?: FocusEventHandler<HTMLInputElement>
 }
 
 export interface NumberFieldControlProps extends Omit<
@@ -90,6 +91,11 @@ function NumberInput({
           const event = e as FocusEvent<HTMLInputElement>
           rest.onBlur?.(event)
           inputProps?.onBlur?.(event)
+        },
+        onFocus: (e) => {
+          const event = e as FocusEvent<HTMLInputElement>
+          rest.onFocus?.(event)
+          inputProps?.onFocus?.(event)
         },
       }}
       endAdornment={
