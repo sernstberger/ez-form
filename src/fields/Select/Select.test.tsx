@@ -122,4 +122,22 @@ describe('Select', () => {
     // portaled popover cannot satisfy and which is page structure, not the component.)
     await expectNoA11yViolations(screen.getByRole('listbox'))
   })
+
+  it('renders a disabled option as disabled', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <Select
+          name="role"
+          label="Role"
+          options={[
+            { value: 'admin', label: 'Admin', disabled: true },
+            { value: 'user', label: 'User' },
+          ]}
+        />
+      </Form>,
+    )
+    await user.click(screen.getByRole('combobox', { name: 'Role' }))
+    expect(await screen.findByRole('option', { name: 'Admin' })).toHaveAttribute('aria-disabled', 'true')
+  })
 })
