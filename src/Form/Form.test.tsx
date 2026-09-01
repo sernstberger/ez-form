@@ -1,3 +1,4 @@
+import { createRef } from 'react'
 import { render, renderHook, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
@@ -89,6 +90,56 @@ describe('Form', () => {
     await waitFor(() => expect(screen.getByLabelText('Email')).toBeDisabled())
     resolve()
     await waitFor(() => expect(screen.getByLabelText('Email')).toBeEnabled())
+  })
+
+  it('disables the fields and submit while async defaultValues load, then fills them', async () => {
+    let resolve!: (values: { email: string }) => void
+    const load = vi.fn(() => new Promise<{ email: string }>((r) => (resolve = r)))
+    render(
+      <Form schema={schema} defaultValues={load} onSubmit={() => {}}>
+        <TextField name="email" label="Email" />
+        <SubmitButton />
+      </Form>,
+    )
+    expect(screen.getByLabelText('Email')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled()
+    resolve({ email: 'a@b.co' })
+    await waitFor(() => expect(screen.getByLabelText('Email')).toHaveValue('a@b.co'))
+    await waitFor(() => expect(screen.getByLabelText('Email')).toBeEnabled())
+    expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled()
+  })
+
+  it('re-syncs the fields when values changes', async () => {
+    const view = render(
+      <Form schema={schema} values={{ email: 'a@b.co' }} onSubmit={() => {}}>
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    expect(screen.getByLabelText('Email')).toHaveValue('a@b.co')
+    view.rerender(
+      <Form schema={schema} values={{ email: 'c@d.co' }} onSubmit={() => {}}>
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    await waitFor(() => expect(screen.getByLabelText('Email')).toHaveValue('c@d.co'))
+  })
+
+  it('exposes the form methods through ref', async () => {
+    const user = userEvent.setup()
+    const ref = createRef<FormMethods<{ email: string }, { email: string }>>()
+    render(
+      <>
+        <Form ref={ref} schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+          <TextField name="email" label="Email" />
+        </Form>
+        <button type="button" onClick={() => ref.current?.reset({ email: 'r@s.co' })}>
+          Load
+        </button>
+      </>,
+    )
+    await user.type(screen.getByLabelText('Email'), 'typed')
+    await user.click(screen.getByRole('button', { name: 'Load' }))
+    expect(screen.getByLabelText('Email')).toHaveValue('r@s.co')
   })
 })
 
