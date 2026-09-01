@@ -1,4 +1,5 @@
 export { Form, type FormProps, type FormMethods } from './Form'
 export { SubmitButton, type SubmitButtonProps } from './SubmitButton'
 export { TextField, type TextFieldProps } from './fields/TextField'
+export { Select, type SelectProps, type SelectOption } from './fields/Select'
 export type { FieldRules, BooleanFieldRules } from './rules'
