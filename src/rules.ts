@@ -83,7 +83,8 @@ function wrapValidate(
 ): Validate<unknown, FieldValues> {
   return async (value, values) => {
     const result = await fn(value, values)
-    return result === false ? fallback : result
+    // `false` and an empty array are failures with no message of their own; use the label-derived one.
+    return result === false || (Array.isArray(result) && result.length === 0) ? fallback : result
   }
 }
 

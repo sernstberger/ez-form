@@ -23,13 +23,20 @@ const isEmpty = (value: unknown): boolean =>
 const isNumeric = (value: unknown): boolean =>
   value !== '' && value !== null && typeof value !== 'boolean' && !Number.isNaN(Number(value))
 
-/** `true` when `value` is beyond `bound` in the given direction, mirroring hookform. */
+/**
+ * `true` when `value` is beyond `bound`, mirroring hookform's `validateField`:
+ * a numeric value compares as a number (a non-numeric bound compares as NaN,
+ * so never fails); otherwise a string bound compares as `Date`s, skipped when
+ * either side is an Invalid Date; a numeric bound with a non-numeric value
+ * never fails.
+ */
 function outOfRange(value: unknown, bound: number | string, direction: 'min' | 'max'): boolean {
-  if (isNumeric(value) && isNumeric(bound)) {
-    return direction === 'min' ? Number(value) < Number(bound) : Number(value) > Number(bound)
-  }
-  const [a, b] = [String(value), String(bound)]
-  return direction === 'min' ? a < b : a > b
+  const below = (a: number | Date, b: number | Date) => (direction === 'min' ? a < b : a > b)
+  if (isNumeric(value)) return below(Number(value), Number(bound))
+  if (typeof bound !== 'string' || typeof value !== 'string' || value === '') return false
+  const [valueDate, boundDate] = [new Date(value), new Date(bound)]
+  if (Number.isNaN(valueDate.getTime()) || Number.isNaN(boundDate.getTime())) return false
+  return below(valueDate, boundDate)
 }
 
 /**
@@ -75,11 +82,12 @@ export async function validateRules(
         : Object.entries(rules.validate)
     for (const [type, fn] of entries) {
       const result = await fn(value, values)
+      // hookform: a string, an all-string array (even empty), or `false` is a failure.
       const message =
         typeof result === 'string'
           ? result
-          : Array.isArray(result)
-            ? result[0]
+          : Array.isArray(result) && result.every((r) => typeof r === 'string')
+            ? (result[0] ?? defaultMessages.validate(FALLBACK_LABEL))
             : result === false
               ? defaultMessages.validate(FALLBACK_LABEL)
               : undefined

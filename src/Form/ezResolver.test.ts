@@ -123,6 +123,39 @@ describe('ezResolver', () => {
     })
   })
 
+  it('mirrors hookform for min/max on non-numeric values: date strings compare as dates, else no error', async () => {
+    const schema = z.object({ v: z.string() })
+    const check = (value: string, r: FieldRules) =>
+      run(schema, { v: value }, { v: rules(r, 'Value') })
+    // numeric bound, non-numeric value: hookform compares NaN and reports nothing
+    expect((await check('abc', { max: 99 })).errors).toEqual({})
+    expect((await check('abc', { min: 18 })).errors).toEqual({})
+    // string bound: Date comparison, not lexicographic ("1/2/2021" is after 2020-01-01)
+    expect((await check('1/2/2021', { min: '2020-01-01' })).errors).toEqual({})
+    expect((await check('2019-12-31', { min: '2020-01-01' })).errors).toEqual({
+      v: { type: 'min', message: 'Value must be at least 2020-01-01.' },
+    })
+    expect((await check('2021-06-01', { max: '2021-01-01' })).errors).toEqual({
+      v: { type: 'max', message: 'Value must be at most 2021-01-01.' },
+    })
+    // invalid date on either side: skipped
+    expect((await check('not a date', { min: '2020-01-01' })).errors).toEqual({})
+    expect((await check('2020-01-01', { min: 'garbage' })).errors).toEqual({})
+    // numeric value with a date-string bound: hookform compares against NaN and reports nothing
+    expect((await check('5', { min: '2020-01-01' })).errors).toEqual({})
+  })
+
+  it('treats an all-string array from validate as a failure with its first element as the message', async () => {
+    const schema = z.object({ v: z.string() })
+    const check = (r: FieldRules<string>) => run(schema, { v: 'x' }, { v: rules(r, 'Value') })
+    expect((await check({ validate: () => ['First', 'Second'] })).errors).toEqual({
+      v: { type: 'validate', message: 'First' },
+    })
+    expect((await check({ validate: () => [] })).errors).toEqual({
+      v: { type: 'validate', message: 'Value is invalid.' },
+    })
+  })
+
   it('derives minLength/maxLength messages from the label and honours overrides', async () => {
     const short = await run(text, { nick: 'ab' }, { nick: rules({ minLength: 3 }, 'Nickname') })
     expect(short.errors).toEqual({
