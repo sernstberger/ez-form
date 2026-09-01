@@ -11,19 +11,26 @@ import { TextField } from '../fields/TextField'
 import { Select } from '../fields/Select'
 import { Checkbox } from '../fields/Checkbox'
 import { Switch } from '../fields/Switch'
+import { RadioGroup } from '../fields/RadioGroup'
+import { Autocomplete } from '../fields/Autocomplete'
+import { NumberField } from '../fields/NumberField'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.email({ error: (iss) => (iss.input === '' ? 'Email is required' : 'Invalid email') }),
   role: z.enum(['admin', 'user'], { error: 'Pick a role' }),
+  plan: z.number({ error: 'Pick a plan' }),
+  team: z.string(),
+  seats: z.number(),
   tos: z.boolean().refine(Boolean, { error: 'You must accept the terms' }),
   newsletter: z.boolean(),
 })
 
-// `role` omitted: DefaultValues is DeepPartial; Select renders undefined as the empty state.
+// `role`/`plan` omitted: DefaultValues is DeepPartial; Select/RadioGroup render undefined as the empty state.
 const emptyValues: DefaultValues<z.input<typeof schema>> = {
   name: '',
   email: '',
+  team: '',
   tos: false,
   newsletter: false,
 }
@@ -31,6 +38,16 @@ const emptyValues: DefaultValues<z.input<typeof schema>> = {
 const roles = [
   { value: 'admin', label: 'Admin' },
   { value: 'user', label: 'User' },
+] as const
+
+const plans = [
+  { value: 1, label: 'Basic' },
+  { value: 2, label: 'Pro' },
+] as const
+
+const teams = [
+  { value: 'core', label: 'Core' },
+  { value: 'infra', label: 'Infra' },
 ] as const
 
 const onSubmit = fn()
@@ -42,6 +59,9 @@ function SignupFields({ submitLabel = 'Create account' }: { submitLabel?: string
       <TextField name="name" label="Name" required />
       <TextField name="email" label="Email" helperText="We never share it" required />
       <Select name="role" label="Role" options={roles} required />
+      <RadioGroup name="plan" label="Plan" options={plans} required />
+      <Autocomplete name="team" label="Team" options={teams} required />
+      <NumberField name="seats" label="Seats" min={1} required />
       <Checkbox name="tos" label="I accept the terms" required />
       <Switch name="newsletter" label="Send me the newsletter" />
       <SubmitButton>{submitLabel}</SubmitButton>
@@ -95,6 +115,9 @@ export const AsyncSubmit: Story = {
       name: 'Ada',
       email: 'ada@example.com',
       role: 'admin',
+      plan: 1,
+      team: 'core',
+      seats: 5,
       tos: true,
       newsletter: true,
     },
@@ -113,6 +136,9 @@ const savedUser: SignupIn = {
   name: 'Ada Lovelace',
   email: 'ada@example.com',
   role: 'admin',
+  plan: 2,
+  team: 'infra',
+  seats: 8,
   tos: true,
   newsletter: false,
 }

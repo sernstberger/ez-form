@@ -8,6 +8,9 @@ import { TextField } from '../fields/TextField'
 import { Select } from '../fields/Select'
 import { Checkbox } from '../fields/Checkbox'
 import { Switch } from '../fields/Switch'
+import { RadioGroup } from '../fields/RadioGroup'
+import { Autocomplete } from '../fields/Autocomplete'
+import { NumberField } from '../fields/NumberField'
 import { useEzFormContext } from '../useEzFormContext'
 import { expectNoA11yViolations } from '../test/axe'
 
@@ -143,11 +146,14 @@ describe('Form', () => {
   })
 })
 
-describe('Form with all five components', () => {
+describe('Form with every component', () => {
   const signup = z.object({
     name: z.string(),
     email: z.email(),
     role: z.enum(['admin', 'user'], { error: 'Pick a role' }),
+    plan: z.number({ error: 'Pick a plan' }),
+    team: z.string(),
+    seats: z.number(),
     tos: z.boolean(),
     newsletter: z.boolean(),
   })
@@ -155,18 +161,29 @@ describe('Form with all five components', () => {
     { value: 'admin', label: 'Admin' },
     { value: 'user', label: 'User' },
   ] as const
+  const plans = [
+    { value: 1, label: 'Basic' },
+    { value: 2, label: 'Pro' },
+  ] as const
+  const teams = [
+    { value: 'core', label: 'Core' },
+    { value: 'infra', label: 'Infra' },
+  ] as const
 
   function renderSignup() {
     return render(
       <Form
         schema={signup}
-        defaultValues={{ name: '', email: '', tos: false, newsletter: false }}
+        defaultValues={{ name: '', email: '', team: '', tos: false, newsletter: false }}
         onSubmit={() => {}}
         aria-label="Sign up"
       >
         <TextField name="name" label="Name" required />
         <TextField name="email" label="Email" helperText="We never share it" required />
         <Select name="role" label="Role" options={roles} required />
+        <RadioGroup name="plan" label="Plan" options={plans} required />
+        <Autocomplete name="team" label="Team" options={teams} required />
+        <NumberField name="seats" label="Seats" min={1} required />
         <Checkbox name="tos" label="I accept the terms" required />
         <Switch name="newsletter" label="Send me the newsletter" />
         <SubmitButton>Create account</SubmitButton>
@@ -178,12 +195,15 @@ describe('Form with all five components', () => {
     render(
       <Form
         schema={signup}
-        defaultValues={{ name: '', email: '', tos: false, newsletter: false }}
+        defaultValues={{ name: '', email: '', team: '', tos: false, newsletter: false }}
         onSubmit={() => {}}
         disabled
       >
         <TextField name="name" label="Name" disabled={false} />
         <Select name="role" label="Role" options={roles} disabled={false} />
+        <RadioGroup name="plan" label="Plan" options={plans} disabled={false} />
+        <Autocomplete name="team" label="Team" options={teams} disabled={false} />
+        <NumberField name="seats" label="Seats" disabled={false} />
         <Checkbox name="tos" label="I accept the terms" disabled={false} />
         <Switch name="newsletter" label="Send me the newsletter" disabled={false} />
         <SubmitButton disabled={false}>Create account</SubmitButton>
@@ -191,6 +211,9 @@ describe('Form with all five components', () => {
     )
     expect(screen.getByRole('textbox', { name: 'Name' })).toBeDisabled()
     expect(screen.getByRole('combobox', { name: 'Role' })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('radio', { name: 'Basic' })).toBeDisabled()
+    expect(screen.getByRole('combobox', { name: 'Team' })).toBeDisabled()
+    expect(screen.getByRole('textbox', { name: 'Seats' })).toBeDisabled()
     expect(screen.getByRole('checkbox', { name: 'I accept the terms' })).toBeDisabled()
     expect(screen.getByRole('switch', { name: 'Send me the newsletter' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Create account' })).toBeDisabled()
