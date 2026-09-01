@@ -61,6 +61,70 @@ describe('TextField', () => {
     expect(screen.getByLabelText('Email')).toHaveValue('a')
   })
 
+  it('shows "<label> is required." when required and left empty', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+        <TextField name="email" label="Email" required />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByText('Email is required.')).toBeInTheDocument()
+  })
+
+  it('lets a rule error win over the zod message for the same field', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+        <TextField name="email" label="Email" required="Please fill in your email" />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByText('Please fill in your email')).toBeInTheDocument()
+    expect(screen.queryByText('Email is required')).not.toBeInTheDocument()
+  })
+
+  it('derives a default message for a bare rule value', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+        <TextField name="email" label="Email" minLength={3} />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.type(screen.getByLabelText('Email'), 'ab')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByText('Email must be at least 3 characters.')).toBeInTheDocument()
+    expect(screen.queryByText('Invalid email')).not.toBeInTheDocument()
+  })
+
+  it('marks the input required and shows the asterisk when required', () => {
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+        <TextField name="email" label="Email" required />
+      </Form>,
+    )
+    expect(screen.getByRole('textbox', { name: 'Email' })).toBeRequired()
+    expect(screen.getByText('*')).toBeInTheDocument()
+  })
+
+  it('submits when every rule passes', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={onSubmit}>
+        <TextField name="email" label="Email" required minLength={3} pattern={/@/} />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    // A required label reads "Email *" to getByLabelText; the asterisk is aria-hidden, so query by role.
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'a@b.co')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(onSubmit).toHaveBeenCalledWith({ email: 'a@b.co' }, expect.anything())
+  })
+
   it('throws outside <Form>', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(() => render(<TextField name="x" />)).toThrow(

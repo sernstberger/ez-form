@@ -7,8 +7,8 @@ import {
   type Mode,
   type UseFormReturn,
 } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
 import type { z } from 'zod'
+import { ezResolver } from './ezResolver'
 
 /**
  * The hookform methods for this form. It is the same object `useFormContext()`
@@ -50,7 +50,7 @@ export function Form<TIn extends FieldValues, TOut>({
   // `disabled` option reactively (control._disableForm in an effect).
   const [submitting, setSubmitting] = useState(false)
   const methods = useForm<TIn, unknown, TOut>({
-    resolver: zodResolver(schema),
+    resolver: ezResolver(schema),
     defaultValues,
     mode,
     disabled: disabled || submitting,
