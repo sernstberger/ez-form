@@ -23,11 +23,11 @@ Storybook is the development environment and living documentation.
 ```
 consumer JSX
   <Form schema={s} defaultValues onSubmit disabled?>
-    ├─ useForm({ resolver: zodResolver(s), defaultValues, mode, disabled })
+    ├─ useForm({ resolver: ezResolver(s), defaultValues, mode, disabled })   ← zod, then each field's rules
     ├─ <FormProvider>                        ← hookform context
     └─ <form noValidate onSubmit={handleSubmit((values) => onSubmit(values, methods))}>
-         ├─ <TextField name="email" />   ─┐
-         ├─ <Select    name="role" />    ├─ useController({ name })
+         ├─ <TextField name="email" required />   ─┐
+         ├─ <Select    name="role" />    ├─ useController({ name, rules })  ← rule props normalized in useEzField
          ├─ <Checkbox  name="tos" />     │   → MUI component
          ├─ <Switch    name="dark" />   ─┘   → error + helperText from fieldState
          └─ <SubmitButton />              ← useFormState → disabled while isSubmitting
@@ -42,19 +42,24 @@ and throw a clear message).
 | Export | Wraps | Props | Behavior |
 |---|---|---|---|
 | `Form<TIn extends FieldValues, TOut>` | `useForm` + `FormProvider` + `<form>` | `schema: z.ZodType<TOut, TIn>`, `onSubmit(values: TOut, form: FormMethods<TIn, TOut>): void \| Promise<void>`, `defaultValues?: DefaultValues<TIn>`, `mode?: Mode`, `disabled?: boolean`, `children`, remaining props spread onto `<form>` | `noValidate` set on the form so browser validation does not preempt zod. `FormMethods<TIn, TOut> = UseFormReturn<TIn, unknown, TOut>` is the same object `useFormContext()` returns, handed to `onSubmit` so the owner can `reset`/`setError`. `disabled` maps to `useForm({ disabled })`: every field disables (and `SubmitButton`), and hookform excludes form-disabled fields from the submit payload while disabled, like a native form. `Form` also disables every field while `onSubmit` is pending (a local `submitting` flag OR'd into `useForm({ disabled })`; the pending submit's values are already captured) |
-| `TextField` | MUI `TextField` | `name: string` + `TextFieldProps` minus `name`, `value`, `error`, `inputRef` | On error: `error={true}`, `helperText=error.message`. Otherwise consumer `helperText`. Consumer `onChange`/`onBlur` run after hookform's |
-| `Select` | MUI `TextField select` | `name`, `options: readonly { value: string \| number; label: string }[]` + same MUI passthrough as TextField | Renders `MenuItem` per option. Single select only |
-| `Checkbox` | `FormControl` + `FormControlLabel` + MUI `Checkbox` | `name`, `label: ReactNode`, `helperText?`, `required?` + `CheckboxProps` minus `name`, `checked` | `checked = !!field.value`, `onChange → e.target.checked` (consumer `onChange(e, checked)` runs after). Error shown in `FormHelperText` with an id; the input gets `aria-describedby`, `aria-invalid`, the RHF ref via `slotProps.input` (merged with the consumer's using `mergeSlotProps`); `required` goes to `FormControlLabel` |
+| `TextField` | MUI `TextField` | `name: string` + `FieldRules<string>` (`required`, `min`, `max`, `minLength`, `maxLength`, `pattern`, `validate`) + `TextFieldProps` minus `name`, `value`, `error`, `inputRef`, `required` | On error: `error={true}`, `helperText=error.message`. Otherwise consumer `helperText`. Consumer `onChange`/`onBlur` run after hookform's. `required` rule renders MUI's asterisk |
+| `Select` | MUI `TextField select` | `name`, `options: readonly { value: string \| number; label: string }[]` + same rules and MUI passthrough as TextField | Renders `MenuItem` per option. Single select only |
+| `Checkbox` | `FormControl` + `FormControlLabel` + MUI `Checkbox` | `name`, `label: ReactNode`, `helperText?` + `BooleanFieldRules` (`required`, `validate`) + `CheckboxProps` minus `name`, `checked`, `required` | `checked = !!field.value`, `onChange → e.target.checked` (consumer `onChange(e, checked)` runs after). Error shown in `FormHelperText` with an id; the input gets `aria-describedby`, `aria-invalid`, the RHF ref via `slotProps.input` (merged with the consumer's using `mergeSlotProps`); `required` goes to `FormControlLabel` |
 | `Switch` | same as Checkbox with MUI `Switch` | same as Checkbox | shares `useBooleanField` internal hook; MUI 9 sets `role="switch"` |
 | `SubmitButton` | MUI `Button` | `ButtonProps` minus `type` | `type="submit"`, `variant="contained"` default, MUI `loading` (which disables) while `isSubmitting`, disabled while `formState.disabled`; consumer `disabled` passed through |
 
-Only these six symbols are exported from `src/index.ts`, plus their prop types and the `FormMethods` type alias.
+Only these six symbols are exported from `src/index.ts`, plus their prop types and the `FormMethods`, `FieldRules`, `BooleanFieldRules` type aliases.
+
+### Field-level rules
+
+Each field accepts hookform-shaped rules as individual props. A bare value uses a default message derived from the field's `label` (fallback `This field`): `required` → `<label> is required.`, `min`/`max` → `<label> must be at least/most <value>.`, `minLength`/`maxLength` → `<label> must be at least/most <value> characters.`, `pattern` and `validate` returning `false` → `<label> is invalid.`; `{ value, message }` overrides it and a string `required` is its message. `useEzField` normalizes the rules and hands them to `useController({ rules })`, where hookform stores them on the field; `ezResolver` (the form's resolver) runs zod first, then each mounted field's rules in hookform's order (`required`, `min`, `max`, `maxLength`, `minLength`, `pattern`, `validate`; empty values only fail `required`), and a rule error replaces zod's error for that field. zod remains the source of truth for types, parsing, and cross-field validation.
 
 ## Error handling
 
 | Source | Path | Owner |
 |---|---|---|
-| zod validation | resolver → `fieldState.error.message` → field helper text | library |
+| zod validation | `ezResolver` → `fieldState.error.message` → field helper text | library |
+| field rule fails | `ezResolver` overlays `{ type, message }` on that field (rule message wins over zod's for the field) → helper text | library |
 | `onSubmit` throws | hookform rejects `handleSubmit`; `isSubmitting` resets | consumer |
 | server/field errors | consumer calls `form.setError` on `onSubmit`'s second argument (or `useFormContext` inside the form) | consumer |
 | field outside `<Form>` | throw `Error("ez-form: <TextField> must be rendered inside <Form>")` | library |
@@ -84,10 +89,11 @@ ez-form/
 ├── src/
 │   ├── index.ts                 public barrel
 │   ├── useEzFormContext.ts      context guard (throws outside <Form>)
-│   ├── Form/                    Form.tsx  Form.test.tsx  Form.stories.tsx  index.ts
+│   ├── rules.ts                 FieldRules types, normalizeRules + default messages
+│   ├── Form/                    Form.tsx  ezResolver.ts  Form.test.tsx  ezResolver.test.ts  Form.stories.tsx  index.ts
 │   ├── SubmitButton/            SubmitButton.tsx  SubmitButton.test.tsx  index.ts
 │   ├── fields/
-│   │   ├── useEzField.ts        useController + context guard
+│   │   ├── useEzField.ts        useController + context guard + rule normalization
 │   │   ├── useBooleanField.ts   shared by Checkbox/Switch
 │   │   ├── TextField/           TextField.tsx  .test.tsx  .stories.tsx  index.ts
 │   │   ├── Select/              (same shape)
@@ -106,7 +112,7 @@ Vitest runs with `restoreMocks: true`; the per-component "throws outside `<Form>
 
 ## Patterns
 
-- **Field prop rule.** Omit from the MUI props only what the binding owns: `name`, `value`/`checked`, `error`, and the ref prop. Everything else (`onChange`, `onBlur`, `helperText`, `disabled`, `required`, `id`, `slotProps`) is accepted and merged; hookform's handler runs first, the consumer's after.
+- **Field prop rule.** Omit from the MUI props only what the binding owns: `name`, `value`/`checked`, `error`, the ref prop, and `required` (driven by the `required` rule). Everything else (`onChange`, `onBlur`, `helperText`, `disabled`, `id`, `slotProps`) is accepted and merged; hookform's handler runs first, the consumer's after. The rule props are destructured out before `rest` is spread so nothing leaks to MUI/DOM. In tests, query a required field by role: `getByLabelText` sees the aria-hidden asterisk as part of the label text.
 - **A11y wiring is the error-announcement strategy** (no live region). Every field hands RHF the real `<input>` ref, so `shouldFocusError` focuses the first invalid field on submit; the input carries `aria-invalid` and `aria-describedby` pointing at the helper text, which the screen reader then reads. MUI `TextField` does this itself (ids from `React.useId`, SSR-stable). `Checkbox`/`Switch` do it by hand: `useBooleanField` mints a `helperTextId` with `useId`, `FormHelperText` gets that id, and `slotProps.input` (merged with the consumer's via `mergeSlotProps`) carries `ref`, `aria-invalid`, `aria-describedby`. `required` is passed to `FormControlLabel` explicitly because it does not read `FormControl` context.
 - **`disabled` semantics.** A consumer's field-level `disabled` is UI-only and is never passed to `useController({ disabled })`, which would strip the value on submit and make a required field fail its own schema. Form-level disabling is `<Form disabled>` → `useForm({ disabled })`, which disables every field and `SubmitButton`; while the form is disabled, react-hook-form (7.87, verified) excludes those fields from the `handleSubmit` payload, mirroring native forms, and re-enabling restores them. `Form` also disables every field while `onSubmit` is pending: the payload for that submit is captured before `onSubmit` runs, so it is complete, and the next submit is complete too. Disabling a focused input blurs it; that is expected.
 - **zod 4 idioms.** `z.email({ error })` (an error map can tell empty from malformed via `iss.input`), `error:` not `message:`, `z.boolean().refine(Boolean, { error })` for must-be-true, and no `as never` in `defaultValues`; omit the key instead (`DefaultValues` is `DeepPartial`; fields render `undefined` as empty). Numeric text fields need `z.coerce.number()` because the input hands zod a string.
