@@ -9,16 +9,16 @@ import { mergeDisabled } from '../mergeDisabled'
 import type { Option } from '../Option'
 import type { FieldRules } from '../../rules'
 
-type FreeSoloValue<FreeSolo extends boolean | undefined> = FreeSolo extends true ? string : never
-
-/** What the form stores: one value (or null), or an array under `multiple`; typed text under `freeSolo`. */
+/**
+ * What the form stores: one value (or null), or an array under `multiple`;
+ * typed text under `freeSolo`. MUI's own value type over `TValue` instead of
+ * the option, with `disableClearable` pinned off (the form owns "empty").
+ */
 export type AutocompleteFormValue<
   TValue,
   Multiple extends boolean | undefined,
   FreeSolo extends boolean | undefined,
-> = Multiple extends true
-  ? (TValue | FreeSoloValue<FreeSolo>)[]
-  : TValue | FreeSoloValue<FreeSolo> | null
+> = AutocompleteValue<TValue, Multiple, false, FreeSolo>
 
 type MuiProps<
   TOption extends Option,
