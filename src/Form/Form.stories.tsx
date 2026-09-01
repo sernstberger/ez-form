@@ -73,6 +73,10 @@ export const ValidationErrors: Story = {
       },
     },
   },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole('button', { name: 'Create account' }))
+    await canvas.findByText('Name is required.')
+  },
 }
 
 export const AsyncSubmit: Story = {

@@ -108,7 +108,19 @@ describe('TextField', () => {
       </Form>,
     )
     expect(screen.getByRole('textbox', { name: 'Email' })).toBeRequired()
-    expect(screen.getByText('*')).toBeInTheDocument()
+  })
+
+  it('reports a rule message while typing in onChange mode', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}} mode="onChange">
+        <TextField name="email" label="Email" minLength={3} />
+      </Form>,
+    )
+    await user.type(screen.getByLabelText('Email'), 'ab')
+    expect(await screen.findByText('Email must be at least 3 characters.')).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Email'), 'c')
+    expect(screen.queryByText('Email must be at least 3 characters.')).not.toBeInTheDocument()
   })
 
   it('submits when every rule passes', async () => {

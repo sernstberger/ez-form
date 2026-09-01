@@ -58,6 +58,56 @@ describe('Select', () => {
     expect(screen.queryByText('Pick a role')).not.toBeInTheDocument()
   })
 
+  it('shows consumer helperText when there is no error', () => {
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <Select name="role" label="Role" options={options} helperText="Pick one" />
+      </Form>,
+    )
+    expect(screen.getByRole('combobox', { name: 'Role' })).toHaveAccessibleDescription('Pick one')
+  })
+
+  it('calls a consumer onChange after updating the form value', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    const onSubmit = vi.fn()
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={onSubmit}>
+        <Select name="role" label="Role" options={options} onChange={onChange} />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.click(screen.getByRole('combobox', { name: 'Role' }))
+    await user.click(await screen.findByRole('option', { name: 'Admin' }))
+    expect(onChange).toHaveBeenCalledTimes(1)
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(onSubmit).toHaveBeenCalledWith({ role: 'admin' }, expect.anything())
+  })
+
+  it('types validate over the option value, including numeric options', async () => {
+    const user = userEvent.setup()
+    const levels = z.object({ level: z.number() })
+    const levelOptions = [
+      { value: 1, label: 'One' },
+      { value: 2, label: 'Two' },
+    ] as const
+    render(
+      <Form schema={levels} defaultValues={{}} onSubmit={() => {}}>
+        <Select
+          name="level"
+          label="Level"
+          options={levelOptions}
+          validate={(v) => v !== 2 || 'Not two'}
+        />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.click(screen.getByRole('combobox', { name: 'Level' }))
+    await user.click(await screen.findByRole('option', { name: 'Two' }))
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByText('Not two')).toBeInTheDocument()
+  })
+
   it('has no accessibility violations', async () => {
     const user = userEvent.setup()
     const { container } = render(
