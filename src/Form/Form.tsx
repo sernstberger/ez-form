@@ -37,7 +37,11 @@ export function Form<S extends z.ZodType<FieldValues, FieldValues>>({
 
   return (
     <FormProvider {...methods}>
-      <form noValidate {...formProps} onSubmit={methods.handleSubmit(onSubmit)}>
+      <form
+        noValidate
+        {...formProps}
+        onSubmit={methods.handleSubmit((values) => onSubmit(values))}
+      >
         {children}
       </form>
     </FormProvider>
