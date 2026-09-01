@@ -3,6 +3,7 @@ import { fn } from 'storybook/test'
 import Stack from '@mui/material/Stack'
 import { z } from 'zod'
 import { Form } from './Form'
+import { SubmitButton } from '../SubmitButton'
 import { TextField } from '../fields/TextField'
 
 const schema = z.object({
@@ -11,6 +12,7 @@ const schema = z.object({
 })
 
 const onSubmit = fn()
+const slowSubmit = fn(() => new Promise<void>((r) => setTimeout(r, 1500)))
 
 const meta = {
   title: 'Form',
@@ -33,7 +35,32 @@ export const Basic: Story = {
       <Stack spacing={2} sx={{ width: 360 }}>
         <TextField name="name" label="Name" />
         <TextField name="email" label="Email" />
-        <button type="submit">Submit</button>
+        <SubmitButton />
+      </Stack>
+    </Form>
+  ),
+}
+
+export const AsyncSubmit: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story: 'Submit awaits 1.5s: every field is disabled and the button shows a spinner until it resolves.',
+      },
+    },
+  },
+  args: {
+    schema,
+    defaultValues: { name: 'Ada', email: 'ada@example.com' },
+    onSubmit: slowSubmit,
+    children: null,
+  },
+  render: (args) => (
+    <Form {...args}>
+      <Stack spacing={2} sx={{ width: 360 }}>
+        <TextField name="name" label="Name" />
+        <TextField name="email" label="Email" />
+        <SubmitButton>Save (1.5s)</SubmitButton>
       </Stack>
     </Form>
   ),
