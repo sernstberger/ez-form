@@ -73,8 +73,8 @@ Each field accepts hookform-shaped rules as individual props. A bare value uses 
 | Build | Vite lib mode, ESM only, `vite-plugin-dts` emits `.d.ts`. Entry `src/index.ts` → `dist/index.js` + `dist/index.d.ts` |
 | Peer deps | `react`, `react-dom`, `@mui/material`, `@emotion/react`, `@emotion/styled`, `react-hook-form`, `zod` (`^4`: the published d.ts uses zod 4's `ZodType<Output, Input>` parameter order) |
 | Runtime deps | `@hookform/resolvers` |
-| Storybook | `@storybook/react-vite`, stories co-located as `*.stories.tsx`, global decorator with MUI `ThemeProvider` + `CssBaseline` |
-| Tests | Vitest + `@testing-library/react` + `@testing-library/user-event` + jsdom. Co-located `*.test.tsx` |
+| Storybook | `@storybook/react-vite` + `@storybook/addon-docs` + `@storybook/addon-a11y`, stories co-located as `*.stories.tsx`, global decorator with MUI `ThemeProvider` + `CssBaseline` |
+| Tests | Vitest + `@testing-library/react` + `@testing-library/user-event` + jsdom, plus `jest-axe` for automated accessibility checks. Co-located `*.test.tsx` |
 | Format | Prettier. ESLint deferred |
 | License | MIT |
 
@@ -99,7 +99,7 @@ ez-form/
 │   │   ├── Select/              (same shape)
 │   │   ├── Checkbox/            (same shape)
 │   │   └── Switch/              (same shape)
-│   └── test/setup.ts            jest-dom matchers
+│   └── test/                    setup.ts (jest-dom + jest-axe), axe.ts, vitest.d.ts, jest-axe.d.ts
 ├── package.json  tsconfig.json  vite.config.ts  .prettierrc  .prettierignore
 ├── README.md  LICENSE
 ```
@@ -108,7 +108,7 @@ ez-form/
 
 Tests follow Kent C. Dodds' Testing Library guidance: query by role/label/text in that priority, `screen` everywhere, `userEvent.setup()` per test, `findBy*` for async, jest-dom matchers, `renderHook` for hooks, behavior over implementation. No test IDs, no `fireEvent`, no manual `act()`.
 
-Vitest runs with `restoreMocks: true`; the per-component "throws outside `<Form>`" test stubs `console.error` with `vi.spyOn` and never restores by hand. `onSubmit` spies are asserted with `toHaveBeenCalledWith(values, expect.anything())`. Helper-text wiring is asserted with `toHaveAccessibleDescription`, never by id.
+Every component has a jest-axe test ("has no accessibility violations") rendered inside `<Form>` in its error state, via `expectNoA11yViolations(container)` from `src/test/axe.ts` (`container` is handed to axe only, never queried; no axe rule is disabled). Storybook runs `@storybook/addon-a11y`. Vitest runs with `restoreMocks: true`; the per-component "throws outside `<Form>`" test stubs `console.error` with `vi.spyOn` and never restores by hand. `onSubmit` spies are asserted with `toHaveBeenCalledWith(values, expect.anything())`. Helper-text wiring is asserted with `toHaveAccessibleDescription`, never by id.
 
 ## Patterns
 

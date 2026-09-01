@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../../Form'
 import { TextField } from './TextField'
+import { expectNoA11yViolations } from '../../test/axe'
 
 const schema = z.object({
   email: z.email({ error: (iss) => (iss.input === '' ? 'Email is required' : 'Invalid email') }),
@@ -123,6 +124,19 @@ describe('TextField', () => {
     await user.type(screen.getByRole('textbox', { name: 'Email' }), 'a@b.co')
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(onSubmit).toHaveBeenCalledWith({ email: 'a@b.co' }, expect.anything())
+  })
+
+  it('has no accessibility violations', async () => {
+    const user = userEvent.setup()
+    const { container } = render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+        <TextField name="email" label="Email" helperText="We never share it" required />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByText('Email is required.')).toBeInTheDocument()
+    await expectNoA11yViolations(container)
   })
 
   it('throws outside <Form>', () => {

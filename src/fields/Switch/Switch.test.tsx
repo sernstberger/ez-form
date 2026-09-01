@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../../Form'
 import { Switch } from './Switch'
+import { expectNoA11yViolations } from '../../test/axe'
 
 const schema = z.object({ darkMode: z.boolean() })
 
@@ -85,6 +86,19 @@ describe('Switch', () => {
     const sw = screen.getByRole('switch', { name: 'Dark mode' })
     expect(sw).toHaveAttribute('title', 'Flip me')
     expect(sw).toHaveAccessibleDescription('Easier on the eyes')
+  })
+
+  it('has no accessibility violations', async () => {
+    const user = userEvent.setup()
+    const { container } = render(
+      <Form schema={schema} defaultValues={{ darkMode: false }} onSubmit={() => {}}>
+        <Switch name="darkMode" label="Dark mode" helperText="Easier on the eyes" required />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByText('Dark mode is required.')).toBeInTheDocument()
+    await expectNoA11yViolations(container)
   })
 
   it('throws outside <Form>', () => {

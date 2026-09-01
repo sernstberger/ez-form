@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../../Form'
 import { Checkbox } from './Checkbox'
+import { expectNoA11yViolations } from '../../test/axe'
 
 const schema = z.object({
   tos: z.boolean().refine(Boolean, { error: 'You must accept the terms' }),
@@ -108,6 +109,19 @@ describe('Checkbox', () => {
     const box = screen.getByRole('checkbox', { name: 'Accept terms' })
     expect(box).toHaveAttribute('title', 'Tick to continue')
     expect(box).toHaveAccessibleDescription('Required to continue')
+  })
+
+  it('has no accessibility violations', async () => {
+    const user = userEvent.setup()
+    const { container } = render(
+      <Form schema={schema} defaultValues={{ tos: false }} onSubmit={() => {}}>
+        <Checkbox name="tos" label="Accept terms" helperText="Required to continue" required />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByText('Accept terms is required.')).toBeInTheDocument()
+    await expectNoA11yViolations(container)
   })
 
   it('throws outside <Form>', () => {

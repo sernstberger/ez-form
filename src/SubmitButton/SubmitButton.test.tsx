@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../Form'
 import { SubmitButton } from './SubmitButton'
+import { expectNoA11yViolations } from '../test/axe'
 
 const schema = z.object({ ok: z.boolean() })
 
@@ -52,6 +53,23 @@ describe('SubmitButton', () => {
       </Form>,
     )
     expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled()
+  })
+
+  it('has no accessibility violations while pending', async () => {
+    const user = userEvent.setup()
+    let resolve!: () => void
+    const onSubmit = vi.fn(() => new Promise<void>((r) => (resolve = r)))
+    const { container } = render(
+      <Form schema={schema} defaultValues={{ ok: true }} onSubmit={onSubmit}>
+        <SubmitButton>Save</SubmitButton>
+      </Form>,
+    )
+    const btn = screen.getByRole('button', { name: 'Save' })
+    await user.click(btn)
+    await waitFor(() => expect(btn).toBeDisabled())
+    await expectNoA11yViolations(container)
+    resolve()
+    await waitFor(() => expect(btn).toBeEnabled())
   })
 
   it('throws outside <Form>', () => {

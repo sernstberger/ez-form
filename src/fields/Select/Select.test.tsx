@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../../Form'
 import { Select } from './Select'
+import { expectNoA11yViolations } from '../../test/axe'
 
 const schema = z.object({
   role: z.enum(['admin', 'user'], { error: 'Pick a role' }),
@@ -55,5 +56,33 @@ describe('Select', () => {
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(await screen.findByText('Role is required.')).toBeInTheDocument()
     expect(screen.queryByText('Pick a role')).not.toBeInTheDocument()
+  })
+
+  it('has no accessibility violations', async () => {
+    const user = userEvent.setup()
+    const { container } = render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <Select name="role" label="Role" options={options} helperText="Pick one" required />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByText('Role is required.')).toBeInTheDocument()
+    await expectNoA11yViolations(container)
+  })
+
+  it('has no accessibility violations with the listbox open', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <Select name="role" label="Role" options={options} required />
+      </Form>,
+    )
+    await user.click(screen.getByRole('combobox', { name: 'Role' }))
+    expect(await screen.findByRole('option', { name: 'User' })).toBeInTheDocument()
+    // MUI portals the listbox outside `container`; scope axe to the popover's listbox.
+    // (Running on document.body only adds the page-level `region` landmark rule, which a
+    // portaled popover cannot satisfy and which is page structure, not the component.)
+    await expectNoA11yViolations(screen.getByRole('listbox'))
   })
 })

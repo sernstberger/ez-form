@@ -2,8 +2,13 @@ import { render, renderHook, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form, type FormMethods } from './Form'
+import { SubmitButton } from '../SubmitButton'
 import { TextField } from '../fields/TextField'
+import { Select } from '../fields/Select'
+import { Checkbox } from '../fields/Checkbox'
+import { Switch } from '../fields/Switch'
 import { useEzFormContext } from '../useEzFormContext'
+import { expectNoA11yViolations } from '../test/axe'
 
 const schema = z.object({ email: z.email() })
 
@@ -84,6 +89,51 @@ describe('Form', () => {
     await waitFor(() => expect(screen.getByLabelText('Email')).toBeDisabled())
     resolve()
     await waitFor(() => expect(screen.getByLabelText('Email')).toBeEnabled())
+  })
+})
+
+describe('Form accessibility', () => {
+  const signup = z.object({
+    name: z.string(),
+    email: z.email(),
+    role: z.enum(['admin', 'user'], { error: 'Pick a role' }),
+    tos: z.boolean(),
+    newsletter: z.boolean(),
+  })
+  const roles = [
+    { value: 'admin', label: 'Admin' },
+    { value: 'user', label: 'User' },
+  ] as const
+
+  function renderSignup() {
+    return render(
+      <Form
+        schema={signup}
+        defaultValues={{ name: '', email: '', tos: false, newsletter: false }}
+        onSubmit={() => {}}
+        aria-label="Sign up"
+      >
+        <TextField name="name" label="Name" required />
+        <TextField name="email" label="Email" helperText="We never share it" required />
+        <Select name="role" label="Role" options={roles} required />
+        <Checkbox name="tos" label="I accept the terms" required />
+        <Switch name="newsletter" label="Send me the newsletter" />
+        <SubmitButton>Create account</SubmitButton>
+      </Form>,
+    )
+  }
+
+  it('has no accessibility violations at rest', async () => {
+    const { container } = renderSignup()
+    await expectNoA11yViolations(container)
+  })
+
+  it('has no accessibility violations after an empty submit', async () => {
+    const user = userEvent.setup()
+    const { container } = renderSignup()
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
+    expect(await screen.findByText('Name is required.')).toBeInTheDocument()
+    await expectNoA11yViolations(container)
   })
 })
 
