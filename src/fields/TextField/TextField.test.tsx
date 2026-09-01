@@ -151,6 +151,15 @@ describe('TextField', () => {
     await expectNoA11yViolations(container)
   })
 
+  it('announces the error text as an alert and keeps consumer helper text quiet', async () => {
+    const user = userEvent.setup()
+    renderForm(vi.fn(), 'We never share it')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Email is required')
+    expect(screen.getByLabelText('Email')).toHaveAccessibleDescription('Email is required')
+  })
+
   it('throws outside <Form>', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(() => render(<TextField name="x" />)).toThrow(

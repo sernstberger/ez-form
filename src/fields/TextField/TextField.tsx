@@ -1,4 +1,5 @@
 import MuiTextField, { type TextFieldProps as MuiTextFieldProps } from '@mui/material/TextField'
+import { mergeSlotProps } from '@mui/material/utils'
 import { useEzField } from '../useEzField'
 import { mergeDisabled } from '../mergeDisabled'
 import type { FieldRules } from '../../rules'
@@ -23,6 +24,7 @@ export function TextField({
   disabled,
   onChange,
   onBlur,
+  slotProps,
   required,
   min,
   max,
@@ -32,11 +34,7 @@ export function TextField({
   validate,
   ...rest
 }: TextFieldProps) {
-  const {
-    field,
-    fieldState,
-    required: isRequired,
-  } = useEzField<string>(name, 'TextField', {
+  const f = useEzField<string>(name, 'TextField', {
     label,
     rules: { required, min, max, minLength, maxLength, pattern, validate },
   })
@@ -47,8 +45,9 @@ export function TextField({
     onChange: fieldOnChange,
     onBlur: fieldOnBlur,
     ...fieldProps
-  } = field
+  } = f.field
 
+  // MUI TextField sets aria-invalid and aria-describedby itself; only `role` comes from the hook.
   return (
     <MuiTextField
       {...fieldProps}
@@ -63,10 +62,14 @@ export function TextField({
         onBlur?.(e)
       }}
       disabled={mergeDisabled(disabled, fieldDisabled)}
-      required={isRequired}
+      required={f.required}
       inputRef={ref}
-      error={fieldState.invalid}
-      helperText={fieldState.error?.message ?? helperText}
+      error={f.invalid}
+      helperText={f.helperText(helperText)}
+      slotProps={{
+        ...slotProps,
+        formHelperText: mergeSlotProps(slotProps?.formHelperText, { role: f.helperTextA11y.role }),
+      }}
       {...rest}
     />
   )
