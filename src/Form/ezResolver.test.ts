@@ -44,6 +44,22 @@ describe('ezResolver', () => {
     }
   })
 
+  it('runs validate even when the value is empty or false, like hookform', async () => {
+    const schema = z.object({ v: z.unknown() })
+    const optIn = rules<unknown>({ validate: (v) => v === true || 'You must opt in' }, 'Opt in')
+    expect((await run(schema, { v: false }, { v: optIn })).errors).toEqual({ v: { type: 'validate', message: 'You must opt in' } })
+    expect((await run(schema, { v: '' }, { v: optIn })).errors).toEqual({ v: { type: 'validate', message: 'You must opt in' } })
+    expect((await run(schema, { v: true }, { v: optIn })).errors).toEqual({})
+  })
+
+  it('fails required on false and on empty, but skips minLength on an empty string', async () => {
+    const schema = z.object({ v: z.unknown() })
+    expect((await run(schema, { v: false }, { v: rules({ required: true }, 'Terms') })).errors).toEqual({
+      v: { type: 'required', message: 'Terms is required.' },
+    })
+    expect((await run(schema, { v: '' }, { v: rules({ minLength: 3 }, 'Nick') })).errors).toEqual({})
+  })
+
   it('skips the other rules when the value is empty and not required', async () => {
     const result = await run(text, { nick: '' }, { nick: rules({ minLength: 3, pattern: /^x$/ }, 'Nickname') })
     expect(result.errors).toEqual({})

@@ -81,6 +81,35 @@ describe('Checkbox', () => {
     expect(screen.getByRole('checkbox', { name: 'Accept terms' })).toBeChecked()
   })
 
+  it('runs a consumer validate rule when submitted unchecked', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{ tos: false }} onSubmit={() => {}}>
+        <Checkbox name="tos" label="Accept terms" validate={(v) => v || 'You must opt in'} />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByText('You must opt in')).toBeInTheDocument()
+    expect(screen.queryByText('You must accept the terms')).not.toBeInTheDocument()
+  })
+
+  it('merges consumer slotProps.input with the a11y wiring', () => {
+    render(
+      <Form schema={schema} defaultValues={{ tos: false }} onSubmit={() => {}}>
+        <Checkbox
+          name="tos"
+          label="Accept terms"
+          helperText="Required to continue"
+          slotProps={{ input: { title: 'Tick to continue' } }}
+        />
+      </Form>,
+    )
+    const box = screen.getByRole('checkbox', { name: 'Accept terms' })
+    expect(box).toHaveAttribute('title', 'Tick to continue')
+    expect(box).toHaveAccessibleDescription('Required to continue')
+  })
+
   it('throws outside <Form>', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(() => render(<Checkbox name="x" label="x" />)).toThrow(

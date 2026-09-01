@@ -13,12 +13,9 @@ import { FALLBACK_LABEL, defaultMessages, normalizeRules, type NormalizedRules }
 
 type RuleError = Pick<FieldError, 'type' | 'message'>
 
+/** hookform's emptiness for the value rules: `false` is not empty here (it only matters to `required`). */
 const isEmpty = (value: unknown): boolean =>
-  value === undefined ||
-  value === null ||
-  value === '' ||
-  value === false ||
-  (Array.isArray(value) && value.length === 0)
+  value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)
 
 const isNumeric = (value: unknown): boolean =>
   value !== '' && value !== null && typeof value !== 'boolean' && !Number.isNaN(Number(value))
@@ -34,35 +31,38 @@ function outOfRange(value: unknown, bound: number | string, direction: 'min' | '
 
 /**
  * Runs hookform-shaped rules in hookform's order; the first failure wins.
- * Empty values (`undefined | null | '' | false | []`) only fail `required`.
- * `minLength`/`maxLength`/`pattern` apply to string values only (hookform's
- * `validateField` guards all three with `isString`).
+ * Matches hookform's `validateField` gating: `required` fails on an empty value
+ * (`undefined | null | '' | []`) or `false`; `min`/`max`/`maxLength`/`minLength`/
+ * `pattern` are skipped for empty values (and the three string rules apply to
+ * string values only); `validate` always runs.
  */
 export async function validateRules(
   rules: NormalizedRules,
   value: unknown,
   values: FieldValues,
 ): Promise<RuleError | undefined> {
-  if (isEmpty(value)) {
-    return rules.required?.value ? { type: 'required', message: rules.required.message } : undefined
+  if (rules.required?.value && (isEmpty(value) || value === false)) {
+    return { type: 'required', message: rules.required.message }
   }
-  if (rules.min && outOfRange(value, rules.min.value as number | string, 'min')) {
-    return { type: 'min', message: rules.min.message }
-  }
-  if (rules.max && outOfRange(value, rules.max.value as number | string, 'max')) {
-    return { type: 'max', message: rules.max.message }
-  }
-  if (typeof value === 'string') {
-    if (rules.maxLength && value.length > (rules.maxLength.value as number)) {
-      return { type: 'maxLength', message: rules.maxLength.message }
+  if (!isEmpty(value)) {
+    if (rules.min && outOfRange(value, rules.min.value as number | string, 'min')) {
+      return { type: 'min', message: rules.min.message }
     }
-    if (rules.minLength && value.length < (rules.minLength.value as number)) {
-      return { type: 'minLength', message: rules.minLength.message }
+    if (rules.max && outOfRange(value, rules.max.value as number | string, 'max')) {
+      return { type: 'max', message: rules.max.message }
     }
-    if (rules.pattern) {
-      const regex = rules.pattern.value as RegExp
-      regex.lastIndex = 0
-      if (!regex.test(value)) return { type: 'pattern', message: rules.pattern.message }
+    if (typeof value === 'string') {
+      if (rules.maxLength && value.length > (rules.maxLength.value as number)) {
+        return { type: 'maxLength', message: rules.maxLength.message }
+      }
+      if (rules.minLength && value.length < (rules.minLength.value as number)) {
+        return { type: 'minLength', message: rules.minLength.message }
+      }
+      if (rules.pattern) {
+        const regex = rules.pattern.value as RegExp
+        regex.lastIndex = 0
+        if (!regex.test(value)) return { type: 'pattern', message: rules.pattern.message }
+      }
     }
   }
   if (rules.validate) {
