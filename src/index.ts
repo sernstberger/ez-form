@@ -7,3 +7,8 @@ export { Checkbox, type CheckboxProps } from './fields/Checkbox'
 export { Switch, type SwitchProps } from './fields/Switch'
 export { RadioGroup, type RadioGroupProps } from './fields/RadioGroup'
 export type { FieldRules, BooleanFieldRules } from './rules'
+export {
+  Autocomplete,
+  type AutocompleteProps,
+  type AutocompleteFormValue,
+} from './fields/Autocomplete'

@@ -1,0 +1,177 @@
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { z } from 'zod'
+import { Form } from '../../Form'
+import { Autocomplete } from './Autocomplete'
+import { describeFieldContract } from '../../test/describeFieldContract'
+
+const schema = z.object({ role: z.enum(['admin', 'user'], { error: 'Pick a role' }) })
+
+const roles = [
+  { value: 'admin', label: 'Admin' },
+  { value: 'user', label: 'User' },
+] as const
+
+const combobox = () => screen.getByRole('combobox', { name: 'Role' })
+
+async function pick(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(combobox())
+  await user.click(await screen.findByRole('option', { name }))
+}
+
+describeFieldContract({
+  componentName: 'Autocomplete',
+  label: 'Role',
+  schema,
+  defaultValues: {},
+  render: (props) => <Autocomplete name="role" label="Role" options={roles} {...props} />,
+  getControl: combobox,
+  interact: (user) => pick(user, 'User'),
+})
+
+describe('Autocomplete', () => {
+  it('submits the chosen option value', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={onSubmit}>
+        <Autocomplete name="role" label="Role" options={roles} />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await pick(user, 'User')
+    expect(combobox()).toHaveValue('User')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(onSubmit).toHaveBeenCalledWith({ role: 'user' }, expect.anything())
+  })
+
+  it('renders a default value by its option label', () => {
+    render(
+      <Form schema={schema} defaultValues={{ role: 'admin' }} onSubmit={() => {}}>
+        <Autocomplete name="role" label="Role" options={roles} />
+      </Form>,
+    )
+    expect(combobox()).toHaveValue('Admin')
+  })
+
+  it('submits null when cleared and shows the zod message', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{ role: 'admin' }} onSubmit={() => {}}>
+        <Autocomplete name="role" label="Role" options={roles} />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.click(combobox())
+    await user.click(screen.getByRole('button', { name: 'Clear' }))
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByText('Pick a role')).toBeInTheDocument()
+  })
+
+  it('submits an array of values when multiple', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const multi = z.object({
+      roles: z.array(z.enum(['admin', 'user'])).min(1, 'Pick at least one'),
+    })
+    render(
+      <Form schema={multi} defaultValues={{ roles: [] }} onSubmit={onSubmit}>
+        <Autocomplete name="roles" label="Role" options={roles} multiple />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await pick(user, 'Admin')
+    await pick(user, 'User')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(onSubmit).toHaveBeenCalledWith({ roles: ['admin', 'user'] }, expect.anything())
+  })
+
+  it('treats an empty array as empty for the required rule', async () => {
+    const user = userEvent.setup()
+    const multi = z.object({ roles: z.array(z.enum(['admin', 'user'])) })
+    render(
+      <Form schema={multi} defaultValues={{ roles: [] }} onSubmit={() => {}}>
+        <Autocomplete name="roles" label="Role" options={roles} multiple required />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByText('Role is required.')).toBeInTheDocument()
+  })
+
+  it('submits typed text under freeSolo', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const free = z.object({ role: z.string() })
+    render(
+      <Form schema={free} defaultValues={{}} onSubmit={onSubmit}>
+        <Autocomplete name="role" label="Role" options={roles} freeSolo />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.type(combobox(), 'Owner{Enter}')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(onSubmit).toHaveBeenCalledWith({ role: 'Owner' }, expect.anything())
+  })
+
+  it('stores the option object when getOptionValue returns it', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const objectSchema = z.object({ role: z.object({ value: z.string(), label: z.string() }) })
+    render(
+      <Form schema={objectSchema} defaultValues={{}} onSubmit={onSubmit}>
+        <Autocomplete name="role" label="Role" options={roles} getOptionValue={(o) => o} />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await pick(user, 'User')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(onSubmit).toHaveBeenCalledWith(
+      { role: { value: 'user', label: 'User' } },
+      expect.anything(),
+    )
+  })
+
+  it('still renders a value that is not in the current options', () => {
+    const free = z.object({ city: z.string() })
+    render(
+      <Form schema={free} defaultValues={{ city: 'Springfield' }} onSubmit={() => {}}>
+        <Autocomplete name="city" label="City" options={[]} />
+      </Form>,
+    )
+    expect(screen.getByRole('combobox', { name: 'City' })).toHaveValue('Springfield')
+  })
+
+  it('hands the consumer onChange the full option, extra fields included', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    const places = [{ value: '1 Main St', label: '1 Main St', placeId: 'p1' }]
+    render(
+      <Form schema={z.object({ address: z.string() })} defaultValues={{}} onSubmit={() => {}}>
+        <Autocomplete name="address" label="Address" options={places} onChange={onChange} />
+      </Form>,
+    )
+    await user.click(screen.getByRole('combobox', { name: 'Address' }))
+    await user.click(await screen.findByRole('option', { name: '1 Main St' }))
+    expect(onChange).toHaveBeenCalledWith(
+      expect.anything(),
+      { value: '1 Main St', label: '1 Main St', placeId: 'p1' },
+      'selectOption',
+      expect.anything(),
+    )
+  })
+
+  it('shows the required rule message and focuses the input after a failed submit', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <Autocomplete name="role" label="Role" options={roles} required />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    expect(combobox()).toBeRequired()
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByText('Role is required.')).toBeInTheDocument()
+    expect(combobox()).toHaveFocus()
+  })
+})
