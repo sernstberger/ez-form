@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import MuiSwitch, { type SwitchProps as MuiSwitchProps } from '@mui/material/Switch'
 import { mergeSlotProps } from '@mui/material/utils'
-import { BooleanFieldControl } from '../BooleanFieldControl'
+import { FieldFrame } from '../FieldFrame'
 import type { BooleanFieldRules } from '../../rules'
 
 export type SwitchProps = Omit<MuiSwitchProps, 'name' | 'checked' | 'required'> & {
@@ -24,14 +24,31 @@ export function Switch({
   ...rest
 }: SwitchProps) {
   return (
-    <BooleanFieldControl
+    <FieldFrame<boolean>
       componentName="Switch"
-      {...{ name, label, helperText, disabled, required, validate, onChange, onBlur }}
-      renderControl={({ inputProps, ...bound }) => (
+      name={name}
+      label={label}
+      helperText={helperText}
+      disabled={disabled}
+      rules={{ required, validate }}
+      labelAs="control"
+      renderControl={({ field, inputA11y }) => (
         <MuiSwitch
           {...rest}
-          {...bound}
-          slotProps={{ ...slotProps, input: mergeSlotProps(slotProps?.input, inputProps) }}
+          name={field.name}
+          checked={Boolean(field.value)}
+          onChange={(e, checked) => {
+            field.onChange(checked)
+            onChange?.(e, checked)
+          }}
+          onBlur={(e) => {
+            field.onBlur()
+            onBlur?.(e)
+          }}
+          slotProps={{
+            ...slotProps,
+            input: mergeSlotProps(slotProps?.input, { ref: field.ref, ...inputA11y }),
+          }}
         />
       )}
     />

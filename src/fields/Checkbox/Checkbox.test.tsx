@@ -124,6 +124,19 @@ describe('Checkbox', () => {
     await expectNoA11yViolations(container)
   })
 
+  it('announces the error text as an alert', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{ tos: false }} onSubmit={() => {}}>
+        <Checkbox name="tos" label="Accept terms" helperText="Required to continue" />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('You must accept the terms')
+  })
+
   it('throws outside <Form>', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(() => render(<Checkbox name="x" label="x" />)).toThrow(
