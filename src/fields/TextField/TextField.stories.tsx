@@ -6,8 +6,10 @@ import { Form } from '../../Form'
 import { TextField } from './TextField'
 
 const schema = z.object({
-  email: z.string().min(1, 'Email is required').email('Invalid email'),
+  email: z.email({ error: (iss) => (iss.input === '' ? 'Email is required' : 'Invalid email') }),
 })
+
+const onSubmit = fn()
 
 const meta = {
   title: 'Fields/TextField',
@@ -15,7 +17,7 @@ const meta = {
   args: { name: 'email', label: 'Email' },
   decorators: [
     (Story) => (
-      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={fn()}>
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={onSubmit}>
         <Stack spacing={2} sx={{ maxWidth: 360 }}>
           <Story />
           <button type="submit">Submit</button>

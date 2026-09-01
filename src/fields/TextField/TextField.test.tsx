@@ -48,6 +48,19 @@ describe('TextField', () => {
     expect(screen.queryByText('We never share it')).not.toBeInTheDocument()
   })
 
+  it('calls a consumer onChange after updating the form value', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+        <TextField name="email" label="Email" onChange={onChange} />
+      </Form>,
+    )
+    await user.type(screen.getByLabelText('Email'), 'a')
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(screen.getByLabelText('Email')).toHaveValue('a')
+  })
+
   it('throws outside <Form>', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(() => render(<TextField name="x" />)).toThrow(
