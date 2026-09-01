@@ -5,34 +5,47 @@ import {
   type DefaultValues,
   type FieldValues,
   type Mode,
-  type Resolver,
+  type UseFormReturn,
 } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { z } from 'zod'
 
-export interface FormProps<S extends z.ZodType<FieldValues, FieldValues>>
+/**
+ * The hookform methods for this form. It is the same object `useFormContext()`
+ * returns inside the form; it is handed to `onSubmit` so the component that
+ * owns the form can `reset`, `setError`, etc. without a child component.
+ */
+export type FormMethods<TIn extends FieldValues, TOut> = UseFormReturn<TIn, unknown, TOut>
+
+export interface FormProps<TIn extends FieldValues, TOut>
   extends Omit<FormHTMLAttributes<HTMLFormElement>, 'onSubmit'> {
-  schema: S
-  onSubmit: (values: z.output<S>) => void | Promise<void>
-  defaultValues?: DefaultValues<z.input<S>>
+  /** zod schema. Its input type types `defaultValues`; its output type types `onSubmit`. */
+  schema: z.ZodType<TOut, TIn>
+  onSubmit: (values: NoInfer<TOut>, form: FormMethods<TIn, TOut>) => void | Promise<void>
+  defaultValues?: NoInfer<DefaultValues<TIn>>
   mode?: Mode
+  /**
+   * Disables every field in the form (hookform's form-level `disabled`).
+   * Unlike a field-level `disabled`, values are still submitted.
+   */
+  disabled?: boolean
   children: ReactNode
 }
 
-export function Form<S extends z.ZodType<FieldValues, FieldValues>>({
+export function Form<TIn extends FieldValues, TOut>({
   schema,
   onSubmit,
   defaultValues,
   mode = 'onSubmit',
+  disabled,
   children,
   ...formProps
-}: FormProps<S>) {
-  const methods = useForm<z.input<S>, unknown, z.output<S>>({
-    // The generic resolver from zodResolver widens to Resolver<FieldValues, ...>,
-    // which TS will not narrow back to the schema's input/output types directly.
-    resolver: zodResolver(schema) as unknown as Resolver<z.input<S>, unknown, z.output<S>>,
+}: FormProps<TIn, TOut>) {
+  const methods = useForm<TIn, unknown, TOut>({
+    resolver: zodResolver(schema),
     defaultValues,
     mode,
+    disabled,
   })
 
   return (
@@ -40,7 +53,7 @@ export function Form<S extends z.ZodType<FieldValues, FieldValues>>({
       <form
         noValidate
         {...formProps}
-        onSubmit={methods.handleSubmit((values) => onSubmit(values))}
+        onSubmit={methods.handleSubmit((values) => onSubmit(values, methods))}
       >
         {children}
       </form>

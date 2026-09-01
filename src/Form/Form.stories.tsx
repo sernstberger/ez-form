@@ -7,8 +7,10 @@ import { TextField } from '../fields/TextField'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
-  email: z.string().min(1, 'Email is required').email('Invalid email'),
+  email: z.email({ error: (iss) => (iss.input === '' ? 'Email is required' : 'Invalid email') }),
 })
+
+const onSubmit = fn()
 
 const meta = {
   title: 'Form',
@@ -23,7 +25,7 @@ export const Basic: Story = {
   args: {
     schema,
     defaultValues: { name: '', email: '' },
-    onSubmit: fn(),
+    onSubmit,
     children: null,
   },
   render: (args) => (

@@ -5,7 +5,7 @@ import { Form } from '../../Form'
 import { TextField } from './TextField'
 
 const schema = z.object({
-  email: z.string().min(1, 'Email is required').email('Invalid email'),
+  email: z.email({ error: (iss) => (iss.input === '' ? 'Email is required' : 'Invalid email') }),
 })
 
 function renderForm(onSubmit = vi.fn(), helperText?: string) {
@@ -32,7 +32,7 @@ describe('TextField', () => {
     const { onSubmit } = renderForm()
     await user.type(screen.getByLabelText('Email'), 'a@b.co')
     await user.click(screen.getByRole('button', { name: 'Go' }))
-    expect(onSubmit).toHaveBeenCalledWith({ email: 'a@b.co' })
+    expect(onSubmit).toHaveBeenCalledWith({ email: 'a@b.co' }, expect.anything())
   })
 
   it('shows consumer helperText when there is no error', () => {
