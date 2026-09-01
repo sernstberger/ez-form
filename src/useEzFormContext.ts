@@ -4,9 +4,10 @@ import { useFormContext, type UseFormReturn } from 'react-hook-form'
  * Guard hook: returns the hookform methods from context or throws a clear
  * error naming the component that was rendered outside `<Form>`.
  *
- * RHF's `useFormContext` is typed as non-null but is literally
- * `React.useContext(HookFormContext)` with a `null` default, so the runtime
- * check is real, not defensive.
+ * The null check is real, not defensive: react-hook-form types
+ * `useFormContext()` as non-null, but it is literally
+ * `React.useContext(HookFormContext)` with a `null` default, so outside a
+ * `FormProvider` it returns `null` at runtime.
  */
 export function useEzFormContext(componentName: string): UseFormReturn {
   const ctx = useFormContext()

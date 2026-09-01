@@ -1,10 +1,7 @@
 import type { ReactNode } from 'react'
 import MuiCheckbox, { type CheckboxProps as MuiCheckboxProps } from '@mui/material/Checkbox'
-import FormControl from '@mui/material/FormControl'
-import FormControlLabel from '@mui/material/FormControlLabel'
-import FormHelperText from '@mui/material/FormHelperText'
 import { mergeSlotProps } from '@mui/material/utils'
-import { useBooleanField } from '../useBooleanField'
+import { BooleanFieldControl } from '../BooleanFieldControl'
 import type { BooleanFieldRules } from '../../rules'
 
 export type CheckboxProps = Omit<MuiCheckboxProps, 'name' | 'checked' | 'required'> & {
@@ -25,39 +22,17 @@ export function Checkbox({
   slotProps,
   ...rest
 }: CheckboxProps) {
-  const f = useBooleanField(name, 'Checkbox', { label, rules: { required, validate } })
-  const text = f.errorMessage ?? helperText
-
   return (
-    <FormControl error={f.invalid} disabled={disabled ?? f.disabled} required={f.required}>
-      <FormControlLabel
-        label={label}
-        required={f.required}
-        control={
-          <MuiCheckbox
-            {...rest}
-            name={f.name}
-            checked={f.checked}
-            onChange={(e, checked) => {
-              f.onChange(e)
-              onChange?.(e, checked)
-            }}
-            onBlur={(e) => {
-              f.onBlur()
-              onBlur?.(e)
-            }}
-            slotProps={{
-              ...slotProps,
-              input: mergeSlotProps(slotProps?.input, {
-                ref: f.inputRef,
-                'aria-invalid': f.invalid || undefined,
-                'aria-describedby': text ? f.helperTextId : undefined,
-              }),
-            }}
-          />
-        }
-      />
-      {text ? <FormHelperText id={f.helperTextId}>{text}</FormHelperText> : null}
-    </FormControl>
+    <BooleanFieldControl
+      componentName="Checkbox"
+      {...{ name, label, helperText, disabled, required, validate, onChange, onBlur }}
+      renderControl={({ inputProps, ...bound }) => (
+        <MuiCheckbox
+          {...rest}
+          {...bound}
+          slotProps={{ ...slotProps, input: mergeSlotProps(slotProps?.input, inputProps) }}
+        />
+      )}
+    />
   )
 }
