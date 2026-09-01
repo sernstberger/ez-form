@@ -75,24 +75,32 @@ Only these six symbols are exported from `src/index.ts`, plus their prop types.
 
 ## Layout
 
+One folder per component; each folder holds the component, its test, its stories, and an `index.ts` re-export. Shared hooks stay flat.
+
 ```
 ez-form/
 ├── .storybook/         main.ts, preview.tsx
 ├── docs/superpowers/   specs, plans
 ├── src/
-│   ├── index.ts
-│   ├── Form.tsx            Form.test.tsx        Form.stories.tsx
-│   ├── SubmitButton.tsx    SubmitButton.test.tsx
+│   ├── index.ts                 public barrel
+│   ├── useEzFormContext.ts      context guard (throws outside <Form>)
+│   ├── Form/                    Form.tsx  Form.test.tsx  Form.stories.tsx  index.ts
+│   ├── SubmitButton/            SubmitButton.tsx  SubmitButton.test.tsx  index.ts
 │   ├── fields/
-│   │   ├── TextField.tsx   TextField.test.tsx   TextField.stories.tsx
-│   │   ├── Select.tsx      Select.test.tsx      Select.stories.tsx
-│   │   ├── Checkbox.tsx    Checkbox.test.tsx    Checkbox.stories.tsx
-│   │   ├── Switch.tsx      Switch.test.tsx      Switch.stories.tsx
-│   │   └── useBooleanField.ts
-│   └── test/setup.ts       (jest-dom matchers)
-├── package.json  tsconfig.json  vite.config.ts  .prettierrc
+│   │   ├── useEzField.ts        useController + context guard
+│   │   ├── useBooleanField.ts   shared by Checkbox/Switch
+│   │   ├── TextField/           TextField.tsx  .test.tsx  .stories.tsx  index.ts
+│   │   ├── Select/              (same shape)
+│   │   ├── Checkbox/            (same shape)
+│   │   └── Switch/              (same shape)
+│   └── test/setup.ts            jest-dom matchers
+├── package.json  tsconfig.json  vite.config.ts  .prettierrc  .prettierignore
 ├── README.md  LICENSE
 ```
+
+## Testing conventions
+
+Tests follow Kent C. Dodds' Testing Library guidance: query by role/label/text in that priority, `screen` everywhere, `userEvent.setup()` per test, `findBy*` for async, jest-dom matchers, `renderHook` for hooks, behavior over implementation. No test IDs, no `fireEvent`, no manual `act()`.
 
 ## Stories (v1)
 
