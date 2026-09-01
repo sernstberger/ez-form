@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { Form, TextField, Select, Checkbox, Switch, SubmitButton } from 'ez-form'
 
 const schema = z.object({
-  email: z.email({ error: 'Invalid email' }),
+  email: z.email({ error: (iss) => (iss.input === '' ? 'Email is required' : 'Invalid email') }),
   role: z.enum(['admin', 'user'], { error: 'Pick a role' }),
   tos: z.boolean().refine(Boolean, { error: 'Required' }),
   newsletter: z.boolean(),
@@ -43,18 +43,18 @@ export function Signup() {
 pnpm add ez-form @mui/material @emotion/react @emotion/styled react-hook-form zod
 ```
 
-Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`).
+Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >= 5.4 (the types use `NoInfer`).
 
 ## Components
 
-| Component      | Wraps                  | Extra props                                                                                                            |
-| -------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `Form`         | `useForm` + `<form>`   | `schema`, `onSubmit(values, form)`, `defaultValues?`, `mode?`, `disabled?`; fields disable while `onSubmit` is pending |
-| `TextField`    | MUI `TextField`        | `name`                                                                                                                 |
-| `Select`       | MUI `TextField select` | `name`, `options: readonly { value, label }[]`                                                                         |
-| `Checkbox`     | MUI `Checkbox`         | `name`, `label`, `helperText?`, `required?`                                                                            |
-| `Switch`       | MUI `Switch`           | `name`, `label`, `helperText?`, `required?`                                                                            |
-| `SubmitButton` | MUI `Button`           | `loading` while submitting, disabled while the form is                                                                 |
+| Component      | Wraps                  | Extra props                                                                                                                                         |
+| -------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Form`         | `useForm` + `<form>`   | `schema`, `onSubmit(values, form)`, `defaultValues?`, `mode?`, `disabled?`; fields disable while `onSubmit` is pending                              |
+| `TextField`    | MUI `TextField`        | `name`; rules `required`, `min`, `max`, `minLength`, `maxLength`, `pattern`, `validate`                                                             |
+| `Select`       | MUI `TextField select` | `name`, `options: readonly SelectOption[]` (`{ value: string \| number; label: string }`); the same rules as TextField, typed over the option value |
+| `Checkbox`     | MUI `Checkbox`         | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                        |
+| `Switch`       | MUI `Switch`           | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                        |
+| `SubmitButton` | MUI `Button`           | `loading` while submitting, disabled while the form is                                                                                              |
 
 Every field shows its zod message as helper text (linked to the input with `aria-describedby`; the first invalid field is focused on submit). Fields must be rendered inside `<Form>`. Consumer `onChange`/`onBlur` handlers run after the form's own.
 
@@ -89,13 +89,13 @@ Every field also takes hookform-style rules as props. A bare value gets a messag
 <Checkbox name="tos" label="I accept the terms" required />                          // must be checked
 ```
 
-| rule                      | fields            | default message                                        |
-| ------------------------- | ----------------- | ------------------------------------------------------ |
-| `required`                | all               | `<label> is required.` (also renders the asterisk)     |
-| `min` / `max`             | TextField, Select | `<label> must be at least/most <value>.`               |
-| `minLength` / `maxLength` | TextField, Select | `<label> must be at least/most <value> characters.`    |
-| `pattern`                 | TextField, Select | `<label> is invalid.`                                  |
-| `validate`                | all               | a returned string; `false` gives `<label> is invalid.` |
+| rule                      | fields            | default message                                                                       |
+| ------------------------- | ----------------- | ------------------------------------------------------------------------------------- |
+| `required`                | all               | `<label> is required.` (also renders the asterisk)                                    |
+| `min` / `max`             | TextField, Select | `<label> must be at least/most <value>.` Numbers, or date strings (compared as dates) |
+| `minLength` / `maxLength` | TextField, Select | `<label> must be at least/most <value> characters.`                                   |
+| `pattern`                 | TextField, Select | `<label> is invalid.`                                                                 |
+| `validate`                | all               | a returned string; `false` gives `<label> is invalid.`                                |
 
 `required` fails on empty or `false`; `min`/`max`/length/`pattern` rules are skipped while the value is empty; `validate` always runs (so `validate={(v) => v || 'You must opt in'}` works on an unchecked checkbox). Rules run in hookform's order, first failure wins.
 

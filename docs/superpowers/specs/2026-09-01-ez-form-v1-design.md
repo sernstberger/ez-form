@@ -30,7 +30,7 @@ consumer JSX
          ├─ <Select    name="role" />    ├─ useController({ name, rules })  ← rule props normalized in useEzField
          ├─ <Checkbox  name="tos" />     │   → MUI component
          ├─ <Switch    name="dark" />   ─┘   → error + helperText from fieldState
-         └─ <SubmitButton />              ← useFormState → disabled while isSubmitting
+         └─ <SubmitButton />              ← useFormState → loading while isSubmitting, disabled while the form is
 ```
 
 Every field component reads the form via hookform context. Fields rendered
@@ -48,11 +48,11 @@ and throw a clear message).
 | `Switch` | same as Checkbox with MUI `Switch` | same as Checkbox | shares `useBooleanField` internal hook; MUI 9 sets `role="switch"` |
 | `SubmitButton` | MUI `Button` | `ButtonProps` minus `type` | `type="submit"`, `variant="contained"` default, MUI `loading` (which disables) while `isSubmitting`, disabled while `formState.disabled`; consumer `disabled` passed through |
 
-Only these six symbols are exported from `src/index.ts`, plus their prop types and the `FormMethods`, `FieldRules`, `BooleanFieldRules` type aliases.
+Only these six symbols are exported from `src/index.ts`, plus their prop types, `SelectOption`, and the `FormMethods`, `FieldRules`, `BooleanFieldRules` type aliases.
 
 ### Field-level rules
 
-Each field accepts hookform-shaped rules as individual props. A bare value uses a default message derived from the field's `label` (fallback `This field`): `required` → `<label> is required.`, `min`/`max` → `<label> must be at least/most <value>.`, `minLength`/`maxLength` → `<label> must be at least/most <value> characters.`, `pattern` and `validate` returning `false` → `<label> is invalid.`; `{ value, message }` overrides it and a string `required` is its message. `useEzField` normalizes the rules and hands them to `useController({ rules })`, where hookform stores them on the field; `ezResolver` (the form's resolver) runs zod first, then each mounted field's rules in hookform's order (`required`, `min`, `max`, `maxLength`, `minLength`, `pattern`, `validate`; `required` fails on an empty value or `false`; the value rules are skipped for empty values, and `minLength`/`maxLength`/`pattern` apply to string values only; `validate` always runs, as in hookform), and a rule error replaces zod's error for that field. zod remains the source of truth for types, parsing, and cross-field validation.
+Each field accepts hookform-shaped rules as individual props. A bare value uses a default message derived from the field's `label` (fallback `This field`): `required` → `<label> is required.`, `min`/`max` → `<label> must be at least/most <value>.`, `minLength`/`maxLength` → `<label> must be at least/most <value> characters.`, `pattern` and `validate` returning `false` → `<label> is invalid.`; `{ value, message }` overrides it and a string `required` is its message. `useEzField` normalizes the rules and hands them to `useController({ rules })`, where hookform stores them on the field; `ezResolver` (the form's resolver) runs zod first, then each mounted field's rules in hookform's order (`required`, `min`, `max`, `maxLength`, `minLength`, `pattern`, `validate`; `required` fails on an empty value or `false`; the value rules are skipped for empty values; `min`/`max` take numbers or date strings (a numeric value compares as a number, otherwise a string bound compares as dates and invalid dates are skipped); `minLength`/`maxLength`/`pattern` apply to string values only; `validate` always runs, an all-string array counting as a failure, as in hookform), and a rule error replaces zod's error for that field. zod remains the source of truth for types, parsing, and cross-field validation.
 
 ## Error handling
 
@@ -95,6 +95,8 @@ ez-form/
 │   ├── fields/
 │   │   ├── useEzField.ts        useController + context guard + rule normalization
 │   │   ├── useBooleanField.ts   shared by Checkbox/Switch
+│   │   ├── BooleanFieldControl.tsx  internal frame (FormControl/Label/HelperText + a11y) rendered by Checkbox/Switch
+│   │   ├── mergeDisabled.ts     form-level disabled wins over a consumer disabled={false}
 │   │   ├── TextField/           TextField.tsx  .test.tsx  .stories.tsx  index.ts
 │   │   ├── Select/              (same shape)
 │   │   ├── Checkbox/            (same shape)
@@ -114,15 +116,15 @@ Every component has a jest-axe test ("has no accessibility violations") rendered
 
 - **Field prop rule.** Omit from the MUI props only what the binding owns: `name`, `value`/`checked`, `error`, the ref prop, and `required` (driven by the `required` rule). Everything else (`onChange`, `onBlur`, `helperText`, `disabled`, `id`, `slotProps`) is accepted and merged; hookform's handler runs first, the consumer's after. The rule props are destructured out before `rest` is spread so nothing leaks to MUI/DOM. In tests, query a required field by role: `getByLabelText` sees the aria-hidden asterisk as part of the label text.
 - **A11y wiring is the error-announcement strategy** (no live region). Every field hands RHF the real `<input>` ref, so `shouldFocusError` focuses the first invalid field on submit; the input carries `aria-invalid` and `aria-describedby` pointing at the helper text, which the screen reader then reads. MUI `TextField` does this itself (ids from `React.useId`, SSR-stable). `Checkbox`/`Switch` do it by hand: `useBooleanField` mints a `helperTextId` with `useId`, `FormHelperText` gets that id, and `slotProps.input` (merged with the consumer's via `mergeSlotProps`) carries `ref`, `aria-invalid`, `aria-describedby`. `required` is passed to `FormControlLabel` explicitly because it does not read `FormControl` context.
-- **`disabled` semantics.** A consumer's field-level `disabled` is UI-only and is never passed to `useController({ disabled })`, which would strip the value on submit and make a required field fail its own schema. Form-level disabling is `<Form disabled>` → `useForm({ disabled })`, which disables every field and `SubmitButton`; while the form is disabled, react-hook-form (7.87, verified) excludes those fields from the `handleSubmit` payload, mirroring native forms, and re-enabling restores them. `Form` also disables every field while `onSubmit` is pending: the payload for that submit is captured before `onSubmit` runs, so it is complete, and the next submit is complete too. Disabling a focused input blurs it; that is expected. Rules (like zod) still run against disabled fields' values at submit, because resolvers receive no disabled set; that is harmless during a pending submit since errors are not rendered then.
+- **`disabled` semantics.** A consumer's field-level `disabled` is UI-only and is never passed to `useController({ disabled })`, which would strip the value on submit and make a required field fail its own schema. Form-level disabling is `<Form disabled>` → `useForm({ disabled })`, which disables every field and `SubmitButton` and wins over a consumer `disabled={false}` (`mergeDisabled(consumer, form)` = `consumer || form`, used by every component); while the form is disabled, react-hook-form (7.87, verified) excludes those fields from the `handleSubmit` payload, mirroring native forms, and re-enabling restores them. `Form` also disables every field while `onSubmit` is pending: the payload for that submit is captured before `onSubmit` runs, so it is complete, and the next submit is complete too. Disabling a focused input blurs it; that is expected. Rules (like zod) still run against disabled fields' values at submit, because resolvers receive no disabled set; that is harmless during a pending submit since errors are not rendered then.
 - **zod 4 idioms.** `z.email({ error })` (an error map can tell empty from malformed via `iss.input`), `error:` not `message:`, `z.boolean().refine(Boolean, { error })` for must-be-true, and no `as never` in `defaultValues`; omit the key instead (`DefaultValues` is `DeepPartial`; fields render `undefined` as empty). Numeric text fields need `z.coerce.number()` because the input hands zod a string.
 
 ## Stories (v1)
 
-- `Form/Basic` — signup form with all five components, logs values on submit
-- `Form/ValidationErrors` — submit empty, every field shows its zod message
+- `Form/Basic` — signup form with all five components (every field `required`), logs values on submit
+- `Form/ValidationErrors` — play clicks submit empty; every required field shows its label-derived rule message
 - `Form/AsyncSubmit` — onSubmit awaits 1.5s, every field disables and SubmitButton shows a spinner
-- One `Default` story per field, plus `WithError` for TextField
+- Per field: `Default`, `Disabled`, `Required` (Select/Checkbox/Switch), `WithHelperText` (TextField/Checkbox/Switch), `WithError` and `Rules` (TextField)
 
 ## Success criteria
 
