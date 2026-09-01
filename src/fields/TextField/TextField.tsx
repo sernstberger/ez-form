@@ -8,15 +8,15 @@ export type TextFieldProps = Omit<
   name: string
 }
 
-export function TextField({ name, helperText, ...rest }: TextFieldProps) {
+export function TextField({ name, helperText, disabled, ...rest }: TextFieldProps) {
   const { field, fieldState } = useEzField(name, 'TextField')
-  const { ref, value, disabled, ...fieldProps } = field
+  const { ref, value, disabled: fieldDisabled, ...fieldProps } = field
 
   return (
     <MuiTextField
       {...fieldProps}
       value={value ?? ''}
-      disabled={rest.disabled ?? disabled}
+      disabled={disabled ?? fieldDisabled}
       inputRef={ref}
       error={fieldState.invalid}
       helperText={fieldState.error?.message ?? helperText}
