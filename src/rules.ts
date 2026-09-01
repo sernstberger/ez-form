@@ -58,7 +58,9 @@ function withMessage<T extends number | string | RegExp>(
 ): ValidationValueMessage<T> | undefined {
   if (rule === undefined) return undefined
   if (isValueMessage(rule)) {
-    return rule.value === undefined ? undefined : { value: rule.value, message: rule.message || message(rule.value) }
+    return rule.value === undefined
+      ? undefined
+      : { value: rule.value, message: rule.message || message(rule.value) }
   }
   return { value: rule, message: message(rule) }
 }
@@ -75,7 +77,10 @@ function normalizeRequired(
   return { value: true, message: required.message || fallback }
 }
 
-function wrapValidate(fn: Validate<unknown, FieldValues>, fallback: string): Validate<unknown, FieldValues> {
+function wrapValidate(
+  fn: Validate<unknown, FieldValues>,
+  fallback: string,
+): Validate<unknown, FieldValues> {
   return async (value, values) => {
     const result = await fn(value, values)
     return result === false ? fallback : result
@@ -96,7 +101,10 @@ export function normalizeRules<TValue>(rules: FieldRules<TValue>, label?: string
 
   const { validate } = rules
   if (typeof validate === 'function') {
-    out.validate = wrapValidate(validate as Validate<unknown, FieldValues>, defaultMessages.validate(l))
+    out.validate = wrapValidate(
+      validate as Validate<unknown, FieldValues>,
+      defaultMessages.validate(l),
+    )
   } else if (validate && typeof validate === 'object') {
     out.validate = Object.fromEntries(
       Object.entries(validate).map(([key, fn]) => [

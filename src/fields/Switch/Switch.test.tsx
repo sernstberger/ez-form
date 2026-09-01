@@ -69,7 +69,10 @@ describe('Switch', () => {
     )
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(await screen.findByText('You must opt in')).toBeInTheDocument()
-    expect(screen.getByRole('switch', { name: 'Dark mode' })).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByRole('switch', { name: 'Dark mode' })).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    )
   })
 
   it('merges consumer slotProps.input with the a11y wiring', () => {

@@ -15,7 +15,10 @@ type RuleError = Pick<FieldError, 'type' | 'message'>
 
 /** hookform's emptiness for the value rules: `false` is not empty here (it only matters to `required`). */
 const isEmpty = (value: unknown): boolean =>
-  value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)
+  value === undefined ||
+  value === null ||
+  value === '' ||
+  (Array.isArray(value) && value.length === 0)
 
 const isNumeric = (value: unknown): boolean =>
   value !== '' && value !== null && typeof value !== 'boolean' && !Number.isNaN(Number(value))

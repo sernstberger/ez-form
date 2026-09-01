@@ -17,8 +17,10 @@ import { ezResolver } from './ezResolver'
  */
 export type FormMethods<TIn extends FieldValues, TOut> = UseFormReturn<TIn, unknown, TOut>
 
-export interface FormProps<TIn extends FieldValues, TOut>
-  extends Omit<FormHTMLAttributes<HTMLFormElement>, 'onSubmit'> {
+export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
+  FormHTMLAttributes<HTMLFormElement>,
+  'onSubmit'
+> {
   /** zod schema. Its input type types `defaultValues`; its output type types `onSubmit`. */
   schema: z.ZodType<TOut, TIn>
   onSubmit: (values: NoInfer<TOut>, form: FormMethods<TIn, TOut>) => void | Promise<void>
