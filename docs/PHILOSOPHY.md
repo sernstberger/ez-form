@@ -75,7 +75,8 @@ An issue says what was observed (or "suspected"), the preferred outcome if there
 one, and 2–4 acceptance bullets; the task template in `.github/ISSUE_TEMPLATE`
 has the headings. Every judgement call made while building is written down as
 `Ruling: <what> — <why> — <cost if wrong>` in the ledger, and the finalized plan is
-posted on the issue so the decision survives the session that made it.
+posted on the issue so the decision survives the session that made it. Every ruling
+lands in [`docs/DECISIONS.md`](../DECISIONS.md).
 
 ## A component ships when
 

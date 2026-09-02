@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 { message })`, e.g. a rejected async `onSubmit`) as an MUI `Alert`; renders nothing
   when there is no root error. `EzFormError` theme key (`defaultProps`,
   `styleOverrides.root`) and the `formErrorClasses` export — #60.
+- `docs/DECISIONS.md`: rulings extracted from every SDD ledger, newest first, with links
+  to source documents and the decisions behind each design choice — #45.
 - `Form` `title` / `description` props with `aria-labelledby` / `aria-describedby` wiring;
   `EzForm` theme key (`root`, `title`, `description`) and `formClasses` — #51.
 - `FormSection`: `<fieldset>`/`<legend>` group with `EzFormSection` theme key
