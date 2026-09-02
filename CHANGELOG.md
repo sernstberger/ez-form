@@ -84,6 +84,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `Form`: a `setError` called synchronously inside `onDefaultValuesError` (for example
+  `ref.current?.setError('root.server', …)`) no longer gets wiped by hookform's own
+  post-rejection `reset({})`. `onDefaultValuesError` now runs after that reset has
+  settled instead of from inside the wrapper's own `.catch()`, and `Form` reads
+  `formState.errors` once so hookform re-renders for a form-wide error even when no
+  field is bound to its path. The form still re-enables either way, and omitting
+  `onDefaultValuesError` still rethrows the rejection unchanged — #70.
 - `FileField`'s picker `Button` `variant="outlined"` default is no longer a bare JSX
   literal: it now reads from a new `slotProps.button` prop, which `useDefaultProps`
   deep-merges key-by-key against `theme.components.EzFileField.defaultProps.slotProps.button`
