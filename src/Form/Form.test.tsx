@@ -570,3 +570,283 @@ describe('title and description', () => {
     expect(form).toHaveAccessibleDescription('All fields required')
   })
 })
+
+describe('requiredIndicator', () => {
+  const asterisk = (container: HTMLElement) => container.querySelector('[class*="asterisk"]')
+
+  it('defaults to "asterisk": unchanged from today (asterisk shown, no suffix)', () => {
+    const { container } = render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+        <TextField name="email" label="Email" required />
+      </Form>,
+    )
+    expect(asterisk(container)).not.toBeNull()
+    expect(screen.getByRole('textbox', { name: 'Email' })).toBeRequired()
+  })
+
+  it('"optional": a required field keeps required/aria-required but shows no asterisk', () => {
+    const { container } = render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: '' }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <TextField name="email" label="Email" required />
+      </Form>,
+    )
+    const input = screen.getByRole('textbox', { name: 'Email' })
+    // TextField's native `required` is what announces this to assistive tech
+    // (redundant `aria-required` is not needed alongside it, see RadioGroup's own
+    // `aria-required` for the case where the group has no native `required`).
+    expect(input).toBeRequired()
+    expect(asterisk(container)).toBeNull()
+  })
+
+  it('"optional": RadioGroup keeps aria-required but shows no legend asterisk', () => {
+    const { container } = render(
+      <Form
+        schema={z.object({ plan: z.number() })}
+        defaultValues={{}}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <RadioGroup
+          name="plan"
+          label="Plan"
+          options={[{ value: 1, label: 'Basic' }] as const}
+          required
+        />
+      </Form>,
+    )
+    expect(screen.getByRole('radiogroup', { name: 'Plan' })).toHaveAttribute(
+      'aria-required',
+      'true',
+    )
+    expect(asterisk(container)).toBeNull()
+  })
+
+  it('"optional": a required field still blocks submit', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: '' }}
+        onSubmit={onSubmit}
+        requiredIndicator="optional"
+      >
+        <TextField name="email" label="Email" required />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(await screen.findByText('Email is required.')).toBeInTheDocument()
+  })
+
+  it('"optional": a not-required field label ends with the default "(optional)" text', () => {
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: '' }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    expect(screen.getByLabelText('Email (optional)')).toBeInTheDocument()
+  })
+
+  it('"optional": Form optionalText overrides the default suffix', () => {
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: '' }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+        optionalText="(not required)"
+      >
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    expect(screen.getByLabelText('Email (not required)')).toBeInTheDocument()
+  })
+
+  it('a per-field optionalText overrides the Form-level one', () => {
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: '' }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+        optionalText="(not required)"
+      >
+        <TextField name="email" label="Email" optionalText="(skip if unsure)" />
+      </Form>,
+    )
+    expect(screen.getByLabelText('Email (skip if unsure)')).toBeInTheDocument()
+  })
+
+  it('a per-field optionalText={false} hides the suffix on that field only', () => {
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: '' }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <TextField name="email" label="Email" optionalText={false} />
+      </Form>,
+    )
+    expect(screen.getByLabelText('Email')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/optional/i)).not.toBeInTheDocument()
+  })
+
+  it('"asterisk" mode never appends optionalText', () => {
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    expect(screen.getByLabelText('Email')).toBeInTheDocument()
+    expect(screen.queryByText(/optional/i)).not.toBeInTheDocument()
+  })
+
+  it('renders the default requiredIndicatorText as the description in "optional" mode', () => {
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: '' }}
+        onSubmit={() => {}}
+        title="Sign up"
+        requiredIndicator="optional"
+      >
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    const form = screen.getByRole('form', { name: 'Sign up' })
+    expect(form).toHaveAccessibleDescription('All fields are required unless marked optional.')
+  })
+
+  it('appends requiredIndicatorText as a second sentence when description is also set', () => {
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: '' }}
+        onSubmit={() => {}}
+        title="Sign up"
+        description="We use this to contact you."
+        requiredIndicator="optional"
+      >
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    const form = screen.getByRole('form', { name: 'Sign up' })
+    expect(form).toHaveAccessibleDescription(
+      'We use this to contact you. All fields are required unless marked optional.',
+    )
+  })
+
+  it('requiredIndicatorText={false} suppresses the sentence entirely', () => {
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: '' }}
+        onSubmit={() => {}}
+        title="Sign up"
+        requiredIndicator="optional"
+        requiredIndicatorText={false}
+      >
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    const form = screen.getByRole('form', { name: 'Sign up' })
+    expect(form).not.toHaveAttribute('aria-describedby')
+  })
+
+  it('requiredIndicatorText is ignored in "asterisk" mode', () => {
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}} title="Sign up">
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    const form = screen.getByRole('form', { name: 'Sign up' })
+    expect(form).not.toHaveAttribute('aria-describedby')
+  })
+
+  it('is theme-defaultable via EzForm.defaultProps.requiredIndicator', () => {
+    const theme = createTheme({
+      components: { EzForm: { defaultProps: { requiredIndicator: 'optional' } } },
+    })
+    const { container } = render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+          <TextField name="email" label="Email" required />
+        </Form>
+      </ThemeProvider>,
+    )
+    expect(asterisk(container)).toBeNull()
+    expect(screen.getByRole('textbox', { name: 'Email' })).toBeRequired()
+  })
+
+  it('a per-form requiredIndicator overrides the theme default', () => {
+    const theme = createTheme({
+      components: { EzForm: { defaultProps: { requiredIndicator: 'optional' } } },
+    })
+    const { container } = render(
+      <ThemeProvider theme={theme}>
+        <Form
+          schema={schema}
+          defaultValues={{ email: '' }}
+          onSubmit={() => {}}
+          requiredIndicator="asterisk"
+        >
+          <TextField name="email" label="Email" required />
+        </Form>
+      </ThemeProvider>,
+    )
+    expect(asterisk(container)).not.toBeNull()
+  })
+
+  it('has no accessibility violations in "optional" mode with a mix of required/optional fields', async () => {
+    const { container } = render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: '' }}
+        onSubmit={() => {}}
+        title="Sign up"
+        requiredIndicator="optional"
+      >
+        <TextField name="email" label="Email" required />
+        <RadioGroup
+          name="plan"
+          label="Plan"
+          options={[{ value: 1, label: 'Basic' }] as const}
+          required
+        />
+        <Checkbox name="tos" label="I accept the terms" required />
+        <Switch name="newsletter" label="Send me the newsletter" />
+      </Form>,
+    )
+    await expectNoA11yViolations(container)
+  })
+
+  it('"optional": Checkbox keeps required with no asterisk, and a not-required Switch gets the suffix', () => {
+    const { container } = render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: '' }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <Checkbox name="tos" label="I accept the terms" required />
+        <Switch name="newsletter" label="Send me the newsletter" />
+      </Form>,
+    )
+    expect(screen.getByRole('checkbox', { name: 'I accept the terms' })).toBeRequired()
+    expect(screen.getByLabelText('Send me the newsletter (optional)')).toBeInTheDocument()
+    expect(asterisk(container)).toBeNull()
+  })
+})

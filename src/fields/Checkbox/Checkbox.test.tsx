@@ -107,4 +107,33 @@ describe('Checkbox', () => {
     expect(box).toHaveAttribute('title', 'Tick to continue')
     expect(box).toHaveAccessibleDescription('Required to continue')
   })
+
+  it('Form requiredIndicator="optional": required stays required with no asterisk', () => {
+    const { container } = render(
+      <Form
+        schema={schema}
+        defaultValues={{ tos: false }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <Checkbox name="tos" label="Accept terms" required />
+      </Form>,
+    )
+    expect(screen.getByRole('checkbox', { name: 'Accept terms' })).toBeRequired()
+    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
+  })
+
+  it('Form requiredIndicator="optional": not-required gets the optional suffix on the label', () => {
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ tos: false }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <Checkbox name="tos" label="Accept terms" />
+      </Form>,
+    )
+    expect(screen.getByRole('checkbox', { name: 'Accept terms (optional)' })).toBeInTheDocument()
+  })
 })

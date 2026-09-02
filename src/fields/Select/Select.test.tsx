@@ -141,4 +141,13 @@ describe('Select', () => {
       'true',
     )
   })
+
+  it('Form requiredIndicator="optional": not-required gets the optional suffix in its label', () => {
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}} requiredIndicator="optional">
+        <Select name="role" label="Role" options={options} />
+      </Form>,
+    )
+    expect(screen.getByLabelText('Role (optional)')).toBeInTheDocument()
+  })
 })

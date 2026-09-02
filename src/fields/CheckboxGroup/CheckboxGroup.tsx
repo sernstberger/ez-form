@@ -19,6 +19,11 @@ export type CheckboxGroupProps = Omit<FormGroupProps, 'children' | 'onChange' | 
   onChange?: (event: ChangeEvent<HTMLInputElement>, value: Value[]) => void
   /** The event's element is Checkbox's root button, not the hidden input. */
   onBlur?: (event: FocusEvent<HTMLElement>) => void
+  /**
+   * Overrides `Form`'s `optionalText` for this field when the form's
+   * `requiredIndicator` is `"optional"`; `false` hides it on this field.
+   */
+  optionalText?: ReactNode | false
 } & Pick<FieldRules<Value[]>, 'required' | 'validate'>
 
 /**
@@ -35,6 +40,7 @@ export function CheckboxGroup({
   disabled,
   required,
   validate,
+  optionalText,
   onChange,
   onBlur,
   ...rest
@@ -47,6 +53,7 @@ export function CheckboxGroup({
       helperText={helperText}
       disabled={disabled}
       rules={{ required, validate }}
+      optionalText={optionalText}
       labelAs="legend"
       renderControl={({ field, inputA11y, labelId }) => {
         const selected: Value[] = Array.isArray(field.value) ? field.value : []

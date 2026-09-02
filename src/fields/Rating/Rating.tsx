@@ -10,6 +10,11 @@ export type RatingProps = Omit<MuiRatingProps, 'name' | 'value' | 'defaultValue'
   label: ReactNode
   helperText?: ReactNode
   disabled?: boolean
+  /**
+   * Overrides `Form`'s `optionalText` for this field when the form's
+   * `requiredIndicator` is `"optional"`; `false` hides it on this field.
+   */
+  optionalText?: ReactNode | false
 } & Pick<FieldRules<number | null>, 'required' | 'validate'>
 
 /**
@@ -24,6 +29,7 @@ export function Rating({
   disabled,
   required,
   validate,
+  optionalText,
   onChange,
   onBlur,
   ...rest
@@ -36,6 +42,7 @@ export function Rating({
       helperText={helperText}
       disabled={disabled}
       rules={{ required, validate }}
+      optionalText={optionalText}
       labelAs="legend"
       renderControl={({ field, required: isRequired, inputA11y, labelId }) => (
         <RatingControl

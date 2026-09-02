@@ -8,6 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `Form` `requiredIndicator?: 'asterisk' | 'optional'` (default `'asterisk'`, theme-defaultable
+  via `EzForm.defaultProps`): in `'optional'` mode, a required field keeps
+  `required`/`aria-required` on its input but renders no asterisk, and a not-required field's
+  label gets `optionalText` appended (`Form`'s `optionalText`, default `'(optional)'`,
+  overridable per field via that field's own `optionalText` prop, or `false` to hide it there).
+  `Form`'s `requiredIndicatorText` (default "All fields are required unless marked optional.")
+  states the convention once, in the `description` slot — appended as a second sentence when
+  `description` is also set, `false` to suppress — #33.
 - `FormError`: renders `formState.errors.root` (set via `form.setError('root.<key>',
 { message })`, e.g. a rejected async `onSubmit`) as an MUI `Alert`; renders nothing
   when there is no root error. `EzFormError` theme key (`defaultProps`,
