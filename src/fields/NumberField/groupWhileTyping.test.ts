@@ -57,6 +57,17 @@ describe('groupWhileTyping', () => {
     },
   )
 
+  describe('non-space-group locales reject a stray ASCII space (#42)', () => {
+    it('en-US: strips a typed space instead of leaving it in the output', () => {
+      expect(groupWhileTyping('1 234', 5, separators)).toEqual({ text: '1,234', caret: 5 })
+    })
+
+    it('de-DE: strips a typed space instead of leaving it in the output', () => {
+      const de = getSeparators('de-DE')
+      expect(groupWhileTyping('1 234', 5, de)).toEqual({ text: '1.234', caret: 5 })
+    })
+  })
+
   describe('leading minus', () => {
     it('keeps a lone minus untouched', () => {
       expect(groupWhileTyping('-', 1, separators)).toEqual({ text: '-', caret: 1 })
@@ -82,6 +93,10 @@ describe('groupWhileTyping', () => {
         text: `1${NNBSP}234${NNBSP}567`,
         caret: 9,
       })
+    })
+
+    it('accepts a typed ASCII space as a group char (#42 guard)', () => {
+      expect(groupWhileTyping('1 234', 5, fr)).toEqual({ text: `1${NNBSP}234`, caret: 5 })
     })
 
     it('regroups text grouped with plain ASCII spaces', () => {
