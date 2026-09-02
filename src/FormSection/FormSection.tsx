@@ -5,6 +5,7 @@ import {
   type FieldsetHTMLAttributes,
   type ReactNode,
 } from 'react'
+import { useId, type FieldsetHTMLAttributes, type ReactNode, type Ref } from 'react'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import { styled } from '@mui/material/styles'
@@ -32,6 +33,8 @@ export interface FormSectionProps extends Omit<
   title?: ReactNode
   /** Text after the legend, wired to the fieldset through `aria-describedby`. */
   description?: ReactNode
+  /** The `<fieldset>` element, for measuring or moving focus into the group. */
+  ref?: Ref<HTMLFieldSetElement>
   slotProps?: {
     /**
      * Props (including `className`) for the heading rendered inside the
@@ -76,6 +79,7 @@ export function FormSection(inProps: FormSectionProps) {
     slotProps,
     className,
     children,
+    ref,
     'aria-describedby': ariaDescribedBy,
     ...rest
   } = useDefaultProps({ props: inProps, name: 'EzFormSection' })
@@ -95,6 +99,7 @@ export function FormSection(inProps: FormSectionProps) {
   return (
     <FormSectionRoot
       {...rest}
+      ref={ref}
       aria-describedby={ariaDescribedBy ?? (description != null ? descriptionId : undefined)}
       className={`${formSectionClasses.root}${className ? ` ${className}` : ''}`}
     >

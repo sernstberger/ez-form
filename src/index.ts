@@ -87,6 +87,12 @@ export {
 export { FormError, formErrorClasses, type FormErrorProps } from './FormError'
 export { FormSection, formSectionClasses, type FormSectionProps } from './FormSection'
 export {
+  FieldArray,
+  fieldArrayClasses,
+  type FieldArrayProps,
+  type FieldArrayRow,
+} from './FieldArray'
+export {
   PasswordStrength,
   passwordStrengthClasses,
   scorePassword,
