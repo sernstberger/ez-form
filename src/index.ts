@@ -8,6 +8,11 @@ export { Switch, type SwitchProps } from './fields/Switch'
 export { RadioGroup, type RadioGroupProps } from './fields/RadioGroup'
 export { NumberField, numberFieldClasses, type NumberFieldProps } from './fields/NumberField'
 export { MoneyField, type MoneyFieldProps } from './fields/MoneyField'
+export {
+  PasswordField,
+  passwordFieldClasses,
+  type PasswordFieldProps,
+} from './fields/PasswordField'
 export type { FieldRules, BooleanFieldRules } from './rules'
 export {
   Autocomplete,
@@ -58,3 +63,10 @@ export {
   type ReadOnlyFieldProps,
 } from './fields/ReadOnlyField'
 export { FormSection, formSectionClasses, type FormSectionProps } from './FormSection'
+export {
+  PasswordStrength,
+  passwordStrengthClasses,
+  scorePassword,
+  type PasswordStrengthProps,
+  type PasswordStrengthScore,
+} from './fields/PasswordStrength'

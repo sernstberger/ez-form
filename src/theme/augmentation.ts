@@ -8,6 +8,8 @@ import type { ReadOnlyFieldProps } from '../fields/ReadOnlyField'
 import type { NumberFieldControlProps } from '../fields/NumberField/NumberFieldControl'
 import type { FormProps } from '../Form'
 import type { FormSectionProps } from '../FormSection'
+import type { PasswordFieldProps } from '../fields/PasswordField'
+import type { PasswordStrengthProps } from '../fields/PasswordStrength'
 
 declare module '@mui/material/styles' {
   interface ComponentsPropsList {
@@ -21,6 +23,8 @@ declare module '@mui/material/styles' {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     EzForm: Partial<FormProps<any, any>>
     EzFormSection: Partial<FormSectionProps>
+    EzPasswordField: Partial<PasswordFieldProps>
+    EzPasswordStrength: Partial<PasswordStrengthProps>
   }
 
   interface ComponentNameToClassKey {
@@ -33,6 +37,8 @@ declare module '@mui/material/styles' {
     EzNumberField: 'root' | 'steppers' | 'increment' | 'decrement'
     EzForm: 'root' | 'title' | 'description'
     EzFormSection: 'root' | 'legend' | 'description' | 'content'
+    EzPasswordField: 'root' | 'toggle'
+    EzPasswordStrength: 'root' | 'bar' | 'label'
   }
 
   interface Components<Theme = unknown> {
@@ -71,6 +77,14 @@ declare module '@mui/material/styles' {
     EzFormSection?: {
       defaultProps?: ComponentsProps['EzFormSection']
       styleOverrides?: ComponentsOverrides<Theme>['EzFormSection']
+    }
+    EzPasswordField?: {
+      defaultProps?: ComponentsProps['EzPasswordField']
+      styleOverrides?: ComponentsOverrides<Theme>['EzPasswordField']
+    }
+    EzPasswordStrength?: {
+      defaultProps?: ComponentsProps['EzPasswordStrength']
+      styleOverrides?: ComponentsOverrides<Theme>['EzPasswordStrength']
     }
   }
 }
