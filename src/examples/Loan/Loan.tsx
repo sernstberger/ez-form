@@ -146,11 +146,9 @@ function sumField<T extends Record<string, unknown>>(rows: readonly T[], key: ke
 /**
  * Derived totals for the Review step: total monthly income (applicant +
  * co-applicants + every employment row), total monthly debt payment, and the
- * DTI ratio. Rendered with plain `Typography` rather than `ReadOnlyField`
- * because these are computed values, not a form path — `ReadOnlyField` only
- * supports `useWatch({ name })` today. See #68 (ReadOnlyField computed mode),
- * filed while building this example; once it lands this block becomes a
- * `format`-less `ReadOnlyField` fed by `compute`.
+ * DTI ratio. These are computed values, not form paths, so they use
+ * `ReadOnlyField`'s `value` mode (#68): the example derives them with its own
+ * `useWatch` calls and hands the results in.
  */
 function Totals() {
   const applicantIncome = useWatch<Input, 'applicantIncome'>({ name: 'applicantIncome' }) ?? 0
@@ -164,18 +162,13 @@ function Totals() {
     sumField(employment as Record<string, unknown>[], 'monthlyIncome')
   const totalMonthlyDebt = sumField(debts as Record<string, unknown>[], 'monthlyPayment')
   const dti = totalMonthlyIncome > 0 ? totalMonthlyDebt / totalMonthlyIncome : 1
-  // Spread (rather than a literal `component="p"` prop) so TS resolves Typography's
-  // polymorphic-component overload the same way Checkout's OrderSummary does.
-  const dtiProps = { variant: 'subtitle1', component: 'p', fontWeight: 'bold' } as const
 
   return (
     <FormSection title="Totals">
       <Stack spacing={1}>
-        <Typography variant="body2">Total monthly income: {money(totalMonthlyIncome)}</Typography>
-        <Typography variant="body2">
-          Total monthly debt payment: {money(totalMonthlyDebt)}
-        </Typography>
-        <Typography {...dtiProps}>Debt-to-income ratio: {(dti * 100).toFixed(1)}%</Typography>
+        <ReadOnlyField label="Total monthly income" value={money(totalMonthlyIncome)} />
+        <ReadOnlyField label="Total monthly debt payment" value={money(totalMonthlyDebt)} />
+        <ReadOnlyField label="Debt-to-income ratio" value={`${(dti * 100).toFixed(1)}%`} />
       </Stack>
     </FormSection>
   )

@@ -171,7 +171,8 @@ describe('Loan', () => {
     // income = 8000 (applicant) + 8000 (employment) = 16000; debt = 400 → DTI = 2.5%
     expect(within(totals).getByText(/total monthly income: \$16,000\.00/i)).toBeInTheDocument()
     expect(within(totals).getByText(/total monthly debt payment: \$400\.00/i)).toBeInTheDocument()
-    expect(within(totals).getByText(/debt-to-income ratio: 2\.5%/i)).toBeInTheDocument()
+    expect(within(totals).getByText('Debt-to-income ratio')).toBeInTheDocument()
+    expect(within(totals).getByText('2.5%')).toBeInTheDocument()
   })
 
   it('declines a high-DTI application and shows the server alert', async () => {
