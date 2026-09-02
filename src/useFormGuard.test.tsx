@@ -5,6 +5,7 @@ import { Form } from './Form'
 import { TextField } from './fields/TextField'
 import { SubmitButton } from './SubmitButton'
 import { useFormGuard, type FormGuardBlocker } from './useFormGuard'
+import { expectConsole } from './test/expectConsole'
 
 const schema = z.object({ email: z.string() })
 
@@ -112,7 +113,10 @@ describe('useFormGuard', () => {
   })
 
   it('throws outside <Form>', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
+    // React logs every error it caught while rendering before rethrowing it. The `toThrow`
+    // below is the assertion; these allow the noise that necessarily comes with it.
+    expectConsole('error', 'must be rendered inside <Form>')
+    expectConsole('error', 'The above error occurred')
     const fake = makeFakeBlocker()
     expect(() => render(<Probe useBlocker={fake.useBlocker} />)).toThrow(
       'ez-form: <useFormGuard> must be rendered inside <Form>',

@@ -281,12 +281,9 @@ export function ApplicantStep() {
 }
 
 export function ContactStep() {
-  // See ApplicantStep's comment: street/city/ZIP tokens are hardcoded (no `type` derives
-  // them), so they route through `resolveAutoComplete` the same way. `email` and `tel` would
-  // already be suppressed by `TextField`'s own `type`-derived default — they are hardcoded
-  // here only because this form also carries `phone`'s own `pattern` rule, not to opt out of
-  // that default, so they get the same explicit treatment for consistency.
-  const assisted = useAssisted()
+  // No `resolveAutoComplete` call here any more: `EmailField`, `PhoneField` and
+  // `AddressField` each derive their own autofill tokens and suppress them under
+  // `<Form assisted>` internally, so this step has no token to route by hand.
   return (
     <WizardStep id="contact">
       <Stack spacing={3}>

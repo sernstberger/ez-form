@@ -15,25 +15,27 @@ import { Switch } from './fields/Switch'
 import { Rating } from './fields/Rating'
 import { PasswordField } from './fields/PasswordField'
 import { TextareaField } from './fields/TextareaField'
-import type { MockInstance } from 'vitest'
 import { resetDevWarnings } from './devWarn'
-import { expectConsole } from './test/expectConsole'
+import { consoleMessages, expectConsole } from './test/expectConsole'
 
 /**
- * `devWarn` deduplicates by key for the life of the module, so every test starts by
- * clearing that set — otherwise the second test to trip the same warning sees nothing and
- * passes for the wrong reason. `vi.spyOn` is restored automatically (`restoreMocks` in
- * vite.config.ts), which also keeps the *real* console silent for the rest of the run.
+ * `devWarn` deduplicates by key for the life of the module, so every test starts by clearing
+ * that set — otherwise the second test to trip the same warning sees nothing and passes for
+ * the wrong reason.
+ *
+ * The warnings themselves are read from the console guard (src/test/expectConsole.ts) rather
+ * than from a `vi.spyOn`: a spy would replace the console the guard installed, taking every
+ * *other* message in these tests out of its view. `expectConsole` below tells the guard that
+ * `ez-form:` warnings are expected here, so they are allowed but still recorded — and any
+ * console output that is *not* an ez-form warning still fails these tests.
  */
-let warn: MockInstance<(...args: unknown[]) => void>
-
 beforeEach(() => {
   resetDevWarnings()
-  warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  expectConsole('warn', 'ez-form:')
 })
 
 /** The warning text, so a test asserts on the message rather than on call bookkeeping. */
-const messages = () => warn.mock.calls.map(([first]) => String(first))
+const messages = () => consoleMessages('warn')
 const messagesMatching = (pattern: RegExp) => messages().filter((m) => pattern.test(m))
 
 const schema = z.object({ email: z.string(), role: z.string() })
@@ -443,7 +445,7 @@ describe('production build', () => {
       () => ({}),
     )
 
-    expect(warn).not.toHaveBeenCalled()
+    expect(messages()).toEqual([])
   })
 
   it('warns in development, proving the production test is not vacuous', async () => {
@@ -461,6 +463,6 @@ describe('production build', () => {
       () => ({}),
     )
 
-    expect(warn).toHaveBeenCalledTimes(4)
+    expect(messages()).toHaveLength(4)
   })
 })

@@ -9,6 +9,7 @@ import { TextField } from '../TextField'
 import { Wizard, WizardStep } from '../../Wizard'
 import { ReadOnlyField, readOnlyFieldClasses, type ReadOnlyFieldProps } from './ReadOnlyField'
 import { expectNoA11yViolations } from '../../test/axe'
+import { expectConsole } from '../../test/expectConsole'
 
 // Spied (not mocked away) so every other test in this file still exercises the
 // real hook; only the "never calls useWatch" test below reads the call count.
@@ -102,6 +103,25 @@ describe('ReadOnlyField', () => {
     expect(screen.getByText('Alpha, zzz')).toBeInTheDocument()
   })
 
+  /*
+   * The array branch composes React nodes instead of `Array.join(', ')`. Every `display`
+   * branch returns a string today, so this pins the *observable* contract — one flat, comma-
+   * separated line with each entry formatted by its own rules, and never a stringified
+   * object — which is what would break first if a branch ever returned a real element.
+   */
+  it('array: entries are formatted individually and joined with ", "', () => {
+    wrap(
+      <ReadOnlyField value={[new Date('2024-03-02T12:00:00Z'), true, ['a', 'b']]} label="Mixed" />,
+    )
+
+    const rendered = document.querySelector('.EzReadOnlyField-value')
+    expect(rendered).not.toHaveTextContent('[object Object]')
+    // `Date` → locale string, `true` → "Yes", nested array → its own ", "-joined entries.
+    expect(rendered).toHaveTextContent(/2024/)
+    expect(rendered).toHaveTextContent(/Yes/)
+    expect(rendered).toHaveTextContent(/a, b/)
+  })
+
   it('format wins over every default', () => {
     wrap(<ReadOnlyField name="tags" format={(v) => `${(v as string[]).length} tags`} />)
     expect(screen.getByText('2 tags')).toBeInTheDocument()
@@ -169,7 +189,10 @@ describe('ReadOnlyField', () => {
   })
 
   it('throws outside <Form>', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
+    // React logs every error it caught while rendering before rethrowing it. The `toThrow`
+    // below is the assertion; these allow the noise that necessarily comes with it.
+    expectConsole('error', 'must be rendered inside <Form>')
+    expectConsole('error', 'The above error occurred')
     expect(() => render(<ReadOnlyField name="email" />)).toThrow(
       'ez-form: <ReadOnlyField> must be rendered inside <Form>',
     )

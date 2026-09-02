@@ -182,8 +182,9 @@ describe('Autocomplete', () => {
     })
 
     it('shows a structurally-equal default value as selected, without an MUI console warning', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      // "without an MUI console warning" is the console guard's job now
+      // (src/test/expectConsole.ts): any console.warn/error this test does not opt into fails
+      // it. The absence of an `expectConsole` call is the assertion.
       render(
         <Form
           schema={objectSchema}
@@ -196,15 +197,12 @@ describe('Autocomplete', () => {
         </Form>,
       )
       expect(combobox()).toHaveValue('Admin')
-      expect(warnSpy).not.toHaveBeenCalled()
-      expect(errorSpy).not.toHaveBeenCalled()
-      warnSpy.mockRestore()
-      errorSpy.mockRestore()
     })
 
     it('renders both chips for structurally-equal default values under multiple', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      // "without an MUI console warning" is the console guard's job now
+      // (src/test/expectConsole.ts): any console.warn/error this test does not opt into fails
+      // it. The absence of an `expectConsole` call is the assertion.
       render(
         <Form
           schema={objectMultiSchema}
@@ -227,10 +225,6 @@ describe('Autocomplete', () => {
       )
       expect(screen.getByRole('button', { name: 'Admin' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'User' })).toBeInTheDocument()
-      expect(warnSpy).not.toHaveBeenCalled()
-      expect(errorSpy).not.toHaveBeenCalled()
-      warnSpy.mockRestore()
-      errorSpy.mockRestore()
     })
 
     it('uses a consumer-supplied isOptionEqualToValue instead of the default', async () => {

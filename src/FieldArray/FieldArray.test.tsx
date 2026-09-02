@@ -8,6 +8,7 @@ import { TextField } from '../fields/TextField'
 import { expectNoA11yViolations } from '../test/axe'
 import { expectTargetSize } from '../test/targetSize'
 import { FieldArray, fieldArrayClasses } from './FieldArray'
+import { expectConsole } from '../test/expectConsole'
 
 const schema = z.object({
   applicants: z.array(z.object({ name: z.string(), email: z.string() })),
@@ -421,7 +422,10 @@ describe('FieldArray', () => {
   })
 
   it('throws a clear error outside <Form>', () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    // React logs every error it caught while rendering before rethrowing it. The `toThrow`
+    // below is the assertion; these allow the noise that necessarily comes with it.
+    expectConsole('error', 'must be rendered inside <Form>')
+    expectConsole('error', 'The above error occurred')
     expect(() =>
       render(
         <FieldArray name="applicants" label="Applicants" emptyRow={() => ({})}>
@@ -429,7 +433,6 @@ describe('FieldArray', () => {
         </FieldArray>,
       ),
     ).toThrow('ez-form: <FieldArray> must be rendered inside <Form>')
-    spy.mockRestore()
   })
 
   it('has no a11y violations', async () => {

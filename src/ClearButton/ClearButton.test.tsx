@@ -7,6 +7,7 @@ import { TextField } from '../fields/TextField'
 import { NumberField } from '../fields/NumberField'
 import { ClearButton, clearButtonClasses } from './ClearButton'
 import { expectNoA11yViolations } from '../test/axe'
+import { expectConsole } from '../test/expectConsole'
 
 const schema = z.object({ name: z.string(), seats: z.number().nullable() })
 const defaults = { name: 'Ada', seats: 2 }
@@ -164,7 +165,10 @@ describe('ClearButton', () => {
   })
 
   it('throws outside <Form>', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
+    // React logs every error it caught while rendering before rethrowing it. The `toThrow`
+    // below is the assertion; these allow the noise that necessarily comes with it.
+    expectConsole('error', 'must be rendered inside <Form>')
+    expectConsole('error', 'The above error occurred')
     expect(() => render(<ClearButton />)).toThrow(
       'ez-form: <ClearButton> must be rendered inside <Form>',
     )

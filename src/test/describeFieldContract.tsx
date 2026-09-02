@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react'
 import { render, screen } from '@testing-library/react'
+import { expectConsole } from './expectConsole'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import type { DefaultValues, FieldValues } from 'react-hook-form'
 import type { z } from 'zod'
@@ -66,7 +67,10 @@ export function describeFieldContract<TIn extends FieldValues, TOut>(c: FieldCon
 
   describe(`${c.componentName} field contract`, () => {
     it('throws outside <Form>', () => {
-      vi.spyOn(console, 'error').mockImplementation(() => {})
+      // React logs every error it caught while rendering before rethrowing it. The throw
+      // below is the assertion; these allow the noise that necessarily comes with it.
+      expectConsole('error', `must be rendered inside <Form>`)
+      expectConsole('error', 'The above error occurred')
       expect(() => render(c.render({}))).toThrow(
         `ez-form: <${c.componentName}> must be rendered inside <Form>`,
       )

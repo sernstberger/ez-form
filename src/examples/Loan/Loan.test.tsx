@@ -23,7 +23,9 @@ async function fillLoanStep(user: ReturnType<typeof userEvent.setup>, amount = '
 /** Below Loan's LOW_INCOME_THRESHOLD (see Loan.tsx): the co-signer note becomes required. */
 const LOW_INCOME_THRESHOLD = 3000
 
-async function fillApplicantStep(user: ReturnType<typeof userEvent.setup>, income = '8000') {
+// `_user`: this step now fills every field through `setValue` (see #85), so it needs no
+// userEvent instance — but the parameter stays so every fill* helper is called the same way.
+async function fillApplicantStep(_user: ReturnType<typeof userEvent.setup>, income = '8000') {
   setValue(screen.getByLabelText(/full name/i), 'Ada Lovelace')
   setValue(screen.getByLabelText(/^email/i), 'ada@example.com')
   typeDate('applicantBirthday', '12/10/1985')
@@ -61,15 +63,7 @@ async function fillThroughDebts(user: ReturnType<typeof userEvent.setup>) {
   await next(user) // debts: none required
 }
 
-/*
- * A longer per-test budget than the 5s default, for this file only. StrictMode (see
- * src/test/setup.ts) renders every component twice, and these tests walk a multi-step wizard
- * filling every field on the way — roughly double the work of any other suite here. The tests
- * themselves are already as lean as they go (`delay: null` on userEvent, a zeroed fake-API
- * delay, a seeded resume state for the Review step); what is left is real double-rendering,
- * not waiting. See #85 for the wider slowness of these two example suites.
- */
-describe('Loan', { timeout: 20_000 }, () => {
+describe('Loan', () => {
   it('has an accessible form name "Loan application"', () => {
     render(<Loan />)
     expect(screen.getByRole('form', { name: 'Loan application' })).toBeInTheDocument()

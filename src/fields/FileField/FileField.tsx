@@ -144,7 +144,6 @@ export type FileFieldProps = {
   onChange?: (event: SyntheticEvent, value: FileFieldValue) => void
 } & Pick<FieldRules<FileFieldValue>, 'required' | 'validate'>
 
-/** 1 kB = 1000 B, matching how OS file dialogs and `accept`-adjacent UI report sizes. */
 /**
  * "This effect has not run yet" marker for the rejection-revalidation effect below. A distinct
  * sentinel rather than `undefined`, because `undefined` is itself a real `rejection` value
@@ -152,6 +151,7 @@ export type FileFieldProps = {
  */
 const MOUNT = Symbol('mount')
 
+/** 1 kB = 1000 B, matching how OS file dialogs and `accept`-adjacent UI report sizes. */
 const SIZE_UNITS = ['B', 'kB', 'MB', 'GB', 'TB'] as const
 
 /** `1500000` → `"1.5 MB"`; whole numbers lose the `.0` (`1000` → `"1 kB"`). */

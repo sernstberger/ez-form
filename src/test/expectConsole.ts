@@ -107,6 +107,19 @@ export function expectConsole(level: Level, matcher: string | RegExp): void {
   expectations.push({ level, matcher })
 }
 
+/**
+ * Everything `console[level]` has been called with so far in the current test, formatted the
+ * way a developer would see it.
+ *
+ * For tests whose subject *is* the console output — `devWarn.test.tsx` asserts on the exact
+ * text of every developer warning. Those tests still call `expectConsole` to say the output is
+ * expected; this is how they then read it, instead of installing a `vi.spyOn` that would take
+ * the console away from the guard.
+ */
+export function consoleMessages(level: Level): string[] {
+  return recorded.filter((call) => call.level === level).map((call) => call.text)
+}
+
 /** Installs the patched console. Called once from `setup.ts`. */
 export function installConsoleGuard(): void {
   beforeEach(() => {
@@ -123,42 +136,60 @@ export function installConsoleGuard(): void {
   })
 
   afterEach(() => {
+    /*
+     * Unmount everything first, while the patched console is still in place.
+     *
+     * Two reasons, both load-bearing:
+     *
+     * 1. **Coverage.** Unmounting runs every effect cleanup and, under StrictMode, a whole
+     *    extra unmount pass. A `console.error` from a cleanup — a subscription torn down
+     *    twice, a timer cleared after the component is gone — is exactly the kind of bug this
+     *    guard exists to catch, and it happens *during* cleanup. Restoring the console first
+     *    would let all of it through unseen.
+     * 2. **Ordering.** Testing Library registers its own auto-cleanup `afterEach` when
+     *    `@testing-library/react` is first imported, which `setup.ts` does on the line above
+     *    `installConsoleGuard()`. Vitest runs `afterEach` hooks in reverse registration order,
+     *    so this one runs *first* — and throwing below would skip RTL's cleanup entirely,
+     *    leaving the previous test's DOM mounted. The next test then fails with "Found
+     *    multiple elements", blaming a file that is not at fault (this cost the whole
+     *    FileField suite once already).
+     *
+     * `cleanup()` is idempotent, so RTL's own hook running afterwards is a no-op.
+     */
+    cleanup()
+
     for (const level of ['error', 'warn'] as const) {
       const restore = original[level]
       if (restore) console[level] = restore
     }
 
-    const allowed = [...ALWAYS_ALLOWED, ...expectations]
-    const unexpected = recorded.filter(
-      (call) => !allowed.some((expectation) => matches(expectation, call)),
-    )
-    recorded = []
-    expectations = []
-
-    if (unexpected.length > 0) {
-      /*
-       * Unmount anything still rendered before throwing.
-       *
-       * Testing Library registers its own auto-cleanup `afterEach` when
-       * `@testing-library/react` is first imported, which `setup.ts` does on the line above
-       * `installConsoleGuard()`. Vitest runs `afterEach` hooks in reverse registration order,
-       * so this one runs *first* — and throwing here would skip the cleanup entirely, leaving
-       * the previous test's DOM mounted. The next test then fails with "Found multiple
-       * elements", blaming a file that is not at fault (this cost the whole FileField suite
-       * once already).
-       */
-      cleanup()
-
-      // De-duplicated: React logs the same warning once per render pass, and StrictMode
-      // doubles that, so the raw list is the same line several times over.
-      const lines = [...new Set(unexpected.map((c) => `  console.${c.level}: ${c.text}`))].join(
-        '\n',
-      )
-      throw new Error(
-        `Unexpected console output during this test:\n${lines}\n\n` +
-          'Fix the component, or — if the message is the point of the test — opt in with ' +
-          "`expectConsole('warn', /…/)` from src/test/expectConsole.ts.",
-      )
-    }
+    assertNoUnexpectedOutput()
   })
+}
+
+/**
+ * Throws if anything recorded this test was not allowed, then clears the buffers ready for the
+ * next one. Split out of the `afterEach` so `expectConsole.test.tsx` can drive it directly: a
+ * test that let the hook fire would fail itself, which is the one behaviour it cannot assert.
+ *
+ * @internal — exported for that test only.
+ */
+export function assertNoUnexpectedOutput(): void {
+  const allowed = [...ALWAYS_ALLOWED, ...expectations]
+  const unexpected = recorded.filter(
+    (call) => !allowed.some((expectation) => matches(expectation, call)),
+  )
+  recorded = []
+  expectations = []
+
+  if (unexpected.length > 0) {
+    // De-duplicated: React logs the same warning once per render pass, and StrictMode
+    // doubles that, so the raw list is the same line several times over.
+    const lines = [...new Set(unexpected.map((c) => `  console.${c.level}: ${c.text}`))].join('\n')
+    throw new Error(
+      `Unexpected console output during this test:\n${lines}\n\n` +
+        'Fix the component, or — if the message is the point of the test — opt in with ' +
+        "`expectConsole('warn', /…/)` from src/test/expectConsole.ts.",
+    )
+  }
 }

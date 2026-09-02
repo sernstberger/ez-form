@@ -10,6 +10,7 @@ import { Wizard, type WizardStepDef } from '../Wizard/Wizard'
 import { WizardStep } from '../Wizard/WizardStep'
 import { WizardNav } from '../Wizard/WizardNav'
 import { expectNoA11yViolations } from '../test/axe'
+import { expectConsole } from '../test/expectConsole'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -340,7 +341,10 @@ describe('FormErrorSummary inside a Wizard', () => {
 
 describe('useEzFormContext guard', () => {
   it('throws a clear error outside <Form>', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
+    // React logs every error it caught while rendering before rethrowing it. The `toThrow`
+    // below is the assertion; these allow the noise that necessarily comes with it.
+    expectConsole('error', 'must be rendered inside <Form>')
+    expectConsole('error', 'The above error occurred')
     expect(() => render(<FormErrorSummary />)).toThrow(
       'ez-form: <FormErrorSummary> must be rendered inside <Form>',
     )

@@ -107,6 +107,9 @@ export function EmailField(inProps: EmailFieldProps) {
     // Only when it actually differs, so an already-canonical value fires no
     // extra change and never marks the field dirty on its own.
     if (next !== input.value) {
+      // Deliberately unbound: `.call(input, next)` below drives the *native* setter, which is
+      // what bypasses React's value tracker so the dispatched `input` event is not swallowed.
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
       setter?.call(input, next)
       input.dispatchEvent(new Event('input', { bubbles: true }))

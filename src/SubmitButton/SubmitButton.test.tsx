@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { Form } from '../Form'
 import { SubmitButton, submitButtonClasses } from './SubmitButton'
 import { expectNoA11yViolations } from '../test/axe'
+import { expectConsole } from '../test/expectConsole'
 
 const schema = z.object({ ok: z.boolean() })
 
@@ -74,7 +75,10 @@ describe('SubmitButton', () => {
   })
 
   it('throws outside <Form>', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
+    // React logs every error it caught while rendering before rethrowing it. The `toThrow`
+    // below is the assertion; these allow the noise that necessarily comes with it.
+    expectConsole('error', 'must be rendered inside <Form>')
+    expectConsole('error', 'The above error occurred')
     expect(() => render(<SubmitButton />)).toThrow(
       'ez-form: <SubmitButton> must be rendered inside <Form>',
     )

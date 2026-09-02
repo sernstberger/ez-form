@@ -50,9 +50,15 @@ const isEmpty = (v: unknown) =>
   v === '' || v === null || v === undefined || (Array.isArray(v) && v.length === 0)
 
 function display(value: unknown, options?: readonly Option[]): ReactNode {
-  // Joined as React nodes, not with `Array.join`: each element's own `display` may resolve to
-  // an `Option.label`, which is a `ReactNode` — stringifying one would render the literal
-  // "[object Object]" instead of the label.
+  /*
+   * Composed as React nodes rather than `Array.join(', ')`.
+   *
+   * Today every non-array branch below returns a string, so the two produce identical output
+   * and this is defensive, not a bug fix — `no-base-to-string` flags the `join` because the
+   * declared return type is `ReactNode`, and that type is the contract. The moment any branch
+   * returns an actual element (an `Option.label` widened to `ReactNode`, a formatted chip),
+   * `join` would call `toString` on it and render "[object Object]"; composing nodes cannot.
+   */
   if (Array.isArray(value)) {
     return value.map((v, i) => (
       <Fragment key={i}>

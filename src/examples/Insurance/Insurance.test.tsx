@@ -201,15 +201,7 @@ afterEach(() => {
   localStorage.clear()
 })
 
-/*
- * A longer per-test budget than the 5s default, for this file only. StrictMode (see
- * src/test/setup.ts) renders every component twice, and these tests walk a multi-step wizard
- * filling every field on the way — roughly double the work of any other suite here. The tests
- * themselves are already as lean as they go (`delay: null` on userEvent, a zeroed fake-API
- * delay, a seeded resume state for the Review step); what is left is real double-rendering,
- * not waiting. See #85 for the wider slowness of these two example suites.
- */
-describe('Insurance', { timeout: 20_000 }, () => {
+describe('Insurance', () => {
   it('has an accessible form name "Auto insurance application"', () => {
     render(withPickers(<Insurance />))
     expect(screen.getByRole('form', { name: 'Auto insurance application' })).toBeInTheDocument()
