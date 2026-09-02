@@ -40,13 +40,11 @@ export {
   type FileFieldProps,
   type FileFieldValue,
 } from './fields/FileField'
-export { OtpField, type OtpFieldProps } from './fields/OtpField'
 export {
   ResendCodeButton,
   resendCodeButtonClasses,
   type ResendCodeButtonProps,
 } from './fields/OtpField/ResendCodeButton'
-export { FileField, type FileFieldProps, type FileFieldValue } from './fields/FileField'
 export {
   ConfirmDialog,
   confirmDialogClasses,
