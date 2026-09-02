@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { get, useFormState, type FieldValues, type Path } from 'react-hook-form'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useFormState, type FieldValues, type Path } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
 import {
   WizardContext,
@@ -9,6 +9,20 @@ import {
 } from './WizardContext'
 
 export type { WizardStepDef, WizardStepStatus } from './WizardContext'
+
+/**
+ * The field paths that have an error, in schema order. hookform nests `errors` to mirror
+ * the values (`{ address: { city: FieldError } }`), so this walks it down to the
+ * `FieldError` leaves — recognised by their `type` — and joins the keys back into the
+ * dotted paths a step's `fields` are written in.
+ */
+function errorFieldPaths(errors: unknown, prefix = ''): string[] {
+  if (typeof errors !== 'object' || errors === null) return []
+  if ('type' in errors) return prefix ? [prefix] : []
+  return Object.entries(errors).flatMap(([key, value]) =>
+    errorFieldPaths(value, prefix ? `${prefix}.${key}` : key),
+  )
+}
 
 export interface WizardProps<TIn extends FieldValues> {
   /**
@@ -31,7 +45,8 @@ export interface WizardProps<TIn extends FieldValues> {
    * Controlled list of step ids the user has reached: which stepper steps are
    * clickable and where an unreachable `step` redirects. Omit for internal
    * state. Save it with draft values so a returning user resumes where they
-   * left off.
+   * left off. Ids that no longer match a step are ignored; if none match, the
+   * wizard starts at the first step.
    */
   visited?: readonly string[]
   onVisitedChange?: (ids: readonly string[]) => void
@@ -54,8 +69,8 @@ export function Wizard<TIn extends FieldValues>({
   orientation = 'horizontal',
   children,
 }: WizardProps<TIn>) {
-  const { trigger, control } = useEzFormContext('Wizard')
-  const { errors } = useFormState({ control })
+  const { trigger, control, setFocus } = useEzFormContext('Wizard')
+  const { errors, submitCount } = useFormState({ control })
   // `steps` is required and a wizard with no steps has nothing to render;
   // every index below is derived from it and clamped to its range, so the
   // non-null assertions here are the shape of the data, not a guess.
@@ -68,7 +83,11 @@ export function Wizard<TIn extends FieldValues>({
   const visited = visitedProp ?? visitedState
   const requestedId = step ?? stepState
   const indexOf = useCallback((id: string) => steps.findIndex((s) => s.id === id), [steps])
-  const lastVisitedIndex = Math.max(0, ...visited.map(indexOf))
+  // Stale ids (a renamed step id after a localStorage resume) resolve to -1 from `indexOf`.
+  // Filter them out before Math.max so the fallback to step 0 only happens when nothing in
+  // `visited` matches a step, not as a side effect of -1 losing to the 0 floor.
+  const visitedIndexes = visited.map(indexOf).filter((i) => i !== -1)
+  const lastVisitedIndex = visitedIndexes.length ? Math.max(...visitedIndexes) : 0
   // A controlled `step` that is unknown or not yet visited is shown as the last visited step
   // while the effect below asks the consumer to move there.
   const reachable = indexOf(requestedId) !== -1 && visited.includes(requestedId)
@@ -135,23 +154,62 @@ export function Wizard<TIn extends FieldValues>({
     [indexOf, index, visited, lastVisitedIndex, validateCurrent, move],
   )
 
-  const hasError = useCallback(
-    (def: WizardStepDef) => (def.fields ?? []).some((f) => get(errors, f) !== undefined),
-    [errors],
+  const errorPaths = useMemo(() => errorFieldPaths(errors), [errors])
+
+  // The step that owns an error path: the one listing the path itself or a prefix of it
+  // (`address` owns `address.city`), and the last step for a path no step lists — so an
+  // error on a field the wizard never mounts is still reported and navigated to.
+  const ownerIndex = useCallback(
+    (path: string) => {
+      const owner = steps.findIndex((s) =>
+        (s.fields ?? []).some((f) => path === f || path.startsWith(`${f}.`)),
+      )
+      return owner === -1 ? steps.length - 1 : owner
+    },
+    [steps],
   )
 
   const stepStatus = useCallback(
     (id: string): WizardStepStatus => {
       if (id === current.id) return 'current'
       if (!visited.includes(id)) return 'upcoming'
-      const def = steps[indexOf(id)]
-      return def && hasError(def) ? 'visited' : 'completed'
+      const to = indexOf(id)
+      if (to === -1) return 'completed'
+      return errorPaths.some((p) => ownerIndex(p) === to) ? 'visited' : 'completed'
     },
-    [current.id, visited, steps, indexOf, hasError],
+    [current.id, visited, indexOf, errorPaths, ownerIndex],
   )
+
+  // A failed submit: `submitCount` went up and left errors behind. hookform focused the
+  // first errored field, which does nothing when that field is on another step or on no
+  // step at all — so the wizard navigates to the step that owns it and focuses it there
+  // once it mounts. The ref makes this fire once per submit rather than on every render
+  // that follows one (and never on mount, where submitCount is already 0).
+  const handledSubmit = useRef(submitCount)
+  const [focusTarget, setFocusTarget] = useState<{ id: string; path: string } | null>(null)
+
+  useEffect(() => {
+    if (submitCount === handledSubmit.current) return
+    handledSubmit.current = submitCount
+    if (!errorPaths.length) return
+    // The earliest owning step wins; among that step's errors, the first in schema order.
+    const owned = errorPaths.map((path) => ({ path, to: ownerIndex(path) }))
+    const to = Math.min(...owned.map((o) => o.to))
+    if (to === index) return
+    move(to)
+    setFocusTarget({ id: steps[to]!.id, path: owned.find((o) => o.to === to)!.path })
+  }, [submitCount, errorPaths, ownerIndex, index, move, steps])
+
+  useEffect(() => {
+    if (!focusTarget || focusTarget.id !== current.id) return
+    setFocusTarget(null)
+    setFocus(focusTarget.path)
+  }, [focusTarget, current.id, setFocus])
 
   const value = useMemo<WizardContextValue>(
     () => ({
+      // The context is deliberately untyped in `TIn`: WizardStepper / WizardNav / useWizard
+      // consume it without knowing the form's field type, so these casts erase `TIn` on purpose.
       steps: steps as readonly WizardStepDef[],
       current: current as WizardStepDef,
       index,

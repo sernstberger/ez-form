@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useFormContext } from 'react-hook-form'
 import { z } from 'zod'
 import { Form } from '../Form'
+import { SubmitButton } from '../SubmitButton'
 import { TextField } from '../fields/TextField'
 import { expectNoA11yViolations } from '../test/axe'
 import { Wizard, type WizardStepDef } from './Wizard'
@@ -28,9 +30,11 @@ const steps = [
 /** Buttons + a readout so tests drive the context without the Stepper/Nav components. */
 function Controls() {
   const w = useWizard('Controls')
+  const [went, setWent] = useState<string>('')
   return (
     <>
       <output data-testid="current">{w.current.id}</output>
+      <output data-testid="went">{went}</output>
       <output data-testid="visited">{w.visited.join(',')}</output>
       <output data-testid="status">
         {w.steps.map((s) => `${s.id}:${w.stepStatus(s.id)}`).join(' ')}
@@ -47,6 +51,9 @@ function Controls() {
       </button>
       <button type="button" onClick={() => void w.go('review')}>
         go review
+      </button>
+      <button type="button" onClick={() => void w.go('gone').then((r) => setWent(String(r)))}>
+        go gone
       </button>
     </>
   )
@@ -72,6 +79,31 @@ function Steps() {
 
 const empty = { name: '', email: '', plan: '' }
 const filled = { name: 'Ada', email: 'ada@x.io', plan: 'pro' }
+
+/** `nickname` appears in no step's `fields`: only final submit ever validates it. */
+const unlistedSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  nickname: z.string().min(1, 'Nickname is required'),
+})
+const unlistedSteps = [
+  { id: 'account', label: 'Account', fields: ['name'] },
+  { id: 'review', label: 'Review' },
+] as const satisfies WizardStepDef<z.input<typeof unlistedSchema>>[]
+const unlistedEmpty = { name: 'Ada', nickname: '' }
+
+/**
+ * Invalidates a field from another step, the way an async `values` load or a "clear"
+ * action on a review step does: the account step is unmounted, so nothing shows the
+ * error and hookform's submit-time focus has no input to focus.
+ */
+function ClearEmail() {
+  const { setValue } = useFormContext<Input>()
+  return (
+    <button type="button" onClick={() => setValue('email', '')}>
+      clear email
+    </button>
+  )
+}
 
 describe('Wizard', () => {
   it('renders only the current step and starts on the first', () => {
@@ -292,6 +324,114 @@ describe('Wizard', () => {
     it('redirects a step beyond the restored visited list to the last visited step', async () => {
       render(<Controlled initial="review" visited={['account', 'plan']} />)
       await waitFor(() => expect(screen.getByTestId('param')).toHaveTextContent('plan'))
+    })
+
+    it('ignores a stale visited id and redirects to the last id that still matches a step', async () => {
+      render(<Controlled initial="review" visited={['gone', 'plan']} />)
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+      expect(screen.getByTestId('param')).toHaveTextContent('plan')
+    })
+
+    it('falls back to the first step when no visited id matches a step', async () => {
+      render(<Controlled initial="review" visited={['gone']} />)
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('account'))
+      expect(screen.getByTestId('param')).toHaveTextContent('account')
+    })
+
+    it('stepStatus does not throw for a stale id', () => {
+      render(<Controlled initial="account" visited={['account', 'gone']} />)
+      expect(screen.getByTestId('current')).toHaveTextContent('account')
+      expect(screen.getByTestId('status')).toHaveTextContent(
+        'account:current plan:upcoming review:upcoming',
+      )
+    })
+  })
+
+  it('go() with an id that is in no step resolves false without throwing', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+        <Wizard steps={steps}>
+          <Steps />
+        </Wizard>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'go gone' }))
+    await waitFor(() => expect(screen.getByTestId('went')).toHaveTextContent('false'))
+    expect(screen.getByTestId('current')).toHaveTextContent('account')
+  })
+
+  describe('failed submit', () => {
+    it('an error on a field in no step belongs to the last step and blocks submit', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={unlistedSchema} defaultValues={unlistedEmpty} onSubmit={onSubmit}>
+          <Wizard steps={unlistedSteps}>
+            <WizardStep id="account">
+              <TextField name="name" label="Name" />
+            </WizardStep>
+            <WizardStep id="review">
+              <p>Review</p>
+            </WizardStep>
+            <Controls />
+            <SubmitButton />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('review'))
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      // `nickname` is in no step's fields, so its error belongs to the last step: the
+      // wizard is already there, and the stepper marks it rather than saying "completed".
+      await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('review:current'))
+      await user.click(screen.getByRole('button', { name: 'go account' }))
+      await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('review:visited'))
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('moves to the first errored step and focuses the field', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={schema} defaultValues={filled} onSubmit={onSubmit}>
+          <Wizard steps={steps}>
+            <Steps />
+            <ClearEmail />
+            <SubmitButton />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('review'))
+      // The account step is unmounted when email goes invalid, so before this fix Submit
+      // failed with nothing shown and nothing focused.
+      await user.click(screen.getByRole('button', { name: 'clear email' }))
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('account'))
+      await waitFor(() => expect(screen.getByRole('textbox', { name: 'Email' })).toHaveFocus())
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('does not navigate when the errored field is on the current step', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={schema} defaultValues={filled} onSubmit={onSubmit}>
+          <Wizard steps={steps}>
+            <Steps />
+            <SubmitButton />
+          </Wizard>
+        </Form>,
+      )
+      await user.clear(screen.getByRole('textbox', { name: 'Email' }))
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      await waitFor(() => expect(screen.getByText('Invalid email')).toBeInTheDocument())
+      expect(screen.getByTestId('current')).toHaveTextContent('account')
+      expect(screen.getByTestId('visited')).toHaveTextContent('account')
+      expect(onSubmit).not.toHaveBeenCalled()
     })
   })
 
