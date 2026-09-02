@@ -31,6 +31,7 @@ function Controls() {
       <output data-testid="status">
         {w.steps.map((s) => `${s.id}:${w.stepStatus(s.id)}`).join(' ')}
       </output>
+      <output data-testid="pending">{String(w.pending)}</output>
       <button type="button" onClick={() => void w.next()}>
         next
       </button>
@@ -162,6 +163,35 @@ describe('Wizard', () => {
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('plan:visited'))
   })
 
+  it('reports pending while an async rule validates, and clears it after the move', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+        <Wizard steps={steps}>
+          <WizardStep id="account">
+            <TextField
+              name="name"
+              label="Name"
+              validate={() => new Promise<true>((r) => setTimeout(() => r(true), 50))}
+            />
+            <TextField name="email" label="Email" />
+          </WizardStep>
+          <WizardStep id="plan">
+            <TextField name="plan" label="Plan" />
+          </WizardStep>
+          <Controls />
+        </Wizard>
+      </Form>,
+    )
+    expect(screen.getByTestId('pending')).toHaveTextContent('false')
+    await user.click(screen.getByRole('button', { name: 'next' }))
+    // The slow validate keeps `next()` in flight, so Task 7's Next button has a
+    // loading state to render.
+    await waitFor(() => expect(screen.getByTestId('pending')).toHaveTextContent('true'))
+    await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+    expect(screen.getByTestId('pending')).toHaveTextContent('false')
+  })
+
   it('next on the last step is a no-op that returns false', async () => {
     const user = userEvent.setup()
     render(
@@ -189,6 +219,11 @@ describe('Wizard', () => {
       onVisitedChange?: (ids: readonly string[]) => void
     }) {
       const [step, setStep] = useState(initial)
+      // A controlled `visited` behaves like a controlled `step`: the wizard
+      // only moves once the consumer feeds the new list back. Tests that pass
+      // `onVisitedChange` get that round trip; the redirect test deliberately
+      // leaves the list frozen so the wizard cannot reach `review`.
+      const [visitedState, setVisitedState] = useState(visited)
       const onStepChange = vi.fn((s: WizardStepDef) => setStep(s.id))
       return (
         <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
@@ -197,8 +232,14 @@ describe('Wizard', () => {
             steps={steps}
             step={step}
             onStepChange={onStepChange}
-            visited={visited}
-            onVisitedChange={onVisitedChange}
+            visited={onVisitedChange ? visitedState : visited}
+            onVisitedChange={
+              onVisitedChange &&
+              ((ids) => {
+                onVisitedChange(ids)
+                setVisitedState(ids)
+              })
+            }
           >
             <Steps />
           </Wizard>
@@ -238,6 +279,10 @@ describe('Wizard', () => {
       await waitFor(() =>
         expect(onVisitedChange).toHaveBeenCalledWith(['account', 'plan', 'review']),
       )
+      // The move sticks: with the new list fed back, the wizard reaches review
+      // instead of being bounced to the last visited step by the redirect effect.
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('review'))
+      expect(screen.getByTestId('param')).toHaveTextContent('review')
     })
 
     it('redirects a step beyond the restored visited list to the last visited step', async () => {

@@ -11,6 +11,12 @@ import {
 export type { WizardStepDef, WizardStepStatus } from './WizardContext'
 
 export interface WizardProps<TIn extends FieldValues> {
+  /**
+   * The steps, in order. Must be a stable reference — a module-level `const`
+   * (with `satisfies WizardStepDef<Input>[]` so `fields` autocompletes) or a
+   * `useMemo`. An array literal written inline in JSX is a new array every
+   * render, which re-creates the wizard context and re-renders every consumer.
+   */
   steps: readonly WizardStepDef<TIn>[]
   /** Controlled current step id. Omit for internal state. */
   step?: string
