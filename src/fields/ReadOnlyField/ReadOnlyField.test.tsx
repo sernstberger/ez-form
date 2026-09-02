@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useFormContext } from 'react-hook-form'
 import { z } from 'zod'
 import { Form } from '../../Form'
 import { TextField } from '../TextField'
 import { Wizard, WizardStep } from '../../Wizard'
-import { ReadOnlyField, readOnlyFieldClasses } from './ReadOnlyField'
+import { ReadOnlyField, readOnlyFieldClasses, type ReadOnlyFieldProps } from './ReadOnlyField'
 import { expectNoA11yViolations } from '../../test/axe'
 
 const schema = z.object({
@@ -192,5 +193,65 @@ describe('ReadOnlyField', () => {
     const value = screen.getByText('ada@x.io')
     expect(value).toHaveClass(readOnlyFieldClasses.value)
     expect(getComputedStyle(value).textTransform).toBe('uppercase')
+  })
+
+  describe('value mode', () => {
+    it('renders the given value instead of watching name', () => {
+      wrap(<ReadOnlyField value={42} label="Total" />)
+      expect(screen.getByText('42')).toBeInTheDocument()
+    })
+
+    it('runs value through format', () => {
+      wrap(<ReadOnlyField value={42} label="Total" format={(v) => `$${v}`} />)
+      expect(screen.getByText('$42')).toBeInTheDocument()
+    })
+
+    it('runs value through options', () => {
+      wrap(<ReadOnlyField value="admin" label="Role" options={roles} />)
+      expect(screen.getByText('Administrator')).toBeInTheDocument()
+    })
+
+    it('runs value through empty', () => {
+      wrap(<ReadOnlyField value="" label="Total" empty="none" />)
+      expect(screen.getByText('none')).toBeInTheDocument()
+    })
+
+    it('re-renders when the value prop changes', () => {
+      const { rerender } = wrap(<ReadOnlyField value={1} label="Total" />)
+      expect(screen.getByText('1')).toBeInTheDocument()
+      rerender(
+        <Form schema={schema} defaultValues={values} onSubmit={() => {}}>
+          <ReadOnlyField value={2} label="Total" />
+        </Form>,
+      )
+      expect(screen.getByText('2')).toBeInTheDocument()
+    })
+
+    it('does not register or watch a field: form isDirty stays false', () => {
+      function DirtyProbe() {
+        const {
+          formState: { isDirty },
+        } = useFormContext()
+        return <span data-testid="dirty">{String(isDirty)}</span>
+      }
+      wrap(
+        <>
+          <ReadOnlyField value={1} label="Total" />
+          <DirtyProbe />
+        </>,
+      )
+      expect(screen.getByTestId('dirty')).toHaveTextContent('false')
+    })
+
+    it('has no accessibility violations in value mode', async () => {
+      const { container } = wrap(<ReadOnlyField value={42} label="Total" />)
+      await expectNoA11yViolations(container)
+    })
+
+    it('type-level: value without label is a compile error', () => {
+      // @ts-expect-error label is required when value is given (no name to humanize)
+      const props: ReadOnlyFieldProps = { value: 1 }
+      expect(props).toBeDefined()
+    })
   })
 })

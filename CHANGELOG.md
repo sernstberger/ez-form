@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `ReadOnlyField` accepts `value: unknown` (with `label` then required, since there is
+  no `name` to humanize a default from) as an alternative to `name`: the field renders
+  the given value through the same `format`/`options`/`empty` pipeline and never calls
+  `useWatch` — a computed total (from the caller's own `useWatch`, e.g. `Checkout`'s
+  subtotal/total) is rendered without a whole-form subscription living in the library
+  — #68.
+
 - `FieldArray`: a repeating group of fields over hookform `useFieldArray`, rendered as
   a `FormSection` per array and a nested `FormSection` per row. `name`, `label`,
   `emptyRow` (a value or a per-Add factory), `singular?` / `rowLabel?`, `minRows?` /

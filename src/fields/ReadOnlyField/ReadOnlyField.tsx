@@ -10,11 +10,7 @@ import { useOptionalWizard } from '../../Wizard/useWizard'
 import type { Option } from '../Option'
 import { humanize } from './humanize'
 
-export interface ReadOnlyFieldProps {
-  /** Form path to display. Read with `useWatch`; never registered, never validated. */
-  name: string
-  /** Defaults to a humanized `name` (`cardNumber` → `Card number`). */
-  label?: ReactNode
+interface ReadOnlyFieldBaseProps {
   /** Show the matching option label(s) instead of the raw value. */
   options?: readonly Option[]
   /** Custom rendering; wins over every default. */
@@ -31,6 +27,24 @@ export interface ReadOnlyFieldProps {
     edit?: ButtonProps
   }
 }
+
+export type ReadOnlyFieldProps = ReadOnlyFieldBaseProps &
+  (
+    | {
+        /** Form path to display. Read with `useWatch`; never registered, never validated. */
+        name: string
+        value?: never
+        /** Defaults to a humanized `name` (`cardNumber` → `Card number`). */
+        label?: ReactNode
+      }
+    | {
+        name?: never
+        /** An already-computed value to display, e.g. a caller's own `useWatch`-derived total. Wins over `name`; when set, the field never calls `useWatch` itself. */
+        value: unknown
+        /** Required: there is no `name` to humanize into a default. */
+        label: ReactNode
+      }
+  )
 
 const isEmpty = (v: unknown) =>
   v === '' || v === null || v === undefined || (Array.isArray(v) && v.length === 0)
@@ -79,10 +93,15 @@ export function ReadOnlyField(inProps: ReadOnlyFieldProps) {
   const props = useDefaultProps({ props: inProps, name: 'EzReadOnlyField' })
   const { name, label, options, format, empty = '—', editStep, slotProps } = props
   useEzFormContext('ReadOnlyField')
-  const value = useWatch({ name })
+  // `value` wins when given; the hook itself must still run every render (rules of
+  // hooks), so it's disabled rather than skipped, and `name` falls back to a dummy
+  // path so `useWatch` never subscribes to a real field while a `value` is in use.
+  const hasValue = 'value' in props && props.value !== undefined
+  const watched = useWatch({ name: name ?? '__ez_readonly_unused__', disabled: hasValue })
+  const value = hasValue ? props.value : watched
   const wizard = useOptionalWizard()
   const labelId = useId()
-  const text = label ?? humanize(name)
+  const text = label ?? (name !== undefined ? humanize(name) : undefined)
   const content = format ? format(value) : isEmpty(value) ? empty : display(value, options)
   // In `page` layout every step (and so every field) is already on screen at once, so
   // `wizard.go()` has nothing to do there — it's a no-op that always resolves `false`. An
@@ -115,7 +134,7 @@ export function ReadOnlyField(inProps: ReadOnlyFieldProps) {
           <ReadOnlyFieldEdit
             type="button"
             onClick={() => void wizard.go(editStep)}
-            aria-label={`Edit ${typeof text === 'string' ? text : name}`}
+            aria-label={`Edit ${typeof text === 'string' ? text : (name ?? 'value')}`}
             {...slotProps?.edit}
             className={`${readOnlyFieldClasses.edit}${slotProps?.edit?.className ? ` ${slotProps.edit.className}` : ''}`}
           >
