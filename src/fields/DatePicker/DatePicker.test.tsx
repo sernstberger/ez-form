@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { Form, type FormMethods } from '../../Form'
 import { DatePicker } from './DatePicker'
 import { describeFieldContract } from '../../test/describeFieldContract'
-import { withPickers } from '../../test/pickers'
+import { withPickers, pasteAllText } from '../../test/pickers'
 
 const schema = z.object({ start: z.date().nullable() })
 
@@ -187,6 +187,64 @@ describe('DatePicker', () => {
     typeDate('start', '01/15/2030')
     await user.click(screen.getByRole('button', { name: 'Go' }))
     await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  // QA #73: a real paste (not per-section typing) of an unparsable string is
+  // what silently dropped to `null` — see DateField.test.tsx for the full
+  // root cause and why `pasteAllText` (Ctrl/Cmd+A then paste, matching what a
+  // real paste actually does) is required over a `fireEvent.change` on the
+  // hidden input, which a real paste never touches.
+  it('pasting a parseable date round-trips to a Date (control, proves the paste simulation is faithful)', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ start: null }} onSubmit={onSubmit}>
+          <DatePicker name="start" label="Start" />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    await pasteAllText(screen.getByRole('group', { name: 'Start' }), '01/15/2030')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(onSubmit).toHaveBeenCalledWith({ start: new Date(2030, 0, 15) }, expect.anything())
+  })
+
+  it('pasting an unparsable date shows an invalid-date error and blocks submit', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ start: null }} onSubmit={onSubmit}>
+          <DatePicker name="start" label="Start" />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    await pasteAllText(screen.getByRole('group', { name: 'Start' }), 'March 2, 2024')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Start is invalid.')
+    expect(screen.getByRole('group', { name: 'Start' })).toHaveAttribute('aria-invalid', 'true')
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('pasting an empty selection still submits null with no error (genuine clear)', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ start: new Date(2030, 5, 1) }} onSubmit={onSubmit}>
+          <DatePicker name="start" label="Start" />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    await pasteAllText(screen.getByRole('group', { name: 'Start' }), '')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    await vi.waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith({ start: null }, expect.anything()),
+    )
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 

@@ -1,4 +1,6 @@
 import type { ReactElement } from 'react'
+import { fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
 
@@ -6,3 +8,31 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
 export const withPickers = (element: ReactElement) => (
   <LocalizationProvider dateAdapter={AdapterDateFns}>{element}</LocalizationProvider>
 )
+
+/**
+ * Simulates a real paste over a picker field's whole value — the way a user
+ * pastes a full date/time string, not the per-section `fireEvent.change` on
+ * the hidden input used elsewhere in these suites (which only exercises MUI
+ * X's programmatic-write test seam, not what a real paste dispatches; see
+ * QA #73). `fieldRoot` is the field's `role="group"` element.
+ *
+ * MUI X's own paste handler (`useFieldRootProps.js`'s `handlePaste`) only
+ * runs when every section is selected (`parsedSelectedSections === 'all'`),
+ * which a real paste always has (the browser selects-all on focus, or the
+ * user does via Ctrl/Cmd+A) — so this selects all sections the same way
+ * (`useFieldRootProps.js`'s `handleKeyDown`, the "Select all" case) before
+ * dispatching `paste`. Both the `keydown` and the `paste` must target the
+ * sections container (`.MuiPickersSectionList-root`, the element that is
+ * actually focused and holds these listeners) rather than the outer
+ * `role="group"` wrapper, or MUI X's field never sees either event.
+ */
+export const pasteAllText = async (fieldRoot: HTMLElement, text: string) => {
+  const user = userEvent.setup()
+  await user.click(fieldRoot)
+  const target = document.activeElement as HTMLElement
+  fireEvent.keyDown(target, { key: 'a', ctrlKey: true, keyCode: 65, code: 'KeyA' })
+  const sectionsRoot = fieldRoot.querySelector<HTMLElement>('.MuiPickersSectionList-root')!
+  fireEvent.paste(sectionsRoot, {
+    clipboardData: { getData: () => text, types: ['text/plain'] } as unknown as DataTransfer,
+  })
+}

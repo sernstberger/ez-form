@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { Form } from '../../Form'
 import { TimePicker } from './TimePicker'
 import { describeFieldContract } from '../../test/describeFieldContract'
-import { withPickers } from '../../test/pickers'
+import { withPickers, pasteAllText } from '../../test/pickers'
 
 const schema = z.object({ at: z.date().nullable() })
 
@@ -80,6 +80,52 @@ describe('TimePicker', () => {
   })
 
   it('Form requiredIndicator="optional": not-required gets the optional suffix in its label', () => {
+  // QA #73 (noted "not in scope" as unconfirmed for TimePicker specifically,
+  // shares `usePickerField` with the other three): a real paste (not
+  // per-section typing) of an unparsable string is what silently dropped to
+  // `null` — see DateField.test.tsx for the full root cause and why
+  // `pasteAllText` (Ctrl/Cmd+A then paste, matching what a real paste
+  // actually does) is required over a `fireEvent.change` on the hidden
+  // input, which a real paste never touches.
+  it('pasting a parseable time round-trips to a Date (control, proves the paste simulation is faithful)', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ at: null }} onSubmit={onSubmit}>
+          <TimePicker name="at" label="At" />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    await pasteAllText(screen.getByRole('group', { name: 'At' }), '09:30 AM')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    const at = onSubmit.mock.calls[0]?.[0].at as Date
+    expect(at.getHours()).toBe(9)
+    expect(at.getMinutes()).toBe(30)
+  })
+
+  it('pasting an unparsable time shows an invalid-date error and blocks submit', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ at: null }} onSubmit={onSubmit}>
+          <TimePicker name="at" label="At" />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    await pasteAllText(screen.getByRole('group', { name: 'At' }), 'half past nine')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('At is invalid.')
+    expect(screen.getByRole('group', { name: 'At' })).toHaveAttribute('aria-invalid', 'true')
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('pasting an empty selection still submits null with no error (genuine clear)', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
     render(
       withPickers(
         <Form
@@ -93,5 +139,17 @@ describe('TimePicker', () => {
       ),
     )
     expect(screen.getByRole('group', { name: 'At (optional)' })).toBeInTheDocument()
+          defaultValues={{ at: new Date(2030, 5, 1, 9, 30) }}
+          onSubmit={onSubmit}
+        >
+          <TimePicker name="at" label="At" />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    await pasteAllText(screen.getByRole('group', { name: 'At' }), '')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ at: null }, expect.anything()))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

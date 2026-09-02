@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { Form, type FormMethods } from '../../Form'
 import { DateField } from './DateField'
 import { describeFieldContract } from '../../test/describeFieldContract'
-import { withPickers } from '../../test/pickers'
+import { withPickers, pasteAllText } from '../../test/pickers'
 
 const schema = z.object({ birthday: z.date().nullable() })
 
@@ -31,6 +31,13 @@ function typeGuardFlatOnBlurIsRejected() {
   return <DateField name="birthday" label="Birthday" onBlur={() => {}} />
 }
 void typeGuardFlatOnBlurIsRejected
+
+/** Same guard as above, for `onPaste` (see `DateField.tsx`). */
+function typeGuardFlatOnPasteIsRejected() {
+  // @ts-expect-error onPaste is not a DateField prop — use slotProps.textField.onPaste
+  return <DateField name="birthday" label="Birthday" onPaste={() => {}} />
+}
+void typeGuardFlatOnPasteIsRejected
 
 describeFieldContract({
   componentName: 'DateField',
@@ -257,6 +264,121 @@ describe('DateField', () => {
     await user.click(screen.getByRole('button', { name: 'Go' }))
     await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  // QA #73: a real paste (Ctrl/Cmd+A to select the whole field, then paste —
+  // simulated here by `pasteAllText`) of a string with no recognisable date
+  // shape reaches MUI X's `updateValueFromValueStr`
+  // (internals/hooks/useField/useFieldState.js), whose `parseDateStr`
+  // collapses it straight to `null`; `validateDate`
+  // (validation/validateDate.js) then short-circuits `value === null` to
+  // `null` before running any other check. So a genuine clear and an
+  // unparsable paste both reach `onChange` as `(null, { validationError:
+  // null })` — `usePickerField` tells them apart using the clipboard text
+  // captured in its `slotProps.textField.onPaste` (see `usePickerField.ts`'s
+  // `handlePaste`). The parseable control (`03/02/2024`) is run through the
+  // same `pasteAllText` helper first, to prove the simulated paste is a
+  // faithful stand-in for a real one and not itself the reason the unparsable
+  // cases are rejected.
+  it('pasting a parseable date round-trips to a Date (control, proves the paste simulation is faithful)', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ birthday: null }} onSubmit={onSubmit}>
+          <DateField name="birthday" label="Birthday" />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    await pasteAllText(screen.getByRole('group', { name: 'Birthday' }), '03/02/2024')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(onSubmit).toHaveBeenCalledWith({ birthday: new Date(2024, 2, 2) }, expect.anything())
+  })
+
+  it.each([
+    ['a US-style month name', 'March 2, 2024'],
+    ['an ISO date', '2024-03-02'],
+    ['digits with no separators', '02032024'],
+  ])('pasting %s shows an invalid-date error and blocks submit', async (_desc, text) => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ birthday: null }} onSubmit={onSubmit}>
+          <DateField name="birthday" label="Birthday" />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    await pasteAllText(screen.getByRole('group', { name: 'Birthday' }), text)
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Birthday is invalid.')
+    expect(screen.getByRole('group', { name: 'Birthday' })).toHaveAttribute('aria-invalid', 'true')
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('pasting an empty selection still submits null with no error (genuine clear)', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      withPickers(
+        <Form
+          schema={schema}
+          defaultValues={{ birthday: new Date(1990, 5, 1) }}
+          onSubmit={onSubmit}
+        >
+          <DateField name="birthday" label="Birthday" />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    await pasteAllText(screen.getByRole('group', { name: 'Birthday' }), '')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    await vi.waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith({ birthday: null }, expect.anything()),
+    )
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('clears the invalid-date error once a later paste is a parseable date', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ birthday: null }} onSubmit={onSubmit}>
+          <DateField name="birthday" label="Birthday" />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    const root = screen.getByRole('group', { name: 'Birthday' })
+    await pasteAllText(root, 'March 2, 2024')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Birthday is invalid.')
+    expect(onSubmit).not.toHaveBeenCalled()
+
+    await pasteAllText(root, '03/02/1985')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('leaves a parseable but out-of-range date to the existing minDate/maxDate behaviour', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ birthday: null }} onSubmit={onSubmit}>
+          <DateField name="birthday" label="Birthday" minDate={new Date(1900, 0, 1)} />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    typeDate('birthday', '01/01/1899')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Birthday is too early.')
+    expect(onSubmit).not.toHaveBeenCalled()
   })
 
   it('calls consumer onChange and onError after the form', async () => {

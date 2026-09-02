@@ -179,6 +179,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `reset()`, matching `Form`'s `confirm`/`onSubmit` contract (`onSubmit` never runs on a
   cancelled confirm either); without `confirm` there is nothing to gate on, so `onClick`
   still fires immediately on click, same as a plain `Button` — documented on the prop — #75.
+- `DatePicker` / `DateField` / `TimePicker` / `DateTimePicker`: pasting a string with
+  no recognisable date/time shape (e.g. `March 2, 2024`, `02032024`, `31/02/2024`, an
+  ISO datetime) no longer submits the field as a silent `null`. MUI X's own paste
+  handling (`useFieldRootProps.js`'s `handlePaste`) resolves such a string to `null`
+  and, for the popup pickers, never even calls `onChange` for it (`usePicker`'s
+  `setValue` treats `null`-to-`null` as no change and swallows the callback);
+  `usePickerField` now reads the pasted text directly via a new `onPaste` on
+  `slotProps.textField` (MUI X's `useField.js` runs a consumer's `onPaste` before its
+  own paste handling, so the raw `event.clipboardData` text is captured before MUI X
+  clears it), and treats a non-empty pasted text that resolves to `null` with no other
+  `validationError` as `invalidDate` (`<Label> is invalid.`), blocking submit the same
+  way `minDate`/`disableFuture`/etc. already do. Per-section typing was already
+  correct on its own (MUI X clamps each section to a valid value as it's entered) and
+  needed no change. A genuinely cleared field still submits `null` with no error — #73.
 - `Form`: a `setError` called synchronously inside `onDefaultValuesError` (for example
   `ref.current?.setError('root.server', …)`) no longer gets wiped by hookform's own
   post-rejection `reset({})`. `onDefaultValuesError` now runs after that reset has

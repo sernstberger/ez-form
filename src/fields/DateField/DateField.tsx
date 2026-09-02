@@ -16,6 +16,7 @@ export type DateFieldProps = Omit<
   | 'required'
   | 'helperText'
   | 'onBlur'
+  | 'onPaste'
 > &
   PickerFieldProps<PickerValidDate | null, DateValidationError>
 
@@ -50,11 +51,12 @@ interface DateFieldChangeContext {
  * silently override the form's error text, clear `aria-invalid`, or drop the
  * required marker.
  *
- * `onBlur` is omitted from `DateFieldProps` entirely (not just left unbound):
- * MUI's `DateFieldProps` accepts a flat `onBlur`, and since this component
- * never sets it, a naive `<DateField onBlur={fn} />` would typecheck while
- * `fn` silently fell into `...rest` and was never called — a consumer
- * `onBlur` only takes effect through `slotProps={{ textField: { onBlur } }}`.
+ * `onBlur` and `onPaste` are both omitted from `DateFieldProps` entirely (not
+ * just left unbound): MUI's `DateFieldProps` accepts each as a flat prop, and
+ * since this component never sets either, a naive `<DateField onPaste={fn}
+ * />` would typecheck while `fn` silently fell into `...rest` and was never
+ * called — a consumer `onBlur`/`onPaste` only takes effect through
+ * `slotProps={{ textField: { onBlur, onPaste } }}`.
  */
 export function DateField({
   name,
