@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+### Added
+
+- `EzNumberField` theme key (`defaultProps`, `styleOverrides` for `root`, `steppers`,
+  `increment`, `decrement`) and the `numberFieldClasses` export; NumberField renders
+  through MUI `TextField` — #26.
+
+### Changed
+
+- `NumberField` / `NumberFieldControl` `className` is now `string` only (Base UI's
+  `(state) => string` form is no longer accepted, because the Base UI root no longer
+  renders an element) — #26.
+
+### Notes
+
 - Considering subpath exports (e.g. `ez-form/pickers`) so consumers who use no date
   picker aren't forced to resolve `@mui/x-date-pickers` as a peer. Tracked in #43.
 
