@@ -506,3 +506,23 @@ describe('PhoneField edge cases', () => {
     expect(seen).toEqual(['5551234567'])
   })
 })
+
+describe('PhoneField consumer ref composition', () => {
+  it('honours a consumer slotProps.htmlInput.ref without losing caret restoration', async () => {
+    const user = userEvent.setup()
+    const consumerRef = { current: null as HTMLInputElement | null }
+    renderPhone({ slotProps: { htmlInput: { ref: consumerRef } } })
+
+    // The consumer's ref is populated: it was composed with the hook's, not dropped.
+    expect(consumerRef.current).toBe(input())
+
+    // And the hook's own ref still works — caret restoration is what it drives.
+    // Without the fork, `mergeSlotProps` would have let the consumer ref replace
+    // it and this caret would land at the end instead.
+    await user.type(input(), '5551234567')
+    expect(input()).toHaveValue('555-123-4567')
+    await user.type(input(), '9', { initialSelectionStart: 5, initialSelectionEnd: 5 })
+    expect(input()).toHaveValue('555-192-3456')
+    expect(input().selectionStart).toBe(6)
+  })
+})

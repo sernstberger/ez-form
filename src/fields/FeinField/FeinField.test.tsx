@@ -410,3 +410,41 @@ describe('FeinField theming', () => {
     expect(input()).toHaveValue('12.3456789')
   })
 })
+
+describe('FeinField assisted mode (#65)', () => {
+  it('under <Form assisted> still emits autoComplete="off" (its default already is)', () => {
+    render(
+      <Form schema={schema} defaultValues={{ ein: '' }} onSubmit={() => {}} assisted>
+        <FeinField name="ein" label="EIN" />
+      </Form>,
+    )
+    expect(input()).toHaveAttribute('autoComplete', 'off')
+  })
+
+  it('a consumer autoComplete still wins under assisted', () => {
+    render(
+      <Form schema={schema} defaultValues={{ ein: '' }} onSubmit={() => {}} assisted>
+        <FeinField name="ein" label="EIN" autoComplete="organization" />
+      </Form>,
+    )
+    expect(input()).toHaveAttribute('autoComplete', 'organization')
+  })
+})
+
+describe('FeinField consumer ref composition', () => {
+  it('honours a consumer slotProps.htmlInput.ref without losing caret restoration', async () => {
+    const user = userEvent.setup()
+    const consumerRef = { current: null as HTMLInputElement | null }
+    renderFein({ slotProps: { htmlInput: { ref: consumerRef } } })
+
+    // The consumer's ref is populated: it was composed with the hook's, not dropped.
+    expect(consumerRef.current).toBe(input())
+
+    // And the hook's own ref still works — caret restoration is what it drives.
+    await user.type(input(), '123456789')
+    expect(input()).toHaveValue('12-3456789')
+    await user.type(input(), '9', { initialSelectionStart: 4, initialSelectionEnd: 4 })
+    expect(input()).toHaveValue('12-3945678')
+    expect(input().selectionStart).toBe(5)
+  })
+})

@@ -1107,7 +1107,7 @@ const schema = z.object({ ein: z.string() })
 // user types 123456789 → shows "12-3456789", submits { ein: '123456789' }
 ```
 
-Everything `PhoneField` does with typing, pasting, the caret and Backspace-onto-a-separator applies here unchanged; the two share `formatTemplate` and `resolveTemplateEdit`. What differs is the defaults: `inputMode="numeric"` (there is no `type="tel"` keypad to inherit), `autoComplete="off"` — no autofill token exists for a tax ID, and a browser guessing one over a federal identifier is worse than none — and `invalidMessage`, which defaults to `Enter a 9-digit employer identification number`. `type` stays `text`, so a leading zero is never dropped.
+Everything `PhoneField` does with typing, pasting, the caret and Backspace-onto-a-separator applies here unchanged: all three template fields share one `useTemplateField` hook. What differs is the defaults: `inputMode="numeric"` (there is no `type="tel"` keypad to inherit), `autoComplete="off"` — no autofill token exists for a tax ID, and a browser guessing one over a federal identifier is worse than none — and `invalidMessage`, which defaults to `Enter a 9-digit employer identification number`. `type` stays `text`, so a leading zero is never dropped.
 
 `format`, `invalidMessage` and `autoComplete` are settable app-wide through `theme.components.EzFeinField.defaultProps`; a prop on the element always wins.
 

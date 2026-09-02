@@ -2,6 +2,8 @@ import type { FocusEvent } from 'react'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import { mergeSlotProps } from '@mui/material/utils'
 import { TextField, type TextFieldProps } from '../TextField'
+import { resolveAutoComplete } from '../resolveAutoComplete'
+import { useAssisted } from '../../Form/AssistedContext'
 import { useEzFormContext } from '../../useEzFormContext'
 
 /**
@@ -67,11 +69,13 @@ export function EmailField(inProps: EmailFieldProps) {
     name,
     invalidMessage = 'Enter a valid email address',
     normalize = true,
-    autoComplete = 'email',
+    autoComplete: autoCompleteProp,
     validate,
     slotProps,
     ...rest
   } = props
+  const assisted = useAssisted()
+  const autoComplete = autoCompleteProp ?? resolveAutoComplete('email', assisted)
 
   const consumerValidate =
     validate === undefined ? {} : typeof validate === 'function' ? { validate } : validate

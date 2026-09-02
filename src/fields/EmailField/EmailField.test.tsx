@@ -322,3 +322,23 @@ describe('EmailField readOnly', () => {
     expect(input()).toHaveValue('ada@example.com')
   })
 })
+
+describe('EmailField assisted mode (#65)', () => {
+  it('under <Form assisted> emits autoComplete="off" instead of the email default', () => {
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}} assisted>
+        <EmailField name="email" label="Email" />
+      </Form>,
+    )
+    expect(input()).toHaveAttribute('autoComplete', 'off')
+  })
+
+  it('a consumer autoComplete still wins under assisted', () => {
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}} assisted>
+        <EmailField name="email" label="Email" autoComplete="work email" />
+      </Form>,
+    )
+    expect(input()).toHaveAttribute('autoComplete', 'work email')
+  })
+})
