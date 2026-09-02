@@ -23,8 +23,12 @@ export type NumberFieldProps = Omit<
   | 'onBlur'
   | 'onFocus'
   | 'inputRef'
+  // Root renders no element of its own here (`TextField` is the root), so this is
+  // MUI's plain `string`, not Base UI's `(state) => string` form.
+  | 'className'
 > & {
   name: string
+  className?: string
   label?: ReactNode
   helperText?: ReactNode
   size?: 'small' | 'medium'

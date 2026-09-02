@@ -6,7 +6,7 @@ export type { Option } from './fields/Option'
 export { Checkbox, type CheckboxProps } from './fields/Checkbox'
 export { Switch, type SwitchProps } from './fields/Switch'
 export { RadioGroup, type RadioGroupProps } from './fields/RadioGroup'
-export { NumberField, type NumberFieldProps } from './fields/NumberField'
+export { NumberField, numberFieldClasses, type NumberFieldProps } from './fields/NumberField'
 export { MoneyField, type MoneyFieldProps } from './fields/MoneyField'
 export type { FieldRules, BooleanFieldRules } from './rules'
 export {
