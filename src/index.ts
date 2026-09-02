@@ -27,6 +27,7 @@ export {
   type PasswordFieldProps,
 } from './fields/PasswordField'
 export { PhoneField, type PhoneFieldProps } from './fields/PhoneField'
+export { EmailField, type EmailFieldProps } from './fields/EmailField'
 export type { FieldRules, BooleanFieldRules } from './rules'
 export {
   Autocomplete,

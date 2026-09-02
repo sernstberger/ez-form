@@ -20,6 +20,7 @@ import type { FileFieldProps } from '../fields/FileField'
 import type { TextareaFieldProps } from '../fields/TextareaField/TextareaField'
 import type { ResendCodeButtonProps } from '../fields/OtpField/ResendCodeButton'
 import type { PhoneFieldProps } from '../fields/PhoneField'
+import type { EmailFieldProps } from '../fields/EmailField'
 
 declare module '@mui/material/styles' {
   interface ComponentsPropsList {
@@ -47,6 +48,7 @@ declare module '@mui/material/styles' {
     EzTextareaField: Partial<TextareaFieldProps>
     EzResendCodeButton: Partial<ResendCodeButtonProps>
     EzPhoneField: Partial<PhoneFieldProps>
+    EzEmailField: Partial<EmailFieldProps>
   }
 
   interface ComponentNameToClassKey {
@@ -156,6 +158,12 @@ declare module '@mui/material/styles' {
     // what makes `format` / `invalidMessage` / `autoComplete` theme-settable.
     EzPhoneField?: {
       defaultProps?: ComponentsProps['EzPhoneField']
+    }
+    // Also a plain `TextField` with no styled slot of its own, so it registers
+    // `defaultProps` only — that is what makes `invalidMessage` / `normalize` /
+    // `autoComplete` theme-settable.
+    EzEmailField?: {
+      defaultProps?: ComponentsProps['EzEmailField']
     }
   }
 }

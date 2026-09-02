@@ -111,6 +111,7 @@ React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form
 | `ReadOnlyField`                                | MUI `Typography`                              | `name`, `label?`, `options?`, `format?`, `empty?`, `editStep?` — or `value` (a caller-computed value, e.g. from its own `useWatch`) with `label` required and no `name`; never calls `useWatch` in that mode                                                                                                                                                                                                                                                                     |
 | `PasswordField`                                | ez-form `TextField`                           | `name`; same rules as TextField. `revealable?` (default `true`) shows a show/hide toggle in the end adornment; `autoComplete` defaults to `'current-password'`; `slotProps.toggle?` reaches the toggle `IconButton`                                                                                                                                                                                                                                                              |
 | `PhoneField`                                   | ez-form `TextField`                           | `name`; same rules as TextField, plus `format?` (a `#` template, default `'###-###-####'`) and `invalidMessage?`. The form value is digits only (`'5551234567'`); `type="tel"`, `inputMode="tel"`, `autoComplete` defaults to `'tel'`. A non-empty value shorter than the template's digit count fails with `invalidMessage`                                                                                                                                                     |
+| `EmailField`                                   | ez-form `TextField`                           | `name`; same rules as TextField, plus a built-in format rule (`invalidMessage?`, default `'Enter a valid email address'`) using HTML's own e-mail grammar, and `normalize?` (default `true`) which trims and lower-cases on blur. `type="email"`, `inputMode="email"`, `autoComplete` defaults to `'email'`                                                                                                                                                                      |
 | `PasswordStrength`                             | MUI `LinearProgress`                          | `name`; `score?: (password) => 0\|1\|2\|3\|4` (default a small built-in heuristic); `labels?` (5 strings). Renders as an ARIA `meter`, never registers or validates                                                                                                                                                                                                                                                                                                              |
 | `TextareaField`                                | `TextField` with `multiline` fixed on         | `name`, `showCount?`; the same rules as TextField. Taller default (`minRows: 4`, `maxRows: 12`, both themeable); shows a `n / max` length meter when `maxLength` is set (or `showCount`), which turns into the validation error past the limit                                                                                                                                                                                                                                   |
 | `DateField`                                    | MUI X `DateField`                             | Same shape as `DatePicker`, but no popup — a keyboard-only, sectioned date input. Better for birthdays and other far-away dates: typing beats paging a calendar back decades                                                                                                                                                                                                                                                                                                     |
@@ -745,8 +746,9 @@ Themeable under `EzTextareaField` (`root`, `counter`, exported as `textareaField
 | `MoneyField`  | always (currency has cents)                                           | —               | `decimal`       |
 | `OtpField`    | first slot only, from Base UI itself, not duplicated here             | `one-time-code` | `numeric`       |
 | `PhoneField`  | always — set by the field itself, not the `type="tel"` fallback       | `tel`           | `tel`           |
+| `EmailField`  | always — set by the field itself, via its fixed `type="email"`        | `email`         | `email`         |
 
-`TextField` never guesses a token from `name` — a wrong guess is worse than none, so only these unambiguous `type`s get a default. `PasswordField` covers `autoComplete="current-password"` / `"new-password"` on its own, above. `PhoneField` sets `type="tel"`, `inputMode="tel"` and its `autoComplete` default itself rather than relying on the `type`-derived fallback — the two agree, but the field owns them — and its `autoComplete` takes a sectioned token (`"shipping tel"`, `"work tel"`) for forms with more than one number. The remaining v8 date/time/address fields (#17–#19) will extend this table.
+`TextField` never guesses a token from `name` — a wrong guess is worse than none, so only these unambiguous `type`s get a default. `PasswordField` covers `autoComplete="current-password"` / `"new-password"` on its own, above. `PhoneField` sets `type="tel"`, `inputMode="tel"` and its `autoComplete` default itself rather than relying on the `type`-derived fallback — the two agree, but the field owns them — and its `autoComplete` takes a sectioned token (`"shipping tel"`, `"work tel"`) for forms with more than one number. `EmailField` fixes `type="email"` (so `inputMode="email"` comes from `TextField`'s own `type` mapping) and defaults `autoComplete` to `'email'`, which likewise takes a sectioned token (`"work email"`). The remaining v8 date/time/address fields (#17–#19) will extend this table.
 
 ## NumberField
 
@@ -780,6 +782,30 @@ const schema = z.object({ price: z.number().min(0) })
 ```
 
 The toggle is a themeable `IconButton` under `EzPasswordField` (`root`, `toggle`, exported as `passwordFieldClasses`); `slotProps.toggle` reaches it directly, but its `children` is always overridden — swap the reveal icons with `icons?: { show?: ReactNode; hide?: ReactNode }` instead, defaulted through `useDefaultProps` so `theme.components.EzPasswordField.defaultProps.icons` can replace them app-wide.
+
+## EmailField
+
+`TextField` with `type="email"` fixed on, so the mobile keyboard gets the `@` key and `inputMode`/`autoComplete` default to `email`. The value is the address string (`''` when empty, so `required` still applies):
+
+```tsx
+const schema = z.object({ email: z.string() })
+
+<EmailField name="email" label="Email" required />
+```
+
+A built-in rule rejects a non-empty value that is not a valid address, using **HTML's own e-mail grammar** — the [WHATWG "valid e-mail address" production](https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address) a browser's `<input type="email">` validity check uses. So the field agrees with the native bubble instead of disagreeing with it in either direction, and your zod schema stays a plain `z.string()` with no `.email()` and no regex of its own:
+
+```tsx
+<EmailField name="email" label="Email" invalidMessage="We need a work address" />
+```
+
+`normalize` (default `true`) trims and lower-cases the value **on blur**, so what you submit, store and compare is canonical however it was typed or pasted — `' Ada@Example.COM '` becomes `'ada@example.com'`. It runs in the blur capture phase, ahead of the form's own handler, so validation timing is untouched: a form in `mode="onBlur"` reports on the fixed value, and the default `mode="onSubmit"` still reports nothing until submit. A consumer `onBlur` still fires either way, and the format rule canonicalizes before testing, so a value the field is about to fix is never rejected first. Pass `normalize={false}` to store exactly what was typed:
+
+```tsx
+<EmailField name="email" label="Email" normalize={false} />
+```
+
+`invalidMessage`, `normalize` and `autoComplete` are all settable app-wide through `theme.components.EzEmailField.defaultProps`; a prop on the element always wins. `EmailField` adds no styled slot of its own — it renders a `TextField`, so MUI's own `MuiTextField` / `MuiOutlinedInput` style keys reach it unchanged.
 
 ## US fields
 
@@ -867,6 +893,7 @@ const schema = z.object({ zip: z.string().min(1) })
 | `StateSelect` | —           | `address-level1`       |
 
 `inputMode="numeric"` on `ZipField` brings up the numeric keypad on mobile without changing the underlying `type` (still `text`, so a leading zero like `02134` is never dropped). `StateSelect`'s `autoComplete` reaches the hidden native `<input>` MUI's `Select` renders for autofill via `slotProps.htmlInput` — the same slot a plain `TextField` uses (MUI 9 has no `SelectProps`/native `inputProps` shortcut for this).
+
 ## Developer warnings
 
 Three mistakes leave a form that renders and submits perfectly while quietly failing the

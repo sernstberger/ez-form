@@ -15,6 +15,7 @@ import { WizardStep } from '../../Wizard/WizardStep'
 import { WizardStepper } from '../../Wizard/WizardStepper'
 import { WizardNav } from '../../Wizard/WizardNav'
 import { TextField } from '../../fields/TextField'
+import { EmailField } from '../../fields/EmailField'
 import { DateField } from '../../fields/DateField'
 import { RadioGroup } from '../../fields/RadioGroup'
 import { Slider } from '../../fields/Slider'
@@ -69,7 +70,8 @@ export const schema = z
     lastName: z.string().min(1, 'Last name is required'),
     birthday: z.date('Birthday is required'),
     // Contact
-    email: z.email('Invalid email'),
+    // Plain `z.string()`: <EmailField> owns the format rule (HTML's own e-mail grammar).
+    email: z.string().min(1, 'Email is required'),
     phone: z
       .string()
       .min(1, 'Phone is required')
@@ -259,7 +261,7 @@ export function ContactStep() {
   return (
     <WizardStep id="contact">
       <Stack spacing={3}>
-        <TextField name="email" label="Email" autoComplete="email" required />
+        <EmailField name="email" label="Email" required />
         <TextField
           name="phone"
           label="Phone"
