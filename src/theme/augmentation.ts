@@ -102,6 +102,7 @@ declare module '@mui/material/styles' {
     EzFileField?: {
       defaultProps?: ComponentsProps['EzFileField']
       styleOverrides?: ComponentsOverrides<Theme>['EzFileField']
+    }
     EzTextareaField?: {
       defaultProps?: ComponentsProps['EzTextareaField']
       styleOverrides?: ComponentsOverrides<Theme>['EzTextareaField']
