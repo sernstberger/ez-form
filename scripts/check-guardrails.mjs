@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // CI guardrail: fail on `sx=` / ripple props / theme-unreachable literal JSX attributes in
-// src/, and on exported components missing a README "## Components" row. See docs/PHILOSOPHY.md
+// src/, on exported components missing a README "## Components" row, and on the README structural
+// damage a union merge leaves behind — a component listed in two Components rows, a `##`/`###`
+// heading repeated, or a header row spliced into the middle of a table. See docs/PHILOSOPHY.md
 // rule 2 and GitHub issue #44.
 //
 // Deliberately dependency-free: node:fs/node:path + line-based regexes, not a TS/JSX parser.
@@ -132,6 +134,148 @@ function findMissingReadmeRows(componentNames, readmeSource) {
   return missing
 }
 
+/**
+ * The three README structural checks below all exist because a union merge of two branches that
+ * each edited README.md produced a Components table spliced onto itself: a second header row in
+ * the middle of the table, every component listed twice, and two `##` sections repeated verbatim.
+ * Markdown has no syntax error for any of that — GitHub renders the stray header row as ordinary
+ * data — so nothing caught it until a whole-wave review read the file end to end.
+ *
+ * Returns the rows of the `## Components` table, as `{ line, cells }` where `line` is 1-based in
+ * the whole README and `cells` are the trimmed pipe-delimited cells.
+ *
+ * @param {string} readmeSource
+ */
+function findComponentsTableRows(readmeSource) {
+  const lines = readmeSource.split('\n')
+  const startIdx = lines.findIndex((line) => /^## Components\b/.test(line))
+  if (startIdx === -1) return []
+
+  const rows = []
+  for (let i = startIdx + 1; i < lines.length; i += 1) {
+    const line = lines[i]
+    if (/^## /.test(line)) break
+    if (!line.trimStart().startsWith('|')) continue
+    rows.push({
+      line: i + 1,
+      raw: line,
+      cells: line
+        .trim()
+        .replace(/^\|/, '')
+        .replace(/\|$/, '')
+        .split('|')
+        .map((cell) => cell.trim()),
+    })
+  }
+  return rows
+}
+
+/** A markdown separator row: every cell is dashes (with optional alignment colons). */
+function isSeparatorRow(row) {
+  return row.cells.length > 0 && row.cells.every((cell) => /^:?-{3,}:?$/.test(cell))
+}
+
+/**
+ * (a) A component name appearing in more than one Components-table row.
+ *
+ * The key is the row's first cell, so `Form` and `Form (v4 additions)` are legitimately distinct
+ * rows, while two `PhoneField` rows are not.
+ *
+ * @param {string} readmeSource
+ */
+function findDuplicateComponentRows(readmeSource) {
+  const rows = findComponentsTableRows(readmeSource).filter((row) => !isSeparatorRow(row))
+  /** @type {Map<string, number[]>} */
+  const seen = new Map()
+  for (const row of rows) {
+    const key = row.cells[0]
+    if (!key) continue
+    const lines = seen.get(key) ?? []
+    lines.push(row.line)
+    seen.set(key, lines)
+  }
+
+  const duplicates = []
+  for (const [key, lines] of seen) {
+    if (lines.length > 1) duplicates.push({ name: key, lines })
+  }
+  return duplicates
+}
+
+/**
+ * (b) Any `##` / `###` heading text appearing more than once in the README.
+ *
+ * Compared by the heading's own level plus text, so a `### ZipField` under `## US fields` does not
+ * collide with a hypothetical `## ZipField`.
+ *
+ * @param {string} readmeSource
+ */
+function findDuplicateHeadings(readmeSource) {
+  const lines = readmeSource.split('\n')
+  /** @type {Map<string, number[]>} */
+  const seen = new Map()
+  let inFence = false
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i]
+    if (/^\s*```/.test(line)) {
+      inFence = !inFence
+      continue
+    }
+    if (inFence) continue
+    const match = line.match(/^(#{2,3})\s+(.*?)\s*$/)
+    if (!match) continue
+    const key = `${match[1]} ${match[2]}`
+    const found = seen.get(key) ?? []
+    found.push(i + 1)
+    seen.set(key, found)
+  }
+
+  const duplicates = []
+  for (const [key, found] of seen) {
+    if (found.length > 1) duplicates.push({ heading: key, lines: found })
+  }
+  return duplicates
+}
+
+/**
+ * (c) A table header row appearing mid-table.
+ *
+ * A header row is legitimate only at the very start of a table, immediately followed by a
+ * separator row. So: find every separator row, and flag the row above it if that row is not the
+ * table's first row (i.e. the line above it is itself a table row).
+ *
+ * @param {string} readmeSource
+ */
+function findMidTableHeaderRows(readmeSource) {
+  const lines = readmeSource.split('\n')
+  const isTableLine = (line) => typeof line === 'string' && line.trimStart().startsWith('|')
+
+  const offenders = []
+  let inFence = false
+  for (let i = 0; i < lines.length; i += 1) {
+    if (/^\s*```/.test(lines[i])) {
+      inFence = !inFence
+      continue
+    }
+    if (inFence) continue
+    if (!isTableLine(lines[i])) continue
+    const cells = lines[i]
+      .trim()
+      .replace(/^\|/, '')
+      .replace(/\|$/, '')
+      .split('|')
+      .map((cell) => cell.trim())
+    const separator = cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell))
+    if (!separator) continue
+    // lines[i] is a separator; lines[i - 1] is its header row. That header is mid-table if the
+    // line above *it* is also a table row.
+    if (i >= 2 && isTableLine(lines[i - 1]) && isTableLine(lines[i - 2])) {
+      offenders.push({ line: i, snippet: lines[i - 1].trim() })
+    }
+  }
+  return offenders
+}
+
 function main() {
   const files = walk(SRC_DIR, [])
   files.sort()
@@ -158,6 +302,35 @@ function main() {
       line: 0,
       rule: 'missing-readme-row',
       snippet: name,
+    })
+  }
+
+  const readmeRelPath = relative(REPO_ROOT, README_PATH).split(sep).join('/')
+
+  for (const { name, lines } of findDuplicateComponentRows(readmeSource)) {
+    allViolations.push({
+      path: readmeRelPath,
+      line: lines[1],
+      rule: 'duplicate-readme-row',
+      snippet: `${name} appears in ${lines.length} Components rows (lines ${lines.join(', ')})`,
+    })
+  }
+
+  for (const { heading, lines } of findDuplicateHeadings(readmeSource)) {
+    allViolations.push({
+      path: readmeRelPath,
+      line: lines[1],
+      rule: 'duplicate-readme-heading',
+      snippet: `"${heading}" appears ${lines.length} times (lines ${lines.join(', ')})`,
+    })
+  }
+
+  for (const { line, snippet } of findMidTableHeaderRows(readmeSource)) {
+    allViolations.push({
+      path: readmeRelPath,
+      line,
+      rule: 'mid-table-header-row',
+      snippet: `header row spliced into a table: ${snippet}`,
     })
   }
 
