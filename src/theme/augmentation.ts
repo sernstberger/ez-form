@@ -23,6 +23,9 @@ import type { TextareaFieldProps } from '../fields/TextareaField/TextareaField'
 import type { ResendCodeButtonProps } from '../fields/OtpField/ResendCodeButton'
 import type { PhoneFieldProps } from '../fields/PhoneField'
 import type { EmailListFieldProps } from '../fields/EmailListField'
+import type { EmailFieldProps } from '../fields/EmailField'
+import type { FeinFieldProps } from '../fields/FeinField'
+import type { PercentFieldProps } from '../fields/PercentField'
 import type { SsnFieldProps } from '../fields/SsnField'
 
 declare module '@mui/material/styles' {
@@ -55,6 +58,9 @@ declare module '@mui/material/styles' {
     EzResendCodeButton: Partial<ResendCodeButtonProps>
     EzPhoneField: Partial<PhoneFieldProps>
     EzEmailListField: Partial<EmailListFieldProps>
+    EzEmailField: Partial<EmailFieldProps>
+    EzFeinField: Partial<FeinFieldProps>
+    EzPercentField: Partial<PercentFieldProps>
     EzSsnField: Partial<SsnFieldProps>
   }
 
@@ -183,6 +189,24 @@ declare module '@mui/material/styles' {
     EzEmailListField?: {
       defaultProps?: ComponentsProps['EzEmailListField']
       styleOverrides?: ComponentsOverrides<Theme>['EzEmailListField']
+    }
+    // Also a plain `TextField` with no styled slot of its own, so it registers
+    // `defaultProps` only — that is what makes `invalidMessage` / `normalize` /
+    // `autoComplete` theme-settable.
+    EzEmailField?: {
+      defaultProps?: ComponentsProps['EzEmailField']
+    }
+    // Also a plain `TextField` with no styled slot of its own: `defaultProps`
+    // only, which is what makes `format` / `invalidMessage` / `autoComplete`
+    // theme-settable.
+    EzFeinField?: {
+      defaultProps?: ComponentsProps['EzFeinField']
+    }
+    // Renders a `NumberField`, whose own `EzNumberField` style keys reach it,
+    // so this registers `defaultProps` only — that is what makes `scale` and
+    // the bound/step defaults theme-settable.
+    EzPercentField?: {
+      defaultProps?: ComponentsProps['EzPercentField']
     }
     EzSsnField?: {
       defaultProps?: ComponentsProps['EzSsnField']

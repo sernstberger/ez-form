@@ -18,6 +18,7 @@ import { TextField } from '../../fields/TextField'
 import { PhoneField, PHONE_FORMAT, formatTemplate } from '../../fields/PhoneField'
 import { AddressField, addressSchema } from '../../fields/AddressField'
 import { US_STATES } from '../../fields/StateSelect'
+import { EmailField } from '../../fields/EmailField'
 import { DateField } from '../../fields/DateField'
 import { RadioGroup } from '../../fields/RadioGroup'
 import { Slider } from '../../fields/Slider'
@@ -74,7 +75,8 @@ export const schema = z
     lastName: z.string().min(1, 'Last name is required'),
     birthday: z.date('Birthday is required'),
     // Contact
-    email: z.email('Invalid email'),
+    // Plain `z.string()`: <EmailField> owns the format rule (HTML's own e-mail grammar).
+    email: z.string().min(1, 'Email is required'),
     // No regex: `PhoneField` stores bare digits and owns the "all ten digits" check
     // itself, so zod only asks that something was entered (see README "US fields").
     phone: z.string().min(1, 'Phone is required'),
@@ -288,12 +290,7 @@ export function ContactStep() {
   return (
     <WizardStep id="contact">
       <Stack spacing={3}>
-        <TextField
-          name="email"
-          label="Email"
-          autoComplete={resolveAutoComplete('email', assisted)}
-          required
-        />
+        <EmailField name="email" label="Email" required />
         {/*
           No `pattern` rule: `PhoneField` formats as you type and carries its own
           "all ten digits" check, so the format lives in one place instead of being

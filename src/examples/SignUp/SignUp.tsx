@@ -9,6 +9,7 @@ import { Form } from '../../Form'
 import { FormError } from '../../FormError'
 import { FormSection } from '../../FormSection'
 import { TextField } from '../../fields/TextField'
+import { EmailField } from '../../fields/EmailField'
 import { Select } from '../../fields/Select'
 import { PasswordField } from '../../fields/PasswordField'
 import { Checkbox } from '../../fields/Checkbox'
@@ -29,7 +30,9 @@ const REFERRAL_OPTIONS: readonly Option[] = [
 
 const schema = z
   .object({
-    email: z.email({ error: (iss) => (iss.input === '' ? 'Email is required' : 'Invalid email') }),
+    // Plain `z.string()`: <EmailField> owns the format rule (HTML's own e-mail
+    // grammar), so a `.email()` here would be a second, differently-worded copy of it.
+    email: z.string().min(1, 'Email is required'),
     password: z.string().min(8, 'Password must be at least 8 characters'),
     confirmPassword: z.string().min(1, 'Please confirm your password'),
     displayName: z.string().min(1, 'Display name is required'),
@@ -152,7 +155,7 @@ export function SignUp({ onSuccess }: SignUpProps) {
                 <Stack spacing={3}>
                   <FormSection title="Account">
                     <Stack spacing={2}>
-                      <TextField name="email" label="Email" autoComplete="email" required />
+                      <EmailField name="email" label="Email" required />
                       <PasswordField
                         name="password"
                         label="Password"

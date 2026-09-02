@@ -1,5 +1,5 @@
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
-import { mergeSlotProps } from '@mui/material/utils'
+import { mergeSlotProps, useForkRef } from '@mui/material/utils'
 import { TextField, type TextFieldProps } from '../TextField'
 import { resolveAutoComplete } from '../resolveAutoComplete'
 import { useAssisted } from '../../Form/AssistedContext'
@@ -98,6 +98,17 @@ export function PhoneField(inProps: PhoneFieldProps) {
     normalizeDigits: (digits) => stripCountryCode(digits, capacity),
   })
 
+  // The hook's ref must reach the `<input>` for caret restoration to work, and a
+  // consumer may have passed one of their own. `useForkRef` (MUI's own composer)
+  // keeps both rather than letting either replace the other.
+  const { ref: templateInputRef, ...templateInputProps } = htmlInputProps
+  const inputRef = useForkRef(
+    templateInputRef,
+    slotProps?.htmlInput && 'ref' in slotProps.htmlInput
+      ? (slotProps.htmlInput.ref as React.Ref<HTMLInputElement>)
+      : null,
+  )
+
   const consumerValidate =
     validate === undefined ? {} : typeof validate === 'function' ? { validate } : validate
 
@@ -118,10 +129,17 @@ export function PhoneField(inProps: PhoneFieldProps) {
       }}
       slotProps={{
         ...slotProps,
-        htmlInput: mergeSlotProps(slotProps?.htmlInput, {
-          inputMode: 'tel',
-          ...htmlInputProps,
-        }),
+        htmlInput: {
+          ...mergeSlotProps(slotProps?.htmlInput, {
+            inputMode: 'tel',
+            ...templateInputProps,
+          }),
+          // After the merge, deliberately: `mergeSlotProps` spreads the
+          // consumer's props last, so a consumer `ref` would replace the hook's
+          // and silently disable caret restoration. `inputRef` already includes
+          // that consumer ref, so nothing is dropped.
+          ref: inputRef,
+        },
       }}
     />
   )

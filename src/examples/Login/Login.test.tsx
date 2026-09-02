@@ -58,6 +58,11 @@ describe('Login', () => {
     await user.type(screen.getByLabelText(/^password/i), LOGIN_BAD_PASSWORD)
     await user.click(screen.getByRole('button', { name: /sign in/i }))
     await screen.findByRole('alert')
+    // The alert renders while the rejected submit is still settling (`isSubmitting` flips
+    // back and the button re-renders). axe's tree walk is slow enough that on a loaded
+    // machine those updates land mid-scan and React reports them as un-acted. Waiting for
+    // the button to leave its loading state is the behaviour-level "submit has finished".
+    await waitFor(() => expect(screen.getByRole('button', { name: /sign in/i })).toBeEnabled())
     await expectNoA11yViolations(container)
   })
 })

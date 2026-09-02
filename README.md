@@ -74,7 +74,7 @@ rules and the checklist a component must pass before it ships.
 pnpm add ez-form @mui/material @mui/icons-material @mui/x-date-pickers @emotion/react @emotion/styled @base-ui/react react-hook-form zod
 ```
 
-`@mui/x-date-pickers` is a required peer even if you use no picker: ez-form has a single entry point, so the package is always resolved. `@base-ui/react` backs `NumberField`, `MoneyField`, and `OtpField`; `@mui/x-date-pickers` backs the three pickers. Both are tree-shakeable, and you also install one date adapter library (`date-fns`, `dayjs`, `luxon`, or `moment`) for the pickers — see "Date pickers" below.
+`@mui/x-date-pickers` is a required peer even if you use no picker: ez-form has a single entry point, so the package is always resolved. `@base-ui/react` backs `NumberField`, `MoneyField`, `PercentField`, and `OtpField`; `@mui/x-date-pickers` backs the three pickers. Both are tree-shakeable, and you also install one date adapter library (`date-fns`, `dayjs`, `luxon`, or `moment`) for the pickers — see "Date pickers" below.
 
 Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >= 5.4 (the types use `NoInfer`).
 
@@ -97,7 +97,9 @@ React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form
 | `NumberField`                                  | Base UI `NumberField` through MUI `TextField` | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max` (also the stepper bounds), `validate`. Value is `number \| null`; digits group while typing (new in v2.1), and `format={{ useGrouping: false }}` turns that off                                                                                                                                                                                                                                                                                      |
 | `MoneyField`                                   | `NumberField` pinned to USD                   | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max`, `validate`. Value is a `number` in dollars, rounded to the cent; shows `$1,234.50` on blur                                                                                                                                                                                                                                                                                                                                                          |
 | `PhoneField`                                   | ez-form `TextField`                           | `name`; same rules as TextField, plus `format?` (a `#` template, default `'###-###-####'`) and `invalidMessage?`. The form value is digits only (`'5551234567'`); `type="tel"`, `inputMode="tel"`, `autoComplete` defaults to `'tel'`. A non-empty value shorter than the template's digit count fails with `invalidMessage`                                                                                                                                                                                                  |
+| `PercentField`                                 | `NumberField` with an Intl `%`                | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min` (default 0), `max` (default 100), `validate`; `step` defaults to 1 and `scale?: 'percent' \| 'fraction'` decides what the value means. Shows `12.5%` on blur; bounds and step are always percentage points                                                                                                                                                                                                                                                  |
 | `ZipField`                                     | `TextField`                                   | `name`; same rules as TextField, plus a built-in "5 digits" rule (`invalidMessage?`, default `'Enter a 5-digit ZIP code'`). Digits only, capped at 5 (anything else is stripped on type/paste); `inputMode="numeric"`, `autoComplete` defaults to `'postal-code'`. Value is the digit string                                                                                                                                                                                                                                  |
+| `FeinField`                                    | ez-form `TextField`                           | `name`; same rules as TextField, plus `format?` (a `#` template, default `'##-#######'`) and `invalidMessage?` (default `'Enter a 9-digit employer identification number'`). The form value is digits only (`'123456789'`); `inputMode="numeric"`, `autoComplete` defaults to `'off'`                                                                                                                                                                                                                                         |
 | `StateSelect`                                  | `Select`                                      | `name`; same rules as Select. Options are the 50 states + DC by default; `territories?` adds PR, GU, VI, AS, MP. `autoComplete` defaults to `'address-level1'`. Value is the USPS abbreviation; also exports `US_STATES`/`US_TERRITORIES` option arrays                                                                                                                                                                                                                                                                       |
 | `AddressField`                                 | `TextField` + `StateSelect` + `ZipField`      | `name` (nested object), `legend?`/`description?` (renders a `FormSection`), `autoCompleteSection?` (`'shipping'`/`'billing'`/any section token, prefixes every autofill token), `street2?` (default `true`), `streetLabel?`/`street2Label?`/`cityLabel?`/`stateLabel?`/`zipLabel?`, `required`/`disabled`, `slotProps?`. `required` reaches street/city/state/zip, never street2; `addressSchema()` is the matching zod object                                                                                                |
 | `DatePicker` / `TimePicker` / `DateTimePicker` | MUI X pickers                                 | `name`, `label?`, `helperText?`, `errorMessages?`; rules `required`, `validate`. The picker's own props (`minDate`, `disablePast`, `views`, …) pass through. Value is the adapter's date type or `null`                                                                                                                                                                                                                                                                                                                       |
@@ -115,6 +117,7 @@ React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form
 | `ReadOnlyField`                                | MUI `Typography`                              | `name`, `label?`, `options?`, `format?`, `empty?`, `editStep?` — or `value` (a caller-computed value, e.g. from its own `useWatch`) with `label` required and no `name`; never calls `useWatch` in that mode                                                                                                                                                                                                                                                                                                                  |
 | `PasswordField`                                | ez-form `TextField`                           | `name`; same rules as TextField. `revealable?` (default `true`) shows a show/hide toggle in the end adornment; `autoComplete` defaults to `'current-password'`; `slotProps.toggle?` reaches the toggle `IconButton`; `showLabel?`/`hideLabel?` set its accessible name                                                                                                                                                                                                                                                        |
 | `PhoneField`                                   | ez-form `TextField`                           | `name`; same rules as TextField, plus `format?` (a `#` template, default `'###-###-####'`) and `invalidMessage?`. The form value is digits only (`'5551234567'`); `type="tel"`, `inputMode="tel"`, `autoComplete` defaults to `'tel'`. A non-empty value shorter than the template's digit count fails with `invalidMessage`                                                                                                                                                                                                  |
+| `EmailField`                                   | ez-form `TextField`                           | `name`; same rules as TextField, plus a built-in format rule (`invalidMessage?`, default `'Enter a valid email address'`) using HTML's own e-mail grammar, and `normalize?` (default `true`) which trims and lower-cases on blur. `type="email"`, `inputMode="email"`, `autoComplete` defaults to `'email'`                                                                                                                                                                                                                   |
 | `SsnField`                                     | ez-form `TextField`                           | `name`; same rules as TextField, plus a built-in "9 digits" rule (`invalidMessage?`, default `'Enter a 9-digit Social Security number'`). The form value is digits only (`'123456789'`), displayed as `123-45-6789`; `inputMode="numeric"`, `autoComplete="off"`. `reveal?` (default `true`) shows a show/hide toggle; hidden renders `type="password"`                                                                                                                                                                       |
 | `PasswordField`                                | ez-form `TextField`                           | `name`; same rules as TextField. `revealable?` (default `true`) shows a show/hide toggle in the end adornment; `autoComplete` defaults to `'current-password'`; `slotProps.toggle?` reaches the toggle `IconButton`                                                                                                                                                                                                                                                                                                           |
 | `PasswordStrength`                             | MUI `LinearProgress`                          | `name`; `score?: (password) => 0\|1\|2\|3\|4` (default a small built-in heuristic); `labels?` (5 strings). Renders as an ARIA `meter`, never registers or validates                                                                                                                                                                                                                                                                                                                                                           |
@@ -1014,21 +1017,24 @@ Themeable under `EzFileField` (`root`, `fileList`, `deleteIcon`, `dropZone`, `dr
 
 `TextField`, `NumberField`, `MoneyField`, and `OtpField` set `autoComplete` / `inputMode` defaults so mobile keyboards and password managers do the right thing without per-field wiring. A default only applies when the consumer sets neither the prop nor its `slotProps.htmlInput` equivalent — an explicit value always wins.
 
-| Component     | Condition                                                             | `autoComplete`  | `inputMode`     |
-| ------------- | --------------------------------------------------------------------- | --------------- | --------------- |
-| `TextField`   | `type="email"`                                                        | `email`         | `email`         |
-| `TextField`   | `type="tel"`                                                          | `tel`           | `tel`           |
-| `TextField`   | `type="url"`                                                          | `url`           | `url`           |
-| `TextField`   | `type="search"`                                                       | — (not guessed) | `search`        |
-| `TextField`   | any other `type` (including no `type`)                                | — (not guessed) | — (not guessed) |
-| `NumberField` | integer-only (no fractional `step`, no `format` with fraction digits) | —               | `numeric`       |
-| `NumberField` | otherwise (fractional `step`, or a `format` with fraction digits)     | —               | `decimal`       |
-| `MoneyField`  | always (currency has cents)                                           | —               | `decimal`       |
-| `OtpField`    | first slot only, from Base UI itself, not duplicated here             | `one-time-code` | `numeric`       |
-| `PhoneField`  | always — set by the field itself, not the `type="tel"` fallback       | `tel`           | `tel`           |
-| `SsnField`    | always — an SSN has no autofill token, so `off` is deliberate         | `off`           | `numeric`       |
+| Component      | Condition                                                             | `autoComplete`  | `inputMode`     |
+| -------------- | --------------------------------------------------------------------- | --------------- | --------------- |
+| `TextField`    | `type="email"`                                                        | `email`         | `email`         |
+| `TextField`    | `type="tel"`                                                          | `tel`           | `tel`           |
+| `TextField`    | `type="url"`                                                          | `url`           | `url`           |
+| `TextField`    | `type="search"`                                                       | — (not guessed) | `search`        |
+| `TextField`    | any other `type` (including no `type`)                                | — (not guessed) | — (not guessed) |
+| `NumberField`  | integer-only (no fractional `step`, no `format` with fraction digits) | —               | `numeric`       |
+| `NumberField`  | otherwise (fractional `step`, or a `format` with fraction digits)     | —               | `decimal`       |
+| `MoneyField`   | always (currency has cents)                                           | —               | `decimal`       |
+| `PercentField` | always (the percent format allows fraction digits)                    | —               | `decimal`       |
+| `OtpField`     | first slot only, from Base UI itself, not duplicated here             | `one-time-code` | `numeric`       |
+| `PhoneField`   | always — set by the field itself, not the `type="tel"` fallback       | `tel`           | `tel`           |
+| `EmailField`   | always — set by the field itself, via its fixed `type="email"`        | `email`         | `email`         |
+| `FeinField`    | always — a tax ID has no autofill token worth guessing                | `off`           | `numeric`       |
+| `SsnField`     | always — an SSN has no autofill token, so `off` is deliberate         | `off`           | `numeric`       |
 
-`TextField` never guesses a token from `name` — a wrong guess is worse than none, so only these unambiguous `type`s get a default. `PasswordField` covers `autoComplete="current-password"` / `"new-password"` on its own, above. `PhoneField` sets `type="tel"`, `inputMode="tel"` and its `autoComplete` default itself rather than relying on the `type`-derived fallback — the two agree, but the field owns them — and its `autoComplete` takes a sectioned token (`"shipping tel"`, `"work tel"`) for forms with more than one number. `SsnField` pins `autoComplete="off"` rather than offering it as a prop: there is no autofill token for a Social Security number, and inviting a browser to store one is the wrong default. The remaining v8 date/time/address fields (#18–#19) will extend this table.
+`TextField` never guesses a token from `name` — a wrong guess is worse than none, so only these unambiguous `type`s get a default. `PasswordField` covers `autoComplete="current-password"` / `"new-password"` on its own, above. `PhoneField` sets `type="tel"`, `inputMode="tel"` and its `autoComplete` default itself rather than relying on the `type`-derived fallback — the two agree, but the field owns them — and its `autoComplete` takes a sectioned token (`"shipping tel"`, `"work tel"`) for forms with more than one number. `EmailField` fixes `type="email"` (so `inputMode="email"` comes from `TextField`'s own `type` mapping) and defaults `autoComplete` to `'email'`, which likewise takes a sectioned token (`"work email"`). `SsnField` pins `autoComplete="off"` rather than offering it as a prop: there is no autofill token for a Social Security number, and inviting a browser to store one is the wrong default; `FeinField` pins the same default for an EIN, but leaves it overridable. Every one of these defaults becomes `"off"` under `<Form assisted>` (below). The remaining v8 date/time fields (#19) will extend this table.
 
 ## Assisted mode
 
@@ -1115,6 +1121,30 @@ USD only: digits group as you type (`1234` shows `1,234`) and the field formats 
 const schema = z.object({ price: z.number().min(0) })
 ```
 
+## PercentField
+
+`NumberField` with a percent sign, put through the same `Intl` `format` slot `MoneyField` uses for `$` — so the `%` is part of the formatted value rather than an adornment beside the input, and it is the theme's `EzNumberField` keys that style the field:
+
+```tsx
+const schema = z.object({ rate: z.number().nullable() })
+
+<PercentField name="rate" label="Rate" />
+// user types 12.5 → shows "12.5%" on blur, submits { rate: 12.5 }
+```
+
+`min` defaults to `0`, `max` to `100` and `step` to `1`, all overridable and all in **percentage points**. Digits group while typing exactly as they do on `NumberField`, and the value rounds to the two fraction digits the display carries.
+
+`scale` decides what the stored number means. The default, `'percent'`, stores what it shows. `'fraction'` leaves the display alone and stores the fraction instead, for schemas and APIs that keep rates that way:
+
+```tsx
+<PercentField name="rate" label="Rate" scale="fraction" />
+// user types 12.5 → shows "12.5%", submits { rate: 0.125 }
+```
+
+Only the stored value moves: `min`, `max` and `step` stay in percentage points under either scale, so `max={50}` means 50% and its message still reads `must be at most 50.` — the bound is scaled with the value so the rule fires at all, but the number you wrote is the number the user is told. A consumer `onValueChange` sees the **stored** value, matching what `onSubmit` receives, and an empty field is `null` rather than a scaled zero.
+
+`scale` and the bound/step defaults are settable app-wide through `theme.components.EzPercentField.defaultProps`; a prop on the element always wins.
+
 ## PasswordField
 
 `TextField` with `type` fixed to `password`/`text` by a show/hide toggle in the end adornment. The reveal state is local UI state only — it never reaches the form value, and it resets to hidden if the field unmounts. `autoComplete` defaults to `'current-password'`; pass `'new-password'` for sign-up/change-password fields.
@@ -1130,9 +1160,33 @@ The toggle is a themeable `IconButton` under `EzPasswordField` (`root`, `toggle`
 
 Revealing keeps your place: flipping an `<input>` between `type="password"` and `type="text"` makes the browser re-create the editing context, which drops the selection, and the click that flipped it has already moved focus to the button. Both fields with a toggle capture the selection before the swap and restore focus and caret after it — unless focus was not in the input to begin with (a toggle reached by Tab), in which case focus stays on the button where you put it.
 
+## EmailField
+
+`TextField` with `type="email"` fixed on, so the mobile keyboard gets the `@` key and `inputMode`/`autoComplete` default to `email`. The value is the address string (`''` when empty, so `required` still applies):
+
+```tsx
+const schema = z.object({ email: z.string() })
+
+<EmailField name="email" label="Email" required />
+```
+
+A built-in rule rejects a non-empty value that is not a valid address, using **HTML's own e-mail grammar** — the [WHATWG "valid e-mail address" production](https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address) a browser's `<input type="email">` validity check uses. So the field agrees with the native bubble instead of disagreeing with it in either direction, and your zod schema stays a plain `z.string()` with no `.email()` and no regex of its own:
+
+```tsx
+<EmailField name="email" label="Email" invalidMessage="We need a work address" />
+```
+
+`normalize` (default `true`) trims and lower-cases the value **on blur**, so what you submit, store and compare is canonical however it was typed or pasted — `' Ada@Example.COM '` becomes `'ada@example.com'`. It runs in the blur capture phase, ahead of the form's own handler, so validation timing is untouched: a form in `mode="onBlur"` reports on the fixed value, and the default `mode="onSubmit"` still reports nothing until submit. A consumer `onBlur` still fires either way, and the format rule canonicalizes before testing, so a value the field is about to fix is never rejected first. Pass `normalize={false}` to store exactly what was typed:
+
+```tsx
+<EmailField name="email" label="Email" normalize={false} />
+```
+
+`invalidMessage`, `normalize` and `autoComplete` are all settable app-wide through `theme.components.EzEmailField.defaultProps`; a prop on the element always wins. `EmailField` adds no styled slot of its own — it renders a `TextField`, so MUI's own `MuiTextField` / `MuiOutlinedInput` style keys reach it unchanged.
+
 ## US fields
 
-`PhoneField` and `SsnField` are the template-driven US fields. They share one rule: **the form value is the bare digits, and the template only decides how they are displayed.** So a zod schema stays a plain `z.string()` with no regex — the field itself owns completeness — and the value you submit, store and compare is always canonical, whatever the user typed or pasted.
+`PhoneField`, `SsnField` and `FeinField` are the template-driven US fields (`ZipField` and `StateSelect` are below). They share one rule: **the form value is the bare digits, and the template only decides how they are displayed.** So a zod schema stays a plain `z.string()` with no regex — the field itself owns completeness — and the value you submit, store and compare is always canonical, whatever the user typed or pasted.
 
 ## PasswordStrength
 
@@ -1218,6 +1272,21 @@ A value that is non-empty but shorter than nine digits fails on submit with `inv
 `autoComplete` is pinned to `'off'` and is not a prop: there is no autofill token for an SSN, and inviting a browser to store one is the wrong default.
 
 The toggle is a themeable `IconButton` under `EzSsnField` (`root`, `toggle`, exported as `ssnFieldClasses`); `slotProps.toggle` reaches it, `icons?: { show?, hide? }` swaps its icons, and `showLabel`/`hideLabel` set its accessible name (defaults `'Show Social Security number'` / `'Hide Social Security number'`). `invalidMessage`, `reveal`, `icons` and the labels are all settable app-wide through `theme.components.EzSsnField.defaultProps`; a prop on the element always wins.
+
+### FeinField
+
+`FeinField` is the same machinery on the IRS's own two-then-seven shape — the form value is the bare nine digits, `format` (default `'##-#######'`) decides only how they are drawn:
+
+```tsx
+const schema = z.object({ ein: z.string() })
+
+<FeinField name="ein" label="EIN" required />
+// user types 123456789 → shows "12-3456789", submits { ein: '123456789' }
+```
+
+Everything `PhoneField` does with typing, pasting, the caret and Backspace-onto-a-separator applies here unchanged: all three template fields share one `useTemplateField` hook. What differs is the defaults: `inputMode="numeric"` (there is no `type="tel"` keypad to inherit), `autoComplete="off"` — no autofill token exists for a tax ID, and a browser guessing one over a federal identifier is worse than none — and `invalidMessage`, which defaults to `Enter a 9-digit employer identification number`. `type` stays `text`, so a leading zero is never dropped.
+
+`format`, `invalidMessage` and `autoComplete` are settable app-wide through `theme.components.EzFeinField.defaultProps`; a prop on the element always wins.
 
 ## PasswordStrength
 

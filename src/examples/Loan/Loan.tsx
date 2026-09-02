@@ -12,6 +12,7 @@ import { FormError } from '../../FormError'
 import { FormErrorSummary } from '../../Form/FormErrorSummary'
 import { FormSection } from '../../FormSection'
 import { TextField } from '../../fields/TextField'
+import { EmailField } from '../../fields/EmailField'
 import { Select } from '../../fields/Select'
 import { MoneyField } from '../../fields/MoneyField'
 import { Slider } from '../../fields/Slider'
@@ -100,7 +101,8 @@ const schema = z
     ),
     termMonths: z.number().min(MIN_TERM_MONTHS).max(MAX_TERM_MONTHS),
     applicantName: z.string().min(1, 'Name is required'),
-    applicantEmail: z.email('Invalid email address'),
+    // Plain `z.string()`: <EmailField> owns the format rule (HTML's own e-mail grammar).
+    applicantEmail: z.string().min(1, 'Email is required'),
     // See employmentSchema's `from` comment: `required` on <DateField> enforces this.
     applicantBirthday: z.date().nullable(),
     applicantIncome: z.number().min(0, 'Monthly income cannot be negative'),
@@ -350,7 +352,7 @@ export function Loan({ onSuccess }: LoanProps) {
                       autoComplete="name"
                       required
                     />
-                    <TextField name="applicantEmail" label="Email" autoComplete="email" required />
+                    <EmailField name="applicantEmail" label="Email" required />
                     <DateField
                       name="applicantBirthday"
                       label="Birthday"
