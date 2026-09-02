@@ -19,7 +19,8 @@ const withPickers = (el: React.ReactElement) => (
 )
 const hiddenInput = (name: string) =>
   document.querySelector<HTMLInputElement>(`input[name="${name}"]`)!
-const typeDate = (name: string, text: string) => fireEvent.change(hiddenInput(name), { target: { value: text } })
+const typeDate = (name: string, text: string) =>
+  fireEvent.change(hiddenInput(name), { target: { value: text } })
 
 const schema = z.object({ start: z.date().nullable() })
 

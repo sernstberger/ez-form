@@ -46,7 +46,10 @@ describe('ez-form DatePicker: unparsable paste gives no visible feedback', () =>
     console.log('any role=alert present:', screen.queryAllByRole('alert').length)
     console.log('submitted value:', JSON.stringify(onSubmit.mock.calls[0]?.[0]))
     console.log('hidden input after submit:', hiddenInput('start').value)
-    console.log('form was allowed to "succeed" (onSubmit called) with start=null:', onSubmit.mock.calls.length > 0)
+    console.log(
+      'form was allowed to "succeed" (onSubmit called) with start=null:',
+      onSubmit.mock.calls.length > 0,
+    )
   })
 
   it('required + unparsable paste: does required catch it, or does it look like an empty-but-valid submit?', async () => {

@@ -163,6 +163,7 @@ field" behavior so the two don't fight over focus.
 
 Inside a `Wizard`, place one `<FormErrorSummary />` per `WizardStep`: each shows only that step's
 own `fields` from its last failed `Next`, not the whole form's errors.
+
 ## Field arrays
 
 `FieldArray` repeats a group of fields over a hookform `useFieldArray`. The array

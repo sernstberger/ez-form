@@ -81,7 +81,10 @@ describe('QA: TextareaField maxLength + counter vs newline abuse', () => {
     setter.call(textarea, 'this is way more than ten characters')
     textarea.dispatchEvent(new Event('input', { bubbles: true }))
     await userEvent.click(screen.getByRole('button', { name: 'Go' }))
-    console.log('helper text after over-limit paste:', document.querySelector('.MuiFormHelperText-root')?.textContent)
+    console.log(
+      'helper text after over-limit paste:',
+      document.querySelector('.MuiFormHelperText-root')?.textContent,
+    )
   })
 })
 

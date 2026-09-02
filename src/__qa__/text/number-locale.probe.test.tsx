@@ -56,7 +56,9 @@ describe('QA: MoneyField paste', () => {
       const input = screen.getByRole('textbox', { name: 'Amount' }) as HTMLInputElement
       paste(input, text)
       input.blur()
-      console.log(`[money] pasted ${JSON.stringify(text)} -> displayed ${JSON.stringify(input.value)}`)
+      console.log(
+        `[money] pasted ${JSON.stringify(text)} -> displayed ${JSON.stringify(input.value)}`,
+      )
     })
   }
 })

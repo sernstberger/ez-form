@@ -49,30 +49,33 @@ describe('DatePicker paste — locale round-trip', () => {
     ['en-GB', enGB],
   ]
 
-  it.each(locales)('%s: typed native-format date round-trips to the same calendar day', async (name, locale) => {
-    const onSubmit = vi.fn()
-    render(
-      withLocale(locale)(
-        <Form schema={schema} defaultValues={{ start: null }} onSubmit={onSubmit}>
-          <DatePicker name="start" label="Start" />
-          <button type="submit">Go</button>
-        </Form>,
-      ),
-    )
-    // date-fns default format per locale differs; use the picker's own
-    // format placeholder to know what it expects, then type March 2 2024
-    // in that locale's own convention.
-    const formatted: Record<string, string> = {
-      'en-US': '03/02/2024',
-      de: '02.03.2024',
-      fr: '02/03/2024',
-      'en-GB': '02/03/2024',
-    }
-    typeDate('start', formatted[name])
-    const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: 'Go' }))
-    expect(onSubmit).toHaveBeenCalledWith({ start: new Date(2024, 2, 2) }, expect.anything())
-  })
+  it.each(locales)(
+    '%s: typed native-format date round-trips to the same calendar day',
+    async (name, locale) => {
+      const onSubmit = vi.fn()
+      render(
+        withLocale(locale)(
+          <Form schema={schema} defaultValues={{ start: null }} onSubmit={onSubmit}>
+            <DatePicker name="start" label="Start" />
+            <button type="submit">Go</button>
+          </Form>,
+        ),
+      )
+      // date-fns default format per locale differs; use the picker's own
+      // format placeholder to know what it expects, then type March 2 2024
+      // in that locale's own convention.
+      const formatted: Record<string, string> = {
+        'en-US': '03/02/2024',
+        de: '02.03.2024',
+        fr: '02/03/2024',
+        'en-GB': '02/03/2024',
+      }
+      typeDate('start', formatted[name])
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      expect(onSubmit).toHaveBeenCalledWith({ start: new Date(2024, 2, 2) }, expect.anything())
+    },
+  )
 
   it('en-US: pastes 2024-03-02 (ISO) — does it round-trip or get rejected cleanly?', async () => {
     const onSubmit = vi.fn()
