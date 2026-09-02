@@ -224,7 +224,18 @@ export function Wizard<TIn extends FieldValues>({
   }, [submitCount, errorPaths, ownerIndex, index, move, steps])
 
   useEffect(() => {
-    if (!focusTarget || focusTarget.id !== current.id) return
+    if (!focusTarget) return
+    if (focusTarget.id !== current.id) {
+      // A controlled wizard (`step`/`onStepChange`) can decline the move `move()` requested
+      // for this target: `current.id` then changes to something else entirely (or never
+      // leaves where it was) instead of becoming `focusTarget.id`. Left set, the target is
+      // inert until a later, unrelated arrival at that step — via the consumer's own
+      // navigation, long after the failed submit — would wrongly focus a stale field on
+      // mount. Any `current.id` change that isn't the requested step means the move didn't
+      // happen (or was superseded); either way the target is stale and gets dropped.
+      setFocusTarget(null)
+      return
+    }
     setFocusTarget(null)
     setFocus(focusTarget.path)
   }, [focusTarget, current.id, setFocus])
