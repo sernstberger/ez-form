@@ -330,7 +330,7 @@ describe('DatePicker', () => {
 
     await user.click(root)
     await user.keyboard('05')
-    await user.click(clearButton(root)!)
+    await user.click(clearButton(root))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(root).toHaveAttribute('aria-invalid', 'false')
 
@@ -355,7 +355,7 @@ describe('DatePicker', () => {
       ),
     )
     const root = screen.getByRole('group', { name: 'Start' })
-    await user.click(clearButton(root)!)
+    await user.click(clearButton(root))
     expect(onClear).toHaveBeenCalledTimes(1)
     expect(hiddenInput('start')).toHaveValue('')
   })

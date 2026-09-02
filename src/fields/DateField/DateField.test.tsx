@@ -472,7 +472,7 @@ describe('DateField', () => {
 
     await user.click(root)
     await user.keyboard('05')
-    await user.click(clearButton(root)!)
+    await user.click(clearButton(root))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(root).toHaveAttribute('aria-invalid', 'false')
 
@@ -480,6 +480,52 @@ describe('DateField', () => {
     await vi.waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith({ birthday: null }, expect.anything()),
     )
+  })
+
+  // The consumer's `onChange` must fire on a clear whether or not MUI X publishes the
+  // change itself: it does when the field held a real value, and skips it when the value
+  // was already `null` (the unparsable-paste case), so `usePickerField` fills that one in.
+  // Both are asserted here — an emptying clear should look the same to a consumer either way.
+  it('clearable: clearing notifies a consumer onChange, including after an unparsable paste', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    const { rerender } = render(
+      withPickers(
+        <Form
+          schema={schema}
+          defaultValues={{ birthday: new Date(1990, 5, 1) }}
+          onSubmit={() => {}}
+        >
+          <DateField name="birthday" label="Birthday" clearable onChange={onChange} />
+        </Form>,
+      ),
+    )
+    await user.click(clearButton(screen.getByRole('group', { name: 'Birthday' })))
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange).toHaveBeenCalledWith(null, expect.objectContaining({ validationError: null }))
+
+    // Same again, but from the stuck state: value already `null`, `pickerError` holding
+    // `invalidDate`, so MUI X's own `clearValue` publishes nothing.
+    onChange.mockClear()
+    rerender(
+      withPickers(
+        <Form schema={schema} defaultValues={{ birthday: null }} onSubmit={() => {}}>
+          <DateField name="birthday" label="Birthday" clearable onChange={onChange} />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    const root = screen.getByRole('group', { name: 'Birthday' })
+    await pasteAllText(root, 'March 2, 2024')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Birthday is invalid.')
+    await user.click(root)
+    await user.keyboard('05')
+    onChange.mockClear()
+    await user.click(clearButton(root))
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange).toHaveBeenCalledWith(null, expect.objectContaining({ validationError: null }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it("clearable: a consumer's own onClear still runs", async () => {
@@ -497,7 +543,7 @@ describe('DateField', () => {
       ),
     )
     const root = screen.getByRole('group', { name: 'Birthday' })
-    await user.click(clearButton(root)!)
+    await user.click(clearButton(root))
     expect(onClear).toHaveBeenCalledTimes(1)
     expect(hiddenInput('birthday')).toHaveValue('')
   })

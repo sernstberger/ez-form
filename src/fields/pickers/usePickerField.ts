@@ -60,6 +60,16 @@ interface PickerHandlers<
 }
 
 /**
+ * The part of the consumer's `slotProps.field` this hook merges by hand. Only the
+ * popup pickers have this slot, and `clearable`/`onClear` are the only keys of it
+ * this hook cares about; `TSlotProps` does not describe it at all, so — like
+ * `ConsumerTextFieldSlotProps` below — it is read through this.
+ */
+interface ConsumerFieldSlotProps {
+  onClear?: (event: MouseEvent) => void
+}
+
+/**
  * The parts of the consumer's `slotProps.textField` this hook merges by hand.
  * `TSlotProps` only guarantees `textField?: object`, so read them through this.
  */
@@ -221,11 +231,27 @@ export function usePickerField<
    * otherwise silently replace a consumer's rather than compose with it, the same trap
    * this hook's `helperText`/`error`/`onBlur` merging already avoids.
    */
-  const consumerOnClear =
-    onClear ??
-    (slotProps as { field?: { onClear?: (event: MouseEvent) => void } } | undefined)?.field
-      ?.onClear ??
-    consumerTextField?.onClear
+  const consumerField = (slotProps as { field?: ConsumerFieldSlotProps } | undefined)?.field
+  const consumerOnClear = onClear ?? consumerField?.onClear ?? consumerTextField?.onClear
+
+  /**
+   * The bound `onChange`, named so `onClear` below can route through it rather than
+   * reaching past it to `f.field.onChange` — everything a value change owes the form
+   * (claiming a pending paste, deriving `pickerError`, then notifying the consumer)
+   * lives here and stays in one place.
+   */
+  const handleChange = (value: TValue, context: TContext) => {
+    // `DateField`'s synchronous case, and any paste that changes the value
+    // at all (see `handlePaste` above): MUI X did call back here for the
+    // same paste, so claim the pending clipboard text ourselves instead of
+    // leaving it for the microtask.
+    const rawText = pendingPasteText.current
+    pendingPasteText.current = null
+    const unparsable = value == null && !context.validationError && !!rawText
+    pickerError.current = unparsable ? ('invalidDate' as TError) : context.validationError
+    f.field.onChange(value)
+    onChange?.(value, context)
+  }
 
   return {
     name: f.field.name,
@@ -233,18 +259,7 @@ export function usePickerField<
     value: (f.field.value as TValue | undefined) ?? null,
     inputRef: f.field.ref,
     disabled: mergeDisabled(disabled, f.field.disabled),
-    onChange: (value: TValue, context: TContext) => {
-      // `DateField`'s synchronous case, and any paste that changes the value
-      // at all (see `handlePaste` above): MUI X did call back here for the
-      // same paste, so claim the pending clipboard text ourselves instead of
-      // leaving it for the microtask.
-      const rawText = pendingPasteText.current
-      pendingPasteText.current = null
-      const unparsable = value == null && !context.validationError && !!rawText
-      pickerError.current = unparsable ? ('invalidDate' as TError) : context.validationError
-      f.field.onChange(value)
-      onChange?.(value, context)
-    },
+    onChange: handleChange,
     onError: (error: TError, value: TValue) => {
       pickerError.current = error
       onError?.(error, value)
@@ -278,25 +293,39 @@ export function usePickerField<
         },
         // #83: the clear button, when a consumer opts into `clearable`. MUI X's
         // `useField.js` `handleClear` runs `onClear?.(event)` and *then*
-        // `clearValue()`, which only fires `onChange` when the value actually
-        // changes. After an unparsable paste the stored value is already `null`
-        // (the string never parsed) while `pickerError` is holding `invalidDate`
-        // from `handlePaste` above — so clearing produces no `onChange`, nothing
-        // resets the ref, and the field stays stuck showing "… is invalid." with
-        // `aria-invalid="true"` and no way back. Reset the ref here and re-run the
-        // field's own error derivation via `field.onChange` so the error clears.
+        // `clearValue()`, and `clearValue` (internals/hooks/useField/useFieldState.js)
+        // only reaches `publishValue` — the call that becomes `onChange` — on the
+        // branch where the value was *not* already empty. After an unparsable paste
+        // the stored value is already `null` (the string never parsed) while
+        // `pickerError` holds the `invalidDate` `handlePaste` set, so that branch is
+        // skipped: no `onChange`, nothing resets the ref, and the field stays stuck
+        // showing "… is invalid." with `aria-invalid="true"` and no way back.
         //
-        // Also drops any *other* pending picker error (`minDate`, …) — correct
-        // either way: an empty field cannot be out of range, and the `required`
-        // rule is what should speak for an emptied required field, not a stale
-        // range code. Ordered "form's handler first" like onBlur/onPaste above.
+        // So this fills in exactly the change MUI X is about to skip, and only then:
+        // routed through `handleChange` (not `f.field.onChange`) so an emptying clear
+        // is indistinguishable from any other — same `pickerError` reset, and the
+        // consumer's own `onChange` fires for it just as it does on the non-empty
+        // branch, where MUI X's `publishValue` will call `handleChange` itself a beat
+        // later. Guarding on the value keeps that from firing twice.
+        //
+        // Clearing `pickerError` also drops any *other* pending picker code
+        // (`minDate`, …) — correct either way: an empty field cannot be out of range,
+        // and the `required` rule is what should speak for an emptied required field,
+        // not a stale range code. Ordered "form's handler first" like onBlur/onPaste.
         onClear: (event: MouseEvent) => {
           pendingPasteText.current = null
-          pickerError.current = null
-          // `TValue` is not constrained to include `null` at the signature, but every
-          // instantiation is `PickerValidDate | null` (all four pickers), and an empty
-          // picker is exactly the `null` the `value` above already normalises to.
-          f.field.onChange(null as TValue)
+          if (f.field.value == null) {
+            // `TValue` is not constrained to include `null` at the signature, but every
+            // instantiation is `PickerValidDate | null` (all four pickers), and an empty
+            // picker is exactly the `null` the `value` above already normalises to.
+            // `validationError: null` is the truth for an empty field, and matches what
+            // MUI X passes on its own clear path.
+            handleChange(null as TValue, { validationError: null } as TContext)
+          } else {
+            // MUI X's `clearValue` will publish this one, so only the error state needs
+            // resetting here — `handleChange` runs on its own for the value itself.
+            pickerError.current = null
+          }
           consumerOnClear?.(event)
         },
         slotProps: {
