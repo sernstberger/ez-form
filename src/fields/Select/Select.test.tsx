@@ -142,6 +142,16 @@ describe('Select', () => {
     )
   })
 
+  it('Form requiredIndicator="optional": required stays required with no asterisk', () => {
+    const { container } = render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}} requiredIndicator="optional">
+        <Select name="role" label="Role" options={options} required />
+      </Form>,
+    )
+    expect(screen.getByRole('combobox', { name: 'Role' })).toBeRequired()
+    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
+  })
+
   it('Form requiredIndicator="optional": not-required gets the optional suffix in its label', () => {
     render(
       <Form schema={schema} defaultValues={{}} onSubmit={() => {}} requiredIndicator="optional">

@@ -234,4 +234,19 @@ describe('PasswordField', () => {
     expect(input()).toHaveAttribute('type', 'password')
     expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument()
   })
+
+  it('Form requiredIndicator="optional": required stays required with no asterisk', () => {
+    const { container } = render(
+      <Form
+        schema={schema}
+        defaultValues={{ password: '' }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <PasswordField name="password" label="Password" required />
+      </Form>,
+    )
+    expect(input()).toBeRequired()
+    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
+  })
 })

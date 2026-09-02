@@ -139,4 +139,33 @@ describe('OtpField', () => {
     expect(helperText).toHaveClass(otpFieldClasses.helperText)
     expect(getComputedStyle(helperText).letterSpacing).toBe('9px')
   })
+
+  it('Form requiredIndicator="optional": required stays required with no label asterisk', () => {
+    const { container } = render(
+      <Form
+        schema={schema}
+        defaultValues={{ code: '' }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <OtpField name="code" label="Code" length={4} required />
+      </Form>,
+    )
+    expect(screen.getByRole('textbox', { name: 'Code' })).toBeInTheDocument()
+    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
+  })
+
+  it('Form requiredIndicator="optional": not-required gets the optional suffix in its label', () => {
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ code: '' }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <OtpField name="code" label="Code" length={4} />
+      </Form>,
+    )
+    expect(screen.getByRole('textbox', { name: 'Code (optional)' })).toBeInTheDocument()
+  })
 })

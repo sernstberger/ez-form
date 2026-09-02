@@ -61,4 +61,37 @@ describe('TimePicker', () => {
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('At is too early.')
   })
+
+  it('Form requiredIndicator="optional": required stays required with no label asterisk', () => {
+    const { container } = render(
+      withPickers(
+        <Form
+          schema={schema}
+          defaultValues={{ at: null }}
+          onSubmit={() => {}}
+          requiredIndicator="optional"
+        >
+          <TimePicker name="at" label="At" required />
+        </Form>,
+      ),
+    )
+    expect(hiddenInput('at')).toBeRequired()
+    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
+  })
+
+  it('Form requiredIndicator="optional": not-required gets the optional suffix in its label', () => {
+    render(
+      withPickers(
+        <Form
+          schema={schema}
+          defaultValues={{ at: null }}
+          onSubmit={() => {}}
+          requiredIndicator="optional"
+        >
+          <TimePicker name="at" label="At" />
+        </Form>,
+      ),
+    )
+    expect(screen.getByRole('group', { name: 'At (optional)' })).toBeInTheDocument()
+  })
 })

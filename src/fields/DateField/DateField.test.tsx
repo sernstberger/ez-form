@@ -282,4 +282,37 @@ describe('DateField', () => {
     )
     expect(onError).toHaveBeenCalledWith('minDate', expect.any(Date))
   })
+
+  it('Form requiredIndicator="optional": required stays required with no label asterisk', () => {
+    const { container } = render(
+      withPickers(
+        <Form
+          schema={schema}
+          defaultValues={{ birthday: null }}
+          onSubmit={() => {}}
+          requiredIndicator="optional"
+        >
+          <DateField name="birthday" label="Birthday" required />
+        </Form>,
+      ),
+    )
+    expect(hiddenInput('birthday')).toBeRequired()
+    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
+  })
+
+  it('Form requiredIndicator="optional": not-required gets the optional suffix in its label', () => {
+    render(
+      withPickers(
+        <Form
+          schema={schema}
+          defaultValues={{ birthday: null }}
+          onSubmit={() => {}}
+          requiredIndicator="optional"
+        >
+          <DateField name="birthday" label="Birthday" />
+        </Form>,
+      ),
+    )
+    expect(screen.getByRole('group', { name: 'Birthday (optional)' })).toBeInTheDocument()
+  })
 })

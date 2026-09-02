@@ -24,6 +24,11 @@ export type OtpFieldProps = Omit<
   disabled?: boolean
   /** Number of characters. */
   length?: number
+  /**
+   * Overrides `Form`'s `optionalText` for this field when the form's
+   * `requiredIndicator` is `"optional"`; `false` hides it on this field.
+   */
+  optionalText?: ReactNode | false
   /** Runs after the form's own handler. */
   onValueChange?: OTPField.Root.Props['onValueChange']
   /** Runs after the form's own handler, when focus leaves the group. */
@@ -43,6 +48,7 @@ export function OtpField({
   disabled,
   required,
   validate,
+  optionalText,
   length = 6,
   onValueChange,
   onBlur,
@@ -62,6 +68,7 @@ export function OtpField({
           v === '' || v == null || v.length === length || `${l} must be ${length} characters.`,
       },
     },
+    optionalText,
   })
   const text = f.helperText(helperText)
 
@@ -69,7 +76,7 @@ export function OtpField({
     <OtpFieldControl
       {...rest}
       name={f.field.name}
-      label={label}
+      label={f.displayLabel}
       length={length}
       value={f.field.value ?? ''}
       onValueChange={(value, details) => {
@@ -77,6 +84,7 @@ export function OtpField({
         onValueChange?.(value, details)
       }}
       required={f.required}
+      labelRequired={f.labelRequired}
       disabled={mergeDisabled(disabled, f.field.disabled)}
       error={f.invalid}
       helperText={text}

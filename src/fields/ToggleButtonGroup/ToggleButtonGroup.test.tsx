@@ -109,4 +109,32 @@ describe('ToggleButtonGroup', () => {
     await user.click(screen.getByRole('button', { name: 'Left' }))
     expect(onChange).toHaveBeenCalledWith(expect.anything(), 'left')
   })
+
+  it('Form requiredIndicator="optional": required stays required with no legend asterisk', () => {
+    const { container } = render(
+      <Form
+        schema={multiSchema}
+        defaultValues={{ format: [] }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <ToggleButtonGroup name="format" label="Format" options={formats} required />
+      </Form>,
+    )
+    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
+  })
+
+  it('Form requiredIndicator="optional": not-required gets the optional suffix on the legend', () => {
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ align: null }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <ToggleButtonGroup name="align" label="Align" options={aligns} exclusive />
+      </Form>,
+    )
+    expect(getInnerGroup('Align (optional)')).toBeInTheDocument()
+  })
 })

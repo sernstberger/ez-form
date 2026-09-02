@@ -101,4 +101,32 @@ describe('CheckboxGroup', () => {
     )
     expect(getInnerGroup('Toppings')).toHaveClass('MuiFormGroup-row')
   })
+
+  it('Form requiredIndicator="optional": required stays required with no legend asterisk', () => {
+    const { container } = render(
+      <Form
+        schema={schema}
+        defaultValues={{ toppings: [] }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <CheckboxGroup name="toppings" label="Toppings" options={toppings} required />
+      </Form>,
+    )
+    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
+  })
+
+  it('Form requiredIndicator="optional": not-required gets the optional suffix on the legend', () => {
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ toppings: [] }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <CheckboxGroup name="toppings" label="Toppings" options={toppings} />
+      </Form>,
+    )
+    expect(getInnerGroup('Toppings (optional)')).toBeInTheDocument()
+  })
 })

@@ -87,4 +87,33 @@ describe('Switch', () => {
     expect(sw).toHaveAttribute('title', 'Flip me')
     expect(sw).toHaveAccessibleDescription('Easier on the eyes')
   })
+
+  it('Form requiredIndicator="optional": required stays required with no asterisk', () => {
+    const { container } = render(
+      <Form
+        schema={schema}
+        defaultValues={{ darkMode: false }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <Switch name="darkMode" label="Dark mode" required />
+      </Form>,
+    )
+    expect(screen.getByRole('switch', { name: 'Dark mode' })).toBeRequired()
+    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
+  })
+
+  it('Form requiredIndicator="optional": not-required gets the optional suffix in its label', () => {
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ darkMode: false }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <Switch name="darkMode" label="Dark mode" />
+      </Form>,
+    )
+    expect(screen.getByRole('switch', { name: 'Dark mode (optional)' })).toBeInTheDocument()
+  })
 })
