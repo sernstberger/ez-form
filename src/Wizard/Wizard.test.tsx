@@ -15,6 +15,22 @@ import { WizardStepper, wizardStepperClasses } from './WizardStepper'
 import { WizardNav } from './WizardNav'
 import { useWizard } from './useWizard'
 
+// A spy on the real `useWatch` — proves a `when`-less `Wizard` never calls it at all
+// (the fix for the reviewed bug: `disabled: true` still subscribed at the react-hook-form
+// level; only never mounting the hook is a real no-op). Wraps rather than replaces, so
+// every other test in this file exercises the genuine hook.
+const useWatchSpy = vi.fn()
+vi.mock('react-hook-form', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-hook-form')>()
+  return {
+    ...actual,
+    useWatch: (...args: Parameters<typeof actual.useWatch>) => {
+      useWatchSpy(...args)
+      return actual.useWatch(...(args as unknown as []))
+    },
+  }
+})
+
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.email('Invalid email'),
@@ -147,6 +163,19 @@ function ConditionalSteps() {
       </button>
     </>
   )
+}
+
+/**
+ * Counts distinct `steps` array references seen across renders (a `Set` of identities,
+ * read via its size) — proves the effective list keeps its reference across a value
+ * change that doesn't flip any `when` predicate's answer, rather than being re-derived
+ * (and handed a fresh array) on every keystroke.
+ */
+const seenStepsRefs = new Set<unknown>()
+function StepsIdentityProbe() {
+  const { steps } = useWizard('StepsIdentityProbe')
+  seenStepsRefs.add(steps)
+  return <output data-testid="steps-ref-count">{seenStepsRefs.size}</output>
 }
 
 /** `nickname` appears in no step's `fields`: only final submit ever validates it. */
@@ -735,6 +764,22 @@ describe('Wizard', () => {
   })
 
   describe('conditional steps (when)', () => {
+    beforeEach(() => {
+      useWatchSpy.mockClear()
+      seenStepsRefs.clear()
+    })
+
+    it('a wizard with no `when` never calls useWatch', () => {
+      render(
+        <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+          <Wizard steps={steps}>
+            <Steps />
+          </Wizard>
+        </Form>,
+      )
+      expect(useWatchSpy).not.toHaveBeenCalled()
+    })
+
     it('a step whose `when` is false is absent from the effective steps and stepper', () => {
       render(
         <Form schema={conditionalSchema} defaultValues={conditionalFilled} onSubmit={() => {}}>
@@ -933,6 +978,78 @@ describe('Wizard', () => {
         </Form>,
       )
       await expectNoA11yViolations(container)
+    })
+
+    it('keeps the effective steps array reference while typing (no predicate answer changed)', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={conditionalSchema} defaultValues={conditionalFilled} onSubmit={() => {}}>
+          <Wizard steps={conditionalSteps}>
+            <ConditionalSteps />
+            <StepsIdentityProbe />
+          </Wizard>
+        </Form>,
+      )
+      // Mount already recorded one reference; typing into `name` (unrelated to `hasExtra`,
+      // the only value `when` reads) must not add a second one.
+      expect(screen.getByTestId('steps-ref-count')).toHaveTextContent('1')
+      await user.type(screen.getByRole('textbox', { name: 'Name' }), ' Lovelace')
+      expect(screen.getByTestId('steps-ref-count')).toHaveTextContent('1')
+      // Sanity check the probe itself: flipping the predicate *does* produce a new
+      // reference, so a '1' above is "stable", not "the probe never re-samples".
+      await user.click(screen.getByRole('button', { name: 'show extra' }))
+      await waitFor(() => expect(screen.getByTestId('steps-ref-count')).toHaveTextContent('2'))
+    })
+
+    it("a hidden step's field failing on final submit reports against the last visible step", async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      // `extra` has no validation rule of its own, so give the hidden step a `fields`
+      // entry that *can* fail: reuse `plan` (required) but attribute it to `extra`
+      // instead, the way ownerIndex would see a field whose owning step is hidden.
+      const hiddenOwnerSteps = [
+        { id: 'account', label: 'Account', fields: ['name', 'hasExtra'] },
+        {
+          id: 'extra',
+          label: 'Extra',
+          fields: ['plan'],
+          when: (v: ConditionalInput) => Boolean(v.hasExtra),
+        },
+        { id: 'review', label: 'Review' },
+      ] as const satisfies WizardStepDef<ConditionalInput>[]
+      render(
+        <Form
+          schema={conditionalSchema}
+          defaultValues={{ ...conditionalFilled, plan: '' }}
+          onSubmit={onSubmit}
+        >
+          <Wizard steps={hiddenOwnerSteps}>
+            <WizardStep id="account">
+              <TextField name="name" label="Name" />
+            </WizardStep>
+            <WizardStep id="extra">
+              <TextField name="extra" label="Extra" />
+            </WizardStep>
+            <WizardStep id="review">
+              <p>Review</p>
+            </WizardStep>
+            <Controls />
+            <ConditionalControls />
+            <SubmitButton />
+          </Wizard>
+        </Form>,
+      )
+      // `extra` (the owner of the failing `plan` field) is hidden throughout: `hasExtra`
+      // stays false, so final submit's own errorPaths -> ownerIndex resolution can't
+      // land on it and falls through to the last step, same as a field listed in no
+      // step's `fields` already does. Get to review without ever mounting `extra`.
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('review'))
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      // Reports on review (the last step), not on the hidden, unreachable `extra` step —
+      // and does not crash even though `plan` never mounted an input for setFocus to find.
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('review'))
+      expect(onSubmit).not.toHaveBeenCalled()
     })
   })
 

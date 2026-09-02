@@ -10,14 +10,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `Wizard`: `WizardStepDef.when?: (values) => boolean` — a first-class conditional-step
   predicate, so a form no longer needs to hand-roll a `useMemo` filter over its `steps`
-  array to show/hide a step. `Wizard` subscribes to live form values with `useWatch()`
-  only when at least one step defines `when` (no subscription, and no re-render cost,
-  otherwise) and derives the effective step list itself; every consumer — the stepper,
-  `page` layout, `next`/`prev`/`go`, and failed-submit step ownership — uses that
-  effective list. Hiding the current step moves the wizard to the nearest visible step
-  before it (or the first); `go()` on a hidden step resolves `false`; `visited` keeps a
-  hidden step's id so it returns as completed rather than upcoming; a saved `visited`/
-  `step` naming a currently-hidden step resumes on the nearest visible one. `steps` in
+  array to show/hide a step. A wizard with no `when` anywhere never calls `useWatch` (no
+  subscription at all, not merely a disabled one); a wizard with at least one `when`
+  mounts it and re-renders on value changes, but the effective step list keeps its array
+  reference across a change that doesn't flip any predicate's answer, so a stepper/nav
+  memoized on it doesn't re-run every keystroke, only on an actual show/hide. Every
+  consumer — the stepper, `page` layout, `next`/`prev`/`go`, and failed-submit step
+  ownership — uses that effective list. Hiding the current step moves the wizard to the
+  nearest visible step before it (or the first); `go()` on a hidden step resolves
+  `false`; `visited` keeps a hidden step's id so it returns as completed rather than
+  upcoming; a saved `visited`/`step` naming a currently-hidden step resumes on the
+  nearest visible one; a hidden step's field that still fails final submit reports
+  against the last step, same as a field listed in no step's `fields`. `steps` in
   `useWizard()`'s context is the effective (visible) list; `allSteps` exposes every step
   passed to `Wizard`, hidden ones included — #80.
 - `FieldArray`: a repeating group of fields over hookform `useFieldArray`, rendered as
