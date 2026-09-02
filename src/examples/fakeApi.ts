@@ -156,6 +156,8 @@ export async function submitLoanApi(values: SubmitLoanValues): Promise<SubmitLoa
     throw new Error('Your debt-to-income ratio is too high for this loan. Try a smaller amount.')
   }
   return { applicationId: `LOAN-${Math.random().toString(36).slice(2, 10).toUpperCase()}` }
+}
+
 export interface SubmitApplicationResult {
   applicationId: string
 }
