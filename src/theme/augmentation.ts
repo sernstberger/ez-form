@@ -51,6 +51,7 @@ declare module '@mui/material/styles' {
     EzClearButton: 'root'
     EzSubmitButton: 'root'
     EzConfirmDialog: 'root' | 'confirm' | 'cancel'
+    EzWizard: 'status'
     EzWizardStepper: 'root' | 'stepButton' | 'verticalStepButton'
     EzWizardNav: 'root' | 'prev' | 'next' | 'submit'
     EzReadOnlyField: 'root' | 'header' | 'label' | 'value' | 'edit'
@@ -84,6 +85,7 @@ declare module '@mui/material/styles' {
     }
     EzWizard?: {
       defaultProps?: ComponentsProps['EzWizard']
+      styleOverrides?: ComponentsOverrides<Theme>['EzWizard']
     }
     EzWizardStepper?: {
       defaultProps?: ComponentsProps['EzWizardStepper']

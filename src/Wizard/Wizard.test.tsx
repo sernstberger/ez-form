@@ -9,7 +9,8 @@ import { SubmitButton } from '../SubmitButton'
 import { TextField } from '../fields/TextField'
 import { expectNoA11yViolations } from '../test/axe'
 import { FormSection, formSectionClasses } from '../FormSection'
-import { Wizard, type WizardStepDef } from './Wizard'
+import { FormErrorSummary } from '../Form/FormErrorSummary'
+import { Wizard, wizardClasses, type WizardStepDef } from './Wizard'
 import { WizardStep } from './WizardStep'
 import { WizardStepper, wizardStepperClasses } from './WizardStepper'
 import { WizardNav } from './WizardNav'
@@ -1061,6 +1062,306 @@ describe('Wizard', () => {
       // and does not crash even though `plan` never mounted an input for setFocus to find.
       await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('review'))
       expect(onSubmit).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('step change focus and announcement', () => {
+    /** The wizard's own step-change region, not the form's or a field's (see README). */
+    const statusRegion = () => document.querySelector(`.${wizardClasses.status}`)
+
+    it('does not steal focus or announce on initial mount', () => {
+      render(
+        <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+          <Wizard steps={steps}>
+            <Steps />
+          </Wizard>
+        </Form>,
+      )
+      // A live region has to be in the DOM from the first render, empty, or the first real
+      // announcement has no prior content to change from.
+      expect(statusRegion()).toBeInTheDocument()
+      expect(statusRegion()).toBeEmptyDOMElement()
+      expect(document.body).toHaveFocus()
+      expect(screen.getByRole('heading', { name: 'Account' })).not.toHaveFocus()
+    })
+
+    it('focuses the new step heading after next, and again after prev', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+          <Wizard steps={steps}>
+            <Steps />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Plan' })).toHaveFocus())
+      // The container, not the first field: the step's name and position are announced first.
+      expect(screen.getByRole('textbox', { name: 'Plan' })).not.toHaveFocus()
+
+      await user.click(screen.getByRole('button', { name: 'prev' }))
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Account' })).toHaveFocus())
+    })
+
+    it('focuses the heading after a go() to a visited step', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+          <Wizard steps={steps}>
+            <Steps />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+      await user.click(screen.getByRole('button', { name: 'go account' }))
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Account' })).toHaveFocus())
+    })
+
+    it('announces the step position and label on each move', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+          <Wizard steps={steps}>
+            <Steps />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(statusRegion()).toHaveTextContent('Step 2 of 3, Plan'))
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(statusRegion()).toHaveTextContent('Step 3 of 3, Review'))
+      await user.click(screen.getByRole('button', { name: 'prev' }))
+      await waitFor(() => expect(statusRegion()).toHaveTextContent('Step 2 of 3, Plan'))
+    })
+
+    it('re-announces the same step: two arrivals at the same label are both heard', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+          <Wizard steps={steps}>
+            <Steps />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(statusRegion()).toHaveTextContent('Step 2 of 3, Plan'))
+      const first = statusRegion()
+      await user.click(screen.getByRole('button', { name: 'prev' }))
+      await waitFor(() => expect(statusRegion()).toHaveTextContent('Step 1 of 3, Account'))
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(statusRegion()).toHaveTextContent('Step 2 of 3, Plan'))
+      // `announcementKey` re-keys the region, so the identical text mounts a fresh node —
+      // which is the only way assistive tech hears a repeat of a message it already read.
+      expect(statusRegion()).not.toBe(first)
+    })
+
+    it('vertical: focuses the stepper label the step is named by, and announces', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+          <Wizard steps={steps} orientation="vertical">
+            <WizardStepper />
+            <Steps />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(statusRegion()).toHaveTextContent('Step 2 of 3, Plan'))
+      // Vertical renders no legend: the step's `aria-labelledby` target — the stepper's own
+      // label for that step — is what names the group and so what takes focus.
+      const group = screen.getByRole('group')
+      const labelId = group.getAttribute('aria-labelledby')
+      expect(labelId).toBeTruthy()
+      await waitFor(() => expect(document.getElementById(labelId!)).toHaveFocus())
+    })
+
+    it('title={null}: with no heading, focus falls through to the fieldset', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+          <Wizard steps={steps}>
+            <WizardStep id="account">
+              <TextField name="name" label="Name" />
+            </WizardStep>
+            <WizardStep id="plan" title={null}>
+              <TextField name="plan" label="Plan" />
+            </WizardStep>
+            <WizardStep id="review">
+              <p>Review</p>
+            </WizardStep>
+            <Controls />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+      const fieldset = screen.getByRole('textbox', { name: 'Plan' }).closest('fieldset')
+      await waitFor(() => expect(fieldset).toHaveFocus())
+      expect(fieldset).toHaveAttribute('tabindex', '-1')
+    })
+
+    it('counts only visible steps: a hidden `when` step is out of both index and count', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={conditionalSchema} defaultValues={conditionalFilled} onSubmit={() => {}}>
+          <Wizard steps={conditionalSteps}>
+            <ConditionalSteps />
+          </Wizard>
+        </Form>,
+      )
+      // `extra` is hidden (hasExtra: false), so the four declared steps read as three and
+      // `plan` — steps[2] in the full list — is step 2 of 3, which is what the stepper shows.
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(statusRegion()).toHaveTextContent('Step 2 of 3, Plan'))
+
+      // Showing `extra` makes it four visible steps and slots it in at index 1, so Back from
+      // `plan` now lands on `extra` — and the count the user hears grows with the stepper.
+      await user.click(screen.getByRole('button', { name: 'show extra' }))
+      await user.click(screen.getByRole('button', { name: 'prev' }))
+      await waitFor(() => expect(statusRegion()).toHaveTextContent('Step 2 of 4, Extra'))
+      await user.click(screen.getByRole('button', { name: 'prev' }))
+      await waitFor(() => expect(statusRegion()).toHaveTextContent('Step 1 of 4, Account'))
+    })
+
+    it('a custom stepAnnouncement replaces the default text', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+          <Wizard
+            steps={steps}
+            stepAnnouncement={({ index, count, label, step }) =>
+              `${label} (${step.id}) — ${index + 1}/${count}`
+            }
+          >
+            <Steps />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(statusRegion()).toHaveTextContent('Plan (plan) — 2/3'))
+    })
+
+    it('stepAnnouncement={false} announces nothing but still moves focus', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+          <Wizard steps={steps} stepAnnouncement={false}>
+            <Steps />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      // Turning the announcement off must not also turn off focus management.
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Plan' })).toHaveFocus())
+      expect(statusRegion()).toBeEmptyDOMElement()
+    })
+
+    it('a failed Next neither announces nor moves focus (the step did not change)', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={schema} defaultValues={{ ...filled, name: '' }} onSubmit={() => {}}>
+          <Wizard steps={steps}>
+            <Steps />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      expect(await screen.findByText('Name is required')).toBeInTheDocument()
+      expect(screen.getByTestId('current')).toHaveTextContent('account')
+      expect(statusRegion()).toBeEmptyDOMElement()
+    })
+
+    it('layout="page" never announces: there is no step to change to', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+          <Wizard steps={steps} layout="page">
+            <Steps />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      expect(statusRegion()).toBeEmptyDOMElement()
+    })
+
+    it('the failed-submit jump leaves focus to FormErrorSummary, not the step heading', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={schema} defaultValues={filled} onSubmit={onSubmit}>
+          <Wizard steps={steps}>
+            <WizardStep id="account">
+              <FormErrorSummary />
+              <TextField name="name" label="Name" />
+              <TextField name="email" label="Email" />
+            </WizardStep>
+            <WizardStep id="plan">
+              <TextField name="plan" label="Plan" />
+            </WizardStep>
+            <WizardStep id="review">
+              <p>Review</p>
+            </WizardStep>
+            <Controls />
+            <ClearEmail />
+            <SubmitButton />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('review'))
+      // The region still holds whatever the last real navigation said; capture the node so
+      // the jump can be shown to leave it alone rather than re-announce over the summary.
+      const beforeJump = statusRegion()
+      expect(beforeJump).toHaveTextContent('Step 3 of 3, Review')
+      await user.click(screen.getByRole('button', { name: 'clear email' }))
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('account'))
+      // The summary owns this arrival: its heading takes focus, the step heading does not,
+      // and the wizard says nothing over it.
+      await waitFor(() =>
+        expect(screen.getByRole('heading', { name: 'There is a problem' })).toHaveFocus(),
+      )
+      expect(screen.getByRole('heading', { name: 'Account' })).not.toHaveFocus()
+      // Same node, same text: no new `announcementKey`, so nothing was re-announced. (Had
+      // the jump announced, the region would read "Step 1 of 3, Account" on a fresh node.)
+      expect(statusRegion()).toBe(beforeJump)
+      expect(statusRegion()).toHaveTextContent('Step 3 of 3, Review')
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('is themeable: EzWizard.styleOverrides.status reaches the region', async () => {
+      const theme = createTheme({
+        components: { EzWizard: { styleOverrides: { status: { opacity: 0.5 } } } },
+      })
+      render(
+        <ThemeProvider theme={theme}>
+          <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+            <Wizard steps={steps}>
+              <Steps />
+            </Wizard>
+          </Form>
+        </ThemeProvider>,
+      )
+      expect(statusRegion()).toHaveStyle({ opacity: '0.5' })
+    })
+
+    it('has no accessibility violations after a step change', async () => {
+      const user = userEvent.setup()
+      const { container } = render(
+        <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+          <Wizard steps={steps}>
+            <WizardStepper />
+            <Steps />
+            <WizardNav />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Plan' })).toHaveFocus())
+      await expectNoA11yViolations(container)
     })
   })
 

@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
+import generateUtilityClasses from '@mui/material/generateUtilityClasses'
+import { styled } from '@mui/material/styles'
 import { useFormState, useWatch, type FieldValues, type Path } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
 import { useHasErrorSummary } from '../Form/ErrorSummaryContext'
+import { LiveRegion, type LiveRegionProps } from '../Form/LiveRegion'
 import {
   WizardContext,
   type WizardContextValue,
@@ -11,6 +14,15 @@ import {
 } from './WizardContext'
 
 export type { WizardStepDef, WizardStepStatus } from './WizardContext'
+
+export const wizardClasses = generateUtilityClasses('EzWizard', ['status'])
+
+// The step-change region gets its own EzWizard slot rather than rendering a bare
+// LiveRegion, for the same reason `<Form>`'s does: a form can hold several
+// `EzLiveRegion-root` nodes at once (the form's own submit status, a FieldArray,
+// a PasswordStrength), so that class alone doesn't identify *this* region.
+// `wizardClasses.status` is what names it, for a theme and for a test query.
+const WizardStatus = styled(LiveRegion, { name: 'EzWizard', slot: 'Status' })({})
 
 /**
  * A `FieldError` leaf, recognised by hookform's own shape rather than by any one key: `type`
@@ -118,8 +130,40 @@ export interface WizardProps<TIn extends FieldValues> {
    * `SubmitButton` validates the whole schema, same as always.
    */
   layout?: 'steps' | 'page'
+  /**
+   * What to announce when the step changes. Called with the new step's position in the
+   * *effective* (conditional `when`-filtered) step list, so a wizard whose step 2 is hidden
+   * announces "Step 2 of 3" for what is really `steps[2]` — the counts a user can see in the
+   * stepper. Default `` ({ index, count, label }) => `Step ${index + 1} of ${count}${label ? `, ${label}` : ''}` ``;
+   * `false` announces nothing. Ignored in `layout="page"`, which never changes step.
+   *
+   * Like `steps`, prefer a stable reference (a module-level `const`, or a `useMemo`/
+   * `useCallback`): an arrow written inline in JSX is a new function every render, which
+   * re-creates the wizard context and re-renders every consumer. Correctness is unaffected
+   * either way.
+   */
+  stepAnnouncement?: ((info: WizardStepAnnouncementInfo) => ReactNode) | false
+  slotProps?: {
+    /** The step-change live region. `message`/`announcementKey` are owned by the wizard. */
+    liveRegion?: Omit<LiveRegionProps, 'message' | 'announcementKey'>
+  }
   children: ReactNode
 }
+
+/** What `WizardProps.stepAnnouncement` is called with. */
+export interface WizardStepAnnouncementInfo {
+  /** Zero-based position in the effective step list. */
+  index: number
+  /** How many steps are currently visible. */
+  count: number
+  /** The step's `label` from `steps`. */
+  label: ReactNode
+  /** The whole step definition, for an announcement that needs more than the label. */
+  step: WizardStepDef
+}
+
+const defaultStepAnnouncement = ({ index, count, label }: WizardStepAnnouncementInfo): ReactNode =>
+  `Step ${index + 1} of ${count}${label ? `, ${label}` : ''}`
 
 /**
  * Multi-step navigation over one `<Form>`. Values live in hookform; the
@@ -167,6 +211,8 @@ function WizardBody<TIn extends FieldValues>({
   onVisitedChange,
   orientation = 'horizontal',
   layout = 'steps',
+  stepAnnouncement = defaultStepAnnouncement,
+  slotProps,
   children,
 }: WizardBodyProps<TIn>) {
   const { trigger, control, setFocus } = useEzFormContext('Wizard')
@@ -186,6 +232,18 @@ function WizardBody<TIn extends FieldValues>({
   const [pending, setPending] = useState(false)
   const [contentEl, setContentEl] = useState<HTMLElement | null>(null)
   const [lastFailed, setLastFailed] = useState<readonly string[] | null>(null)
+  // The step-change announcement and the focus request are one piece of state so a single
+  // navigation produces exactly one commit for both, and `seq` serves as `LiveRegion`'s
+  // `announcementKey` (two Nexts landing on the same label must both be heard) *and* as the
+  // `focusRequest` a `WizardStep` watches. `seq: 0` with no `stepId` is the resting value the
+  // wizard mounts with — that is what keeps initial mount from announcing or stealing focus,
+  // while the region itself is still in the DOM from the first render, which is what makes
+  // the first real announcement audible.
+  const [stepChange, setStepChange] = useState<{
+    stepId: string | null
+    text: ReactNode
+    seq: number
+  }>({ stepId: null, text: null, seq: 0 })
 
   const visited = visitedProp ?? visitedState
   const requestedId = step ?? stepState
@@ -217,9 +275,38 @@ function WizardBody<TIn extends FieldValues>({
   )
 
   const move = useCallback(
-    (to: number) => {
+    (to: number, userInitiated = true) => {
       const target = steps[to]!
       markVisited(target.id)
+      // Ruling: raise the announcement and the focus request here, in the same state batch as
+      // the step change itself, rather than from an effect watching the rendered `current.id`.
+      // An effect would need its own extra commit before `WizardStep` ever sees the request,
+      // so focus would land a render *after* the new step's content — visible to a consumer
+      // only as flakiness (a test that finds the new step's field still has to await another
+      // tick before focus arrives) and to a screen reader as a gap. Batching it here makes the
+      // step change and its focus one commit. `stepId` is what keeps a *controlled* wizard
+      // honest: `onStepChange` may decline the move, and only the `WizardStep` whose id
+      // matches acts on the request — see `WizardStepProps`. Cost if wrong: a declined
+      // controlled move announces a step the user never reached.
+      //
+      // `userInitiated: false` is the failed-submit jump: `<FormErrorSummary>` focuses its own
+      // heading on the step it lands on, and both an announcement and a competing heading
+      // focus would fight it.
+      if (userInitiated) {
+        setStepChange((prev) => ({
+          stepId: target.id,
+          text:
+            layout === 'page' || !stepAnnouncement
+              ? null
+              : stepAnnouncement({
+                  index: to,
+                  count: steps.length,
+                  label: target.label,
+                  step: target as WizardStepDef,
+                }),
+          seq: prev.seq + 1,
+        }))
+      }
       // `lastFailed` scopes a step's own last failed validation; leaving the step (forward
       // after a pass — already null from validateCurrent — or backward without validating)
       // must not leak it onto whichever step becomes current next.
@@ -227,7 +314,7 @@ function WizardBody<TIn extends FieldValues>({
       if (step === undefined) setStepState(target.id)
       onStepChange?.(target)
     },
-    [steps, markVisited, step, onStepChange],
+    [steps, markVisited, step, onStepChange, layout, stepAnnouncement],
   )
 
   useEffect(() => {
@@ -339,7 +426,9 @@ function WizardBody<TIn extends FieldValues>({
     const owned = errorPaths.map((path) => ({ path, to: ownerIndex(path) }))
     const to = Math.min(...owned.map((o) => o.to))
     if (to === index) return
-    move(to)
+    // `false`: this jump is not user navigation — `<FormErrorSummary>` focuses its own
+    // heading on arrival, and the step-change announcement would talk over it.
+    move(to, false)
     setFocusTarget({ id: steps[to]!.id, path: owned.find((o) => o.to === to)!.path })
   }, [submitCount, errorPaths, ownerIndex, index, move, steps, layout])
 
@@ -359,6 +448,14 @@ function WizardBody<TIn extends FieldValues>({
     setFocusTarget(null)
     setFocus(focusTarget.path)
   }, [focusTarget, current.id, setFocus])
+
+  // Memoized on its own so the context object below doesn't get a new identity on a render
+  // where nothing about the focus request changed (the `text` half of `stepChange` is only
+  // read by the live region, not by any context consumer).
+  const focusRequest = useMemo(
+    () => ({ stepId: stepChange.stepId, seq: stepChange.seq }),
+    [stepChange.stepId, stepChange.seq],
+  )
 
   const value = useMemo<WizardContextValue>(
     () => ({
@@ -382,6 +479,7 @@ function WizardBody<TIn extends FieldValues>({
       stepStatus,
       contentEl,
       setContentEl,
+      focusRequest,
     }),
     [
       id,
@@ -399,8 +497,25 @@ function WizardBody<TIn extends FieldValues>({
       go,
       stepStatus,
       contentEl,
+      focusRequest,
     ],
   )
 
-  return <WizardContext.Provider value={value}>{children}</WizardContext.Provider>
+  return (
+    <WizardContext.Provider value={value}>
+      {children}
+      {/*
+        Rendered unconditionally, empty at rest: a live region has to be in the DOM before
+        its text arrives, or assistive tech has no prior content to observe changing and the
+        first announcement is missed. After `children` so it is the wizard's last node — it
+        is visually hidden, so document order is all that is at stake.
+      */}
+      <WizardStatus
+        {...slotProps?.liveRegion}
+        message={stepChange.text}
+        announcementKey={stepChange.seq}
+        className={`${wizardClasses.status}${slotProps?.liveRegion?.className ? ` ${slotProps.liveRegion.className}` : ''}`}
+      />
+    </WizardContext.Provider>
+  )
 }

@@ -66,7 +66,9 @@ export type {} from './theme/augmentation'
 export { useFormGuard, type FormGuardBlocker, type UseFormGuardReturn } from './useFormGuard'
 export {
   Wizard,
+  wizardClasses,
   type WizardProps,
+  type WizardStepAnnouncementInfo,
   type WizardStepDef,
   type WizardStepStatus,
   type WizardContextValue,
