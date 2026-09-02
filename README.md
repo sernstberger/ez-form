@@ -139,6 +139,18 @@ Inside child components use `useFormContext()` from `react-hook-form`.
 
 Numbers: NumberField stores `number | null`, so use `z.number()` (add `.nullable()` if empty is allowed). TextField hands zod the string from the input, so a numeric TextField needs `z.coerce.number()`.
 
+### Checkbox vs Switch
+
+| Use case                                                                                                                                                      | Prefer     | Why                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------- |
+| A yes/no answer or opt-in recorded on submit ("I accept the terms", "Same as shipping", "Insure a vehicle")                                                   | `Checkbox` | Reviewed and only takes effect once the form is submitted |
+| One of several independent options                                                                                                                            | `Checkbox` | `CheckboxGroup` — each option is its own recorded opt-in  |
+| A setting that takes effect immediately, no submit step (dark mode, notifications on an autosaving settings page, a UI toggle whose `onChange` does the work) | `Switch`   | Nothing to submit — flipping it is the action             |
+
+If the page has a Submit button, it is almost always a `Checkbox`. Both: phrase the label as the state when on ("Marketing emails"), never as a question ("Receive marketing emails?").
+
+This follows [Material Design's selection-controls guidance](https://m3.material.io/components/switch/guidelines) and WCAG: MUI's `Switch` sets `role="switch"`, and assistive tech announces "on/off" for it — correct for a setting that takes effect immediately, wrong for an answer that is only recorded when the surrounding form is submitted.
+
 ## Error summary
 
 `<FormErrorSummary />` is a child you place — under the form's title, or inside the current

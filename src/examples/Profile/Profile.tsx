@@ -13,7 +13,7 @@ import { TextField } from '../../fields/TextField'
 import { TextareaField } from '../../fields/TextareaField'
 import { DateField } from '../../fields/DateField'
 import { Autocomplete } from '../../fields/Autocomplete'
-import { Switch } from '../../fields/Switch'
+import { Checkbox } from '../../fields/Checkbox'
 import { Select } from '../../fields/Select'
 import { FileField } from '../../fields/FileField'
 import { loadProfileApi, saveProfileApi, type ProfileValues } from '../fakeApi'
@@ -144,7 +144,7 @@ export function Profile({ onSuccess, loadSeed }: ProfileProps) {
             <FormSection title="Preferences">
               <Stack spacing={2}>
                 <Autocomplete name="country" label="Country" options={countries} required />
-                <Switch name="marketingEmails" label="Marketing emails" />
+                <Checkbox name="marketingEmails" label="Marketing emails" />
                 <Select name="language" label="Language" options={languages} required />
               </Stack>
             </FormSection>
