@@ -166,8 +166,18 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
   const baseId = useId()
   const titleId = `${baseId}-title`
   const descriptionId = `${baseId}-description`
-  const titleProps = { component: 'h2', variant: 'h5', ...slotProps?.title } as const
-  const descriptionProps = { component: 'p', variant: 'body2', ...slotProps?.description } as const
+  // `id` is spread-overridable (`slotProps.title.id`) so a wrapper that owns the
+  // dialog/section around this form — `FormDialog`, say — can point its own
+  // `aria-labelledby`/`aria-describedby` at these elements. The wrapper is
+  // expected to pass the matching `aria-*` prop too; the fallbacks below keep
+  // the `<form>` itself wired either way.
+  const titleProps = { component: 'h2', variant: 'h5', id: titleId, ...slotProps?.title } as const
+  const descriptionProps = {
+    component: 'p',
+    variant: 'body2',
+    id: descriptionId,
+    ...slotProps?.description,
+  } as const
   // The "required unless marked optional" convention is stated once, in the same
   // slot as `description`: appended as a second sentence when both are set, or
   // rendered alone when `description` is unset. Only relevant in `optional` mode;
@@ -342,9 +352,9 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
           noValidate
           {...formProps}
           className={`${formClasses.root}${className ? ` ${className}` : ''}`}
-          aria-labelledby={ariaLabelledBy ?? (title != null ? titleId : undefined)}
+          aria-labelledby={ariaLabelledBy ?? (title != null ? titleProps.id : undefined)}
           aria-describedby={
-            ariaDescribedBy ?? (effectiveDescription != null ? descriptionId : undefined)
+            ariaDescribedBy ?? (effectiveDescription != null ? descriptionProps.id : undefined)
           }
           onSubmit={
             confirmOptions
@@ -376,7 +386,6 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
           {title != null && (
             <FormTitle
               {...titleProps}
-              id={titleId}
               className={`${formClasses.title}${titleProps.className ? ` ${titleProps.className}` : ''}`}
             >
               {title}
@@ -385,7 +394,6 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
           {effectiveDescription != null && (
             <FormDescription
               {...descriptionProps}
-              id={descriptionId}
               className={`${formClasses.description}${descriptionProps.className ? ` ${descriptionProps.className}` : ''}`}
             >
               {effectiveDescription}

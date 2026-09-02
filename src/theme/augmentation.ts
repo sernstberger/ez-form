@@ -2,6 +2,7 @@ import type { ComponentsOverrides, ComponentsProps } from '@mui/material/styles'
 import type { ClearButtonProps } from '../ClearButton'
 import type { SubmitButtonProps } from '../SubmitButton'
 import type { ConfirmDialogProps } from '../ConfirmDialog'
+import type { FormDialogProps } from '../FormDialog'
 import type { WizardStepperProps } from '../Wizard/WizardStepper'
 import type { WizardNavProps } from '../Wizard/WizardNav'
 import type { WizardProps } from '../Wizard/Wizard'
@@ -24,6 +25,8 @@ declare module '@mui/material/styles' {
     EzClearButton: Partial<ClearButtonProps>
     EzSubmitButton: Partial<SubmitButtonProps>
     EzConfirmDialog: Partial<ConfirmDialogProps>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    EzFormDialog: Partial<FormDialogProps<any, any>>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     EzWizard: Partial<WizardProps<any>>
     EzWizardStepper: Partial<WizardStepperProps>
@@ -49,6 +52,7 @@ declare module '@mui/material/styles' {
     EzClearButton: 'root'
     EzSubmitButton: 'root'
     EzConfirmDialog: 'root' | 'confirm' | 'cancel'
+    EzFormDialog: 'root' | 'form' | 'title' | 'content' | 'actions' | 'cancel' | 'submit'
     EzWizardStepper: 'root' | 'stepButton' | 'verticalStepButton'
     EzWizardNav: 'root' | 'prev' | 'next' | 'submit'
     EzReadOnlyField: 'root' | 'header' | 'label' | 'value' | 'edit'
@@ -78,6 +82,10 @@ declare module '@mui/material/styles' {
     EzConfirmDialog?: {
       defaultProps?: ComponentsProps['EzConfirmDialog']
       styleOverrides?: ComponentsOverrides<Theme>['EzConfirmDialog']
+    }
+    EzFormDialog?: {
+      defaultProps?: ComponentsProps['EzFormDialog']
+      styleOverrides?: ComponentsOverrides<Theme>['EzFormDialog']
     }
     EzWizard?: {
       defaultProps?: ComponentsProps['EzWizard']
