@@ -11,6 +11,28 @@ export interface WizardStepDef<TIn extends FieldValues = FieldValues> {
   fields?: readonly Path<TIn>[]
   /** Secondary text under the label (`StepLabel optional`). */
   optional?: ReactNode
+  /**
+   * Whether this step is currently part of the wizard. Omit for a step that's always
+   * shown. Read live off the form's values: `Wizard` calls `useWatch()` — and only
+   * `useWatch()`, no `disabled` flag — exclusively when at least one step defines
+   * `when`, so a wizard with no `when` anywhere carries no subscription at all. A
+   * wizard that does have one re-renders on every value change (unavoidable — it has
+   * to re-evaluate the predicates), but the effective step list itself keeps its array
+   * reference across a change that doesn't flip any predicate's answer, so consumers
+   * memoized on it don't re-run on every keystroke, only on an actual show/hide.
+   *
+   * A hidden step is absent from the stepper and from `next`/`prev`/`go` navigation and
+   * page layout, and its `fields` are skipped by `next`; final submit still validates
+   * the whole schema, so gate a hidden step's fields in the schema itself (`superRefine`
+   * or a discriminated union) the way a step that's always shown does not need to. If a
+   * hidden step's field fails final submit anyway (a schema that isn't actually gating
+   * it), the error is attributed to the last step — same as a field listed in no step's
+   * `fields` — and since the field was never mounted there, there is no input for
+   * `setFocus` to land on.
+   * `visited` keeps a hidden step's id — it still counts as reached if the predicate
+   * turns true again later.
+   */
+  when?: (values: TIn) => boolean
 }
 
 export type WizardStepStatus = 'current' | 'completed' | 'visited' | 'upcoming'
@@ -18,7 +40,10 @@ export type WizardStepStatus = 'current' | 'completed' | 'visited' | 'upcoming'
 export interface WizardContextValue {
   /** Stable id prefix for this wizard (`useId`), used for step label ids. */
   id: string
+  /** The effective steps: every entry in `steps` whose `when` is absent or true. */
   steps: readonly WizardStepDef[]
+  /** Every step passed to `Wizard`, including ones currently hidden by `when`. */
+  allSteps: readonly WizardStepDef[]
   current: WizardStepDef
   index: number
   visited: readonly string[]

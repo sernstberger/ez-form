@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
-import { useFormState, type FieldValues, type Path } from 'react-hook-form'
+import { useFormState, useWatch, type FieldValues, type Path } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
 import { useHasErrorSummary } from '../Form/ErrorSummaryContext'
 import {
@@ -40,12 +40,55 @@ function errorFieldPaths(errors: unknown, prefix = ''): string[] {
   )
 }
 
+/**
+ * Mounted only when at least one step defines `when` (the caller branches before
+ * rendering this), so `useWatch()` — and the subscription it registers on `control` —
+ * exists at all only for a wizard that needs live values; a wizard with no `when` never
+ * calls `useWatch`, not even with `disabled: true`. `mask` (one `'1'`/`'0'` character per
+ * step, "is this step currently visible") is what the step list is memoized on rather
+ * than `values` itself: `values` is a new object on every keystroke regardless of
+ * whether any `when` predicate's answer changed, and memoizing on it would recompute
+ * (and hand out a new array reference for) `steps` — invalidating every context
+ * consumer — on every keystroke. Memoizing on `mask` instead means the array keeps its
+ * reference until a predicate's answer actually flips.
+ *
+ * `useEzFormContext` runs first, purely for its guard: a bare `useWatch()` outside
+ * `<Form>` throws react-hook-form's own opaque `TypeError` (it reads off a context that
+ * doesn't exist) before this ever gets to render `WizardBody`, whose "must be rendered
+ * inside <Form>" error is what a consumer of this library should actually see. Calling
+ * `useEzFormContext('Wizard')` here means that clear error wins even when the wizard
+ * has a `when` and so takes this branch instead of going straight to `WizardBody`.
+ */
+function WizardWhenBridge<TIn extends FieldValues>({
+  allSteps,
+  children,
+}: {
+  allSteps: readonly WizardStepDef<TIn>[]
+  children: (steps: readonly WizardStepDef<TIn>[]) => ReactNode
+}) {
+  // `control` from `useEzFormContext` is untyped (`Control<FieldValues>`): `useWatch` is
+  // called with that erased type and the snapshot is restored to `TIn` where a step's
+  // `when` reads it, the same erase-and-restore already used for `trigger`'s `fields`
+  // argument in `WizardBody` below.
+  const { control } = useEzFormContext('Wizard')
+  const values = useWatch({ control })
+  const mask = allSteps.map((s) => (!s.when || s.when(values as TIn) ? '1' : '0')).join('')
+  // `allSteps` is already required to be a stable reference (see `WizardProps.steps`), so
+  // including it here costs nothing on the common render and removes the latent stale-
+  // closure risk of filtering a *previous* `allSteps` against a *current* `mask` on the
+  // rare render where the prop does change.
+  const steps = useMemo(() => allSteps.filter((_, i) => mask[i] === '1'), [allSteps, mask])
+  return children(steps)
+}
+
 export interface WizardProps<TIn extends FieldValues> {
   /**
-   * The steps, in order. Must be a stable reference — a module-level `const`
-   * (with `satisfies WizardStepDef<Input>[]` so `fields` autocompletes) or a
-   * `useMemo`. An array literal written inline in JSX is a new array every
-   * render, which re-creates the wizard context and re-renders every consumer.
+   * The steps, in order, including any hidden by `when` — pass the full list rather than
+   * filtering it yourself; `Wizard` derives the effective (visible) list internally. Must
+   * be a stable reference — a module-level `const` (with `satisfies WizardStepDef<Input>[]`
+   * so `fields` autocompletes) or a `useMemo` keyed on nothing that changes per render. An
+   * array literal written inline in JSX is a new array every render, which re-creates the
+   * wizard context and re-renders every consumer.
    */
   steps: readonly WizardStepDef<TIn>[]
   /** Controlled current step id. Omit for internal state. */
@@ -83,24 +126,49 @@ export interface WizardProps<TIn extends FieldValues> {
  * wizard only knows which step is current and which have been visited.
  * Next validates the current step's `fields` with `trigger`; submit (the
  * whole schema) is `<SubmitButton>` on the last step.
+ *
+ * A step's `when` needs live form values; a wizard with no `when` anywhere needs none of
+ * that. `hasWhen` decides, once per render, which of two children `WizardBody` gets:
+ * with no `when`, `allSteps` is passed straight through as `steps` and `WizardWhenBridge`
+ * — the only thing that calls `useWatch()` — is never mounted at all, so a plain wizard
+ * carries no subscription of any kind. Only a wizard with at least one `when` mounts the
+ * bridge, which is what actually derives the effective step list.
  */
 export function Wizard<TIn extends FieldValues>(inProps: WizardProps<TIn>) {
   // `useDefaultProps` is untyped in `TIn` (it only cares about `layout`/
   // `orientation`, neither of which mentions the field type), so the cast
   // erases `TIn` for this call only and restores it on the result.
-  const {
-    steps,
-    step,
-    onStepChange,
-    visited: visitedProp,
-    onVisitedChange,
-    orientation = 'horizontal',
-    layout = 'steps',
-    children,
-  } = useDefaultProps({
+  const props = useDefaultProps({
     props: inProps as WizardProps<FieldValues>,
     name: 'EzWizard',
   }) as WizardProps<TIn>
+  const allSteps = props.steps
+  const hasWhen = allSteps.some((s) => s.when)
+  if (!hasWhen) return <WizardBody {...props} steps={allSteps} allSteps={allSteps} />
+  return (
+    <WizardWhenBridge allSteps={allSteps}>
+      {(steps) => <WizardBody {...props} steps={steps} allSteps={allSteps} />}
+    </WizardWhenBridge>
+  )
+}
+
+interface WizardBodyProps<TIn extends FieldValues> extends WizardProps<TIn> {
+  /** The effective (visible) steps — `allSteps` itself when no step has `when`. */
+  steps: readonly WizardStepDef<TIn>[]
+  allSteps: readonly WizardStepDef<TIn>[]
+}
+
+function WizardBody<TIn extends FieldValues>({
+  steps,
+  allSteps,
+  step,
+  onStepChange,
+  visited: visitedProp,
+  onVisitedChange,
+  orientation = 'horizontal',
+  layout = 'steps',
+  children,
+}: WizardBodyProps<TIn>) {
   const { trigger, control, setFocus } = useEzFormContext('Wizard')
   const { errors, submitCount } = useFormState({ control })
   // A mounted <FormErrorSummary> moves focus to its own heading on a failed Next; letting
@@ -108,6 +176,7 @@ export function Wizard<TIn extends FieldValues>(inProps: WizardProps<TIn>) {
   // <Form>'s own shouldFocusError suppression, applied to this step-local trigger() call.
   const hasErrorSummary = useHasErrorSummary()
   const id = useId()
+
   // `steps` is required and a wizard with no steps has nothing to render;
   // every index below is derived from it and clamped to its range, so the
   // non-null assertions here are the shape of the data, not a guess.
@@ -120,6 +189,11 @@ export function Wizard<TIn extends FieldValues>(inProps: WizardProps<TIn>) {
 
   const visited = visitedProp ?? visitedState
   const requestedId = step ?? stepState
+  // `indexOf` (and hence every navigation/status computation below) resolves against the
+  // *effective* `steps`, so a hidden step's id behaves exactly like a stale one already does:
+  // -1, filtered out of `visitedIndexes`, falling back to the nearest still-visible visited
+  // step (or the first, if none match) via the same `lastVisitedIndex`/redirect machinery that
+  // already exists for a renamed step id after a localStorage resume.
   const indexOf = useCallback((id: string) => steps.findIndex((s) => s.id === id), [steps])
   // Stale ids (a renamed step id after a localStorage resume) resolve to -1 from `indexOf`.
   // Filter them out before Math.max so the fallback to step 0 only happens when nothing in
@@ -292,6 +366,7 @@ export function Wizard<TIn extends FieldValues>(inProps: WizardProps<TIn>) {
       // The context is deliberately untyped in `TIn`: WizardStepper / WizardNav / useWizard
       // consume it without knowing the form's field type, so these casts erase `TIn` on purpose.
       steps: steps as readonly WizardStepDef[],
+      allSteps: allSteps as readonly WizardStepDef[],
       current: current as WizardStepDef,
       index,
       visited,
@@ -311,6 +386,7 @@ export function Wizard<TIn extends FieldValues>(inProps: WizardProps<TIn>) {
     [
       id,
       steps,
+      allSteps,
       current,
       index,
       visited,

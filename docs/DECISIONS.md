@@ -2,7 +2,32 @@
 
 A ruling is a judgement call recorded during implementation: `Ruling: <what> — <why> — <cost if wrong>`. This page lists every ruling across the project's SDD ledgers and specs, newest first, grouped by source document. To append a ruling, add a `Ruling:` line to a ledger or spec under `docs/superpowers/`, then re-run this extraction.
 
-**55 rulings across 6 documents as of 2026-09-02.**
+**77 rulings across 7 documents as of 2026-09-02.**
+
+## [Examples wave — SDD ledger](superpowers/reviews/2026-09-02-examples-wave-sdd-ledger.md)
+
+- `title`/`description` are `Form` props, not a `FormTitle` child — one surface; the form owns the lifecycle — cost if wrong: consumers with a custom heading pass `aria-labelledby`.
+- legend contains a heading element (h3 default, depth-derived below) — heading outline for WCAG 2.4.6/2.4.10 — cost if wrong: double announcement in some AT.
+- vertical wizard names the step via `aria-labelledby` to the stepper label, no legend — avoids the label twice — cost if wrong: no heading inside the step.
+- `WizardStep` always renders a fieldset — steps are groups — cost if wrong: one extra element for existing consumers.
+- legend-less sections do not deepen nested headings — a `title={null}` step otherwise pushed sections to h4 under h2 — cost if wrong: set `slotProps.legend.component` explicitly.
+- `#48` split into six child issues + epic — each rung reviewable alone — cost if wrong: more tracker noise.
+- examples live in Storybook (`src/examples`, excluded from the package build) — QA and Playwright already target Storybook — cost if wrong: an `examples/` consumer app comes with #31.
+- QA breaker = persisted agent definition, session fans out — matches the subagent rule — cost if wrong: manual dedupe of findings.
+- QA severity reuses `priority:*` + `qa` label — no new taxonomy — cost if wrong: coarser triage.
+- `@mui/icons-material` is a peer dependency, per-icon imports; hand-rolled SVGs are a guardrail violation — Steve's call — cost if wrong: one more peer for consumers.
+- `PasswordStrength` is a separate export with a pluggable `score` — keeps zxcvbn-class scorers out of the bundle — cost if wrong: two extra consumer lines.
+- `FieldArray` class key `errorText` vs theme slot `error` — `generateUtilityClasses` collides with MUI's global `Mui-error` — cost if wrong: one naming asymmetry.
+- `ReadOnlyField` computed values via an explicit `value` prop, implemented as separate watched/static components — RHF's `useWatch({ disabled })` still subscribes — cost if wrong: two components instead of one.
+- Wizard `when` predicate evaluated in a child bridge only when some step defines `when`, effective list memoised on a visibility mask — same `disabled` trap — cost if wrong: re-render per keystroke only in `when` wizards.
+- `FormErrorSummary` root drops `role="alert"`; focus on the heading announces — GOV.UK removed it for double announcement — cost if wrong: AT that ignores focus-driven reading.
+- `ResendCodeButton` swallows `onResend` rejections into `errorText` + `onResendError` — a resend failing silently is the common case — cost if wrong: consumers wanting the throw wrap it.
+- `DateField` has no flat `onBlur` (compile error) — one path, like `DatePicker` — cost if wrong: nested `slotProps.textField.onBlur` is two lines.
+- pickers detect unparsable paste via the forwarded `onPaste` + a single bounded microtask — MUI X offers no callback for the popup pickers' swallowed case — cost if wrong: re-verify on the next MUI X major.
+- NumberField paste normalises only unambiguous mixed-separator shapes; Base UI's `parseFloat` prefix truncation stays upstream (`it.todo`) — cost if wrong: `12abc` → 12 remains.
+- v1 ships `en` + `es` only (Steve) — #23 scoped accordingly — cost if wrong: other locales are consumer-supplied.
+- docs-only branches (#45, #78, #32) are self-checked instead of a review seat — cost if wrong: a doc inaccuracy until the next pass.
+- we do not mirror MUI's per-instance `classes` prop; per-slot `className` via `slotProps` covers it — cost if wrong: a ticket when a consumer asks.
 
 ## [Form Title / Sections — design spec](specs/2026-09-02-form-title-sections-design.md)
 

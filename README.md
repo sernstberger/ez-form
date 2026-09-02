@@ -276,6 +276,25 @@ Each `WizardStep` is a `FormSection` (a fieldset). Horizontally, the step's `tit
 
 Nested `FormSection`s (inside a step or anywhere else) get progressively deeper legend headings automatically — `h3` at the top level, `h4` one level in, `h5` the next, capped at `h6` — so a step with its own sub-sections still produces a correct heading hierarchy without hand-picking `slotProps.legend.component` at every level. An explicit `slotProps.legend.component` (your own, or a theme default) always overrides the automatic level.
 
+### Conditional steps
+
+A step can hide itself based on the form's own values: `WizardStepDef.when?: (values) => boolean`. Pass the full step list, including the conditional ones — `Wizard` derives the visible list itself, so you never filter `steps` by hand:
+
+```tsx
+const steps = [
+  { id: 'account', label: 'Account', fields: ['name', 'email'] },
+  { id: 'hasVehicle', label: 'Vehicle?', fields: ['hasVehicle'] },
+  { id: 'vehicle', label: 'Vehicle', fields: ['vehicle'], when: (v) => v.hasVehicle },
+  { id: 'review', label: 'Review' },
+] as const satisfies WizardStepDef<z.input<typeof schema>>[]
+```
+
+A wizard with no `when` anywhere subscribes to nothing extra: `useWatch` is not called at all, not even in a disabled form — the subscription only exists once at least one step defines `when`. A wizard that does have a `when` re-renders on every form value change (it has to, to re-evaluate the predicates), but the effective `steps` array itself keeps its reference across a change that doesn't flip any predicate's answer — only a render where some step's `when` actually flips gets a new array, so a `WizardStepper`/`WizardNav`/`useWizard()` consumer memoized on `steps` doesn't re-run on every keystroke.
+
+A hidden step disappears from the stepper and from `next`/`prev`/`go` navigation and `page` layout, and its `fields` are skipped by Next; if it was the current step, the wizard moves to the nearest visible step before it (or the first, if none qualify). `visited` still remembers a hidden step's id, so it comes back as completed — not upcoming — if it becomes visible again, and a saved `visited`/`step` that names a currently-hidden step resumes on the nearest visible one instead.
+
+`when` only controls navigation and per-step validation — final submit still validates the whole schema, so a hidden step's fields need to be genuinely optional at the schema level (a `superRefine` that only requires them when the gate is true, or a discriminated union) the same way a field listed in no step's `fields` already does. If a hidden step's field still manages to fail final submit (a schema this loose lets it), the wizard treats it exactly like an error on a field listed in no step: it reports against the last step rather than the (unreachable, unmounted) step that owns it, and since that field was never mounted there's no input for `setFocus` to land on — the summary/error still renders, just without a working focus target. Keep a hidden step's fields truly optional in the schema and this never comes up in practice.
+
 ### One route per step
 
 `Wizard` is controlled through `step` / `onStepChange`; wire those to your router. With react-router, put `<Form>` + `<Wizard>` in a layout route and render the step routes through `<Outlet>`:
