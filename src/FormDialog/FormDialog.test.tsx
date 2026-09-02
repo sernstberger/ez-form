@@ -308,16 +308,27 @@ describe('FormDialog', () => {
 
   it('has no accessibility violations with the exit prompt open', async () => {
     const user = userEvent.setup()
-    const { baseElement } = render(<Harness />)
+    // The nested ConfirmDialog mounts with a real Fade transition, whose enter callback
+    // keeps updating state (entering -> entered) after the button we'd otherwise wait on
+    // is already in the DOM. On a slow runner axe can walk the tree while that update is
+    // still in flight, outside any act() — a real "not wrapped in act" warning, not a test
+    // artifact. `motion.reducedMotion: 'always'` is a first-class MUI theme setting (not a
+    // test hack): every Transition still runs, but its completion timer is scheduled at 0ms
+    // instead of the authored duration, so RTL's own act-wrapped polling (findByRole below)
+    // observes the transition settle instead of racing it.
+    const theme = createTheme({ motion: { reducedMotion: 'always' } })
+    const { baseElement } = render(
+      <ThemeProvider theme={theme}>
+        <Harness />
+      </ThemeProvider>,
+    )
     await openDialog(user)
     await type(user, 'Ada')
     await user.keyboard('{Escape}')
-    // Let the prompt's enter transition settle before axe walks the tree, so its final state
-    // update lands inside act() rather than mid-audit. Waiting on the prompt being *present*
-    // rather than focused: this prompt is a dialog inside a dialog, and the outer Dialog's
-    // focus trap keeps focus on its paper, so ConfirmDialog's `autoFocus` on Cancel does not
-    // win the race here. Focus behaviour has its own tests (ConfirmDialog.test.tsx); what
-    // this one is for is the axe audit below.
+    // Waiting on the prompt being *present* rather than focused: this prompt is a dialog
+    // inside a dialog, and the outer Dialog's focus trap keeps focus on its paper, so
+    // ConfirmDialog's `autoFocus` on Cancel does not win the race here. Focus behaviour has
+    // its own tests (ConfirmDialog.test.tsx); what this one is for is the axe audit below.
     expect(await screen.findByRole('button', { name: 'Keep editing' })).toBeInTheDocument()
     await expectNoA11yViolations(baseElement)
   })
