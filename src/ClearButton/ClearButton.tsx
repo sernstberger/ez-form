@@ -15,6 +15,15 @@ export interface ClearButtonProps extends Omit<ButtonProps, 'type'> {
   to?: 'defaults' | 'empty'
   /** Ask first. `true` uses `Discard changes?`; pass `ConfirmOptions` for your own copy. */
   confirm?: true | ConfirmOptions
+  /**
+   * Fires only once the clear has actually happened: with `confirm` set, right
+   * after the dialog is confirmed and the form is `reset()`; not called at all
+   * if the dialog is cancelled. Without `confirm` there is nothing to gate on,
+   * so it fires immediately on click, same as `Button`'s own `onClick` — #75.
+   * This matches `Form`'s `confirm`/`onSubmit` contract, where `onSubmit` never
+   * runs on a cancelled confirm either.
+   */
+  onClick?: ButtonProps['onClick']
 }
 
 const ClearButtonRoot = styled(Button, { name: 'EzClearButton', slot: 'Root' })({})
@@ -48,10 +57,17 @@ export function ClearButton(inProps: ClearButtonProps) {
         disabled={mergeDisabled(disabled, formDisabled) || !isDirty}
         className={`${clearButtonClasses.root}${className ? ` ${className}` : ''}`}
         onClick={async (event) => {
-          onClick?.(event)
+          // Ruling: gate the consumer's onClick behind confirm, matching Form's
+          // confirm/onSubmit contract (onSubmit never runs on a cancelled confirm)
+          // — #75. Previously onClick ran unconditionally, before the dialog was
+          // even answered, so a caller wiring analytics/navigation/optimistic UI
+          // through it could not tell from onClick alone whether the form was
+          // actually cleared. Cost if wrong: an onClick that assumes "the form was
+          // cleared" fires on a Cancel too.
           if (options && !(await ask(options))) return
           if (to === 'empty') reset(emptyOf(defaultValues) as typeof defaultValues)
           else reset()
+          onClick?.(event)
         }}
         {...rest}
       >
