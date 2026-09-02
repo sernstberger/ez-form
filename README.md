@@ -110,6 +110,7 @@ React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form
 | `ConfirmDialog`                                | MUI `Dialog`                                  | `open`, `title`, `message?`, `confirmLabel?`, `cancelLabel?`, `confirmColor?`, `onConfirm`, `onCancel`, `actionsOrder?: 'cancel-confirm' \| 'confirm-cancel'` (default `'cancel-confirm'`; Cancel keeps `autoFocus` either way); `useConfirm()` gives a promise API                                                                                                                                                                                                              |
 | `FormDialog`                                   | MUI `Dialog` + `Form`                         | `open`, `onClose(event, reason)`, `title`, `actions?`/`cancelLabel?`/`submitLabel?`, `exitConfirm?: ConfirmOptions \| false`, `closeOnSubmit?`; every `Form` prop (`schema`, `onSubmit`, `confirm`, …) and every `Dialog` prop (`maxWidth`, `fullScreen`, …). Closing while dirty asks first                                                                                                                                                                                     |
 | `Wizard`                                       | MUI `Stepper`                                 | `steps`, `step?`/`onStepChange?`, `visited?`/`onVisitedChange?`, `orientation?`, `layout?: 'steps' \| 'page'`; with `WizardStepper`, `WizardStep`, `WizardNav` (`actionsOrder?: 'back-next' \| 'next-back'`, default `'back-next'`), `useWizard`                                                                                                                                                                                                                                 |
+| `Wizard`                                       | MUI `Stepper`                                 | `steps`, `step?`/`onStepChange?`, `visited?`/`onVisitedChange?`, `orientation?`, `layout?: 'steps' \| 'page'`, `stepAnnouncement?`; with `WizardStepper`, `WizardStep`, `WizardNav` (`actionsOrder?: 'back-next' \| 'next-back'`, default `'back-next'`), `useWizard`                                                                                                                                                                                                            |
 | `ReadOnlyField`                                | MUI `Typography`                              | `name`, `label?`, `options?`, `format?`, `empty?`, `editStep?` — or `value` (a caller-computed value, e.g. from its own `useWatch`) with `label` required and no `name`; never calls `useWatch` in that mode                                                                                                                                                                                                                                                                     |
 | `PasswordField`                                | ez-form `TextField`                           | `name`; same rules as TextField. `revealable?` (default `true`) shows a show/hide toggle in the end adornment; `autoComplete` defaults to `'current-password'`; `slotProps.toggle?` reaches the toggle `IconButton`                                                                                                                                                                                                                                                              |
 | `PhoneField`                                   | ez-form `TextField`                           | `name`; same rules as TextField, plus `format?` (a `#` template, default `'###-###-####'`) and `invalidMessage?`. The form value is digits only (`'5551234567'`); `type="tel"`, `inputMode="tel"`, `autoComplete` defaults to `'tel'`. A non-empty value shorter than the template's digit count fails with `invalidMessage`                                                                                                                                                     |
@@ -233,7 +234,7 @@ the node, so an identical message mounts a fresh region and is heard again:
 
 Render a `LiveRegion` unconditionally with an empty `message` at rest, rather than mounting it
 alongside its text: a region that appears in the same commit as its content has nothing to
-change _from_, and that first announcement is unreliable. `Form`, `FieldArray`,
+change _from_, and that first announcement is unreliable. `Form`, `Wizard`, `FieldArray`,
 `ResendCodeButton` and `PasswordStrength` all use this same component internally.
 
 Because several of them can be on screen at once, one form may hold more than one
@@ -336,6 +337,39 @@ const steps = [
 Every field in the schema should appear in exactly one step's `fields`. When Submit fails validation, the wizard moves to the first step (in `steps` order) owning an errored field and focuses that field once it mounts, so an error on a step you have navigated away from is never silent. A field listed in no step is validated only on final submit and its error belongs to the last step: that step is marked in the stepper, and a failed submit lands there.
 
 Each `WizardStep` is a `FormSection` (a fieldset). Horizontally, the step's `title` defaults to its `label` from `steps` and renders as a heading in the legend; pass `title={null}` to render no legend. Vertically, the legend is suppressed and the section is named by the stepper's label via `aria-labelledby`, so the step has no visible legend but is still named for assistive technology; `description` works in both modes.
+
+### Step changes are announced and focused
+
+Changing step swaps the page's content without moving the caret, so a screen reader user is left reading the old step. On every `Next` / `Back` / stepper click, the wizard moves focus to the new step's **heading** and announces the move in a live region it renders itself — no wiring:
+
+```tsx
+<Wizard steps={steps}>   {/* announces "Step 2 of 3, Plan" and focuses that step's heading */}
+```
+
+Focus goes to the step's container, not its first field: focusing an input announces the input and skips the step's name and position, so the user would hear "Email, edit" with no idea they had moved. It lands on the legend heading horizontally, on the stepper label the step is named by vertically (there is no legend there), and on the `<fieldset>` itself for a `title={null}` step, which has no naming element to reach.
+
+The announcement is a function prop, so it can be localised or turned off:
+
+```tsx
+<Wizard
+  steps={steps}
+  stepAnnouncement={({ index, count, label }) => `Paso ${index + 1} de ${count}: ${label}`}
+>
+
+<Wizard steps={steps} stepAnnouncement={false} />   {/* silent; focus still moves */}
+```
+
+`index` and `count` are positions in the **effective** step list — a step hidden by `when` is not counted, so what the user hears matches what the stepper shows. `stepAnnouncement={false}` suppresses only the announcement; focus management is not optional.
+
+Four cases deliberately stay quiet: initial mount (nothing changed, and stealing focus on load is hostile), a failed `Next` (the step did not change — `<FormErrorSummary />` announces and focuses instead), the failed-submit jump to the first errored step, which is `<FormErrorSummary />`'s arrival to own, and a controlled wizard's declined move. `layout="page"` never navigates, so it never announces.
+
+That last case matters when `step`/`onStepChange` are wired to a router: both the announcement and the focus move wait until the wizard has actually _arrived_ on the requested step, so a transition your own code vetoes — or one that resolves a tick later through `navigate()` — never announces a step the user is not looking at.
+
+Because a form can hold several `role="status"` regions at once, query this one by its slot class in a test:
+
+```tsx
+document.querySelector(`.${wizardClasses.status}`) // the wizard's, not the form's
+```
 
 ### Same steps, one page
 
