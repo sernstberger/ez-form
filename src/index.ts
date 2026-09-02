@@ -34,3 +34,4 @@ export {
 } from './ConfirmDialog'
 export { ClearButton, clearButtonClasses, type ClearButtonProps } from './ClearButton'
 export type {} from './theme/augmentation'
+export { useFormGuard, type FormGuardBlocker, type UseFormGuardReturn } from './useFormGuard'
