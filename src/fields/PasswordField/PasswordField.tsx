@@ -1,15 +1,12 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { useFormState } from 'react-hook-form'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import IconButton, { type IconButtonProps } from '@mui/material/IconButton'
-import InputAdornment from '@mui/material/InputAdornment'
 import { styled } from '@mui/material/styles'
-import { mergeSlotProps } from '@mui/material/utils'
-import VisibilityOutlined from '@mui/icons-material/VisibilityOutlined'
-import VisibilityOffOutlined from '@mui/icons-material/VisibilityOffOutlined'
 import { TextField, type TextFieldProps } from '../TextField'
 import { mergeDisabled } from '../mergeDisabled'
+import { RevealToggle, type RevealIcons } from '../RevealToggle'
 import { useEzFormContext } from '../../useEzFormContext'
 
 export const passwordFieldClasses = generateUtilityClasses('EzPasswordField', ['root', 'toggle'])
@@ -32,7 +29,7 @@ export type PasswordFieldProps = Omit<TextFieldProps, 'type' | 'componentName'> 
    * still reaches the toggle `IconButton` itself, but its `children` is always
    * overridden by this prop (or the default icons), not the other way around.
    */
-  icons?: { show?: ReactNode; hide?: ReactNode }
+  icons?: RevealIcons
   slotProps?: TextFieldProps['slotProps'] & { toggle?: IconButtonProps }
 }
 
@@ -74,26 +71,17 @@ export function PasswordField(inProps: PasswordFieldProps) {
         input: {
           ...restSlotProps?.input,
           endAdornment: revealable ? (
-            <InputAdornment position="end">
-              <PasswordFieldToggle
-                {...mergeSlotProps(toggleSlotProps, {
-                  className: passwordFieldClasses.toggle,
-                })}
-                type="button"
-                aria-label={revealed ? 'Hide password' : 'Show password'}
-                aria-pressed={revealed}
-                edge="end"
-                disabled={toggleDisabled}
-                onClick={(e) => {
-                  setRevealed((r) => !r)
-                  toggleSlotProps?.onClick?.(e)
-                }}
-              >
-                {revealed
-                  ? (icons?.hide ?? <VisibilityOffOutlined />)
-                  : (icons?.show ?? <VisibilityOutlined />)}
-              </PasswordFieldToggle>
-            </InputAdornment>
+            <RevealToggle
+              component={PasswordFieldToggle}
+              revealed={revealed}
+              onToggle={() => setRevealed((r) => !r)}
+              showLabel="Show password"
+              hideLabel="Hide password"
+              disabled={toggleDisabled}
+              className={passwordFieldClasses.toggle}
+              icons={icons}
+              slotProps={toggleSlotProps}
+            />
           ) : undefined,
         },
       }}
