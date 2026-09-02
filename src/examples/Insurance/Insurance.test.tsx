@@ -4,6 +4,7 @@ import { Insurance } from './Insurance'
 import { APPLICATION_DECLINED_FOR } from '../fakeApi'
 import { expectNoA11yViolations } from '../../test/axe'
 import { withPickers } from '../../test/pickers'
+import { setValue } from '../../test/setValue'
 
 const STORAGE_KEY = 'ez-form:insurance-resume'
 
@@ -18,8 +19,8 @@ async function goNext(user: ReturnType<typeof userEvent.setup>) {
 }
 
 async function fillApplicant(user: ReturnType<typeof userEvent.setup>, firstName = 'Ada') {
-  await user.type(screen.getByLabelText(/first name/i), firstName)
-  await user.type(screen.getByLabelText(/last name/i), 'Lovelace')
+  setValue(screen.getByLabelText(/first name/i), firstName)
+  setValue(screen.getByLabelText(/last name/i), 'Lovelace')
   typeDate('birthday', '01/01/1985')
   await goNext(user)
 }
@@ -53,21 +54,21 @@ function selectState(abbreviation: string) {
 }
 
 async function fillContact(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
-  // Typed as a person would; `PhoneField` formats to "555-555-5555" on screen and
-  // stores the bare digits.
+  setValue(screen.getByLabelText(/^email/i), 'ada@example.com')
+  // Typed as a person would, not `setValue`d: `PhoneField` builds its stored digits from
+  // the keystrokes, and the dedicated phone test below covers the formatting this produces.
   await user.type(screen.getByLabelText(/^phone/i), '5555555555')
   const address = screen.getByRole('group', { name: 'Address' })
-  await user.type(within(address).getByLabelText(/street address/i), '1 Analytical Way')
-  await user.type(within(address).getByLabelText(/^city/i), 'Cambridge')
+  setValue(within(address).getByLabelText(/street address/i), '1 Analytical Way')
+  setValue(within(address).getByLabelText(/^city/i), 'Cambridge')
   selectState('MA')
-  await user.type(within(address).getByLabelText(/zip code/i), '02139')
+  setValue(within(address).getByLabelText(/zip code/i), '02139')
   await goNext(user)
 }
 
 async function fillCoverage(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('radio', { name: 'Liability only' }))
-  await user.type(screen.getByLabelText(/coverage amount/i), '10000')
+  setValue(screen.getByLabelText(/coverage amount/i), '10000')
   await goNext(user)
 }
 
@@ -82,17 +83,17 @@ async function takeVehicle(user: ReturnType<typeof userEvent.setup>) {
 }
 
 async function fillVehicle(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText(/^make/i), 'Toyota')
-  await user.type(screen.getByLabelText(/^model/i), 'Corolla')
-  await user.type(screen.getByLabelText(/^year/i), '2020')
-  await user.type(screen.getByLabelText(/plate number/i), 'ABC123')
+  setValue(screen.getByLabelText(/^make/i), 'Toyota')
+  setValue(screen.getByLabelText(/^model/i), 'Corolla')
+  setValue(screen.getByLabelText(/^year/i), '2020')
+  setValue(screen.getByLabelText(/plate number/i), 'ABC123')
   await goNext(user)
 }
 
 async function fillDrivers(user: ReturnType<typeof userEvent.setup>) {
   const drivers = screen.getByRole('group', { name: 'Primary driver' })
-  await user.type(within(drivers).getByLabelText(/full name/i), 'Ada Lovelace')
-  await user.type(within(drivers).getByLabelText(/license number/i), 'D1234567')
+  setValue(within(drivers).getByLabelText(/full name/i), 'Ada Lovelace')
+  setValue(within(drivers).getByLabelText(/license number/i), 'D1234567')
   typeDate('driver.licenseDate', '01/01/2010')
   await goNext(user)
 }
@@ -146,33 +147,46 @@ const COMPLETE_VALUES = {
 }
 
 /**
- * Writes the example's own localStorage resume payload (see `saveState`/`loadSaved` in
- * `Insurance.tsx`) so the wizard mounts directly on Review with values restored, instead of
- * driving all eight prior steps through `userEvent` first. `visited` lists every step id so
- * every Review row's Edit link resolves to a real, reachable step (mirrors what a genuine
- * walk-through would have left behind). `JSON.stringify` serializes the `Date` fields as ISO
- * strings exactly as `saveState` does, and `loadSaved`'s reviver turns them back into `Date`s
- * on the way in.
+ * `COMPLETE_VALUES` with the Vehicle step's own fields back at their empty defaults (see
+ * `Insurance.tsx`'s `defaultValues`) — the values a session has when it filled everything
+ * else but never visited Vehicle. `hasVehicle` is the caller's to set: false for a session
+ * that answered No, true for the one that flipped it on from Review without filling the step.
  */
-function seedReview(values: Record<string, unknown> = COMPLETE_VALUES, step = 'review') {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      step,
-      visited: [
-        'applicant',
-        'contact',
-        'coverage',
-        'has-vehicle',
-        'vehicle',
-        'drivers',
-        'history',
-        'documents',
-        'review',
-      ],
-      values,
-    }),
-  )
+const NO_VEHICLE_VALUES = {
+  ...COMPLETE_VALUES,
+  hasVehicle: false,
+  vehicle: { make: '', model: '', year: null, plate: '' },
+}
+
+/** Every step id, in order — what a session that walked the whole wizard leaves in `visited`. */
+const ALL_VISITED = [
+  'applicant',
+  'contact',
+  'coverage',
+  'has-vehicle',
+  'vehicle',
+  'drivers',
+  'history',
+  'documents',
+  'review',
+]
+
+/**
+ * Writes the example's own localStorage resume payload (see `saveState`/`loadSaved` in
+ * `Insurance.tsx`) so the wizard mounts directly on `step` with values restored, instead of
+ * driving the prior steps through `userEvent` first. `visited` defaults to every step id so
+ * every Review row's Edit link resolves to a real, reachable step (mirrors what a genuine
+ * walk-through would have left behind); pass a shorter list to reproduce a session that never
+ * reached one — the failed-submit case below leaves "vehicle" out for exactly that reason.
+ * `JSON.stringify` serializes the `Date` fields as ISO strings exactly as `saveState` does,
+ * and `loadSaved`'s reviver turns them back into `Date`s on the way in.
+ */
+function seedReview(
+  values: Record<string, unknown> = COMPLETE_VALUES,
+  step = 'review',
+  visited: readonly string[] = ALL_VISITED,
+) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ step, visited, values }))
 }
 
 // Cleared on both sides: the example autosaves from an effect, so a test that fails or
@@ -208,10 +222,15 @@ describe('Insurance', () => {
 
   it('skips the Vehicle step when "has vehicle?" is No (the default)', async () => {
     const user = userEvent.setup({ delay: null })
+    // Seeded onto has-vehicle: what this asserts is where Next goes from that step, so the
+    // three steps of typing that precede it are incidental cost.
+    seedReview(NO_VEHICLE_VALUES, 'has-vehicle', [
+      'applicant',
+      'contact',
+      'coverage',
+      'has-vehicle',
+    ])
     render(withPickers(<Insurance />))
-    await fillApplicant(user)
-    await fillContact(user)
-    await fillCoverage(user)
     // On the has-vehicle step, still unchecked (default false).
     expect(screen.getByRole('group', { name: 'Vehicle?' })).toBeInTheDocument()
     await goNext(user)
@@ -222,10 +241,15 @@ describe('Insurance', () => {
 
   it('shows the Vehicle step when "has vehicle?" is Yes', async () => {
     const user = userEvent.setup({ delay: null })
+    // Seeded onto has-vehicle for the same reason as the case above: ticking the box and
+    // pressing Next is the branch under test, not the typing that gets there.
+    seedReview(NO_VEHICLE_VALUES, 'has-vehicle', [
+      'applicant',
+      'contact',
+      'coverage',
+      'has-vehicle',
+    ])
     render(withPickers(<Insurance />))
-    await fillApplicant(user)
-    await fillContact(user)
-    await fillCoverage(user)
     await user.click(screen.getByRole('checkbox', { name: /insure a vehicle/i }))
     await goNext(user)
     expect(screen.getByRole('group', { name: 'Vehicle' })).toBeInTheDocument()
@@ -324,26 +348,10 @@ describe('Insurance', () => {
     // *visited* step is caught at submit). Seeded rather than walked — the eight-step
     // `fillThroughReview` walk cost ~5 s here and left this test on the edge of the
     // timeout, and a timeout mid-walk leaves resume state behind for the next test.
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        step: 'review',
-        visited: [
-          'applicant',
-          'contact',
-          'coverage',
-          'has-vehicle',
-          'drivers',
-          'history',
-          'documents',
-          'review',
-        ],
-        values: {
-          ...COMPLETE_VALUES,
-          hasVehicle: true,
-          vehicle: { make: '', model: '', year: null, plate: '' },
-        },
-      }),
+    seedReview(
+      { ...NO_VEHICLE_VALUES, hasVehicle: true },
+      'review',
+      ALL_VISITED.filter((id) => id !== 'vehicle'),
     )
     const user = userEvent.setup({ delay: null })
     render(withPickers(<Insurance />))
@@ -376,13 +384,14 @@ describe('Insurance', () => {
 
   it('does not persist uploaded documents: resuming after an upload still submits cleanly with Documents empty', async () => {
     const user = userEvent.setup({ delay: null })
+    // Seeded onto Documents rather than walked: what this asserts is the upload/remount
+    // round-trip, so the six steps of typing that precede it are incidental cost.
+    seedReview(
+      NO_VEHICLE_VALUES,
+      'documents',
+      ALL_VISITED.filter((id) => id !== 'vehicle' && id !== 'review'),
+    )
     const { unmount } = render(withPickers(<Insurance />))
-    await fillApplicant(user)
-    await fillContact(user)
-    await fillCoverage(user)
-    await skipVehicle(user)
-    await fillDrivers(user)
-    await fillHistory(user)
     // On Documents: upload a file, then let the autosave effect run before remounting.
     const file = new File(['%PDF'], 'policy.pdf', { type: 'application/pdf' })
     await user.upload(screen.getByLabelText(/^upload documents/i) as HTMLInputElement, file)
@@ -561,10 +570,9 @@ describe('Insurance', () => {
   })
 
   it('is accessible on the Coverage step', async () => {
-    const user = userEvent.setup({ delay: null })
+    seedReview(COMPLETE_VALUES, 'coverage')
     const { container } = render(withPickers(<Insurance />))
-    await fillApplicant(user)
-    await fillContact(user)
+    expect(screen.getByRole('group', { name: 'Coverage' })).toBeInTheDocument()
     await expectNoA11yViolations(container)
   })
 

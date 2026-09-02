@@ -3,12 +3,13 @@ import userEvent from '@testing-library/user-event'
 import { SignUp } from './SignUp'
 import { SIGNUP_GOOD_CODE } from '../fakeApi'
 import { expectNoA11yViolations } from '../../test/axe'
+import { setValue } from '../../test/setValue'
 
 async function fillStepOne(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
-  await user.type(screen.getByLabelText(/^password(?! strength)/i), 'correct-horse-1')
-  await user.type(screen.getByLabelText(/confirm password/i), 'correct-horse-1')
-  await user.type(screen.getByLabelText(/display name/i), 'Ada Lovelace')
+  setValue(screen.getByLabelText(/^email/i), 'ada@example.com')
+  setValue(screen.getByLabelText(/^password(?! strength)/i), 'correct-horse-1')
+  setValue(screen.getByLabelText(/confirm password/i), 'correct-horse-1')
+  setValue(screen.getByLabelText(/display name/i), 'Ada Lovelace')
   await user.click(screen.getByRole('checkbox', { name: /terms/i }))
   await user.click(screen.getByRole('combobox', { name: /how did you hear/i }))
   await user.click(await screen.findByRole('option', { name: 'Search engine' }))
@@ -35,7 +36,7 @@ describe('SignUp', () => {
   })
 
   it('hides "Please specify" until the referral source is "Other"', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<SignUp />)
     expect(screen.queryByLabelText(/please specify/i)).not.toBeInTheDocument()
     await user.click(screen.getByRole('combobox', { name: /how did you hear/i }))
@@ -44,7 +45,7 @@ describe('SignUp', () => {
   })
 
   it('requires "Please specify" only when the referral source is "Other"', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<SignUp />)
     await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
     await user.type(screen.getByLabelText(/^password(?! strength)/i), 'correct-horse-1')
@@ -60,7 +61,7 @@ describe('SignUp', () => {
   })
 
   it('advances once "Please specify" is filled in for an "Other" referral source', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<SignUp />)
     await fillStepOne(user)
     await user.click(screen.getByRole('combobox', { name: /how did you hear/i }))
@@ -89,7 +90,7 @@ describe('SignUp', () => {
     // Regression: zod skips a `.refine` once any other field has a "non-continuable"
     // issue -- `terms` is a `z.literal(true)` starting `false`, which would otherwise
     // silently swallow the "Passwords do not match" message until terms is checked.
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<SignUp />)
     await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
     await user.type(screen.getByLabelText(/^password(?! strength)/i), 'correct-horse-1')
@@ -177,6 +178,12 @@ describe('SignUp', () => {
     await user.type(screen.getByRole('textbox', { name: /verification code/i }), '000000')
     await user.click(screen.getByRole('button', { name: /submit/i }))
     await screen.findByRole('alert')
+    // The alert appears while the rejected submit is still settling (`isSubmitting` flips
+    // back, the nav and the OTP field re-render). axe walks the tree for long enough that,
+    // on a loaded machine, those updates land mid-scan and React reports them as un-acted.
+    // Waiting for the button to leave its loading state is the behaviour-level "the submit
+    // has finished" signal, and leaves the scan on a settled tree.
+    await waitFor(() => expect(screen.getByRole('button', { name: /submit/i })).toBeEnabled())
     await expectNoA11yViolations(container)
   })
 })

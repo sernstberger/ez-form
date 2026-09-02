@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { Loan } from './Loan'
 import { expectNoA11yViolations } from '../../test/axe'
+import { setValue } from '../../test/setValue'
 
 /** `DateField` renders its own hidden text input, found by `name` (see `DateField.test.tsx`). */
 const hiddenDateInput = (name: string) =>
@@ -14,9 +15,7 @@ async function next(user: ReturnType<typeof userEvent.setup>) {
 }
 
 async function fillLoanStep(user: ReturnType<typeof userEvent.setup>, amount = '25,000') {
-  const amountInput = screen.getByLabelText(/loan amount/i)
-  await user.clear(amountInput)
-  await user.type(amountInput, amount)
+  setValue(screen.getByLabelText(/loan amount/i), amount)
   await user.click(screen.getByRole('combobox', { name: /purpose/i }))
   await user.click(await screen.findByRole('option', { name: 'Home purchase' }))
 }
@@ -25,26 +24,23 @@ async function fillLoanStep(user: ReturnType<typeof userEvent.setup>, amount = '
 const LOW_INCOME_THRESHOLD = 3000
 
 async function fillApplicantStep(user: ReturnType<typeof userEvent.setup>, income = '8000') {
-  await user.type(screen.getByLabelText(/full name/i), 'Ada Lovelace')
-  await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
+  setValue(screen.getByLabelText(/full name/i), 'Ada Lovelace')
+  setValue(screen.getByLabelText(/^email/i), 'ada@example.com')
   typeDate('applicantBirthday', '12/10/1985')
-  const incomeInput = screen.getByLabelText(/monthly income/i)
-  await user.clear(incomeInput)
-  await user.type(incomeInput, income)
+  setValue(screen.getByLabelText(/monthly income/i), income)
   if (Number(income.replace(/,/g, '')) < LOW_INCOME_THRESHOLD) {
-    await user.type(screen.getByLabelText(/co-signer note/i), 'Applying with a co-signer')
+    // The note only renders once the income field is dirty, which the change above makes it.
+    setValue(screen.getByLabelText(/co-signer note/i), 'Applying with a co-signer')
   }
 }
 
 async function fillEmploymentStep(user: ReturnType<typeof userEvent.setup>, income = '8000') {
   const group = screen.getByRole('group', { name: 'Employer 1' })
-  await user.type(within(group).getByLabelText(/^employer/i), 'Acme Corp')
+  setValue(within(group).getByLabelText(/^employer/i), 'Acme Corp')
   await user.click(within(group).getByRole('combobox', { name: /employment type/i }))
   await user.click(await screen.findByRole('option', { name: 'Full-time' }))
   typeDate('employment.0.from', '01/01/2018')
-  const incomeInput = within(group).getByLabelText(/monthly income/i)
-  await user.clear(incomeInput)
-  await user.type(incomeInput, income)
+  setValue(within(group).getByLabelText(/monthly income/i), income)
 }
 
 async function goToStep(user: ReturnType<typeof userEvent.setup>, times: number) {
@@ -143,11 +139,9 @@ describe('Loan', () => {
     // Add a second employer, fill it, then move it above the first.
     await user.click(screen.getByRole('button', { name: 'Add' }))
     const second = await screen.findByRole('group', { name: 'Employer 2' })
-    await user.type(within(second).getByLabelText(/^employer/i), 'Beta LLC')
+    setValue(within(second).getByLabelText(/^employer/i), 'Beta LLC')
     typeDate('employment.1.from', '01/01/2020')
-    const secondIncome = within(second).getByLabelText(/monthly income/i)
-    await user.clear(secondIncome)
-    await user.type(secondIncome, '1000')
+    setValue(within(second).getByLabelText(/monthly income/i), '1000')
 
     await user.click(within(second).getByRole('button', { name: /move employer 2 up/i }))
     const rows = screen.getAllByRole('group', { name: /^Employer \d+$/ })
@@ -156,7 +150,7 @@ describe('Loan', () => {
   })
 
   it('hides "Please specify" on an employment row until its type is "Other"', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Loan />)
     await fillLoanStep(user)
     await next(user)
@@ -172,7 +166,7 @@ describe('Loan', () => {
   })
 
   it('requires "Please specify" on an employment row only when its type is "Other"', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Loan />)
     await fillLoanStep(user)
     await next(user)
@@ -195,7 +189,7 @@ describe('Loan', () => {
   })
 
   it('does not show the co-signer note on a pristine applicant step, even though the default income (0) is below the threshold', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Loan />)
     await fillLoanStep(user)
     await next(user)
@@ -205,7 +199,7 @@ describe('Loan', () => {
   })
 
   it('reveals a co-signer note once the user enters an income below the threshold, required only then', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Loan />)
     await fillLoanStep(user)
     await next(user)
@@ -226,7 +220,7 @@ describe('Loan', () => {
   })
 
   it('hides the co-signer note once income is raised to or above the threshold', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Loan />)
     await fillLoanStep(user)
     await next(user)
@@ -243,7 +237,7 @@ describe('Loan', () => {
   })
 
   it('does not require a co-signer note when income is at or above the threshold', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Loan />)
     await fillLoanStep(user)
     await next(user)
@@ -266,13 +260,9 @@ describe('Loan', () => {
     await user.click(screen.getByRole('tab', { name: /debts/i }))
     await user.click(screen.getByRole('button', { name: 'Add' }))
     const debtRow = await screen.findByRole('group', { name: 'Debt 1' })
-    await user.type(within(debtRow).getByLabelText(/creditor/i), 'Card Co')
-    const balance = within(debtRow).getByLabelText(/^balance/i)
-    await user.clear(balance)
-    await user.type(balance, '5000')
-    const payment = within(debtRow).getByLabelText(/monthly payment/i)
-    await user.clear(payment)
-    await user.type(payment, '400')
+    setValue(within(debtRow).getByLabelText(/creditor/i), 'Card Co')
+    setValue(within(debtRow).getByLabelText(/^balance/i), '5000')
+    setValue(within(debtRow).getByLabelText(/monthly payment/i), '400')
     await goToStep(user, 2) // documents, review
 
     const totals = screen.getByRole('group', { name: 'Totals' })
@@ -297,13 +287,9 @@ describe('Loan', () => {
     // Debts: add one with a payment far exceeding income (DTI > 45%).
     await user.click(screen.getByRole('button', { name: 'Add' }))
     const debtRow = await screen.findByRole('group', { name: 'Debt 1' })
-    await user.type(within(debtRow).getByLabelText(/creditor/i), 'Big Bank')
-    const balance = within(debtRow).getByLabelText(/^balance/i)
-    await user.clear(balance)
-    await user.type(balance, '50000')
-    const payment = within(debtRow).getByLabelText(/monthly payment/i)
-    await user.clear(payment)
-    await user.type(payment, '900')
+    setValue(within(debtRow).getByLabelText(/creditor/i), 'Big Bank')
+    setValue(within(debtRow).getByLabelText(/^balance/i), '50000')
+    setValue(within(debtRow).getByLabelText(/monthly payment/i), '900')
     await goToStep(user, 2) // documents, review
 
     await user.click(screen.getByRole('button', { name: /submit application/i }))
@@ -366,12 +352,10 @@ describe('Loan', () => {
     await next(user)
     await user.click(screen.getByRole('button', { name: 'Add' }))
     const row = await screen.findByRole('group', { name: 'Co-applicant 1' })
-    await user.type(within(row).getByLabelText(/^name/i), 'Grace Hopper')
+    setValue(within(row).getByLabelText(/^name/i), 'Grace Hopper')
     await user.click(within(row).getByRole('combobox', { name: /relationship/i }))
     await user.click(await screen.findByRole('option', { name: 'Spouse' }))
-    const rowIncome = within(row).getByLabelText(/monthly income/i)
-    await user.clear(rowIncome)
-    await user.type(rowIncome, '2000')
+    setValue(within(row).getByLabelText(/monthly income/i), '2000')
     await next(user) // employment
     await fillEmploymentStep(user)
     await next(user) // debts
