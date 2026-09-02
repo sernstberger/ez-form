@@ -511,7 +511,6 @@ export function Insurance({
           defaultValues={values}
           autoComplete={agentMode ? 'off' : undefined}
           title="Auto insurance application"
-          description="Fields marked with * are required."
           confirm={agentMode ? undefined : { title: 'Submit application?' }}
           guard={!agentMode}
           mode={agentMode ? 'onSubmit' : undefined}

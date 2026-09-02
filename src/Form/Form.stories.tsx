@@ -231,7 +231,28 @@ export const Titled: Story = {
       defaultValues={emptyValues}
       onSubmit={onSubmit}
       title="Create your account"
-      description="All fields are required unless marked optional."
+      description="We use this to personalize your workspace."
+    >
+      <SignupFields />
+    </Form>
+  ),
+}
+
+export const RequiredIndicatorText: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'The default `requiredIndicatorText` is mode-dependent: "asterisk" mode (shown here) states the asterisk convention in words so it reads sensibly to assistive tech; "optional" mode states its own convention. Pass a string to override, or `false` to suppress it.',
+      },
+    },
+  },
+  render: () => (
+    <Form
+      schema={schema}
+      defaultValues={emptyValues}
+      onSubmit={onSubmit}
+      title="Create your account"
     >
       <SignupFields />
     </Form>
