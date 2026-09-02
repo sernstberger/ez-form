@@ -1,9 +1,12 @@
 import ButtonBase from '@mui/material/ButtonBase'
+import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
+import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import Step from '@mui/material/Step'
 import StepButton from '@mui/material/StepButton'
 import StepContent from '@mui/material/StepContent'
 import StepLabel from '@mui/material/StepLabel'
 import Stepper, { type StepperProps } from '@mui/material/Stepper'
+import { styled } from '@mui/material/styles'
 import type { ReactNode } from 'react'
 import type { WizardStepDef, WizardStepStatus } from './WizardContext'
 import { useWizard } from './useWizard'
@@ -12,6 +15,27 @@ export type WizardStepperProps = Omit<
   StepperProps,
   'activeStep' | 'orientation' | 'nonLinear' | 'children'
 >
+
+export const wizardStepperClasses = generateUtilityClasses('EzWizardStepper', [
+  'root',
+  'verticalStepButton',
+])
+
+/** Vertical clickable step: `ButtonBase` wrapping `StepLabel` (see the
+ * class-level comment for why this can't be `StepButton`). The default style
+ * block is `StepButton`'s own vertical layout — the minimum needed for the
+ * step to be usable — and is fully overridable via
+ * `theme.components.EzWizardStepper.styleOverrides.verticalStepButton`. */
+const VerticalStepButton = styled(ButtonBase, {
+  name: 'EzWizardStepper',
+  slot: 'VerticalStepButton',
+})({
+  width: '100%',
+  justifyContent: 'flex-start',
+  padding: 8,
+  margin: -8,
+  boxSizing: 'content-box',
+})
 
 /** The label content shared by upcoming steps and both clickable-step
  * renderers (horizontal `StepButton`, vertical `ButtonBase`): `optional`
@@ -41,10 +65,17 @@ function stepLabel(step: WizardStepDef, status: WizardStepStatus) {
  * list stays a plain list: visited steps render `ButtonBase` wrapping
  * `StepLabel`, i.e. what `StepButton` is internally minus the tab role.
  */
-export function WizardStepper(props: WizardStepperProps) {
+export function WizardStepper(inProps: WizardStepperProps) {
+  const props = useDefaultProps({ props: inProps, name: 'EzWizardStepper' })
   const { steps, index, orientation, stepStatus, go, setContentEl } = useWizard('WizardStepper')
   return (
-    <Stepper {...props} nonLinear activeStep={index} orientation={orientation}>
+    <Stepper
+      {...props}
+      className={`${wizardStepperClasses.root}${props.className ? ` ${props.className}` : ''}`}
+      nonLinear
+      activeStep={index}
+      orientation={orientation}
+    >
       {steps.map((step) => {
         const status = stepStatus(step.id)
         const clickable = status !== 'upcoming'
@@ -53,19 +84,12 @@ export function WizardStepper(props: WizardStepperProps) {
           button = stepLabel(step, status)
         } else if (orientation === 'vertical') {
           button = (
-            <ButtonBase
-              focusRipple
+            <VerticalStepButton
+              className={wizardStepperClasses.verticalStepButton}
               onClick={() => void go(step.id)}
-              sx={{
-                width: '100%',
-                justifyContent: 'flex-start',
-                boxSizing: 'content-box',
-                padding: '8px',
-                margin: '-8px',
-              }}
             >
               {stepLabel(step, status)}
-            </ButtonBase>
+            </VerticalStepButton>
           )
         } else {
           button = (

@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import type { ComponentsOverrides, ComponentsProps } from '@mui/material/styles'
+import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
@@ -7,8 +9,27 @@ import { TextField } from '../fields/TextField'
 import { expectNoA11yViolations } from '../test/axe'
 import { Wizard, type WizardStepDef } from './Wizard'
 import { WizardStep } from './WizardStep'
-import { WizardStepper } from './WizardStepper'
+import { WizardStepper, wizardStepperClasses, type WizardStepperProps } from './WizardStepper'
 import { useWizard } from './useWizard'
+
+// Local augmentation for the themeability test below: `src/theme/augmentation.ts`
+// (owned by a separate task) will declare this for real across the whole
+// package. TS module augmentations merge additively, so this scoped
+// declaration is safe to keep even after that file lands.
+declare module '@mui/material/styles' {
+  interface ComponentsPropsList {
+    EzWizardStepper: Partial<WizardStepperProps>
+  }
+  interface ComponentNameToClassKey {
+    EzWizardStepper: 'root' | 'verticalStepButton'
+  }
+  interface Components<Theme = unknown> {
+    EzWizardStepper?: {
+      defaultProps?: ComponentsProps['EzWizardStepper']
+      styleOverrides?: ComponentsOverrides<Theme>['EzWizardStepper']
+    }
+  }
+}
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -419,5 +440,28 @@ describe('WizardStepper', () => {
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('plan:visited'))
     const planLabel = screen.getByText('Plan', { selector: '.MuiStepLabel-label' })
     expect(planLabel).toHaveClass('Mui-error')
+  })
+
+  it('is themeable: styleOverrides.verticalStepButton applies to the vertical step button', async () => {
+    const user = userEvent.setup()
+    const theme = createTheme({
+      components: {
+        EzWizardStepper: {
+          styleOverrides: {
+            verticalStepButton: { textTransform: 'uppercase' },
+          },
+        },
+      },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Inline orientation="vertical" />
+      </ThemeProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: 'next' }))
+    await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+    const accountButton = screen.getByText('Account').closest('button')!
+    expect(accountButton).toHaveClass(wizardStepperClasses.verticalStepButton)
+    expect(getComputedStyle(accountButton).textTransform).toBe('uppercase')
   })
 })
