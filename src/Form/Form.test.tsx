@@ -137,6 +137,37 @@ describe('Form', () => {
     expect(onDefaultValuesError).toHaveBeenCalledExactlyOnceWith(boom)
   })
 
+  it("a setError call made synchronously inside onDefaultValuesError survives hookform's post-rejection reset", async () => {
+    // #70: hookform's internal _resetDefaultValues() awaits our wrapped
+    // defaultValues() and, once it resolves, calls its own reset({}) — which
+    // clears formState.errors unless keepErrors is set. A consumer's setError
+    // called synchronously inside onDefaultValuesError must still be visible
+    // once that settles, with no setTimeout/deferral on the consumer's part.
+    let reject!: (error: unknown) => void
+    const load = vi.fn(() => new Promise<{ email: string }>((_r, j) => (reject = j)))
+    const ref = createRef<FormMethods<{ email: string }, { email: string }>>()
+    render(
+      <Form
+        ref={ref}
+        schema={schema}
+        defaultValues={load}
+        onSubmit={() => {}}
+        onDefaultValuesError={(error) => {
+          ref.current?.setError('root.server', { message: (error as Error).message })
+        }}
+      >
+        <TextField name="email" label="Email" />
+        <SubmitButton />
+      </Form>,
+    )
+    expect(screen.getByLabelText('Email')).toBeDisabled()
+    reject(new Error('Could not load profile'))
+    await waitFor(() => expect(screen.getByLabelText('Email')).toBeEnabled())
+    await waitFor(() =>
+      expect(ref.current?.formState.errors.root?.server?.message).toBe('Could not load profile'),
+    )
+  })
+
   it('re-enables the form and rethrows when async defaultValues rejects without a handler', async () => {
     // hookform's internal `_resetDefaultValues` never attaches a `.catch` to the
     // promise our wrapped defaultValues returns, so a rejection with no
