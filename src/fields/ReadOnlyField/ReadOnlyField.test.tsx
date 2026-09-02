@@ -141,6 +141,20 @@ describe('ReadOnlyField', () => {
     )
   })
 
+  it('editStep renders no Edit button in a page-layout Wizard: go() there is a no-op', () => {
+    wrap(
+      <Wizard steps={steps} layout="page">
+        <WizardStep id="account">
+          <TextField name="email" label="Edit email" />
+        </WizardStep>
+        <WizardStep id="review">
+          <ReadOnlyField name="email" label="Email" editStep="account" />
+        </WizardStep>
+      </Wizard>,
+    )
+    expect(screen.queryByRole('button', { name: /Edit/ })).not.toBeInTheDocument()
+  })
+
   it('has no accessibility violations', async () => {
     const { container } = wrap(<ReadOnlyField name="email" label="Email" />)
     await expectNoA11yViolations(container)

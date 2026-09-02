@@ -20,15 +20,24 @@ export interface WizardStepProps {
  * and renders no legend. `page` layout: every step renders unconditionally,
  * in document order (by convention, the order `WizardStep`s appear as
  * children — the same order given to `steps`), each as its own named
- * section — the same markup as a horizontal step.
+ * section — the same markup as a horizontal step. An `id` matching no
+ * `steps` entry renders nothing there too (mirrors `steps` layout's "no
+ * current step matches this id" case) rather than a `FormSection` with no
+ * accessible name, and warns in dev so a stale/misspelled id is noticed.
  */
 export function WizardStep({ id, title, description, slotProps, children }: WizardStepProps) {
   const { steps, current, orientation, layout, contentEl, id: wizardId } = useWizard('WizardStep')
   if (layout === 'page') {
     const step = steps.find((s) => s.id === id)
+    if (!step) {
+      if (import.meta.env.DEV) {
+        console.warn(`ez-form: <WizardStep id="${id}"> does not match any step in \`steps\`.`)
+      }
+      return null
+    }
     return (
       <FormSection
-        title={title === undefined ? step?.label : title}
+        title={title === undefined ? step.label : title}
         description={description}
         slotProps={slotProps}
       >

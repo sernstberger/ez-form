@@ -115,6 +115,9 @@ export const Vertical: Story = { args: { orientation: 'vertical' } }
  * The same `steps` array and `StepsContent` as `Horizontal` / `Vertical`, rendered as one
  * page instead: `WizardStepper` and `WizardNav` render nothing in `layout="page"`, so this
  * story swaps in a plain `SubmitButton` that validates the whole schema at once.
+ * `StepsContent`'s review step still passes `editStep` to its `ReadOnlyField`s, but since
+ * every field is already visible on the page, `ReadOnlyField` renders no Edit button here —
+ * `wizard.go()` would be a no-op in this layout, and a button to nowhere is a dead control.
  */
 export const PageLayout: Story = {
   args: { layout: 'page' },

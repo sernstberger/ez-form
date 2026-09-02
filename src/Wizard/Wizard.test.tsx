@@ -1030,8 +1030,8 @@ describe('Wizard layout="page"', () => {
     await expectNoA11yViolations(container)
   })
 
-  it('a nested FormSection inside a step gets h4', () => {
-    render(
+  it('a nested FormSection inside a step gets h4, with no accessibility violations (heading order h3->h4)', async () => {
+    const { container } = render(
       <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
         <Wizard steps={steps} layout="page">
           <WizardStep id="account">
@@ -1051,6 +1051,30 @@ describe('Wizard layout="page"', () => {
     )
     expect(screen.getByRole('heading', { level: 3, name: 'Account' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 4, name: 'Nested' })).toBeInTheDocument()
+    // Exercises axe's heading-order rule against an actual h3 -> h4 nesting: the
+    // top-level "has no accessibility violations" test above renders only flat,
+    // unnested steps, so it never touches this rule.
+    await expectNoA11yViolations(container)
+  })
+
+  it('a WizardStep id matching no step renders nothing (not an unnamed group) and warns', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    render(
+      <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+        <Wizard steps={steps} layout="page">
+          <WizardStep id="account">
+            <TextField name="name" label="Name" />
+          </WizardStep>
+          <WizardStep id="not-a-real-step">
+            <p>orphaned</p>
+          </WizardStep>
+        </Wizard>
+      </Form>,
+    )
+    expect(screen.queryByText('orphaned')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('group')).toHaveLength(1)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('not-a-real-step'))
+    warn.mockRestore()
   })
 })
 

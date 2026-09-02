@@ -84,7 +84,12 @@ export function ReadOnlyField(inProps: ReadOnlyFieldProps) {
   const labelId = useId()
   const text = label ?? humanize(name)
   const content = format ? format(value) : isEmpty(value) ? empty : display(value, options)
-  const editable = editStep !== undefined && wizard !== null
+  // In `page` layout every step (and so every field) is already on screen at once, so
+  // `wizard.go()` has nothing to do there — it's a no-op that always resolves `false`. An
+  // Edit button that clicks to nowhere is a focusable dead control (WCAG 2.1.1/4.1.2), so
+  // it's hidden rather than disabled: disabling would still leave a control whose purpose
+  // (jump to the field) is meaningless when the field is already visible right there.
+  const editable = editStep !== undefined && wizard !== null && wizard.layout !== 'page'
 
   const labelProps = { variant: 'caption', color: 'text.secondary', ...slotProps?.label } as const
   const valueProps = { variant: 'body1', ...slotProps?.value } as const
