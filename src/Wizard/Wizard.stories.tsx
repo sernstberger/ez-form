@@ -6,6 +6,8 @@ import Typography from '@mui/material/Typography'
 import { useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import { Form } from '../Form'
+import { FormSection } from '../FormSection'
+import { SubmitButton } from '../SubmitButton'
 import { TextField } from '../fields/TextField'
 import { Select } from '../fields/Select'
 import { NumberField } from '../fields/NumberField'
@@ -108,6 +110,79 @@ type Story = StoryObj<typeof meta>
 export const Horizontal: Story = {}
 
 export const Vertical: Story = { args: { orientation: 'vertical' } }
+
+/**
+ * The same `steps` array and `StepsContent` as `Horizontal` / `Vertical`, rendered as one
+ * page instead: `WizardStepper` and `WizardNav` render nothing in `layout="page"`, so this
+ * story swaps in a plain `SubmitButton` that validates the whole schema at once.
+ * `StepsContent`'s review step still passes `editStep` to its `ReadOnlyField`s, but since
+ * every field is already visible on the page, `ReadOnlyField` renders no Edit button here —
+ * `wizard.go()` would be a no-op in this layout, and a button to nowhere is a dead control.
+ */
+export const PageLayout: Story = {
+  args: { layout: 'page' },
+  render: (args) => (
+    <Form
+      schema={schema}
+      defaultValues={emptyValues}
+      onSubmit={onSubmit}
+      confirm={{ title: 'Create account?' }}
+    >
+      <Stack spacing={3} sx={{ width: 480 }}>
+        <Wizard {...args}>
+          <StepsContent />
+          <SubmitButton />
+        </Wizard>
+      </Stack>
+    </Form>
+  ),
+}
+
+/**
+ * A step with its own sub-sections: `FormSection` gives each nested legend a deeper heading
+ * level automatically (`h3` for the step, `h4` for "Billing contact", `h5` if nested again),
+ * so the page keeps a correct heading hierarchy without any `slotProps.legend.component`.
+ */
+export const PageLayoutNestedSections: Story = {
+  args: { layout: 'page' },
+  render: (args) => (
+    <Form
+      schema={schema}
+      defaultValues={emptyValues}
+      onSubmit={onSubmit}
+      confirm={{ title: 'Create account?' }}
+    >
+      <Stack spacing={3} sx={{ width: 480 }}>
+        <Wizard {...args}>
+          <WizardStep id="account">
+            <Stack spacing={2}>
+              <TextField name="name" label="Name" required />
+              <FormSection title="Billing contact" description="Who we email invoices to">
+                <TextField name="email" label="Email" required />
+              </FormSection>
+            </Stack>
+          </WizardStep>
+          <WizardStep id="plan">
+            <Stack spacing={2}>
+              <Select name="plan" label="Plan" options={plans} required />
+              <NumberField name="seats" label="Seats" min={1} />
+            </Stack>
+          </WizardStep>
+          <WizardStep id="review">
+            <Stack spacing={2}>
+              <ReadOnlyField name="name" editStep="account" />
+              <ReadOnlyField name="email" editStep="account" />
+              <ReadOnlyField name="plan" options={plans} editStep="plan" />
+              <ReadOnlyField name="seats" editStep="plan" />
+              <Checkbox name="tos" label="I accept the terms" required />
+            </Stack>
+          </WizardStep>
+          <SubmitButton />
+        </Wizard>
+      </Stack>
+    </Form>
+  ),
+}
 
 /** Values and visited steps survive a reload through localStorage; clear storage to start over. */
 export const Resume: Story = {

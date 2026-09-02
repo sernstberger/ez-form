@@ -91,6 +91,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   box could fall under 24×24 CSS px); `src/test/targetSize.ts` exports
   `expectTargetSize`, a shared test helper asserting a control's declared CSS
   guarantees the floor, called from every affected component's test file — #12.
+- `Wizard` `layout?: 'steps' | 'page'` (default `'steps'`), defaulted through
+  `useDefaultProps`/`EzWizard.defaultProps` (no slots, so no `EzWizard` class key).
+  `'page'` renders every `WizardStep` at once, in document order, each as its own
+  `FormSection` — the same markup a horizontal step already uses — while
+  `WizardStepper` and `WizardNav` render nothing and `useWizard()`'s
+  `next`/`prev`/`go` become no-ops (`current` stays the first step). A plain
+  `<SubmitButton>` validates the whole schema, same as the last step of a `steps`
+  wizard — #64.
+- `FormSection` legend heading level now defaults one level deeper per nesting
+  (`h3` at the top level, `h4` inside another `FormSection`, `h5` inside that, capped
+  at `h6`) via a new `FormSectionDepthContext`, so nested sections — including
+  sub-sections inside a `layout="page"` step — produce a correct heading hierarchy
+  without hand-picking `slotProps.legend.component` at every level. An explicit
+  `slotProps.legend.component`, or a theme default for it, still overrides the
+  automatic level — #64.
 
 ### Changed
 

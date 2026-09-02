@@ -72,7 +72,9 @@ function stepLabel(step: WizardStepDef, status: WizardStepStatus, labelId: strin
  */
 export function WizardStepper(inProps: WizardStepperProps) {
   const props = useDefaultProps({ props: inProps, name: 'EzWizardStepper' })
-  const { id, steps, index, orientation, stepStatus, go, setContentEl } = useWizard('WizardStepper')
+  const { id, steps, index, orientation, layout, stepStatus, go, setContentEl } =
+    useWizard('WizardStepper')
+  if (layout === 'page') return null
   return (
     <Stepper
       {...props}

@@ -57,8 +57,9 @@ export function WizardNav(inProps: WizardNavProps) {
     className,
     ...rest
   } = props
-  const { isFirst, isLast, pending, next, prev } = useWizard('WizardNav')
+  const { isFirst, isLast, pending, next, prev, layout } = useWizard('WizardNav')
   const { disabled: formDisabled } = useFormState()
+  if (layout === 'page') return null
   const prevProps = { variant: 'text', ...slotProps?.prev } as const
   const nextProps = { variant: 'contained', ...slotProps?.next } as const
   return (
