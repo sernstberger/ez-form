@@ -86,8 +86,12 @@ const meta = {
   parameters: { layout: 'centered' },
   args: { steps, children: null },
   render: (args) => (
-    // TODO(v4 integration): add confirm={{ title: 'Create account?' }} once Form confirm merges (Task 10).
-    <Form schema={schema} defaultValues={emptyValues} onSubmit={onSubmit}>
+    <Form
+      schema={schema}
+      defaultValues={emptyValues}
+      onSubmit={onSubmit}
+      confirm={{ title: 'Create account?' }}
+    >
       <Stack spacing={3} sx={{ width: 480 }}>
         <Wizard {...args}>
           <WizardStepper />

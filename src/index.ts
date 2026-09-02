@@ -36,6 +36,23 @@ export { ClearButton, clearButtonClasses, type ClearButtonProps } from './ClearB
 export type {} from './theme/augmentation'
 export { useFormGuard, type FormGuardBlocker, type UseFormGuardReturn } from './useFormGuard'
 export {
+  Wizard,
+  type WizardProps,
+  type WizardStepDef,
+  type WizardStepStatus,
+  type WizardContextValue,
+  WizardStep,
+  type WizardStepProps,
+  WizardStepper,
+  type WizardStepperProps,
+  wizardStepperClasses,
+  WizardNav,
+  type WizardNavProps,
+  wizardNavClasses,
+  useWizard,
+  useOptionalWizard,
+} from './Wizard'
+export {
   ReadOnlyField,
   readOnlyFieldClasses,
   type ReadOnlyFieldProps,

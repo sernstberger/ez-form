@@ -88,6 +88,11 @@ Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >
 | `Checkbox`                                     | MUI `Checkbox`                                | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                                                                                                             |
 | `Switch`                                       | MUI `Switch`                                  | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                                                                                                             |
 | `SubmitButton`                                 | MUI `Button`                                  | `loading` while submitting, disabled while the form is                                                                                                                                                                                   |
+| `Form` (v4 additions)                          | —                                             | `confirm?: true \| ConfirmOptions` asks after validation on every submit path; `guard?: boolean` warns on tab close while dirty                                                                                                          |
+| `ClearButton`                                  | MUI `Button`                                  | `to?: 'defaults' \| 'empty'`, `confirm?`; disabled while pristine                                                                                                                                                                        |
+| `ConfirmDialog`                                | MUI `Dialog`                                  | `open`, `title`, `message?`, `confirmLabel?`, `cancelLabel?`, `confirmColor?`, `onConfirm`, `onCancel`; `useConfirm()` gives a promise API                                                                                               |
+| `Wizard`                                       | MUI `Stepper`                                 | `steps`, `step?`/`onStepChange?`, `visited?`/`onVisitedChange?`, `orientation?`; with `WizardStepper`, `WizardStep`, `WizardNav`, `useWizard`                                                                                            |
+| `ReadOnlyField`                                | MUI `Typography`                              | `name`, `label?`, `options?`, `format?`, `empty?`, `editStep?`                                                                                                                                                                           |
 
 Every field shows its zod message as helper text (linked to the input with `aria-describedby`; the first invalid field is focused on submit). The error text is a live region (`role="alert"`), so it is announced in `onChange`/`onBlur` modes as well. Fields must be rendered inside `<Form>`. Consumer `onChange`/`onBlur` handlers run after the form's own.
 
@@ -108,6 +113,77 @@ Need `reset`, `setError`, `watch`? `onSubmit` receives the form methods as its s
 Inside child components use `useFormContext()` from `react-hook-form`.
 
 Numbers: NumberField stores `number | null`, so use `z.number()` (add `.nullable()` if empty is allowed). TextField hands zod the string from the input, so a numeric TextField needs `z.coerce.number()`.
+
+## Wizard
+
+One `<Form>` and one schema above every step. `Next` validates only the current step's `fields`; `Submit` on the last step validates everything.
+
+```tsx
+const steps = [
+  { id: 'account', label: 'Account', fields: ['name', 'email'] },
+  { id: 'plan', label: 'Plan', fields: ['plan'] },
+  { id: 'review', label: 'Review' },
+] as const satisfies WizardStepDef<z.input<typeof schema>>[]
+
+<Form schema={schema} defaultValues={defaults} onSubmit={save} confirm>
+  <Wizard steps={steps} orientation="vertical">
+    <WizardStepper />
+    <WizardStep id="account">…fields…</WizardStep>
+    <WizardStep id="plan">…fields…</WizardStep>
+    <WizardStep id="review">
+      <ReadOnlyField name="email" editStep="account" />
+    </WizardStep>
+    <WizardNav />
+  </Wizard>
+</Form>
+```
+
+### One route per step
+
+`Wizard` is controlled through `step` / `onStepChange`; wire those to your router. With react-router, put `<Form>` + `<Wizard>` in a layout route and render the step routes through `<Outlet>`:
+
+```tsx
+function SignupLayout() {
+  const { step = '' } = useParams()
+  const navigate = useNavigate()
+  return (
+    <Form schema={schema} defaultValues={defaults} onSubmit={save}>
+      <Wizard steps={steps} step={step} onStepChange={(s) => navigate(`/signup/${s.id}`)}>
+        <WizardStepper />
+        <Outlet />
+        <WizardNav />
+      </Wizard>
+    </Form>
+  )
+}
+// routes: { path: '/signup', element: <SignupLayout/>, children: [{ path: ':step', element: <SignupStep/> }] }
+```
+
+A URL for a step the user has not reached (a deep link, a reload) makes the wizard call `onStepChange` with the last visited step. To resume across reloads, save `visited` (via `onVisitedChange`) with your draft values and pass both back.
+
+## Confirmations and guards
+
+- `<Form confirm>`: dialog after validation, before `onSubmit`, on every submit path.
+- `<ClearButton confirm>`: dialog before reset.
+- `<Form guard>`: browser prompt on tab close / reload while dirty.
+- `useFormGuard(useBlocker)`: in-app navigation; pass react-router's `useBlocker` and render a `ConfirmDialog` with the result.
+
+## Theming
+
+Every ez-form component registers with MUI's theme under `Ez<Name>` (`defaultProps`, `styleOverrides`, and a `<name>Classes` object for slot class names) — no styling is baked into the component itself, so a theme can override every default.
+
+```tsx
+const theme = createTheme({
+  components: {
+    EzWizardNav: {
+      defaultProps: { slotProps: { next: { variant: 'outlined' } } },
+    },
+    EzReadOnlyField: {
+      styleOverrides: { label: { textTransform: 'uppercase' } },
+    },
+  },
+})
+```
 
 ## Loading values from a server
 

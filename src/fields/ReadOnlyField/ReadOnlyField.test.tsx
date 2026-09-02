@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import type { ComponentsOverrides, ComponentsProps } from '@mui/material/styles'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -7,27 +6,8 @@ import { z } from 'zod'
 import { Form } from '../../Form'
 import { TextField } from '../TextField'
 import { Wizard, WizardStep } from '../../Wizard'
-import { ReadOnlyField, readOnlyFieldClasses, type ReadOnlyFieldProps } from './ReadOnlyField'
+import { ReadOnlyField, readOnlyFieldClasses } from './ReadOnlyField'
 import { expectNoA11yViolations } from '../../test/axe'
-
-// Local augmentation for the themeability test below: Task 10 owns
-// `src/theme/augmentation.ts`, which will declare this for real across the
-// whole package. TS module augmentations merge additively, so this scoped
-// declaration is safe to keep even after that file lands.
-declare module '@mui/material/styles' {
-  interface ComponentsPropsList {
-    EzReadOnlyField: Partial<ReadOnlyFieldProps>
-  }
-  interface ComponentNameToClassKey {
-    EzReadOnlyField: 'root' | 'label' | 'value' | 'edit'
-  }
-  interface Components<Theme = unknown> {
-    EzReadOnlyField?: {
-      defaultProps?: ComponentsProps['EzReadOnlyField']
-      styleOverrides?: ComponentsOverrides<Theme>['EzReadOnlyField']
-    }
-  }
-}
 
 const schema = z.object({
   email: z.string(),

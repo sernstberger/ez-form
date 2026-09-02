@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import type { ComponentsOverrides, ComponentsProps } from '@mui/material/styles'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -9,34 +8,9 @@ import { TextField } from '../fields/TextField'
 import { expectNoA11yViolations } from '../test/axe'
 import { Wizard, type WizardStepDef } from './Wizard'
 import { WizardStep } from './WizardStep'
-import { WizardStepper, wizardStepperClasses, type WizardStepperProps } from './WizardStepper'
-import { WizardNav, type WizardNavProps } from './WizardNav'
+import { WizardStepper, wizardStepperClasses } from './WizardStepper'
+import { WizardNav } from './WizardNav'
 import { useWizard } from './useWizard'
-
-// Local augmentation for the themeability tests below: `src/theme/augmentation.ts`
-// (owned by a separate task) will declare this for real across the whole
-// package. TS module augmentations merge additively, so this scoped
-// declaration is safe to keep even after that file lands.
-declare module '@mui/material/styles' {
-  interface ComponentsPropsList {
-    EzWizardStepper: Partial<WizardStepperProps>
-    EzWizardNav: Partial<WizardNavProps>
-  }
-  interface ComponentNameToClassKey {
-    EzWizardStepper: 'root' | 'verticalStepButton'
-    EzWizardNav: 'root' | 'prev' | 'next' | 'submit'
-  }
-  interface Components<Theme = unknown> {
-    EzWizardStepper?: {
-      defaultProps?: ComponentsProps['EzWizardStepper']
-      styleOverrides?: ComponentsOverrides<Theme>['EzWizardStepper']
-    }
-    EzWizardNav?: {
-      defaultProps?: ComponentsProps['EzWizardNav']
-      styleOverrides?: ComponentsOverrides<Theme>['EzWizardNav']
-    }
-  }
-}
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
