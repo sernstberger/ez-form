@@ -35,3 +35,8 @@ export {
 export { ClearButton, clearButtonClasses, type ClearButtonProps } from './ClearButton'
 export type {} from './theme/augmentation'
 export { useFormGuard, type FormGuardBlocker, type UseFormGuardReturn } from './useFormGuard'
+export {
+  ReadOnlyField,
+  readOnlyFieldClasses,
+  type ReadOnlyFieldProps,
+} from './fields/ReadOnlyField'
