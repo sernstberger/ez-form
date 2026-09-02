@@ -3,31 +3,29 @@ import userEvent from '@testing-library/user-event'
 import { Checkout } from './Checkout'
 import { DECLINED_CARD_NUMBER } from '../fakeApi'
 import { expectNoA11yViolations } from '../../test/axe'
+import { setValue } from '../../test/setValue'
 
 async function fillShipping(user: ReturnType<typeof userEvent.setup>) {
   const shipping = screen.getByRole('group', { name: 'Shipping address' })
-  await user.type(within(shipping).getByLabelText(/full name/i), 'Ada Lovelace')
-  await user.type(within(shipping).getByLabelText(/street address/i), '1 Analytical Way')
-  await user.type(within(shipping).getByLabelText(/^city/i), 'London')
+  setValue(within(shipping).getByLabelText(/full name/i), 'Ada Lovelace')
+  setValue(within(shipping).getByLabelText(/street address/i), '1 Analytical Way')
+  setValue(within(shipping).getByLabelText(/^city/i), 'London')
   await user.click(within(shipping).getByRole('combobox', { name: /country/i }))
   await user.click(await screen.findByRole('option', { name: 'United Kingdom' }))
-  await user.type(within(shipping).getByLabelText(/state \/ region/i), 'Greater London')
-  await user.type(within(shipping).getByLabelText(/postal code/i), 'SW1A 1AA')
+  setValue(within(shipping).getByLabelText(/state \/ region/i), 'Greater London')
+  setValue(within(shipping).getByLabelText(/postal code/i), 'SW1A 1AA')
 }
 
-async function fillPayment(
-  user: ReturnType<typeof userEvent.setup>,
-  cardNumber = '4111111111111111',
-) {
+function fillPayment(cardNumber = '4111111111111111') {
   const payment = screen.getByRole('group', { name: 'Payment' })
-  await user.type(within(payment).getByLabelText(/card number/i), cardNumber)
-  await user.type(within(payment).getByLabelText(/expiry/i), '04/29')
-  await user.type(within(payment).getByLabelText(/^cvc/i), '123')
+  setValue(within(payment).getByLabelText(/card number/i), cardNumber)
+  setValue(within(payment).getByLabelText(/expiry/i), '04/29')
+  setValue(within(payment).getByLabelText(/^cvc/i), '123')
 }
 
 async function fillCompleteForm(user: ReturnType<typeof userEvent.setup>, cardNumber?: string) {
   await fillShipping(user)
-  await fillPayment(user, cardNumber)
+  fillPayment(cardNumber)
 }
 
 async function confirmDialog(user: ReturnType<typeof userEvent.setup>) {
@@ -51,7 +49,7 @@ describe('Checkout', () => {
   })
 
   it('shows a State select with US states when the country is United States', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Checkout />)
     const shipping = screen.getByRole('group', { name: 'Shipping address' })
     await user.click(within(shipping).getByRole('combobox', { name: /^country/i }))
@@ -64,7 +62,7 @@ describe('Checkout', () => {
   })
 
   it('shows a province select with Canadian provinces when the country is Canada', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Checkout />)
     const shipping = screen.getByRole('group', { name: 'Shipping address' })
     await user.click(within(shipping).getByRole('combobox', { name: /^country/i }))
@@ -77,7 +75,7 @@ describe('Checkout', () => {
   })
 
   it('falls back to a free-text state/region field for a country with no list (e.g. United Kingdom)', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Checkout />)
     const shipping = screen.getByRole('group', { name: 'Shipping address' })
     await user.click(within(shipping).getByRole('combobox', { name: /^country/i }))
@@ -86,7 +84,7 @@ describe('Checkout', () => {
   })
 
   it('resets the state/region value when the country changes', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Checkout />)
     const shipping = screen.getByRole('group', { name: 'Shipping address' })
     await user.click(within(shipping).getByRole('combobox', { name: /^country/i }))
@@ -239,6 +237,13 @@ describe('Checkout', () => {
     await fillCompleteForm(user, DECLINED_CARD_NUMBER)
     await confirmDialog(user)
     await screen.findByRole('alert')
+    // The alert renders while the rejected submit is still settling (`isSubmitting` flips
+    // back and the button re-renders). axe's tree walk is slow enough that on a loaded
+    // machine those updates land mid-scan and React reports them as un-acted. Waiting for
+    // the button to leave its loading state is the behaviour-level "submit has finished".
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /^place order$/i })).toBeEnabled(),
+    )
     await expectNoA11yViolations(container)
   })
 })

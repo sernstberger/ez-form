@@ -4,6 +4,7 @@ import { Insurance } from './Insurance'
 import { APPLICATION_DECLINED_FOR } from '../fakeApi'
 import { expectNoA11yViolations } from '../../test/axe'
 import { withPickers } from '../../test/pickers'
+import { setValue } from '../../test/setValue'
 
 const STORAGE_KEY = 'ez-form:insurance-resume'
 
@@ -18,25 +19,25 @@ async function goNext(user: ReturnType<typeof userEvent.setup>) {
 }
 
 async function fillApplicant(user: ReturnType<typeof userEvent.setup>, firstName = 'Ada') {
-  await user.type(screen.getByLabelText(/first name/i), firstName)
-  await user.type(screen.getByLabelText(/last name/i), 'Lovelace')
+  setValue(screen.getByLabelText(/first name/i), firstName)
+  setValue(screen.getByLabelText(/last name/i), 'Lovelace')
   typeDate('birthday', '01/01/1985')
   await goNext(user)
 }
 
 async function fillContact(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
-  await user.type(screen.getByLabelText(/^phone/i), '555-555-5555')
+  setValue(screen.getByLabelText(/^email/i), 'ada@example.com')
+  setValue(screen.getByLabelText(/^phone/i), '555-555-5555')
   const address = screen.getByRole('group', { name: 'Address' })
-  await user.type(within(address).getByLabelText(/street address/i), '1 Analytical Way')
-  await user.type(within(address).getByLabelText(/^city/i), 'London')
-  await user.type(within(address).getByLabelText(/zip code/i), 'SW1A1AA')
+  setValue(within(address).getByLabelText(/street address/i), '1 Analytical Way')
+  setValue(within(address).getByLabelText(/^city/i), 'London')
+  setValue(within(address).getByLabelText(/zip code/i), 'SW1A1AA')
   await goNext(user)
 }
 
 async function fillCoverage(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('radio', { name: 'Liability only' }))
-  await user.type(screen.getByLabelText(/coverage amount/i), '10000')
+  setValue(screen.getByLabelText(/coverage amount/i), '10000')
   await goNext(user)
 }
 
@@ -51,17 +52,17 @@ async function takeVehicle(user: ReturnType<typeof userEvent.setup>) {
 }
 
 async function fillVehicle(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText(/^make/i), 'Toyota')
-  await user.type(screen.getByLabelText(/^model/i), 'Corolla')
-  await user.type(screen.getByLabelText(/^year/i), '2020')
-  await user.type(screen.getByLabelText(/plate number/i), 'ABC123')
+  setValue(screen.getByLabelText(/^make/i), 'Toyota')
+  setValue(screen.getByLabelText(/^model/i), 'Corolla')
+  setValue(screen.getByLabelText(/^year/i), '2020')
+  setValue(screen.getByLabelText(/plate number/i), 'ABC123')
   await goNext(user)
 }
 
 async function fillDrivers(user: ReturnType<typeof userEvent.setup>) {
   const drivers = screen.getByRole('group', { name: 'Primary driver' })
-  await user.type(within(drivers).getByLabelText(/full name/i), 'Ada Lovelace')
-  await user.type(within(drivers).getByLabelText(/license number/i), 'D1234567')
+  setValue(within(drivers).getByLabelText(/full name/i), 'Ada Lovelace')
+  setValue(within(drivers).getByLabelText(/license number/i), 'D1234567')
   typeDate('driver.licenseDate', '01/01/2010')
   await goNext(user)
 }
@@ -111,6 +112,17 @@ const COMPLETE_VALUES = {
   priorIncidents: [],
   incidentDetails: '',
   documents: [],
+}
+
+/**
+ * What `fillThroughReview()` (no vehicle) produces: the same values with `hasVehicle` off and
+ * the vehicle sub-object left at its empty default, so ticking "insure a vehicle" afterwards
+ * reveals a Vehicle step whose required fields are genuinely blank.
+ */
+const WITHOUT_VEHICLE_VALUES = {
+  ...COMPLETE_VALUES,
+  hasVehicle: false,
+  vehicle: { make: '', model: '', year: null, plate: '' },
 }
 
 /**
@@ -168,10 +180,10 @@ describe('Insurance', () => {
 
   it('skips the Vehicle step when "has vehicle?" is No (the default)', async () => {
     const user = userEvent.setup({ delay: null })
+    // Resume on the has-vehicle step: pressing Next with the box unticked is the branch this
+    // test is about, not the three steps of typing that precede it.
+    seedReview(WITHOUT_VEHICLE_VALUES, 'has-vehicle')
     render(withPickers(<Insurance />))
-    await fillApplicant(user)
-    await fillContact(user)
-    await fillCoverage(user)
     // On the has-vehicle step, still unchecked (default false).
     expect(screen.getByRole('group', { name: 'Vehicle?' })).toBeInTheDocument()
     await goNext(user)
@@ -182,10 +194,10 @@ describe('Insurance', () => {
 
   it('shows the Vehicle step when "has vehicle?" is Yes', async () => {
     const user = userEvent.setup({ delay: null })
+    // Resume on the has-vehicle step: ticking the box and pressing Next is the branch this
+    // test is about, not the three steps of typing that precede it.
+    seedReview(WITHOUT_VEHICLE_VALUES, 'has-vehicle')
     render(withPickers(<Insurance />))
-    await fillApplicant(user)
-    await fillContact(user)
-    await fillCoverage(user)
     await user.click(screen.getByRole('checkbox', { name: /insure a vehicle/i }))
     await goNext(user)
     expect(screen.getByRole('group', { name: 'Vehicle' })).toBeInTheDocument()
@@ -209,15 +221,15 @@ describe('Insurance', () => {
 
   it('shows the error summary listing step-owned fields on a failed final submit', async () => {
     const user = userEvent.setup({ delay: null })
-    render(withPickers(<Insurance />))
-    // Reach Review with "has vehicle?" still No, then flip it on via the Edit link (backward
-    // nav skips validation) without ever visiting/filling the newly-shown Vehicle step: the
-    // whole schema is only checked on final submit, so this is the realistic way an
+    // Resume on Review with "has vehicle?" still No, then flip it on via the Edit link
+    // (backward nav skips validation) without ever visiting/filling the newly-shown Vehicle
+    // step: the whole schema is only checked on final submit, so this is the realistic way an
     // otherwise-valid wizard reaches Review with an invalid field (see Wizard's own
     // `fields`-ownership doc: a field listed in no *visited* step is caught at submit). Since
     // the resulting submit is invalid, <Form confirm> never asks — the error summary appears
     // directly, with no confirm dialog in between.
-    await fillThroughReview(user)
+    seedReview(WITHOUT_VEHICLE_VALUES)
+    render(withPickers(<Insurance />))
     const review = screen.getByRole('group', { name: 'Review' })
     await user.click(within(review).getByRole('button', { name: /edit has vehicle/i }))
     await user.click(screen.getByRole('checkbox', { name: /insure a vehicle/i }))
@@ -249,13 +261,10 @@ describe('Insurance', () => {
 
   it('does not persist uploaded documents: resuming after an upload still submits cleanly with Documents empty', async () => {
     const user = userEvent.setup({ delay: null })
+    // Resume straight onto Documents with every earlier step already filled: the walk itself
+    // is not what this test is about — the upload/remount round-trip is.
+    seedReview(WITHOUT_VEHICLE_VALUES, 'documents')
     const { unmount } = render(withPickers(<Insurance />))
-    await fillApplicant(user)
-    await fillContact(user)
-    await fillCoverage(user)
-    await skipVehicle(user)
-    await fillDrivers(user)
-    await fillHistory(user)
     // On Documents: upload a file, then let the autosave effect run before remounting.
     const file = new File(['%PDF'], 'policy.pdf', { type: 'application/pdf' })
     await user.upload(screen.getByLabelText(/^upload documents/i) as HTMLInputElement, file)
@@ -319,8 +328,8 @@ describe('Insurance', () => {
 
   it('submits and reports a server error for a declined application', async () => {
     const user = userEvent.setup({ delay: null })
+    seedReview({ ...COMPLETE_VALUES, firstName: APPLICATION_DECLINED_FOR })
     render(withPickers(<Insurance />))
-    await fillThroughReview(user, { firstName: APPLICATION_DECLINED_FOR })
     await user.click(screen.getByRole('button', { name: /submit application/i }))
     const dialog = await screen.findByRole('alertdialog', { name: /submit application\?/i })
     await user.click(within(dialog).getByRole('button', { name: /^confirm$/i }))
@@ -331,9 +340,9 @@ describe('Insurance', () => {
   it('submits successfully and clears saved resume state', async () => {
     const user = userEvent.setup({ delay: null })
     const onSuccess = vi.fn()
+    seedReview()
     render(withPickers(<Insurance onSuccess={onSuccess} />))
-    await fillThroughReview(user)
-    await waitFor(() => expect(localStorage.getItem(STORAGE_KEY)).toBeTruthy())
+    expect(localStorage.getItem(STORAGE_KEY)).toBeTruthy()
     await user.click(screen.getByRole('button', { name: /submit application/i }))
     const dialog = await screen.findByRole('alertdialog', { name: /submit application\?/i })
     await user.click(within(dialog).getByRole('button', { name: /^confirm$/i }))
@@ -402,10 +411,9 @@ describe('Insurance', () => {
   })
 
   it('is accessible on the Coverage step', async () => {
-    const user = userEvent.setup({ delay: null })
+    seedReview(WITHOUT_VEHICLE_VALUES, 'coverage')
     const { container } = render(withPickers(<Insurance />))
-    await fillApplicant(user)
-    await fillContact(user)
+    expect(screen.getByRole('group', { name: 'Coverage' })).toBeInTheDocument()
     await expectNoA11yViolations(container)
   })
 
