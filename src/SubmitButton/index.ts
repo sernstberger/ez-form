@@ -1,1 +1,1 @@
-export * from './SubmitButton'
+export { SubmitButton, submitButtonClasses, type SubmitButtonProps } from './SubmitButton'

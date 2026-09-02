@@ -219,3 +219,18 @@ export const RefReset: Story = {
   },
   render: () => <RefResetDemo />,
 }
+
+export const ConfirmSubmit: Story = {
+  args: { confirm: { title: 'Create account?', message: 'We will email a verification link.' } },
+}
+
+export const UnsavedChangesGuard: Story = {
+  args: { guard: true },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Type something, then try to reload the tab: the browser asks before leaving.',
+      },
+    },
+  },
+}

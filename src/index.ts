@@ -1,5 +1,5 @@
 export { Form, type FormProps, type FormMethods } from './Form'
-export { SubmitButton, type SubmitButtonProps } from './SubmitButton'
+export { SubmitButton, submitButtonClasses, type SubmitButtonProps } from './SubmitButton'
 export { TextField, type TextFieldProps } from './fields/TextField'
 export { Select, type SelectProps, type SelectOption } from './fields/Select'
 export type { Option } from './fields/Option'
@@ -24,3 +24,13 @@ export { DateTimePicker, type DateTimePickerProps } from './fields/DateTimePicke
 export type { PickerErrorMessages } from './fields/pickers/pickerMessages'
 export { OtpField, type OtpFieldProps } from './fields/OtpField'
 export { FileField, type FileFieldProps, type FileFieldValue } from './fields/FileField'
+export {
+  ConfirmDialog,
+  confirmDialogClasses,
+  type ConfirmDialogProps,
+  type ConfirmOptions,
+  useConfirm,
+  type UseConfirmReturn,
+} from './ConfirmDialog'
+export { ClearButton, clearButtonClasses, type ClearButtonProps } from './ClearButton'
+export type {} from './theme/augmentation'

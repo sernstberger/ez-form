@@ -18,6 +18,7 @@ import {
 } from 'react-hook-form'
 import type { z } from 'zod'
 import { ezResolver } from './ezResolver'
+import { useConfirm, type ConfirmOptions } from '../ConfirmDialog'
 
 /**
  * The hookform methods for this form. It is the same object `useFormContext()`
@@ -59,6 +60,18 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
    * `defaultValues` are loading.
    */
   disabled?: boolean
+  /**
+   * Ask before submitting. Runs after validation inside the submit handler,
+   * so an invalid form never asks, and every submit path (button, Enter in a
+   * field, `form.requestSubmit()`) asks. `true` uses the default copy
+   * (`Submit?`); pass `ConfirmOptions` for your own.
+   */
+  confirm?: true | ConfirmOptions
+  /**
+   * Warn on tab close / reload while the form is dirty and not submitting
+   * (a `beforeunload` listener). For in-app navigation use `useFormGuard`.
+   */
+  guard?: boolean
   children: ReactNode
 }
 
@@ -71,6 +84,8 @@ export function Form<TIn extends FieldValues, TOut>({
   ref,
   mode = 'onSubmit',
   disabled = false,
+  confirm,
+  guard = false,
   children,
   ...formProps
 }: FormProps<TIn, TOut>) {
@@ -90,27 +105,55 @@ export function Form<TIn extends FieldValues, TOut>({
     mode,
     disabled: disabled || submitting || loading,
   })
-  const { isLoading } = useFormState({ control: methods.control })
+  const { isLoading, isDirty, isSubmitting } = useFormState({ control: methods.control })
   useEffect(() => {
     setLoading(isLoading)
   }, [isLoading])
   useImperativeHandle(ref, () => methods, [methods])
+
+  const { confirm: ask, dialog } = useConfirm()
+  const confirmOptions: ConfirmOptions | undefined =
+    confirm === true ? { title: 'Submit?' } : confirm
+
+  useEffect(() => {
+    if (!guard || !isDirty || isSubmitting) return
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [guard, isDirty, isSubmitting])
+
+  const submit = methods.handleSubmit(async (submitted) => {
+    setSubmitting(true)
+    try {
+      await onSubmit(submitted, methods)
+    } finally {
+      setSubmitting(false)
+    }
+  })
 
   return (
     <FormProvider {...methods}>
       <form
         noValidate
         {...formProps}
-        onSubmit={methods.handleSubmit(async (submitted) => {
-          setSubmitting(true)
-          try {
-            await onSubmit(submitted, methods)
-          } finally {
-            setSubmitting(false)
-          }
-        })}
+        onSubmit={
+          confirmOptions
+            ? async (event) => {
+                event.preventDefault()
+                // Validate first (focusing the first error like handleSubmit does) so an
+                // invalid form never asks; handleSubmit re-validates on Confirm, which is
+                // cheap and keeps hookform's isSubmitting confined to the real submit.
+                const valid = await methods.trigger(undefined, { shouldFocus: true })
+                if (!valid) return
+                if (await ask(confirmOptions)) await submit(event)
+              }
+            : submit
+        }
       >
         {children}
+        {dialog}
       </form>
     </FormProvider>
   )

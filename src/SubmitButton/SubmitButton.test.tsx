@@ -1,8 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { z } from 'zod'
 import { Form } from '../Form'
-import { SubmitButton } from './SubmitButton'
+import { SubmitButton, submitButtonClasses } from './SubmitButton'
 import { expectNoA11yViolations } from '../test/axe'
 
 const schema = z.object({ ok: z.boolean() })
@@ -77,5 +78,27 @@ describe('SubmitButton', () => {
     expect(() => render(<SubmitButton />)).toThrow(
       'ez-form: <SubmitButton> must be rendered inside <Form>',
     )
+  })
+
+  it('is themeable: defaultProps and styleOverrides apply', () => {
+    const theme = createTheme({
+      components: {
+        EzSubmitButton: {
+          defaultProps: { variant: 'outlined' },
+          styleOverrides: { root: { textTransform: 'lowercase' } },
+        },
+      },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{ ok: true }} onSubmit={() => {}}>
+          <SubmitButton />
+        </Form>
+      </ThemeProvider>,
+    )
+    const btn = screen.getByRole('button', { name: 'Submit' })
+    expect(btn).toHaveClass('MuiButton-outlined')
+    expect(btn).toHaveClass(submitButtonClasses.root)
+    expect(getComputedStyle(btn).textTransform).toBe('lowercase')
   })
 })
