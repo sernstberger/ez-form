@@ -83,6 +83,7 @@ Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >
 | ---------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `Form`                                         | `useForm` + `<form>`                          | `schema`, `onSubmit(values, form)`, `defaultValues?` (object or async function), `values?`, `resetOptions?`, `onDefaultValuesError?`, `ref?`, `mode?`, `disabled?`, `title?`, `description?`, `slotProps?`; fields disable while `onSubmit` is pending or async defaults are loading |
 | `FormSection`                                  | `<fieldset>` + `<legend>`                     | `title?`, `description?`, `slotProps?` (`legend`, `description`, `content`); group name is the legend, disabled disables every field in the group                                                                                                                                    |
+| `FormErrorSummary`                             | —                                             | `title?` (default "There is a problem"), `slotProps?` (`heading`, `list`, `item`, `link`); lists the last failed validation's errors as focusable links, GOV.UK-style — see "Error summary" below                                                                                    |
 | `TextField`                                    | MUI `TextField`                               | `name`; rules `required`, `min`, `max`, `minLength`, `maxLength`, `pattern`, `validate`                                                                                                                                                                                              |
 | `Select`                                       | MUI `TextField select`                        | `name`, `options: readonly SelectOption[]` (`{ value: string \| number; label: string }`); the same rules as TextField, typed over the option value                                                                                                                                  |
 | `RadioGroup`                                   | MUI `RadioGroup`                              | `name`, `label` (legend), `options: readonly Option[]`, `helperText?`; rules `required`, `validate`. The form value keeps the option's type                                                                                                                                          |
@@ -178,6 +179,31 @@ Need `reset`, `setError`, `watch`? `onSubmit` receives the form methods as its s
 Inside child components use `useFormContext()` from `react-hook-form`.
 
 Numbers: NumberField stores `number | null`, so use `z.number()` (add `.nullable()` if empty is allowed). TextField hands zod the string from the input, so a numeric TextField needs `z.coerce.number()`.
+
+## Error summary
+
+`<FormErrorSummary />` is a child you place — under the form's title, or inside the current
+`WizardStep` — not a `<Form>` prop, since a wizard's summary should scope to one step while a
+plain form's should not:
+
+```tsx
+<Form schema={schema} onSubmit={onSubmit} title="Sign up">
+  <FormErrorSummary />
+  <TextField name="email" label="Email" />
+  <SubmitButton />
+</Form>
+```
+
+It renders nothing until a submit (or, inside a `Wizard`, a `Next`/step change) has failed, then
+lists the errors from that attempt as a `role="alert"` region: a heading ("There is a problem" by
+default, `title` to override) that receives focus, and one link per invalid field showing its
+message — activating a link (click or Enter) focuses that field via `setFocus`, so it works even
+without a native `href` target. Items disappear as their fields become valid, and the whole
+summary disappears once none are left. While a summary is mounted, `<Form>` suppresses
+react-hook-form's own "focus the first invalid field" behavior so the two don't fight over focus.
+
+Inside a `Wizard`, place one `<FormErrorSummary />` per `WizardStep`: each shows only that step's
+own `fields` from its last failed `Next`, not the whole form's errors.
 
 ## Wizard
 

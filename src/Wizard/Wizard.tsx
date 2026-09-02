@@ -94,6 +94,7 @@ export function Wizard<TIn extends FieldValues>({
   const [visitedState, setVisitedState] = useState<readonly string[]>([firstId])
   const [pending, setPending] = useState(false)
   const [contentEl, setContentEl] = useState<HTMLElement | null>(null)
+  const [lastFailed, setLastFailed] = useState<readonly string[] | null>(null)
 
   const visited = visitedProp ?? visitedState
   const requestedId = step ?? stepState
@@ -123,6 +124,10 @@ export function Wizard<TIn extends FieldValues>({
     (to: number) => {
       const target = steps[to]!
       markVisited(target.id)
+      // `lastFailed` scopes a step's own last failed validation; leaving the step (forward
+      // after a pass — already null from validateCurrent — or backward without validating)
+      // must not leak it onto whichever step becomes current next.
+      setLastFailed(null)
       if (step === undefined) setStepState(target.id)
       onStepChange?.(target)
     },
@@ -139,7 +144,9 @@ export function Wizard<TIn extends FieldValues>({
     if (!fields?.length) return true
     setPending(true)
     try {
-      return await trigger(fields as unknown as Path<FieldValues>[], { shouldFocus: true })
+      const valid = await trigger(fields as unknown as Path<FieldValues>[], { shouldFocus: true })
+      setLastFailed(valid ? null : (fields as readonly string[]))
+      return valid
     } finally {
       setPending(false)
     }
@@ -254,6 +261,7 @@ export function Wizard<TIn extends FieldValues>({
       isFirst: index === 0,
       isLast: index === steps.length - 1,
       pending,
+      lastFailed,
       next,
       prev,
       go,
@@ -269,6 +277,7 @@ export function Wizard<TIn extends FieldValues>({
       visited,
       orientation,
       pending,
+      lastFailed,
       next,
       prev,
       go,

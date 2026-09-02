@@ -27,6 +27,14 @@ export interface WizardContextValue {
   isLast: boolean
   /** True while `next()` / a forward `go()` is validating. */
   pending: boolean
+  /**
+   * The current step's field paths from its last failed `trigger` (a `next()`/`go()` that
+   * validated and found errors), so a summary rendered inside the step can scope itself to
+   * just this step's problems. `null` before any failure, and cleared back to `null` by any
+   * step change — a successful `next()`/`go()`, or `prev()` — so it never leaks onto the step
+   * that becomes current next.
+   */
+  lastFailed: readonly string[] | null
   /** Validates the current step's fields; on success moves forward. Resolves to whether it moved. */
   next: () => Promise<boolean>
   /** Moves back without validating. */

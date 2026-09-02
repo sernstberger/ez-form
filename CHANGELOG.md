@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `FormErrorSummary`: a `role="alert"` list of the last failed validation attempt's errors
+  (GOV.UK-style), placed as a child under the form title or inside the current `WizardStep`.
+  Each item links to its field (`setFocus`, with `href="#<id>"` when the field's rendered
+  element has one); the heading receives focus on each new failed attempt. Inside a `Wizard`
+  it scopes to the current step's `fields` via a new `lastFailed` on the wizard context. While
+  mounted, `<Form>` suppresses react-hook-form's own first-invalid-field focus
+  (`shouldFocusError`) so the two don't compete. `EzFormErrorSummary` theme key (`defaultProps`,
+  `styleOverrides` for `root`, `heading`, `list`, `item`, `link`) and the
+  `formErrorSummaryClasses` export — #1.
 - `Form` `title` / `description` props with `aria-labelledby` / `aria-describedby` wiring;
   `EzForm` theme key (`root`, `title`, `description`) and `formClasses` — #51.
 - `FormSection`: `<fieldset>`/`<legend>` group with `EzFormSection` theme key

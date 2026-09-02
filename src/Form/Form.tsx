@@ -1,7 +1,9 @@
 import {
+  useCallback,
   useEffect,
   useId,
   useImperativeHandle,
+  useMemo,
   useState,
   type ElementType,
   type FormHTMLAttributes,
@@ -25,6 +27,7 @@ import Typography, { type TypographyProps } from '@mui/material/Typography'
 import type { z } from 'zod'
 import { ezResolver } from './ezResolver'
 import { useConfirm, type ConfirmOptions } from '../ConfirmDialog'
+import { ErrorSummaryContext } from './ErrorSummaryContext'
 
 /**
  * The hookform methods for this form. It is the same object `useFormContext()`
@@ -164,6 +167,15 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
             throw error
           })
       : defaultValues
+  // How many mounted <FormErrorSummary> are inside this form. hookform's own "focus the
+  // first invalid field" (shouldFocusError) would fight a summary that moves focus to its
+  // heading instead, so it is suppressed for as long as at least one is mounted.
+  const [errorSummaryCount, setErrorSummaryCount] = useState(0)
+  const registerErrorSummary = useCallback(() => {
+    setErrorSummaryCount((n) => n + 1)
+    return () => setErrorSummaryCount((n) => n - 1)
+  }, [])
+  const errorSummaryContext = useMemo(() => ({ registerErrorSummary }), [registerErrorSummary])
   const methods = useForm<TIn, unknown, TOut>({
     resolver: ezResolver(schema),
     defaultValues: wrappedDefaultValues,
@@ -171,7 +183,21 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
     resetOptions,
     mode,
     disabled: disabled || submitting || loading,
+    // Read once, at mount, like every other useForm option normally would be — kept live below.
+    shouldFocusError: errorSummaryCount === 0,
   })
+  // Ruling: hookform's `_focusError` reads `_options.shouldFocusError` fresh on every
+  // submit rather than capturing the value passed to `useForm()`, so mutating the private
+  // `control._options` in an effect (rather than only setting it once, at mount) is enough
+  // to keep it correct as summaries mount/unmount later — verified against
+  // react-hook-form's source (`_focusError = () => _options.shouldFocusError && …`).
+  // Cost if wrong: a summary mounted after the initial render would fail to suppress
+  // hookform's own first-invalid-field focus, so both it and the summary heading would
+  // compete for focus after a failed submit.
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(methods.control as any)._options.shouldFocusError = errorSummaryCount === 0
+  }, [methods.control, errorSummaryCount])
   const { isLoading, isDirty, isSubmitting } = useFormState({ control: methods.control })
   useEffect(() => {
     setLoading(isLoading)
@@ -202,51 +228,53 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
 
   return (
     <FormProvider {...methods}>
-      <FormRoot
-        noValidate
-        {...formProps}
-        className={`${formClasses.root}${className ? ` ${className}` : ''}`}
-        aria-labelledby={ariaLabelledBy ?? (title != null ? titleId : undefined)}
-        aria-describedby={ariaDescribedBy ?? (description != null ? descriptionId : undefined)}
-        onSubmit={
-          confirmOptions
-            ? async (event) => {
-                event.preventDefault()
-                // Validate first (focusing the first error like handleSubmit does) so an
-                // invalid form never asks; handleSubmit re-validates on Confirm, which is
-                // cheap and keeps hookform's isSubmitting confined to the real submit.
-                // No try/catch: a rejecting resolver here (e.g. a throwing `validate` rule)
-                // propagates like the non-confirm path's handleSubmit does. Nothing is
-                // stranded either way — `submitting` and the dialog only ever get set after
-                // this awaits successfully (`ask` itself never rejects, see useConfirm).
-                const valid = await methods.trigger(undefined, { shouldFocus: true })
-                if (!valid) return
-                if (await ask(confirmOptions)) await submit(event)
-              }
-            : submit
-        }
-      >
-        {title != null && (
-          <FormTitle
-            {...titleProps}
-            id={titleId}
-            className={`${formClasses.title}${titleProps.className ? ` ${titleProps.className}` : ''}`}
-          >
-            {title}
-          </FormTitle>
-        )}
-        {description != null && (
-          <FormDescription
-            {...descriptionProps}
-            id={descriptionId}
-            className={`${formClasses.description}${descriptionProps.className ? ` ${descriptionProps.className}` : ''}`}
-          >
-            {description}
-          </FormDescription>
-        )}
-        {children}
-        {dialog}
-      </FormRoot>
+      <ErrorSummaryContext.Provider value={errorSummaryContext}>
+        <FormRoot
+          noValidate
+          {...formProps}
+          className={`${formClasses.root}${className ? ` ${className}` : ''}`}
+          aria-labelledby={ariaLabelledBy ?? (title != null ? titleId : undefined)}
+          aria-describedby={ariaDescribedBy ?? (description != null ? descriptionId : undefined)}
+          onSubmit={
+            confirmOptions
+              ? async (event) => {
+                  event.preventDefault()
+                  // Validate first (focusing the first error like handleSubmit does) so an
+                  // invalid form never asks; handleSubmit re-validates on Confirm, which is
+                  // cheap and keeps hookform's isSubmitting confined to the real submit.
+                  // No try/catch: a rejecting resolver here (e.g. a throwing `validate` rule)
+                  // propagates like the non-confirm path's handleSubmit does. Nothing is
+                  // stranded either way — `submitting` and the dialog only ever get set after
+                  // this awaits successfully (`ask` itself never rejects, see useConfirm).
+                  const valid = await methods.trigger(undefined, { shouldFocus: true })
+                  if (!valid) return
+                  if (await ask(confirmOptions)) await submit(event)
+                }
+              : submit
+          }
+        >
+          {title != null && (
+            <FormTitle
+              {...titleProps}
+              id={titleId}
+              className={`${formClasses.title}${titleProps.className ? ` ${titleProps.className}` : ''}`}
+            >
+              {title}
+            </FormTitle>
+          )}
+          {description != null && (
+            <FormDescription
+              {...descriptionProps}
+              id={descriptionId}
+              className={`${formClasses.description}${descriptionProps.className ? ` ${descriptionProps.className}` : ''}`}
+            >
+              {description}
+            </FormDescription>
+          )}
+          {children}
+          {dialog}
+        </FormRoot>
+      </ErrorSummaryContext.Provider>
     </FormProvider>
   )
 }
