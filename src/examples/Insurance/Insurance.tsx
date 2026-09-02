@@ -19,7 +19,7 @@ import { DateField } from '../../fields/DateField'
 import { RadioGroup } from '../../fields/RadioGroup'
 import { Slider } from '../../fields/Slider'
 import { MoneyField } from '../../fields/MoneyField'
-import { Switch } from '../../fields/Switch'
+import { Checkbox } from '../../fields/Checkbox'
 import { NumberField } from '../../fields/NumberField'
 import { TextareaField } from '../../fields/TextareaField'
 import { CheckboxGroup } from '../../fields/CheckboxGroup'
@@ -307,7 +307,7 @@ export function CoverageStep() {
 export function HasVehicleStep() {
   return (
     <WizardStep id="has-vehicle">
-      <Switch name="hasVehicle" label="Do you want to insure a vehicle?" />
+      <Checkbox name="hasVehicle" label="I want to insure a vehicle" />
     </WizardStep>
   )
 }

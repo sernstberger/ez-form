@@ -15,6 +15,14 @@ export type CheckboxProps = Omit<MuiCheckboxProps, 'name' | 'checked' | 'require
   optionalText?: ReactNode | false
 } & BooleanFieldRules
 
+/**
+ * @remarks When to use
+ * Use `Checkbox` for a yes/no answer or opt-in recorded when the form is
+ * submitted — "I accept the terms", "Same as shipping", "Insure a vehicle" —
+ * or one of several independent options (`CheckboxGroup`). If the page has a
+ * Submit button, this is almost always the right control. Prefer `Switch`
+ * only for a setting that takes effect immediately, with no submit step.
+ */
 export function Checkbox({
   name,
   label,

@@ -46,7 +46,7 @@ async function skipVehicle(user: ReturnType<typeof userEvent.setup>) {
 }
 
 async function takeVehicle(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('switch', { name: /insure a vehicle/i }))
+  await user.click(screen.getByRole('checkbox', { name: /insure a vehicle/i }))
   await goNext(user)
 }
 
@@ -186,7 +186,7 @@ describe('Insurance', () => {
     await fillApplicant(user)
     await fillContact(user)
     await fillCoverage(user)
-    await user.click(screen.getByRole('switch', { name: /insure a vehicle/i }))
+    await user.click(screen.getByRole('checkbox', { name: /insure a vehicle/i }))
     await goNext(user)
     expect(screen.getByRole('group', { name: 'Vehicle' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /^Vehicle$/ })).toBeInTheDocument()
@@ -220,7 +220,7 @@ describe('Insurance', () => {
     await fillThroughReview(user)
     const review = screen.getByRole('group', { name: 'Review' })
     await user.click(within(review).getByRole('button', { name: /edit has vehicle/i }))
-    await user.click(screen.getByRole('switch', { name: /insure a vehicle/i }))
+    await user.click(screen.getByRole('checkbox', { name: /insure a vehicle/i }))
     await user.click(screen.getByRole('tab', { name: /Review/ }))
     await user.click(screen.getByRole('button', { name: /submit application/i }))
     await screen.findByRole('heading', { name: /there is a problem/i })
