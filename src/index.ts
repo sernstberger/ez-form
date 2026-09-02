@@ -70,6 +70,12 @@ export {
   useConfirm,
   type UseConfirmReturn,
 } from './ConfirmDialog'
+export {
+  FormDialog,
+  formDialogClasses,
+  type FormDialogProps,
+  type FormDialogCloseReason,
+} from './FormDialog'
 export { ClearButton, clearButtonClasses, type ClearButtonProps } from './ClearButton'
 export type {} from './theme/augmentation'
 export { useFormGuard, type FormGuardBlocker, type UseFormGuardReturn } from './useFormGuard'

@@ -53,6 +53,27 @@ export const formClasses = generateUtilityClasses('EzForm', [
 /** Typography plus `component`, so a slot can pick its element (heading level). */
 export type FormTextSlotProps = TypographyProps & { component?: ElementType }
 
+/**
+ * Whether `<Form>` will render its description element, given the props that
+ * feed it. `description` alone is not the answer: the requiredIndicator
+ * convention is stated in that same slot and is on by default in *both* modes
+ * (#4), so a form with no `description` at all still renders one.
+ *
+ * Ruling: shared with `FormDialog` rather than repeated there — the dialog's
+ * `aria-describedby` lives on the paper (the `dialog` role is there, not on the
+ * `<form>`), so it has to predict this from outside, and a copy would silently
+ * desync the next time the default copy or its modes change. The same reason
+ * `shouldBlockUnsavedChanges` is shared by the two guards (#74). Cost if wrong:
+ * the dialog points `aria-describedby` at an element that never renders, or
+ * misses one that does.
+ */
+export function willRenderFormDescription(props: {
+  description?: ReactNode
+  requiredIndicatorText?: ReactNode | false
+}): boolean {
+  return props.description != null || props.requiredIndicatorText !== false
+}
+
 const FormRoot = styled('form', { name: 'EzForm', slot: 'Root' })({})
 const FormTitle = styled(Typography, { name: 'EzForm', slot: 'Title' })({})
 const FormDescription = styled(Typography, { name: 'EzForm', slot: 'Description' })({})
@@ -209,8 +230,18 @@ function FormImpl<TIn extends FieldValues, TOut>(
   const baseId = useId()
   const titleId = `${baseId}-title`
   const descriptionId = `${baseId}-description`
-  const titleProps = { component: 'h2', variant: 'h5', ...slotProps?.title } as const
-  const descriptionProps = { component: 'p', variant: 'body2', ...slotProps?.description } as const
+  // `id` is spread-overridable (`slotProps.title.id` / `slotProps.description.id`)
+  // so a wrapper that owns the dialog or section around this form — `FormDialog`,
+  // say — can point its own `aria-labelledby` / `aria-describedby` at these
+  // elements. The wrapper is expected to pass the matching `aria-*` prop too; the
+  // fallbacks below keep the `<form>` itself wired either way.
+  const titleProps = { component: 'h2', variant: 'h5', id: titleId, ...slotProps?.title } as const
+  const descriptionProps = {
+    component: 'p',
+    variant: 'body2',
+    id: descriptionId,
+    ...slotProps?.description,
+  } as const
   // The requiredIndicator convention is stated once, in the same slot as
   // `description`: appended as a second sentence when both are set, or rendered
   // alone when `description` is unset. The default text is mode-dependent; an
@@ -422,9 +453,9 @@ function FormImpl<TIn extends FieldValues, TOut>(
           noValidate
           {...formProps}
           className={`${formClasses.root}${className ? ` ${className}` : ''}`}
-          aria-labelledby={ariaLabelledBy ?? (title != null ? titleId : undefined)}
+          aria-labelledby={ariaLabelledBy ?? (title != null ? titleProps.id : undefined)}
           aria-describedby={
-            ariaDescribedBy ?? (effectiveDescription != null ? descriptionId : undefined)
+            ariaDescribedBy ?? (effectiveDescription != null ? descriptionProps.id : undefined)
           }
           onSubmit={
             confirmOptions
@@ -456,7 +487,6 @@ function FormImpl<TIn extends FieldValues, TOut>(
           {title != null && (
             <FormTitle
               {...titleProps}
-              id={titleId}
               className={`${formClasses.title}${titleProps.className ? ` ${titleProps.className}` : ''}`}
             >
               {title}
@@ -465,7 +495,6 @@ function FormImpl<TIn extends FieldValues, TOut>(
           {effectiveDescription != null && (
             <FormDescription
               {...descriptionProps}
-              id={descriptionId}
               className={`${formClasses.description}${descriptionProps.className ? ` ${descriptionProps.className}` : ''}`}
             >
               {effectiveDescription}
