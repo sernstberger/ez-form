@@ -9,6 +9,7 @@ import type { NumberFieldControlProps } from '../fields/NumberField/NumberFieldC
 import type { FormProps } from '../Form'
 import type { FormErrorProps } from '../FormError'
 import type { FormSectionProps } from '../FormSection'
+import type { PasswordFieldProps } from '../fields/PasswordField'
 
 declare module '@mui/material/styles' {
   interface ComponentsPropsList {
@@ -23,6 +24,7 @@ declare module '@mui/material/styles' {
     EzForm: Partial<FormProps<any, any>>
     EzFormError: Partial<FormErrorProps>
     EzFormSection: Partial<FormSectionProps>
+    EzPasswordField: Partial<PasswordFieldProps>
   }
 
   interface ComponentNameToClassKey {
@@ -36,6 +38,7 @@ declare module '@mui/material/styles' {
     EzForm: 'root' | 'title' | 'description'
     EzFormError: 'root'
     EzFormSection: 'root' | 'legend' | 'description' | 'content'
+    EzPasswordField: 'root' | 'toggle'
   }
 
   interface Components<Theme = unknown> {
@@ -78,6 +81,10 @@ declare module '@mui/material/styles' {
     EzFormSection?: {
       defaultProps?: ComponentsProps['EzFormSection']
       styleOverrides?: ComponentsOverrides<Theme>['EzFormSection']
+    }
+    EzPasswordField?: {
+      defaultProps?: ComponentsProps['EzPasswordField']
+      styleOverrides?: ComponentsOverrides<Theme>['EzPasswordField']
     }
   }
 }
