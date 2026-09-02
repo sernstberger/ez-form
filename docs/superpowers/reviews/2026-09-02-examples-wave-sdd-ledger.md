@@ -7,9 +7,9 @@ Session: one controller, subagent-driven, 4–6 parallel worktrees (Steve: "4 la
 | Area | Issues |
 |---|---|
 | Form semantics | #51 Form title/description + FormSection + step sections; #33 required-by-default (optional marker); #1 FormErrorSummary; #60 FormError; #70 onDefaultValuesError ordering; #74 guard disarm; #75 ClearButton confirm gate; #81 confirm-in-wizard summary |
-| Wizard | #64 `layout="page"` + FormSection heading depth; #80 conditional steps (`when`) *(pending merge at time of writing)*; #76 story headings |
+| Wizard | #64 `layout="page"` + FormSection heading depth; #80 conditional steps (`when`); #76 story headings |
 | Fields | #58 PasswordField; #59 PasswordStrength; #69 icons prop; #61 DateField; #49 TextareaField; #63 ResendCodeButton; #13 FieldArray; #68 ReadOnlyField `value`; #72 NumberField cross-locale paste; #73 pickers reject unparsable paste; #12 24×24 targets; #67/#62 MUI icons, no inline SVG; #50 last `sx` removed |
-| Examples (#48 epic, 6/6) | #52 Login, #53 Sign-up, #54 Profile, #55 Checkout, #56 Insurance, #57 Loan; #77 story play fixes; #82 conditional fields *(pending)* |
+| Examples (#48 epic, 6/6) | #52 Login, #53 Sign-up, #54 Profile, #55 Checkout, #56 Insurance, #57 Loan; #77 story play fixes; #82 conditional fields (story + README + all four examples, incl. the zod v4 `refine` gotcha) |
 | Infra / docs | #44 guardrail script (`sx`, ripple, literal variant/size/color, inline SVG, README coverage) in CI; #46 PR template; #45 DECISIONS.md; #47 qa-breaker agent + design; #78 required-date docs; #32 timeout guidance |
 
 ## QA sweep (#47) — first run
@@ -45,6 +45,13 @@ Five breakers (form · text · choice · pickers · wizard+examples) against Sto
 - Ruling: NumberField paste normalises only unambiguous mixed-separator shapes; Base UI's `parseFloat` prefix truncation stays upstream (`it.todo`) — cost if wrong: `12abc` → 12 remains.
 - Ruling: v1 ships `en` + `es` only (Steve) — #23 scoped accordingly — cost if wrong: other locales are consumer-supplied.
 - Ruling: docs-only branches (#45, #78, #32) are self-checked instead of a review seat — cost if wrong: a doc inaccuracy until the next pass.
+- Ruling: we do not mirror MUI's per-instance `classes` prop; per-slot `className` via `slotProps` covers it — cost if wrong: a ticket when a consumer asks.
+
+## Late additions (during wrap)
+
+- #82 surfaced that zod v4 skips object-level `.refine`/`.superRefine` once a sibling has a non-continuable issue (empty enum/literal); Checkout's billing check and Sign-up's password-mismatch check were silently disabled in real use and masked by test fill order. Fixed with `{ when: () => true }` across every object-level refinement (audited: 12 call sites), documented in README.
+- Ruling: zod object-level refinements always pass `{ when: () => true }` — documented zod option, verified against `schemas.ts` — cost if wrong: a refinement runs on already-invalid data and must guard for it.
+- CI timeouts on the Insurance Review-step tests were fixed by removing work, not by raising timeouts (Steve): fake-API delay scale 0 in tests, `userEvent.setup({ delay: null })`, and seeding the wizard at the step under test from the example's own resume state (1.2 s → 0.08–0.15 s per test; example suites 40.7 s → 23.8 s).
 - Ruling: we do not mirror MUI's per-instance `classes` prop; per-slot `className` via `slotProps` covers it — cost if wrong: a ticket when a consumer asks.
 
 ## Deferred minors (from task reviews, none blocking)

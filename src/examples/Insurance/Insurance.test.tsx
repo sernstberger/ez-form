@@ -109,6 +109,7 @@ const COMPLETE_VALUES = {
   driver: { name: 'Ada Lovelace', licenseNumber: 'D1234567', licenseDate: new Date(2010, 0, 1) },
   claims: '',
   priorIncidents: [],
+  incidentDetails: '',
   documents: [],
 }
 
@@ -121,11 +122,11 @@ const COMPLETE_VALUES = {
  * strings exactly as `saveState` does, and `loadSaved`'s reviver turns them back into `Date`s
  * on the way in.
  */
-function seedReview(values: Record<string, unknown> = COMPLETE_VALUES) {
+function seedReview(values: Record<string, unknown> = COMPLETE_VALUES, step = 'review') {
   localStorage.setItem(
     STORAGE_KEY,
     JSON.stringify({
-      step: 'review',
+      step,
       visited: [
         'applicant',
         'contact',
@@ -380,6 +381,24 @@ describe('Insurance', () => {
   it('is accessible on the Applicant step', async () => {
     const { container } = render(withPickers(<Insurance />))
     await expectNoA11yViolations(container)
+  })
+
+  it('History step: incident details appear only once an incident is ticked, and are required then (#82)', async () => {
+    seedReview(COMPLETE_VALUES, 'history')
+    const user = userEvent.setup({ delay: null })
+    render(<Insurance onSuccess={vi.fn()} />)
+    expect(screen.getByRole('group', { name: 'History' })).toBeInTheDocument()
+    expect(screen.queryByLabelText(/please describe the incident/i)).not.toBeInTheDocument()
+    await user.click(screen.getAllByRole('checkbox')[0]!)
+    const details = await screen.findByLabelText(/please describe the incident/i)
+    await goNext(user)
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Describe the incident(s) before continuing',
+    )
+    expect(screen.getByRole('group', { name: 'History' })).toBeInTheDocument()
+    await user.type(details, 'Minor parking scrape, no injuries')
+    await goNext(user)
+    expect(await screen.findByRole('group', { name: 'Documents' })).toBeInTheDocument()
   })
 
   it('is accessible on the Coverage step', async () => {

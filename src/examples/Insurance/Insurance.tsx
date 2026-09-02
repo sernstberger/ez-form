@@ -98,17 +98,31 @@ export const schema = z
     // History
     claims: z.string().max(500, 'Keep claim history under 500 characters'),
     priorIncidents: z.array(z.string()),
+    incidentDetails: z.string(),
     // Documents
     documents: z.array(z.instanceof(File)),
   })
-  .superRefine((data, ctx) => {
-    if (!data.hasVehicle) return
-    const result = vehicleSchema.safeParse(data.vehicle)
-    if (result.success) return
-    for (const issue of result.error.issues) {
-      ctx.addIssue({ ...issue, path: ['vehicle', ...issue.path] })
-    }
-  })
+  .superRefine(
+    (data, ctx) => {
+      // Conditional field (#82): details are required only once an incident is ticked.
+      if (data.priorIncidents.length > 0 && data.incidentDetails.trim() === '') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['incidentDetails'],
+          message: 'Describe the incident(s) before continuing',
+        })
+      }
+      if (!data.hasVehicle) return
+      const result = vehicleSchema.safeParse(data.vehicle)
+      if (result.success) return
+      for (const issue of result.error.issues) {
+        ctx.addIssue({ ...issue, path: ['vehicle', ...issue.path] })
+      }
+    },
+    // Zod v4 skips object-level refinements once any sibling has a non-continuable issue
+    // (the empty `coverageType` enum); `when` keeps this check running. See README "Zod gotcha".
+    { when: () => true },
+  )
 
 export type Input = z.input<typeof schema>
 
@@ -127,6 +141,7 @@ export const emptyValues: Input = {
   driver: { name: '', licenseNumber: '', licenseDate: null as unknown as Date },
   claims: '',
   priorIncidents: [],
+  incidentDetails: '',
   documents: [],
 }
 
@@ -191,7 +206,7 @@ const COVERAGE_FIELDS = ['coverageType', 'deductible', 'coverageAmount'] as cons
 const HAS_VEHICLE_FIELDS = ['hasVehicle'] as const
 const VEHICLE_FIELDS = ['vehicle'] as const
 const DRIVERS_FIELDS = ['driver'] as const
-const HISTORY_FIELDS = ['claims', 'priorIncidents'] as const
+const HISTORY_FIELDS = ['claims', 'priorIncidents', 'incidentDetails'] as const
 const DOCUMENTS_FIELDS = ['documents'] as const
 
 /**
@@ -334,8 +349,18 @@ export function HistoryStep() {
           maxLength={500}
         />
         <CheckboxGroup name="priorIncidents" label="Prior incidents" options={INCIDENT_OPTIONS} />
+        <IncidentDetails />
       </Stack>
     </WizardStep>
+  )
+}
+
+/** Conditional field (#82): shown, and required, only once at least one incident is ticked. */
+function IncidentDetails() {
+  const incidents = useWatch<Input, 'priorIncidents'>({ name: 'priorIncidents' }) ?? []
+  if (incidents.length === 0) return null
+  return (
+    <TextareaField name="incidentDetails" label="Please describe the incident(s)" maxLength={500} />
   )
 }
 
@@ -385,6 +410,7 @@ export function ReviewStep({ hasVehicle }: { hasVehicle: boolean }) {
         <ReadOnlyField name="driver.licenseDate" editStep="drivers" />
         <ReadOnlyField name="claims" editStep="history" />
         <ReadOnlyField name="priorIncidents" options={INCIDENT_OPTIONS} editStep="history" />
+        <ReadOnlyField name="incidentDetails" editStep="history" />
         <ReadOnlyField name="documents" editStep="documents" />
       </Stack>
     </WizardStep>

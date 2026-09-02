@@ -2,7 +2,7 @@
 
 A ruling is a judgement call recorded during implementation: `Ruling: <what> — <why> — <cost if wrong>`. This page lists every ruling across the project's SDD ledgers and specs, newest first, grouped by source document. To append a ruling, add a `Ruling:` line to a ledger or spec under `docs/superpowers/`, then re-run this extraction.
 
-**77 rulings across 7 documents as of 2026-09-02.**
+**78 rulings across 7 documents as of 2026-09-02.**
 
 ## [Examples wave — SDD ledger](superpowers/reviews/2026-09-02-examples-wave-sdd-ledger.md)
 
@@ -27,6 +27,7 @@ A ruling is a judgement call recorded during implementation: `Ruling: <what> —
 - NumberField paste normalises only unambiguous mixed-separator shapes; Base UI's `parseFloat` prefix truncation stays upstream (`it.todo`) — cost if wrong: `12abc` → 12 remains.
 - v1 ships `en` + `es` only (Steve) — #23 scoped accordingly — cost if wrong: other locales are consumer-supplied.
 - docs-only branches (#45, #78, #32) are self-checked instead of a review seat — cost if wrong: a doc inaccuracy until the next pass.
+- zod object-level refinements always pass `{ when: () => true }` — documented zod option, verified against `schemas.ts` — cost if wrong: a refinement runs on already-invalid data and must guard for it.
 - we do not mirror MUI's per-instance `classes` prop; per-slot `className` via `slotProps` covers it — cost if wrong: a ticket when a consumer asks.
 
 ## [Form Title / Sections — design spec](specs/2026-09-02-form-title-sections-design.md)
