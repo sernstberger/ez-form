@@ -898,6 +898,51 @@ Themeable under `EzFileField` (`root`, `fileList`, `deleteIcon`, `dropZone`, `dr
 
 `TextField` never guesses a token from `name` — a wrong guess is worse than none, so only these unambiguous `type`s get a default. `PasswordField` covers `autoComplete="current-password"` / `"new-password"` on its own, above. `PhoneField` sets `type="tel"`, `inputMode="tel"` and its `autoComplete` default itself rather than relying on the `type`-derived fallback — the two agree, but the field owns them — and its `autoComplete` takes a sectioned token (`"shipping tel"`, `"work tel"`) for forms with more than one number. The remaining v8 date/time/address fields (#17–#19) will extend this table.
 
+## Assisted mode
+
+`<Form assisted>` is for a form filled out by someone other than the person it's about — an
+internal rep taking a phone order, an agent entering an applicant's details. You don't
+necessarily know who's actually typing, so the browser's own autofill (their saved name,
+address, card) should never be offered:
+
+```tsx
+<Form assisted schema={schema} defaultValues={values} onSubmit={onSubmit}>
+  <TextField name="firstName" label="First name" />
+  <PhoneField name="phone" label="Phone" />
+</Form>
+```
+
+It does two things:
+
+- Sets `autoComplete="off"` on the `<form>` element itself.
+- Tells every field to emit `autoComplete="off"` in place of its own default token — `TextField`'s
+  `type`-derived guess, `PhoneField`'s `'tel'`, `ZipField`'s `'postal-code'`, `StateSelect`'s
+  `'address-level1'`, and each part of `AddressField`. `PasswordField` is the one exception: it
+  emits `'new-password'` instead of `'off'` (below).
+
+An **explicit `autoComplete` always wins**, on the `<Form>` itself or on any individual field —
+`assisted` only replaces a field's own _default_. This matters for a field whose token has no
+`type` to derive it from — `<TextField name="firstName" autoComplete="given-name" />`, say: since
+there's no default to override, passing `assisted` on `<Form>` alone does nothing for it, and a
+plain `TextField` has no built-in way to resolve it either. The `Insurance` example's Agent story
+(`agentMode`) hits exactly this: its `given-name`/`family-name`/`street-address` fields are
+hardcoded (no `type` derives them), so its `ApplicantStep`/`ContactStep` read the form's assisted
+state and clear their own token when it's on — the pattern to follow for any field where you've
+hardcoded a token that should also disappear under `assisted`.
+
+**What browsers actually honour.** `autoComplete="off"` works for most fields, but Chromium
+ignores it for address-shaped fields (street, city, state, ZIP) and offers to fill them anyway —
+a documented, long-standing browser quirk, not a bug here. No test in this codebase has shown
+`"off"` fail for ez-form's own address fields, so that's what they emit; a future field where it
+provably doesn't work should fall back to a non-matching token (e.g. `one-time-code`) instead,
+with the reasoning recorded next to the change. Password managers also don't reliably honour
+`"off"` on a password input specifically, which is why `PasswordField` uses `autoComplete="new-password"`
+under `assisted` regardless of whether it's a sign-in or sign-up field — the one token browsers
+consistently treat as "don't fill from a saved credential".
+
+`assisted` is theme-defaultable like any other `Form` prop:
+`theme.components.EzForm.defaultProps.assisted`.
+
 ## NumberField
 
 Digits group as you type for every consumer (new in v2.1): typing `1234` shows `1,234` before any blur. Pass `format={{ useGrouping: false }}` to turn grouping off. Pasted numbers group on blur rather than on paste, because Base UI handles the paste itself.

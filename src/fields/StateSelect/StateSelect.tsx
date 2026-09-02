@@ -1,6 +1,8 @@
 import { mergeSlotProps } from '@mui/material/utils'
 import { Select, type SelectProps } from '../Select'
 import type { Option } from '../Option'
+import { resolveAutoComplete } from '../resolveAutoComplete'
+import { useAssisted } from '../../Form/AssistedContext'
 import { useEzFormContext } from '../../useEzFormContext'
 
 export type StateSelectProps = Omit<SelectProps, 'options'> & {
@@ -82,12 +84,14 @@ export const US_TERRITORIES: readonly Option[] = [
  */
 export function StateSelect({
   territories = false,
-  autoComplete = 'address-level1',
+  autoComplete: autoCompleteProp,
   slotProps,
   ...rest
 }: StateSelectProps) {
   // Ahead of Select's own guard, so the "outside <Form>" error names <StateSelect>.
   useEzFormContext('StateSelect')
+  const assisted = useAssisted()
+  const autoComplete = autoCompleteProp ?? resolveAutoComplete('address-level1', assisted)
   const options = territories ? [...US_STATES, ...US_TERRITORIES] : US_STATES
   return (
     <Select

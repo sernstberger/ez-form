@@ -114,6 +114,27 @@ describe('PasswordField', () => {
     expect(input()).toHaveAttribute('autocomplete', 'new-password')
   })
 
+  it('under <Form assisted> defaults to "new-password" instead of "off" (#65 requirement 3)', () => {
+    // Browsers do not reliably honour autoComplete="off" for password inputs, so assisted
+    // mode uses "new-password" here specifically — the one token that reliably suppresses
+    // fill-from-saved-credential, unlike every other field which gets a plain "off".
+    render(
+      <Form schema={schema} defaultValues={{ password: '' }} onSubmit={() => {}} assisted>
+        <PasswordField name="password" label="Password" />
+      </Form>,
+    )
+    expect(input()).toHaveAttribute('autocomplete', 'new-password')
+  })
+
+  it('a consumer autoComplete still wins under assisted', () => {
+    render(
+      <Form schema={schema} defaultValues={{ password: '' }} onSubmit={() => {}} assisted>
+        <PasswordField name="password" label="Password" autoComplete="current-password" />
+      </Form>,
+    )
+    expect(input()).toHaveAttribute('autocomplete', 'current-password')
+  })
+
   it('the toggle button is focusable via Tab', async () => {
     const user = userEvent.setup()
     renderForm()
