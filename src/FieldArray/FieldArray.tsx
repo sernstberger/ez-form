@@ -16,6 +16,7 @@ import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import { styled } from '@mui/material/styles'
 import { useFieldArray, useFormState, type UseFieldArrayProps } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
+import { cx } from '../cx'
 import { FormSection, type FormSectionProps } from '../FormSection'
 import { LiveRegion, type LiveRegionProps } from '../Form/LiveRegion'
 
@@ -118,8 +119,6 @@ const FieldArrayMove = styled(IconButton, { name: 'EzFieldArray', slot: 'Move' }
 // region's role/aria-live and its re-announce handling.
 const FieldArrayStatus = styled(LiveRegion, { name: 'EzFieldArray', slot: 'Status' })({})
 const FieldArrayError = styled(FormHelperText, { name: 'EzFieldArray', slot: 'Error' })({})
-
-const cx = (base: string, extra?: string) => (extra ? `${base} ${extra}` : base)
 
 /** Where focus should land once React has rendered the new row list. */
 type PendingFocus =

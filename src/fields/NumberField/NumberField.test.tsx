@@ -674,3 +674,73 @@ describe('NumberField inputMode default (#6, #7)', () => {
     expect(input()).toHaveAttribute('inputMode', 'text')
   })
 })
+
+describe('NumberField valueScale (internal; PercentField scale="fraction")', () => {
+  const halve = { toDisplay: (v: number) => v * 2, toStored: (v: number) => v / 2 }
+
+  it('displays the transformed value and stores the untransformed one', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      <Form schema={schema} defaultValues={{ age: 10 }} onSubmit={onSubmit}>
+        <NumberField name="age" label="Age" valueScale={halve} />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    expect(input()).toHaveValue('20')
+    await user.clear(input())
+    await user.type(input(), '30')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(onSubmit).toHaveBeenCalledWith({ age: 15 }, expect.anything())
+  })
+
+  it('compares min/max against the stored value while the message keeps the display number', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <NumberField name="age" label="Age" valueScale={halve} max={40} />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    // 50 displayed stores 25, which is under a naive `max: 40`; the bound is
+    // scaled to 20 so the rule fires, and the message still names 40.
+    await user.type(input(), '50')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByText('Age must be at most 40.')).toBeInTheDocument()
+  })
+
+  it("a consumer's own bound message survives the scaling", async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <NumberField
+          name="age"
+          label="Age"
+          valueScale={halve}
+          max={{ value: 40, message: 'Too high' }}
+        />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.type(input(), '50')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByText('Too high')).toBeInTheDocument()
+  })
+
+  it('a consumer onValueChange sees the stored value', async () => {
+    const user = userEvent.setup()
+    const seen: (number | null)[] = []
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <NumberField
+          name="age"
+          label="Age"
+          valueScale={halve}
+          onValueChange={(v) => seen.push(v)}
+        />
+      </Form>,
+    )
+    await user.type(input(), '8')
+    expect(seen.at(-1)).toBe(4)
+  })
+})

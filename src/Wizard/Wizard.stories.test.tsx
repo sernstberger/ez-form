@@ -1,5 +1,7 @@
-import { render } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { composeStories } from '@storybook/react-vite'
+import { wizardClasses } from './Wizard'
 import * as wizardStories from './Wizard.stories'
 import * as wizardRouterStories from './WizardRouter.stories'
 
@@ -47,5 +49,28 @@ describe('Wizard stories: heading order (#76)', () => {
   it('Vertical: renders the Form h2 and no legend heading (unaffected by design)', () => {
     const { container } = render(<Vertical />)
     expect(headingSequence(container)).toEqual(['H2'])
+  })
+})
+
+/**
+ * The router story is a *controlled* wizard whose `onStepChange` navigates instead of setting
+ * `step` directly, so the wizard only arrives on the requested step once react-router has
+ * re-rendered it. The announcement is gated on that arrival: it must never describe a step
+ * the wizard has not reached (#2 review round 1).
+ */
+describe('Wizard router story: the announcement waits for the controlled wizard to arrive', () => {
+  it('OneRoutePerStep: announces the step only once the route is showing it', async () => {
+    const user = userEvent.setup()
+    render(<OneRoutePerStep />)
+    const region = () => document.querySelector(`.${wizardClasses.status}`)
+    expect(region()).toBeEmptyDOMElement()
+
+    await user.type(screen.getByRole('textbox', { name: /Name/ }), 'Ada')
+    await user.type(screen.getByRole('textbox', { name: /Email/ }), 'ada@x.io')
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+
+    // Arrival and announcement agree: the URL is on /signup/plan and the region says so.
+    await waitFor(() => expect(screen.getByText('URL: /signup/plan')).toBeInTheDocument())
+    await waitFor(() => expect(region()).toHaveTextContent('Step 2 of 3, Plan'))
   })
 })

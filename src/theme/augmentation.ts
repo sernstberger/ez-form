@@ -2,6 +2,7 @@ import type { ComponentsOverrides, ComponentsProps } from '@mui/material/styles'
 import type { ClearButtonProps } from '../ClearButton'
 import type { SubmitButtonProps } from '../SubmitButton'
 import type { ConfirmDialogProps } from '../ConfirmDialog'
+import type { FormDialogProps } from '../FormDialog'
 import type { WizardStepperProps } from '../Wizard/WizardStepper'
 import type { WizardNavProps } from '../Wizard/WizardNav'
 import type { WizardProps } from '../Wizard/Wizard'
@@ -13,6 +14,7 @@ import type { LiveRegionProps } from '../Form/LiveRegion'
 import type { FormErrorSummaryProps } from '../Form/FormErrorSummary'
 import type { FormSectionProps } from '../FormSection'
 import type { FieldArrayProps } from '../FieldArray'
+import type { AddressFieldProps } from '../fields/AddressField'
 import type { PasswordFieldProps } from '../fields/PasswordField'
 import type { PasswordStrengthProps } from '../fields/PasswordStrength'
 import type { OtpFieldControlProps } from '../fields/OtpField/OtpFieldControl'
@@ -20,12 +22,19 @@ import type { FileFieldProps } from '../fields/FileField'
 import type { TextareaFieldProps } from '../fields/TextareaField/TextareaField'
 import type { ResendCodeButtonProps } from '../fields/OtpField/ResendCodeButton'
 import type { PhoneFieldProps } from '../fields/PhoneField'
+import type { EmailListFieldProps } from '../fields/EmailListField'
+import type { EmailFieldProps } from '../fields/EmailField'
+import type { FeinFieldProps } from '../fields/FeinField'
+import type { PercentFieldProps } from '../fields/PercentField'
+import type { SsnFieldProps } from '../fields/SsnField'
 
 declare module '@mui/material/styles' {
   interface ComponentsPropsList {
     EzClearButton: Partial<ClearButtonProps>
     EzSubmitButton: Partial<SubmitButtonProps>
     EzConfirmDialog: Partial<ConfirmDialogProps>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    EzFormDialog: Partial<FormDialogProps<any, any>>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     EzWizard: Partial<WizardProps<any>>
     EzWizardStepper: Partial<WizardStepperProps>
@@ -40,6 +49,7 @@ declare module '@mui/material/styles' {
     EzFormSection: Partial<FormSectionProps>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     EzFieldArray: Partial<FieldArrayProps<any>>
+    EzAddressField: Partial<AddressFieldProps>
     EzPasswordField: Partial<PasswordFieldProps>
     EzPasswordStrength: Partial<PasswordStrengthProps>
     EzOtpField: Partial<OtpFieldControlProps>
@@ -47,12 +57,19 @@ declare module '@mui/material/styles' {
     EzTextareaField: Partial<TextareaFieldProps>
     EzResendCodeButton: Partial<ResendCodeButtonProps>
     EzPhoneField: Partial<PhoneFieldProps>
+    EzEmailListField: Partial<EmailListFieldProps>
+    EzEmailField: Partial<EmailFieldProps>
+    EzFeinField: Partial<FeinFieldProps>
+    EzPercentField: Partial<PercentFieldProps>
+    EzSsnField: Partial<SsnFieldProps>
   }
 
   interface ComponentNameToClassKey {
     EzClearButton: 'root'
     EzSubmitButton: 'root'
     EzConfirmDialog: 'root' | 'confirm' | 'cancel'
+    EzFormDialog: 'root' | 'form' | 'title' | 'content' | 'actions' | 'cancel' | 'submit'
+    EzWizard: 'status'
     EzWizardStepper: 'root' | 'stepButton' | 'verticalStepButton'
     EzWizardNav: 'root' | 'prev' | 'next' | 'submit'
     EzReadOnlyField: 'root' | 'header' | 'label' | 'value' | 'edit'
@@ -63,12 +80,15 @@ declare module '@mui/material/styles' {
     EzFormErrorSummary: 'root' | 'heading' | 'list' | 'item' | 'link'
     EzFormSection: 'root' | 'legend' | 'description' | 'content'
     EzFieldArray: 'root' | 'row' | 'actions' | 'add' | 'remove' | 'move' | 'status' | 'error'
+    EzAddressField: 'root' | 'street' | 'street2' | 'city' | 'state' | 'zip'
     EzPasswordField: 'root' | 'toggle'
+    EzSsnField: 'root' | 'toggle'
     EzPasswordStrength: 'root' | 'bar' | 'label'
     EzOtpField: 'root' | 'helperText'
-    EzFileField: 'root' | 'fileList' | 'deleteIcon'
+    EzFileField: 'root' | 'fileList' | 'deleteIcon' | 'dropZone' | 'dragActive' | 'dropText'
     EzTextareaField: 'root' | 'counter'
     EzResendCodeButton: 'root' | 'status'
+    EzEmailListField: 'chip' | 'deleteIcon' | 'status'
   }
 
   interface Components<Theme = unknown> {
@@ -84,8 +104,13 @@ declare module '@mui/material/styles' {
       defaultProps?: ComponentsProps['EzConfirmDialog']
       styleOverrides?: ComponentsOverrides<Theme>['EzConfirmDialog']
     }
+    EzFormDialog?: {
+      defaultProps?: ComponentsProps['EzFormDialog']
+      styleOverrides?: ComponentsOverrides<Theme>['EzFormDialog']
+    }
     EzWizard?: {
       defaultProps?: ComponentsProps['EzWizard']
+      styleOverrides?: ComponentsOverrides<Theme>['EzWizard']
     }
     EzWizardStepper?: {
       defaultProps?: ComponentsProps['EzWizardStepper']
@@ -127,6 +152,10 @@ declare module '@mui/material/styles' {
       defaultProps?: ComponentsProps['EzFieldArray']
       styleOverrides?: ComponentsOverrides<Theme>['EzFieldArray']
     }
+    EzAddressField?: {
+      defaultProps?: ComponentsProps['EzAddressField']
+      styleOverrides?: ComponentsOverrides<Theme>['EzAddressField']
+    }
     EzPasswordField?: {
       defaultProps?: ComponentsProps['EzPasswordField']
       styleOverrides?: ComponentsOverrides<Theme>['EzPasswordField']
@@ -156,6 +185,32 @@ declare module '@mui/material/styles' {
     // what makes `format` / `invalidMessage` / `autoComplete` theme-settable.
     EzPhoneField?: {
       defaultProps?: ComponentsProps['EzPhoneField']
+    }
+    EzEmailListField?: {
+      defaultProps?: ComponentsProps['EzEmailListField']
+      styleOverrides?: ComponentsOverrides<Theme>['EzEmailListField']
+    }
+    // Also a plain `TextField` with no styled slot of its own, so it registers
+    // `defaultProps` only — that is what makes `invalidMessage` / `normalize` /
+    // `autoComplete` theme-settable.
+    EzEmailField?: {
+      defaultProps?: ComponentsProps['EzEmailField']
+    }
+    // Also a plain `TextField` with no styled slot of its own: `defaultProps`
+    // only, which is what makes `format` / `invalidMessage` / `autoComplete`
+    // theme-settable.
+    EzFeinField?: {
+      defaultProps?: ComponentsProps['EzFeinField']
+    }
+    // Renders a `NumberField`, whose own `EzNumberField` style keys reach it,
+    // so this registers `defaultProps` only — that is what makes `scale` and
+    // the bound/step defaults theme-settable.
+    EzPercentField?: {
+      defaultProps?: ComponentsProps['EzPercentField']
+    }
+    EzSsnField?: {
+      defaultProps?: ComponentsProps['EzSsnField']
+      styleOverrides?: ComponentsOverrides<Theme>['EzSsnField']
     }
   }
 }

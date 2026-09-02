@@ -53,6 +53,18 @@ export type AutocompleteProps<
       'name' | 'value' | 'error' | 'inputRef' | 'required' | 'label' | 'helperText' | 'slotProps'
     >
     /**
+     * Extra props for the `<input>` itself, merged over the ones MUI's
+     * `getInputProps()` supplies. `textFieldProps` cannot reach here — it lands
+     * on the TextField root, and the input's props are rebuilt by Autocomplete
+     * on every render — so a field built on top of this one (`EmailListField`
+     * intercepting comma, semicolon and paste) needs its own way in. Merged with
+     * `mergeSlotProps` as the *external* side: a plain prop here wins over MUI's,
+     * and a handler here runs before the input's own rather than replacing it.
+     * Autocomplete's key handling lives on the root, though, so this cannot
+     * override the keys it owns (Enter, Backspace, the arrows).
+     */
+    inputProps?: NonNullable<MuiTextFieldProps['slotProps']>['htmlInput']
+    /**
      * Overrides `Form`'s `optionalText` for this field when the form's
      * `requiredIndicator` is `"optional"`; `false` hides it on this field.
      */
@@ -82,6 +94,7 @@ export function Autocomplete<
   getOptionValue = (o) => o.value as TValue,
   onChange,
   textFieldProps,
+  inputProps,
   multiple,
   freeSolo,
   isOptionEqualToValue,
@@ -176,6 +189,13 @@ export function Autocomplete<
             ...params.slotProps,
             formHelperText: { role: f.helperTextA11y.role },
             inputLabel: mergeSlotProps(params.slotProps?.inputLabel, { required: f.labelRequired }),
+            // `inputProps` first: `mergeSlotProps` lets the *external* value win
+            // for plain props (so a caller's `autoComplete` beats the `'off'`
+            // Autocomplete sets) and composes handlers external-first. Note that
+            // "first" only orders the input's own handlers: MUI's Autocomplete
+            // binds its keydown on the *root*, which runs afterwards regardless,
+            // so a caller cannot suppress Enter/Backspace by preventing default.
+            htmlInput: mergeSlotProps(inputProps, params.slotProps?.htmlInput),
           }}
         />
       )}

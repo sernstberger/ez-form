@@ -264,6 +264,49 @@ describe('Autocomplete', () => {
     })
   })
 
+  describe('inputProps', () => {
+    it('reaches the <input> itself, where textFieldProps cannot', () => {
+      render(
+        <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+          <Autocomplete
+            name="role"
+            label="Role"
+            options={roles}
+            inputProps={{ autoComplete: 'email', 'data-probe': 'yes' }}
+          />
+        </Form>,
+      )
+      // MUI's own `getInputProps()` sets autoComplete="off"; the caller's wins.
+      expect(combobox()).toHaveAttribute('autocomplete', 'email')
+      expect(combobox()).toHaveAttribute('data-probe', 'yes')
+    })
+
+    it("composes handlers with Autocomplete's own rather than replacing them", async () => {
+      const user = userEvent.setup()
+      const onKeyDown = vi.fn()
+      render(
+        <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+          <Autocomplete name="role" label="Role" options={roles} inputProps={{ onKeyDown }} />
+        </Form>,
+      )
+      // The caller's handler runs...
+      await user.type(combobox(), '{ArrowDown}')
+      expect(onKeyDown).toHaveBeenCalled()
+      // ...and MUI's still opens the listbox and highlights the first option.
+      expect(await screen.findByRole('option', { name: 'Admin' })).toBeInTheDocument()
+    })
+
+    it('is inert when undefined', () => {
+      render(
+        <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+          <Autocomplete name="role" label="Role" options={roles} />
+        </Form>,
+      )
+      // Falls back to exactly what Autocomplete sets for itself.
+      expect(combobox()).toHaveAttribute('autocomplete', 'off')
+    })
+  })
+
   describe('requiredIndicator', () => {
     it('"optional": required stays required with no asterisk', () => {
       const { container } = render(

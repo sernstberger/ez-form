@@ -5,13 +5,15 @@ import { z } from 'zod'
 import { Form } from '../../Form'
 import { FormError } from '../../FormError'
 import { SubmitButton } from '../../SubmitButton'
-import { TextField } from '../../fields/TextField'
+import { EmailField } from '../../fields/EmailField'
 import { PasswordField } from '../../fields/PasswordField'
 import { Checkbox } from '../../fields/Checkbox'
 import { loginApi, type LoginResult } from '../fakeApi'
 
 const schema = z.object({
-  email: z.email({ error: (iss) => (iss.input === '' ? 'Email is required' : 'Invalid email') }),
+  // Plain `z.string()`: <EmailField> owns the format rule (HTML's own e-mail
+  // grammar), so a `.email()` here would be a second, differently-worded copy of it.
+  email: z.string().min(1, 'Email is required'),
   password: z.string().min(1, 'Password is required'),
   rememberMe: z.boolean(),
 })
@@ -52,7 +54,7 @@ export function Login({ onSuccess }: LoginProps) {
         >
           <Stack spacing={2}>
             <FormError />
-            <TextField name="email" label="Email" autoComplete="email" required />
+            <EmailField name="email" label="Email" required />
             <PasswordField
               name="password"
               label="Password"

@@ -25,13 +25,44 @@ async function fillApplicant(user: ReturnType<typeof userEvent.setup>, firstName
   await goNext(user)
 }
 
+/**
+ * Picks a state from `StateSelect`'s menu the way a person does. Kept separate from
+ * `fillContact` because it is by far the most expensive interaction in this file:
+ * the menu renders all 51 options, so a click-through costs roughly as much as a
+ * whole other step. `fillContact` uses `selectState` below instead, and the one test
+ * that cares about the menu itself calls this.
+ */
+async function pickStateFromMenu(
+  user: ReturnType<typeof userEvent.setup>,
+  label: string,
+  within_: HTMLElement,
+) {
+  await user.click(within(within_).getByRole('combobox', { name: /^state/i }))
+  await user.click(await screen.findByRole('option', { name: label }))
+}
+
+/**
+ * Sets `StateSelect`'s value through the hidden native `<input>` MUI's `Select`
+ * renders (the same element `StateSelect.test.tsx` reads for its autofill assertions)
+ * rather than opening the 51-option menu. `fireEvent.change` on it is what MUI's own
+ * `Select` dispatches when an option is chosen, so react-hook-form sees exactly the
+ * same change — this skips the menu rendering, not the binding under test, which
+ * `selects a state from the full 50-state menu` below still covers for real.
+ */
+function selectState(abbreviation: string) {
+  fireEvent.change(hiddenInput('address.state'), { target: { value: abbreviation } })
+}
+
 async function fillContact(user: ReturnType<typeof userEvent.setup>) {
   setValue(screen.getByLabelText(/^email/i), 'ada@example.com')
-  setValue(screen.getByLabelText(/^phone/i), '555-555-5555')
+  // Typed as a person would, not `setValue`d: `PhoneField` builds its stored digits from
+  // the keystrokes, and the dedicated phone test below covers the formatting this produces.
+  await user.type(screen.getByLabelText(/^phone/i), '5555555555')
   const address = screen.getByRole('group', { name: 'Address' })
   setValue(within(address).getByLabelText(/street address/i), '1 Analytical Way')
-  setValue(within(address).getByLabelText(/^city/i), 'London')
-  setValue(within(address).getByLabelText(/zip code/i), 'SW1A1AA')
+  setValue(within(address).getByLabelText(/^city/i), 'Cambridge')
+  selectState('MA')
+  setValue(within(address).getByLabelText(/zip code/i), '02139')
   await goNext(user)
 }
 
@@ -100,8 +131,9 @@ const COMPLETE_VALUES = {
   lastName: 'Lovelace',
   birthday: new Date(1985, 0, 1),
   email: 'ada@example.com',
-  phone: '555-555-5555',
-  address: { street: '1 Analytical Way', city: 'London', zip: 'SW1A1AA' },
+  // Digits only — what `PhoneField` stores and what `saveState` would have written.
+  phone: '5555555555',
+  address: { street: '1 Analytical Way', city: 'Cambridge', state: 'MA', zip: '02139' },
   coverageType: 'liability',
   deductible: 500,
   coverageAmount: 10000,
@@ -115,47 +147,57 @@ const COMPLETE_VALUES = {
 }
 
 /**
- * What `fillThroughReview()` (no vehicle) produces: the same values with `hasVehicle` off and
- * the vehicle sub-object left at its empty default, so ticking "insure a vehicle" afterwards
- * reveals a Vehicle step whose required fields are genuinely blank.
+ * `COMPLETE_VALUES` with the Vehicle step's own fields back at their empty defaults (see
+ * `Insurance.tsx`'s `defaultValues`) — the values a session has when it filled everything
+ * else but never visited Vehicle. `hasVehicle` is the caller's to set: false for a session
+ * that answered No, true for the one that flipped it on from Review without filling the step.
  */
-const WITHOUT_VEHICLE_VALUES = {
+const NO_VEHICLE_VALUES = {
   ...COMPLETE_VALUES,
   hasVehicle: false,
   vehicle: { make: '', model: '', year: null, plate: '' },
 }
 
+/** Every step id, in order — what a session that walked the whole wizard leaves in `visited`. */
+const ALL_VISITED = [
+  'applicant',
+  'contact',
+  'coverage',
+  'has-vehicle',
+  'vehicle',
+  'drivers',
+  'history',
+  'documents',
+  'review',
+]
+
 /**
  * Writes the example's own localStorage resume payload (see `saveState`/`loadSaved` in
- * `Insurance.tsx`) so the wizard mounts directly on Review with values restored, instead of
- * driving all eight prior steps through `userEvent` first. `visited` lists every step id so
+ * `Insurance.tsx`) so the wizard mounts directly on `step` with values restored, instead of
+ * driving the prior steps through `userEvent` first. `visited` defaults to every step id so
  * every Review row's Edit link resolves to a real, reachable step (mirrors what a genuine
- * walk-through would have left behind). `JSON.stringify` serializes the `Date` fields as ISO
- * strings exactly as `saveState` does, and `loadSaved`'s reviver turns them back into `Date`s
- * on the way in.
+ * walk-through would have left behind); pass a shorter list to reproduce a session that never
+ * reached one — the failed-submit case below leaves "vehicle" out for exactly that reason.
+ * `JSON.stringify` serializes the `Date` fields as ISO strings exactly as `saveState` does,
+ * and `loadSaved`'s reviver turns them back into `Date`s on the way in.
  */
-function seedReview(values: Record<string, unknown> = COMPLETE_VALUES, step = 'review') {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      step,
-      visited: [
-        'applicant',
-        'contact',
-        'coverage',
-        'has-vehicle',
-        'vehicle',
-        'drivers',
-        'history',
-        'documents',
-        'review',
-      ],
-      values,
-    }),
-  )
+function seedReview(
+  values: Record<string, unknown> = COMPLETE_VALUES,
+  step = 'review',
+  visited: readonly string[] = ALL_VISITED,
+) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ step, visited, values }))
 }
 
+// Cleared on both sides: the example autosaves from an effect, so a test that fails or
+// times out part-way through can still have a pending write land after its own teardown.
+// Without the `afterEach`, that leftover state resumes the *next* test onto the wrong
+// step, turning one slow test into a confusing cascade of unrelated failures.
 beforeEach(() => {
+  localStorage.clear()
+})
+
+afterEach(() => {
   localStorage.clear()
 })
 
@@ -180,9 +222,14 @@ describe('Insurance', () => {
 
   it('skips the Vehicle step when "has vehicle?" is No (the default)', async () => {
     const user = userEvent.setup({ delay: null })
-    // Resume on the has-vehicle step: pressing Next with the box unticked is the branch this
-    // test is about, not the three steps of typing that precede it.
-    seedReview(WITHOUT_VEHICLE_VALUES, 'has-vehicle')
+    // Seeded onto has-vehicle: what this asserts is where Next goes from that step, so the
+    // three steps of typing that precede it are incidental cost.
+    seedReview(NO_VEHICLE_VALUES, 'has-vehicle', [
+      'applicant',
+      'contact',
+      'coverage',
+      'has-vehicle',
+    ])
     render(withPickers(<Insurance />))
     // On the has-vehicle step, still unchecked (default false).
     expect(screen.getByRole('group', { name: 'Vehicle?' })).toBeInTheDocument()
@@ -194,14 +241,59 @@ describe('Insurance', () => {
 
   it('shows the Vehicle step when "has vehicle?" is Yes', async () => {
     const user = userEvent.setup({ delay: null })
-    // Resume on the has-vehicle step: ticking the box and pressing Next is the branch this
-    // test is about, not the three steps of typing that precede it.
-    seedReview(WITHOUT_VEHICLE_VALUES, 'has-vehicle')
+    // Seeded onto has-vehicle for the same reason as the case above: ticking the box and
+    // pressing Next is the branch under test, not the typing that gets there.
+    seedReview(NO_VEHICLE_VALUES, 'has-vehicle', [
+      'applicant',
+      'contact',
+      'coverage',
+      'has-vehicle',
+    ])
     render(withPickers(<Insurance />))
     await user.click(screen.getByRole('checkbox', { name: /insure a vehicle/i }))
     await goNext(user)
     expect(screen.getByRole('group', { name: 'Vehicle' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /^Vehicle$/ })).toBeInTheDocument()
+  })
+
+  it('Contact step: selects a state from the full 50-state menu', async () => {
+    // The one place the `StateSelect` menu is driven for real; `fillContact`'s
+    // `selectState` shortcut stands on this.
+    seedReview(
+      { ...COMPLETE_VALUES, address: { ...COMPLETE_VALUES.address, state: '' } },
+      'contact',
+    )
+    const user = userEvent.setup({ delay: null })
+    render(withPickers(<Insurance />))
+    const address = screen.getByRole('group', { name: 'Address' })
+    await pickStateFromMenu(user, 'Massachusetts', address)
+    expect(within(address).getByRole('combobox', { name: /^state/i })).toHaveTextContent(
+      'Massachusetts',
+    )
+    expect(hiddenInput('address.state')).toHaveValue('MA')
+  })
+
+  it('Contact step: phone formats as you type and blocks Next on a partial number, with no pattern rule', async () => {
+    // The point of the US fields: the format lives in `PhoneField`, so the example
+    // carries no `pattern={{ value: /^\d{3}-\d{3}-\d{4}$/ }}` and the schema no regex.
+    // Seeded with the phone already empty rather than seeding a valid number and
+    // clearing it, so the test starts from the state it actually means to exercise.
+    seedReview({ ...COMPLETE_VALUES, phone: '' }, 'contact')
+    const user = userEvent.setup({ delay: null })
+    render(withPickers(<Insurance />))
+    const phone = screen.getByLabelText(/^phone/i)
+    expect(phone).toHaveValue('')
+    await user.type(phone, '5551234')
+    // Separators are inserted by the field, not typed by the user.
+    expect(phone).toHaveValue('555-123-4')
+    await goNext(user)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Enter a 10-digit phone number')
+    expect(screen.getByRole('group', { name: 'Contact' })).toBeInTheDocument()
+
+    await user.type(phone, '567')
+    expect(phone).toHaveValue('555-123-4567')
+    await goNext(user)
+    expect(await screen.findByRole('group', { name: 'Coverage' })).toBeInTheDocument()
   })
 
   it('lists every value on the Review step, with a working Edit link back to its step', async () => {
@@ -213,27 +305,58 @@ describe('Insurance', () => {
     expect(within(review).getByText('Lovelace')).toBeInTheDocument()
     expect(within(review).getByText('ada@example.com')).toBeInTheDocument()
     expect(within(review).getByText('Toyota')).toBeInTheDocument()
+    // The address's state row resolves 'MA' to its full name through `US_STATES`.
+    expect(within(review).getByText('Massachusetts')).toBeInTheDocument()
+    expect(within(review).getByText('02139')).toBeInTheDocument()
+    // Phone is stored as bare digits but reviews formatted, not as '5555555555'.
+    expect(within(review).getByText('555-555-5555')).toBeInTheDocument()
+    expect(within(review).queryByText('5555555555')).not.toBeInTheDocument()
 
     await user.click(within(review).getByRole('button', { name: /edit first name/i }))
     expect(screen.getByRole('group', { name: 'Applicant' })).toBeInTheDocument()
     expect(screen.getByLabelText(/first name/i)).toHaveValue('Ada')
   })
 
-  it('shows the error summary listing step-owned fields on a failed final submit', async () => {
+  it('Review\'s Edit link navigates back without validating, and flipping "has vehicle?" on reveals the Vehicle step', async () => {
+    // The cause of the failed-submit case below: from Review, the Edit link jumps back to
+    // the has-vehicle step (backward nav skips validation, so it goes even though the
+    // form is mid-flow), and ticking the box makes the conditional Vehicle step appear in
+    // the stepper without it ever having been visited or filled. Seeded onto Review with
+    // "has vehicle?" No, exactly as a completed no-vehicle session would leave it.
+    seedReview({ ...COMPLETE_VALUES, hasVehicle: false })
     const user = userEvent.setup({ delay: null })
-    // Resume on Review with "has vehicle?" still No, then flip it on via the Edit link
-    // (backward nav skips validation) without ever visiting/filling the newly-shown Vehicle
-    // step: the whole schema is only checked on final submit, so this is the realistic way an
-    // otherwise-valid wizard reaches Review with an invalid field (see Wizard's own
-    // `fields`-ownership doc: a field listed in no *visited* step is caught at submit). Since
-    // the resulting submit is invalid, <Form confirm> never asks — the error summary appears
-    // directly, with no confirm dialog in between.
-    seedReview(WITHOUT_VEHICLE_VALUES)
     render(withPickers(<Insurance />))
     const review = screen.getByRole('group', { name: 'Review' })
+    // Vehicle is hidden while hasVehicle is false.
+    expect(screen.queryByRole('tab', { name: /^Vehicle$/ })).not.toBeInTheDocument()
+
     await user.click(within(review).getByRole('button', { name: /edit has vehicle/i }))
+    expect(screen.getByRole('group', { name: 'Vehicle?' })).toBeInTheDocument()
+
     await user.click(screen.getByRole('checkbox', { name: /insure a vehicle/i }))
-    await user.click(screen.getByRole('tab', { name: /Review/ }))
+    // The step is revealed by the flip alone — no Next, nothing filled.
+    expect(await screen.findByRole('tab', { name: /^Vehicle$/ })).toBeInTheDocument()
+  })
+
+  it('shows the error summary listing step-owned fields on a failed final submit', async () => {
+    // The state a session reaches by filling everything with "has vehicle?" No, then
+    // flipping it on from Review's Edit link (backward nav skips validation) without ever
+    // visiting the newly-shown Vehicle step: `hasVehicle` is true, `vehicle` is still
+    // empty, and `visited` never names "vehicle". The whole schema is only checked on
+    // final submit, so this is the realistic way an otherwise-valid wizard reaches Review
+    // with an invalid field (see Wizard's own `fields`-ownership doc: a field listed in no
+    // *visited* step is caught at submit). Seeded rather than walked — the eight-step
+    // `fillThroughReview` walk cost ~5 s here and left this test on the edge of the
+    // timeout, and a timeout mid-walk leaves resume state behind for the next test.
+    seedReview(
+      { ...NO_VEHICLE_VALUES, hasVehicle: true },
+      'review',
+      ALL_VISITED.filter((id) => id !== 'vehicle'),
+    )
+    const user = userEvent.setup({ delay: null })
+    render(withPickers(<Insurance />))
+    // Since the submit is invalid, <Form confirm> never asks — the error summary appears
+    // directly, with no confirm dialog in between.
     await user.click(screen.getByRole('button', { name: /submit application/i }))
     await screen.findByRole('heading', { name: /there is a problem/i })
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
@@ -261,9 +384,13 @@ describe('Insurance', () => {
 
   it('does not persist uploaded documents: resuming after an upload still submits cleanly with Documents empty', async () => {
     const user = userEvent.setup({ delay: null })
-    // Resume straight onto Documents with every earlier step already filled: the walk itself
-    // is not what this test is about — the upload/remount round-trip is.
-    seedReview(WITHOUT_VEHICLE_VALUES, 'documents')
+    // Seeded onto Documents rather than walked: what this asserts is the upload/remount
+    // round-trip, so the six steps of typing that precede it are incidental cost.
+    seedReview(
+      NO_VEHICLE_VALUES,
+      'documents',
+      ALL_VISITED.filter((id) => id !== 'vehicle' && id !== 'review'),
+    )
     const { unmount } = render(withPickers(<Insurance />))
     // On Documents: upload a file, then let the autosave effect run before remounting.
     const file = new File(['%PDF'], 'policy.pdf', { type: 'application/pdf' })
@@ -327,8 +454,12 @@ describe('Insurance', () => {
   })
 
   it('submits and reports a server error for a declined application', async () => {
-    const user = userEvent.setup({ delay: null })
+    // Seeded, not walked: what this asserts is how a *rejected* API response surfaces, so
+    // the eight-step walk is incidental to it — and the walk is what put this test on the
+    // edge of the timeout. `submits successfully` below still walks the whole wizard by
+    // hand, so the "a real walk produces submittable values" path stays covered once.
     seedReview({ ...COMPLETE_VALUES, firstName: APPLICATION_DECLINED_FOR })
+    const user = userEvent.setup({ delay: null })
     render(withPickers(<Insurance />))
     await user.click(screen.getByRole('button', { name: /submit application/i }))
     const dialog = await screen.findByRole('alertdialog', { name: /submit application\?/i })
@@ -340,9 +471,9 @@ describe('Insurance', () => {
   it('submits successfully and clears saved resume state', async () => {
     const user = userEvent.setup({ delay: null })
     const onSuccess = vi.fn()
-    seedReview()
     render(withPickers(<Insurance onSuccess={onSuccess} />))
-    expect(localStorage.getItem(STORAGE_KEY)).toBeTruthy()
+    await fillThroughReview(user)
+    await waitFor(() => expect(localStorage.getItem(STORAGE_KEY)).toBeTruthy())
     await user.click(screen.getByRole('button', { name: /submit application/i }))
     const dialog = await screen.findByRole('alertdialog', { name: /submit application\?/i })
     await user.click(within(dialog).getByRole('button', { name: /^confirm$/i }))
@@ -385,6 +516,34 @@ describe('Insurance', () => {
       expect((await screen.findAllByText(/first name is required/i)).length).toBeGreaterThan(0)
       expect((await screen.findAllByText(/is required/i)).length).toBeGreaterThan(1)
     })
+
+    // #65: these fields' tokens (given-name, family-name, street-address, …) are hardcoded in
+    // ApplicantStep/ContactStep rather than type-derived, so they would otherwise be an
+    // "explicit autoComplete wins" loophole — a rep filling this out for someone else would
+    // still get autofill offers for their own name/address. ApplicantStep/ContactStep resolve
+    // these against the form's assisted flag themselves; this asserts that actually happens.
+    it('suppresses the hardcoded name/contact/address autoComplete tokens too', () => {
+      render(withPickers(<Insurance agentMode />))
+      // agent mode renders every step (including Review's ReadOnlyFields, which repeat these
+      // labels) as one page, so each real control is scoped to its own FormSection group
+      // rather than queried by label text alone.
+      const applicant = within(screen.getByRole('group', { name: 'Applicant' }))
+      expect(applicant.getByLabelText(/first name/i)).toHaveAttribute('autoComplete', 'off')
+      expect(applicant.getByLabelText(/last name/i)).toHaveAttribute('autoComplete', 'off')
+      const contact = within(screen.getByRole('group', { name: 'Contact' }))
+      expect(contact.getByLabelText(/^email/i)).toHaveAttribute('autoComplete', 'off')
+      expect(contact.getByLabelText(/^phone/i)).toHaveAttribute('autoComplete', 'off')
+      const address = within(screen.getByRole('group', { name: 'Address' }))
+      expect(address.getByLabelText(/street address/i)).toHaveAttribute('autoComplete', 'off')
+      expect(address.getByLabelText(/^city/i)).toHaveAttribute('autoComplete', 'off')
+      expect(address.getByLabelText(/zip code/i)).toHaveAttribute('autoComplete', 'off')
+    })
+
+    it('leaves the hardcoded tokens alone outside agent mode', () => {
+      render(withPickers(<Insurance />))
+      expect(screen.getByLabelText(/first name/i)).toHaveAttribute('autoComplete', 'given-name')
+      expect(screen.getByLabelText(/last name/i)).toHaveAttribute('autoComplete', 'family-name')
+    })
   })
 
   it('is accessible on the Applicant step', async () => {
@@ -411,7 +570,7 @@ describe('Insurance', () => {
   })
 
   it('is accessible on the Coverage step', async () => {
-    seedReview(WITHOUT_VEHICLE_VALUES, 'coverage')
+    seedReview(COMPLETE_VALUES, 'coverage')
     const { container } = render(withPickers(<Insurance />))
     expect(screen.getByRole('group', { name: 'Coverage' })).toBeInTheDocument()
     await expectNoA11yViolations(container)

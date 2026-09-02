@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../../Form'
-import { MoneyField } from './MoneyField'
+import { MoneyField, type MoneyFieldProps } from './MoneyField'
 import { describeFieldContract } from '../../test/describeFieldContract'
 
 const schema = z.object({ price: z.number().nullable() })
@@ -140,5 +140,14 @@ describe('MoneyField inputMode default (#6, #7)', () => {
       </Form>,
     )
     expect(input()).toHaveAttribute('inputMode', 'text')
+  })
+})
+
+describe('MoneyField type-level', () => {
+  it("rejects NumberField's internal valueScale prop", () => {
+    const identity = { toDisplay: (v: number) => v, toStored: (v: number) => v }
+    // @ts-expect-error valueScale is NumberField-internal; money is always stored in the units it displays
+    const props: MoneyFieldProps = { name: 'price', valueScale: identity }
+    expect(props).toBeDefined()
   })
 })

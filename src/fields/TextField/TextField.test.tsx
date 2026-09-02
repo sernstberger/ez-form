@@ -278,6 +278,39 @@ describe('TextField autoComplete/inputMode defaults (#6, #7)', () => {
   })
 })
 
+describe('TextField under <Form assisted> (#65)', () => {
+  it('emits autoComplete="off" instead of the type-derived default', () => {
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={vi.fn()} assisted>
+        <TextField name="email" label="Email" type="email" />
+      </Form>,
+    )
+    expect(screen.getByLabelText('Email')).toHaveAttribute('autoComplete', 'off')
+  })
+
+  it('a consumer autoComplete still wins under assisted', () => {
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={vi.fn()} assisted>
+        <TextField name="email" label="Email" type="email" autoComplete="username" />
+      </Form>,
+    )
+    expect(screen.getByLabelText('Email')).toHaveAttribute('autoComplete', 'username')
+  })
+
+  it('a plain type="text" field (no type-derived default) still gets autoComplete="off" under assisted', () => {
+    // Chromium's own autofill heuristics key off `name`/`id`, not just `autoComplete` —
+    // suppressing only the fields that already had a default token would leave that gap
+    // open. Assisted mode sets `off` on every field with no explicit `autoComplete`,
+    // regardless of whether it had a type-derived default to replace.
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={vi.fn()} assisted>
+        <TextField name="email" label="Email" type="text" />
+      </Form>,
+    )
+    expect(screen.getByLabelText('Email')).toHaveAttribute('autoComplete', 'off')
+  })
+})
+
 describe('TextField displayValue', () => {
   it('renders the bound value when displayValue is not set', async () => {
     const user = userEvent.setup()
