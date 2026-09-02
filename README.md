@@ -596,6 +596,18 @@ Use `z.date().nullable()` in the schema and `required` on the field — the same
 
 `disableFuture`, `minDate`, and other picker validations compose with `required` — compose them freely.
 
+One ordering to know: paste something unparsable (`March 2, 2024`, say) into a **required** picker that is still empty and the message is `Birthday is required.`, not `Birthday is invalid.` MUI X parses an unrecognisable string to `null`, so the field really is empty, and `ezResolver` runs `required` before the picker's own code. Submit is blocked either way, and the message becomes `Birthday is invalid.` as soon as the field is not required or already holds a date. Nothing to configure — just don't be surprised by which of the two you see.
+
+### Clearing a picker
+
+MUI X's own `clearable` works as it does outside a form; pass it (and any `onClear` of your own) through `slotProps.textField`, for `DateField` as well as the popup pickers:
+
+```tsx
+<DatePicker name="start" label="Start" slotProps={{ textField: { clearable: true } }} />
+```
+
+Clearing resets the picker's validation state along with the value, so an `invalidDate` left over from an unparsable paste goes away with it. Note that MUI X only renders the clear button while the field shows something — after an unparsable paste it blanks every section, so the button is hidden until the user types into one.
+
 ## Autocomplete
 
 Address lookup (Places-style): the options list is fed by an async lookup, and the free-typed text is kept even if it doesn't match a suggestion.

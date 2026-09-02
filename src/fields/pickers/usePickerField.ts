@@ -1,4 +1,10 @@
-import { useRef, type ClipboardEvent, type FocusEvent, type ReactNode } from 'react'
+import {
+  useRef,
+  type ClipboardEvent,
+  type FocusEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react'
 import { mergeSlotProps } from '@mui/material/utils'
 import type { PickerChangeHandlerContext } from '@mui/x-date-pickers/models'
 import type { FieldValues, Validate } from 'react-hook-form'
@@ -44,6 +50,12 @@ interface PickerHandlers<
 > {
   onChange?: (value: TValue, context: TContext) => void
   onError?: (error: TError, value: TValue) => void
+  /**
+   * A consumer's clear handler passed as a *flat* prop, which is how MUI X types it on
+   * `DateField` (the field is the text field there). The popup pickers have no flat
+   * `onClear`; theirs arrives under `slotProps.field` and is picked up below.
+   */
+  onClear?: (event: MouseEvent) => void
   slotProps?: TSlotProps
 }
 
@@ -58,6 +70,7 @@ interface ConsumerTextFieldSlotProps {
     inputLabel?: { required?: boolean }
   }
   onPaste?: (event: ClipboardEvent<HTMLDivElement>) => void
+  onClear?: (event: MouseEvent) => void
 }
 
 const toRecord = <TValue>(
@@ -102,6 +115,7 @@ export function usePickerField<
     optionalText,
     onChange,
     onError,
+    onClear,
     slotProps,
   }: PickerFieldProps<TValue, TError> & PickerHandlers<TValue, TError, TSlotProps, TContext>,
 ) {
@@ -193,6 +207,25 @@ export function usePickerField<
   })
   const text = f.helperText(helperText)
   const consumerTextField = slotProps?.textField as ConsumerTextFieldSlotProps | undefined
+  /**
+   * A consumer's own clear handler, from wherever MUI X types it for the component in
+   * hand: a flat `onClear` on `DateField` (which *is* the text field), or
+   * `slotProps.field.onClear` on the popup pickers — `BaseSingleInputPickersTextFieldProps`
+   * explicitly `Omit`s `clearable`/`onClear` from `slotProps.textField`, so the field slot
+   * is their only typed home there. `slotProps.textField.onClear` is read last as the
+   * untyped-but-working fallback.
+   *
+   * All three have to be collected here because the `onClear` returned below sits under
+   * `textField`, and MUI X's `useFieldTextFieldProps` resolves `slotProps.textField`
+   * *after* both the flat props and the field slot's — so ez-form's handler would
+   * otherwise silently replace a consumer's rather than compose with it, the same trap
+   * this hook's `helperText`/`error`/`onBlur` merging already avoids.
+   */
+  const consumerOnClear =
+    onClear ??
+    (slotProps as { field?: { onClear?: (event: MouseEvent) => void } } | undefined)?.field
+      ?.onClear ??
+    consumerTextField?.onClear
 
   return {
     name: f.field.name,
@@ -242,6 +275,29 @@ export function usePickerField<
         onPaste: (event: ClipboardEvent<HTMLDivElement>) => {
           handlePaste(event)
           consumerTextField?.onPaste?.(event)
+        },
+        // #83: the clear button, when a consumer opts into `clearable`. MUI X's
+        // `useField.js` `handleClear` runs `onClear?.(event)` and *then*
+        // `clearValue()`, which only fires `onChange` when the value actually
+        // changes. After an unparsable paste the stored value is already `null`
+        // (the string never parsed) while `pickerError` is holding `invalidDate`
+        // from `handlePaste` above — so clearing produces no `onChange`, nothing
+        // resets the ref, and the field stays stuck showing "… is invalid." with
+        // `aria-invalid="true"` and no way back. Reset the ref here and re-run the
+        // field's own error derivation via `field.onChange` so the error clears.
+        //
+        // Also drops any *other* pending picker error (`minDate`, …) — correct
+        // either way: an empty field cannot be out of range, and the `required`
+        // rule is what should speak for an emptied required field, not a stale
+        // range code. Ordered "form's handler first" like onBlur/onPaste above.
+        onClear: (event: MouseEvent) => {
+          pendingPasteText.current = null
+          pickerError.current = null
+          // `TValue` is not constrained to include `null` at the signature, but every
+          // instantiation is `PickerValidDate | null` (all four pickers), and an empty
+          // picker is exactly the `null` the `value` above already normalises to.
+          f.field.onChange(null as TValue)
+          consumerOnClear?.(event)
         },
         slotProps: {
           ...consumerTextField?.slotProps,
