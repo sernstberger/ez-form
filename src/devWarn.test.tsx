@@ -17,6 +17,7 @@ import { PasswordField } from './fields/PasswordField'
 import { TextareaField } from './fields/TextareaField'
 import type { MockInstance } from 'vitest'
 import { resetDevWarnings } from './devWarn'
+import { expectConsole } from './test/expectConsole'
 
 /**
  * `devWarn` deduplicates by key for the life of the module, so every test starts by
@@ -192,6 +193,10 @@ describe('dev warning: duplicate option values', () => {
     ],
     ['Autocomplete', (o: typeof dupes) => <Autocomplete name="role" label="Role" options={o} />],
   ])('%s warns once, naming the field and the duplicated value', (name, renderField) => {
+    // These options collide on purpose, which is exactly the situation React's duplicate-key
+    // error describes: the fields that map options to keyed children (RadioGroup,
+    // CheckboxGroup) legitimately log it here.
+    expectConsole('error', 'two children with the same key')
     wrap(renderField(dupes))
     const hits = messagesMatching(/duplicate option values/)
     expect(hits).toHaveLength(1)

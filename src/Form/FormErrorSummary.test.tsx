@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { z } from 'zod'
@@ -269,7 +269,9 @@ describe('FormErrorSummary inside a Wizard', () => {
 
     // Move focus elsewhere, then fail Next again with nothing fixed: the same fields are still
     // invalid, but the heading must still receive focus a second time.
-    screen.getByLabelText('Name').focus()
+    // Wrapped in `act`: focusing a MUI input flips its FormControl's focused state, and a raw
+    // `.focus()` would land that update outside React's batching.
+    act(() => screen.getByLabelText('Name').focus())
     expect(heading).not.toHaveFocus()
     await user.click(screen.getByRole('button', { name: 'Next' }))
     await waitFor(() => expect(heading).toHaveFocus())

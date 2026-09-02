@@ -246,8 +246,10 @@ describe('Form', () => {
         <TextField name="email" label="Email" />
       </Form>,
     )
-    expect(received).toHaveLength(1)
-    expect(typeof received[0]?.reset).toBe('function')
+    // StrictMode mounts, unmounts and remounts, so the callback runs more than once; what
+    // this test is about is that every call hands over the form methods.
+    expect(received.length).toBeGreaterThan(0)
+    for (const methods of received) expect(typeof methods.reset).toBe('function')
   })
 
   // #71: the suite runs React 19, where a plain function component receives `ref` as an

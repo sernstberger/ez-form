@@ -207,8 +207,11 @@ describe('FormSection', () => {
         <TextField name="street" label="Street" />
       </FormSection>,
     )
-    expect(received).toHaveLength(1)
-    expect(received[0]).toBe(screen.getByRole('group', { name: 'Address' }))
+    // StrictMode mounts, unmounts and remounts, so the callback runs more than once; what
+    // this test is about is *what* it receives, and that every call agrees.
+    expect(received.length).toBeGreaterThan(0)
+    const fieldset = screen.getByRole('group', { name: 'Address' })
+    for (const el of received) expect(el).toBe(fieldset)
   })
 
   // #71: the suite runs React 19, where a plain function component receives `ref` as an
