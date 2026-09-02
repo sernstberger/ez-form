@@ -156,4 +156,26 @@ export async function submitLoanApi(values: SubmitLoanValues): Promise<SubmitLoa
     throw new Error('Your debt-to-income ratio is too high for this loan. Try a smaller amount.')
   }
   return { applicationId: `LOAN-${Math.random().toString(36).slice(2, 10).toUpperCase()}` }
+export interface SubmitApplicationResult {
+  applicationId: string
+}
+
+/** The one first name `submitApplicationApi` treats as a server failure, so stories/tests can trigger the error path on demand. */
+export const APPLICATION_DECLINED_FOR = 'Declined'
+
+/**
+ * Fake "submit an insurance application" endpoint for the Insurance example
+ * (#56): a short delay, then resolves with an application id, or rejects
+ * with a generic message when the applicant's first name is
+ * `APPLICATION_DECLINED_FOR` (a deliberate, easy-to-trigger hook for
+ * stories/tests — never a real underwriting signal).
+ */
+export async function submitApplicationApi(values: {
+  firstName: string
+}): Promise<SubmitApplicationResult> {
+  await delay(300)
+  if (values.firstName === APPLICATION_DECLINED_FOR) {
+    throw new Error('We could not process your application. Try again later.')
+  }
+  return { applicationId: `APP-${Math.random().toString(36).slice(2, 10).toUpperCase()}` }
 }

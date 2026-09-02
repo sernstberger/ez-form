@@ -289,6 +289,51 @@ describe('FormErrorSummary inside a Wizard', () => {
     const heading = within(summary).getByRole('heading', { name: 'There is a problem' })
     await waitFor(() => expect(heading).toHaveFocus())
   })
+
+  it('a failed confirm pre-submit on the last step still shows the summary (regression: #81)', async () => {
+    // `<Form confirm>`'s pre-submit `trigger()` runs before the dialog and outside
+    // `handleSubmit`, so a failed validation there never bumps `submitCount` — the same
+    // gap `failedConfirmAttempt` closes for a plain, non-Wizard form (see the "with
+    // confirm" describe block above). Inside a Wizard, `attempted` used to check only
+    // `wizard.lastFailed`/`submitCount` and never `failedConfirmAttempt`, so a Wizard's
+    // last-step Submit + `confirm` + `FormErrorSummary` silently showed nothing on a
+    // failed submit: no dialog (correctly refused), but also no visible feedback at all.
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      <Form
+        schema={wizardSchema}
+        defaultValues={{ name: '', email: '', plan: '' }}
+        onSubmit={onSubmit}
+        confirm
+      >
+        <Wizard steps={steps}>
+          <WizardStep id="account">
+            <FormErrorSummary />
+            <TextField name="name" label="Name" />
+            <TextField name="email" label="Email" />
+          </WizardStep>
+          <WizardStep id="plan">
+            <FormErrorSummary />
+            <TextField name="plan" label="Plan" />
+          </WizardStep>
+          <WizardNav />
+        </Wizard>
+      </Form>,
+    )
+    await user.type(screen.getByLabelText('Name'), 'Ada')
+    await user.type(screen.getByLabelText('Email'), 'a@b.co')
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => expect(screen.getByLabelText('Plan')).toBeInTheDocument())
+
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    const summary = await findSummary()
+    expect(within(summary).getByRole('link', { name: 'Plan is required' })).toBeInTheDocument()
+    const heading = within(summary).getByRole('heading', { name: 'There is a problem' })
+    await waitFor(() => expect(heading).toHaveFocus())
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
 })
 
 describe('useEzFormContext guard', () => {

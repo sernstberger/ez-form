@@ -143,6 +143,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   announced via `role="status"`, and a runnable code sample showing how form values
   persist across timeouts — #32.
 
+- `Examples/Insurance`: fifth rung of the example ladder (#56), a 9-step wizard
+  (Applicant, Contact, Coverage, Vehicle?, Vehicle, Drivers, History, Documents,
+  Review) with a conditional step (Vehicle, shown only when "has vehicle?" is Yes,
+  derived from `steps` with `useMemo` — see #80 for the missing first-class way to do
+  this), resume from `localStorage` (`step`/`visited`/values via `watch`, wrapped in
+  try/catch), a Review step with `ReadOnlyField` Edit links and a `FormErrorSummary`,
+  and `confirm` on submit. Five stories: `Horizontal`, `Vertical`, `Page`
+  (`layout="page"`, the #64 acceptance for this issue), `ReactRouter` (one route per
+  step), and `Agent` (the manual precursor of #65 — `autoComplete="off"`, `confirm`/
+  `guard` off, one page). Documentation only, not exported from the package.
+
 ### Changed
 
 - `NumberField` / `NumberFieldControl` `className` is now `string` only (Base UI's
@@ -210,6 +221,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Docs**: README now documents the required-date pattern for `DateField`/`DatePicker`: use
   `z.date().nullable()` in the schema and `required` on the field (the same pattern as any
   other field), not a `.refine`-based schema-level check that would fight the rule's message — #78.
+- `FormErrorSummary` inside a `Wizard`: a failed `<Form confirm>` pre-submit validation
+  on the wizard's last step (e.g. Review's own Submit) now shows the summary. Its
+  pre-submit `trigger()` never reaches `handleSubmit`, so `submitCount` never increments;
+  the summary already special-cased this via `failedConfirmAttempt` outside a wizard, but
+  the wizard branch of its `attempted` check omitted it, so a `Wizard` + `confirm` +
+  `FormErrorSummary` combination (as in `Examples/Insurance`, #56) previously left a failed
+  confirm-path submit silently un-announced — #81.
 
 ### Notes
 
