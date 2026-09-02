@@ -6,6 +6,7 @@ import { Form } from '../../Form'
 import { FormError } from '../../FormError'
 import { SubmitButton } from '../../SubmitButton'
 import { TextField } from '../../fields/TextField'
+import { PasswordField } from '../../fields/PasswordField'
 import { Checkbox } from '../../fields/Checkbox'
 import { loginApi, type LoginResult } from '../fakeApi'
 
@@ -52,11 +53,9 @@ export function Login({ onSuccess }: LoginProps) {
           <Stack spacing={2}>
             <FormError />
             <TextField name="email" label="Email" autoComplete="email" required />
-            {/* TODO(#58): swap for PasswordField once it lands (show/hide toggle). */}
-            <TextField
+            <PasswordField
               name="password"
               label="Password"
-              type="password"
               autoComplete="current-password"
               required
             />

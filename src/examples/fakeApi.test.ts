@@ -1,4 +1,4 @@
-import { delay, loginApi, LOGIN_BAD_PASSWORD } from './fakeApi'
+import { delay, loginApi, LOGIN_BAD_PASSWORD, verifyCodeApi, SIGNUP_GOOD_CODE } from './fakeApi'
 
 describe('fakeApi', () => {
   it('delay resolves after roughly the given ms', async () => {
@@ -31,6 +31,23 @@ describe('fakeApi', () => {
       rememberMe: false,
     })
     const assertion = expect(promise).rejects.toThrow('Invalid email or password')
+    await vi.runAllTimersAsync()
+    await assertion
+    vi.useRealTimers()
+  })
+
+  it('verifyCodeApi resolves for the known-good code', async () => {
+    vi.useFakeTimers()
+    const promise = verifyCodeApi(SIGNUP_GOOD_CODE)
+    await vi.runAllTimersAsync()
+    await expect(promise).resolves.toEqual({ verified: true })
+    vi.useRealTimers()
+  })
+
+  it('verifyCodeApi rejects for any other code with a message', async () => {
+    vi.useFakeTimers()
+    const promise = verifyCodeApi('000000')
+    const assertion = expect(promise).rejects.toThrow('That code is incorrect')
     await vi.runAllTimersAsync()
     await assertion
     vi.useRealTimers()

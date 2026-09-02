@@ -35,3 +35,23 @@ export async function loginApi(values: LoginValues): Promise<LoginResult> {
   }
   return { email: values.email }
 }
+
+/** The one code `verifyCodeApi` treats as correct, so stories/tests can trigger either path on demand. */
+export const SIGNUP_GOOD_CODE = '123456'
+
+export interface VerifyCodeResult {
+  verified: true
+}
+
+/**
+ * Fake verification endpoint for the Sign-up example's second step: a short
+ * delay, then resolves only for `SIGNUP_GOOD_CODE`, or rejects with a
+ * generic "wrong code" message for anything else.
+ */
+export async function verifyCodeApi(code: string): Promise<VerifyCodeResult> {
+  await delay(600)
+  if (code !== SIGNUP_GOOD_CODE) {
+    throw new Error('That code is incorrect. Check your email and try again.')
+  }
+  return { verified: true }
+}
