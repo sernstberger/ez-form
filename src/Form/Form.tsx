@@ -332,7 +332,9 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
           {...formProps}
           className={`${formClasses.root}${className ? ` ${className}` : ''}`}
           aria-labelledby={ariaLabelledBy ?? (title != null ? titleId : undefined)}
-          aria-describedby={ariaDescribedBy ?? (description != null ? descriptionId : undefined)}
+          aria-describedby={
+            ariaDescribedBy ?? (effectiveDescription != null ? descriptionId : undefined)
+          }
           onSubmit={
             confirmOptions
               ? async (event) => {
@@ -369,68 +371,21 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
               {title}
             </FormTitle>
           )}
-          {description != null && (
+          {effectiveDescription != null && (
             <FormDescription
               {...descriptionProps}
               id={descriptionId}
               className={`${formClasses.description}${descriptionProps.className ? ` ${descriptionProps.className}` : ''}`}
             >
-              {description}
+              {effectiveDescription}
             </FormDescription>
           )}
-          {children}
+          <RequiredIndicatorContext.Provider value={{ requiredIndicator, optionalText }}>
+            {children}
+          </RequiredIndicatorContext.Provider>
           {dialog}
         </FormRoot>
       </ErrorSummaryContext.Provider>
-      <FormRoot
-        noValidate
-        {...formProps}
-        className={`${formClasses.root}${className ? ` ${className}` : ''}`}
-        aria-labelledby={ariaLabelledBy ?? (title != null ? titleId : undefined)}
-        aria-describedby={
-          ariaDescribedBy ?? (effectiveDescription != null ? descriptionId : undefined)
-        }
-        onSubmit={
-          confirmOptions
-            ? async (event) => {
-                event.preventDefault()
-                // Validate first (focusing the first error like handleSubmit does) so an
-                // invalid form never asks; handleSubmit re-validates on Confirm, which is
-                // cheap and keeps hookform's isSubmitting confined to the real submit.
-                // No try/catch: a rejecting resolver here (e.g. a throwing `validate` rule)
-                // propagates like the non-confirm path's handleSubmit does. Nothing is
-                // stranded either way — `submitting` and the dialog only ever get set after
-                // this awaits successfully (`ask` itself never rejects, see useConfirm).
-                const valid = await methods.trigger(undefined, { shouldFocus: true })
-                if (!valid) return
-                if (await ask(confirmOptions)) await submit(event)
-              }
-            : submit
-        }
-      >
-        {title != null && (
-          <FormTitle
-            {...titleProps}
-            id={titleId}
-            className={`${formClasses.title}${titleProps.className ? ` ${titleProps.className}` : ''}`}
-          >
-            {title}
-          </FormTitle>
-        )}
-        {effectiveDescription != null && (
-          <FormDescription
-            {...descriptionProps}
-            id={descriptionId}
-            className={`${formClasses.description}${descriptionProps.className ? ` ${descriptionProps.className}` : ''}`}
-          >
-            {effectiveDescription}
-          </FormDescription>
-        )}
-        <RequiredIndicatorContext.Provider value={{ requiredIndicator, optionalText }}>
-          {children}
-        </RequiredIndicatorContext.Provider>
-        {dialog}
-      </FormRoot>
     </FormProvider>
   )
 }
