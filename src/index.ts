@@ -8,6 +8,7 @@ export { Switch, type SwitchProps } from './fields/Switch'
 export { RadioGroup, type RadioGroupProps } from './fields/RadioGroup'
 export { NumberField, type NumberFieldProps } from './fields/NumberField'
 export { MoneyField, type MoneyFieldProps } from './fields/MoneyField'
+export { OtpField, type OtpFieldProps } from './fields/OtpField'
 export type { FieldRules, BooleanFieldRules } from './rules'
 export {
   Autocomplete,
