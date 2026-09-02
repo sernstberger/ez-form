@@ -10,6 +10,8 @@ import type { FormProps } from '../Form'
 import type { FormSectionProps } from '../FormSection'
 import type { PasswordFieldProps } from '../fields/PasswordField'
 import type { PasswordStrengthProps } from '../fields/PasswordStrength'
+import type { OtpFieldControlProps } from '../fields/OtpField/OtpFieldControl'
+import type { FileFieldProps } from '../fields/FileField'
 
 declare module '@mui/material/styles' {
   interface ComponentsPropsList {
@@ -25,6 +27,8 @@ declare module '@mui/material/styles' {
     EzFormSection: Partial<FormSectionProps>
     EzPasswordField: Partial<PasswordFieldProps>
     EzPasswordStrength: Partial<PasswordStrengthProps>
+    EzOtpField: Partial<OtpFieldControlProps>
+    EzFileField: Partial<FileFieldProps>
   }
 
   interface ComponentNameToClassKey {
@@ -39,6 +43,8 @@ declare module '@mui/material/styles' {
     EzFormSection: 'root' | 'legend' | 'description' | 'content'
     EzPasswordField: 'root' | 'toggle'
     EzPasswordStrength: 'root' | 'bar' | 'label'
+    EzOtpField: 'root' | 'helperText'
+    EzFileField: 'root' | 'fileList'
   }
 
   interface Components<Theme = unknown> {
@@ -85,6 +91,14 @@ declare module '@mui/material/styles' {
     EzPasswordStrength?: {
       defaultProps?: ComponentsProps['EzPasswordStrength']
       styleOverrides?: ComponentsOverrides<Theme>['EzPasswordStrength']
+    }
+    EzOtpField?: {
+      defaultProps?: ComponentsProps['EzOtpField']
+      styleOverrides?: ComponentsOverrides<Theme>['EzOtpField']
+    }
+    EzFileField?: {
+      defaultProps?: ComponentsProps['EzFileField']
+      styleOverrides?: ComponentsOverrides<Theme>['EzFileField']
     }
   }
 }

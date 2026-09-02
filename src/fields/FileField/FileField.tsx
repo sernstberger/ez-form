@@ -1,8 +1,10 @@
 import { useId, type ReactNode, type SyntheticEvent } from 'react'
 import Button, { type ButtonProps } from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
+import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import FormControl from '@mui/material/FormControl'
 import FormHelperText from '@mui/material/FormHelperText'
+import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import Stack from '@mui/material/Stack'
 import SvgIcon, { type SvgIconProps } from '@mui/material/SvgIcon'
 import { styled } from '@mui/material/styles'
@@ -35,6 +37,17 @@ const VisuallyHiddenInput = styled('input')({
   width: 1,
 })
 
+export const fileFieldClasses = generateUtilityClasses('EzFileField', ['root', 'fileList'])
+
+// Chips wrap onto further rows once the row is full, with a gap above the
+// button — the component's minimum layout so the list doesn't collide with
+// it — so it lives on the styled slot's default style block, still
+// overridable via `theme.components.EzFileField.styleOverrides.fileList`.
+const FileFieldList = styled(Stack, { name: 'EzFileField', slot: 'FileList' })(({ theme }) => ({
+  flexWrap: 'wrap',
+  marginTop: theme.spacing(1),
+}))
+
 export type FileFieldValue = File | null | File[]
 
 export type FileFieldProps = {
@@ -61,18 +74,19 @@ export type FileFieldProps = {
  * A cancelled dialog keeps the current value; the native input is cleared
  * after every pick so choosing the same file again fires `change`.
  */
-export function FileField({
-  name,
-  label,
-  helperText,
-  disabled,
-  accept,
-  multiple,
-  buttonProps,
-  onChange,
-  required,
-  validate,
-}: FileFieldProps) {
+export function FileField(inProps: FileFieldProps) {
+  const {
+    name,
+    label,
+    helperText,
+    disabled,
+    accept,
+    multiple,
+    buttonProps,
+    onChange,
+    required,
+    validate,
+  } = useDefaultProps({ props: inProps, name: 'EzFileField' })
   const f = useEzField<FileFieldValue>(name, 'FileField', { label, rules: { required, validate } })
   const id = useId()
   const text = f.helperText(helperText)
@@ -87,7 +101,12 @@ export function FileField({
   }
 
   return (
-    <FormControl error={f.invalid} disabled={isDisabled} required={f.required}>
+    <FormControl
+      error={f.invalid}
+      disabled={isDisabled}
+      required={f.required}
+      className={fileFieldClasses.root}
+    >
       <Button
         variant="outlined"
         startIcon={<UploadIcon />}
@@ -128,7 +147,7 @@ export function FileField({
         />
       </Button>
       {files.length > 0 ? (
-        <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', mt: 1 }}>
+        <FileFieldList direction="row" spacing={1} useFlexGap className={fileFieldClasses.fileList}>
           {files.map((file) => (
             <Chip
               key={`${file.name}-${file.size}-${file.lastModified}`}
@@ -151,7 +170,7 @@ export function FileField({
               }
             />
           ))}
-        </Stack>
+        </FileFieldList>
       ) : null}
       {text ? <FormHelperText {...f.helperTextA11y}>{text}</FormHelperText> : null}
     </FormControl>

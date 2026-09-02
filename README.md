@@ -236,6 +236,11 @@ const theme = createTheme({
     },
     EzPasswordStrength: {
       styleOverrides: { bar: { height: 6 } },
+    EzOtpField: {
+      styleOverrides: { helperText: { marginLeft: 8 } },
+    },
+    EzFileField: {
+      styleOverrides: { fileList: { marginTop: 16 } },
     },
   },
 })

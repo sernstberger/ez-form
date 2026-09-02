@@ -1,8 +1,10 @@
+import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../../Form'
 import { OtpField } from './OtpField'
+import { otpFieldClasses } from './OtpFieldControl'
 import { describeFieldContract } from '../../test/describeFieldContract'
 
 const schema = z.object({ code: z.string() })
@@ -104,5 +106,27 @@ describe('OtpField', () => {
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(await screen.findByText('Code is required.')).toBeInTheDocument()
     expect(inputs()[0]).toHaveFocus()
+  })
+
+  it('is themeable: styleOverrides.helperText applies', () => {
+    const theme = createTheme({
+      components: {
+        EzOtpField: {
+          styleOverrides: {
+            helperText: { letterSpacing: '9px' },
+          },
+        },
+      },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{ code: '' }} onSubmit={() => {}}>
+          <OtpField name="code" label="Code" length={4} helperText="Enter the code" />
+        </Form>
+      </ThemeProvider>,
+    )
+    const helperText = screen.getByText('Enter the code')
+    expect(helperText).toHaveClass(otpFieldClasses.helperText)
+    expect(getComputedStyle(helperText).letterSpacing).toBe('9px')
   })
 })

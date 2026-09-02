@@ -30,6 +30,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   never pull it or a scorer like zxcvbn into their bundle. Themeable under
   `EzPasswordStrength` (`defaultProps`, `styleOverrides` for `root` | `bar` | `label`),
   exported as `passwordStrengthClasses` — #59.
+- `EzOtpField` theme key (`defaultProps`, `styleOverrides` for `root`, `helperText`) and
+  the `otpFieldClasses` export; `EzFileField` theme key (`defaultProps`, `styleOverrides`
+  for `root`, `fileList`) and the `fileFieldClasses` export — the last `sx` usages in
+  `src/` (`OtpFieldControl`, `FileField`) now go through styled slots — #50.
 
 ### Changed
 
