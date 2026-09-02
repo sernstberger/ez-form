@@ -156,6 +156,116 @@ describe('PhoneField editing', () => {
   })
 })
 
+describe('PhoneField paste over a selection (#16 C1)', () => {
+  // Every earlier paste case starts from an empty field, so none of them could
+  // catch a replacement edit destroying a digit. These all start from a value.
+  it.each([
+    ['same length', '5551234567', '555-123-4567'],
+    // Nine digits is deliberately incomplete: it must survive the paste intact
+    // (the bug truncated it further), and then fail the completeness rule.
+    ['shorter', '212555000', '212-555-000'],
+    ['longer than the current value', '2125550000', '212-555-0000'],
+    ['formatted', '(212) 555-0000', '212-555-0000'],
+  ])('select-all then paste %s keeps every pasted digit', async (_label, pasted, display) => {
+    const user = userEvent.setup()
+    renderPhone()
+    await user.type(input(), '5551234567')
+    await user.tripleClick(input())
+    await user.paste(pasted)
+    expect(input()).toHaveValue(display)
+  })
+
+  it('a complete pasted number submits as digits', async () => {
+    const user = userEvent.setup()
+    const { onSubmit } = renderPhone()
+    await user.type(input(), '5551234567')
+    await user.tripleClick(input())
+    await user.paste('(212) 555-0000')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(onSubmit).toHaveBeenCalledWith({ phone: '2125550000' }, expect.anything())
+  })
+
+  it('pasting over a partial selection replaces only the selected digits', async () => {
+    const user = userEvent.setup()
+    renderPhone()
+    await user.type(input(), '5551234567')
+    // Offsets 4..7 cover the middle group's "123".
+    input().setSelectionRange(4, 7)
+    await user.paste('99')
+    expect(input()).toHaveValue('555-994-567')
+  })
+})
+
+describe('PhoneField Delete and Backspace on a separator (#16 C2)', () => {
+  it('forward Delete just before a separator removes the digit after it', async () => {
+    const user = userEvent.setup()
+    renderPhone()
+    await user.type(input(), '5551234567')
+    // Caret 3 sits just before the first "-"; Delete must take the "1", not a "5".
+    await user.type(input(), '{Delete}', { initialSelectionStart: 3, initialSelectionEnd: 3 })
+    expect(input()).toHaveValue('555-234-567')
+  })
+
+  it('forward Delete mid-group removes the digit in front of the caret', async () => {
+    const user = userEvent.setup()
+    renderPhone()
+    await user.type(input(), '5551234567')
+    await user.type(input(), '{Delete}', { initialSelectionStart: 5, initialSelectionEnd: 5 })
+    expect(input()).toHaveValue('555-134-567')
+  })
+
+  it('Backspace just after a separator removes the digit before it, on "(###) ###-####"', async () => {
+    const user = userEvent.setup()
+    renderPhone({ format: '(###) ###-####' })
+    await user.type(input(), '5551234567')
+    expect(input()).toHaveValue('(555) 123-4567')
+    // Offset 6 is just after the ") "; the digit before it is the third "5".
+    await user.type(input(), '{Backspace}', { initialSelectionStart: 6, initialSelectionEnd: 6 })
+    expect(input()).toHaveValue('(551) 234-567')
+  })
+
+  it('forward Delete before a separator on "(###) ###-####"', async () => {
+    const user = userEvent.setup()
+    renderPhone({ format: '(###) ###-####' })
+    await user.type(input(), '5551234567')
+    // Offset 4 is just before the ")"; Delete takes the "1" across it.
+    await user.type(input(), '{Delete}', { initialSelectionStart: 4, initialSelectionEnd: 4 })
+    expect(input()).toHaveValue('(555) 234-567')
+  })
+})
+
+describe('PhoneField deleting a selection (#16 I2)', () => {
+  it('removes exactly the selected digits and leaves the caret where they were', async () => {
+    const user = userEvent.setup()
+    renderPhone()
+    await user.type(input(), '5551234567')
+    // Offsets 4..7 cover "123": three digits from index 3.
+    await user.type(input(), '{Backspace}', { initialSelectionStart: 4, initialSelectionEnd: 7 })
+    expect(input()).toHaveValue('555-456-7')
+    // Caret sits after the 3rd digit, i.e. where the removed run started.
+    expect(input().selectionStart).toBe(3)
+  })
+
+  it('a selection spanning a separator drops only the digits inside it', async () => {
+    const user = userEvent.setup()
+    renderPhone()
+    await user.type(input(), '5551234567')
+    // Offsets 2..9 cover "5-123-4".
+    await user.type(input(), '{Backspace}', { initialSelectionStart: 2, initialSelectionEnd: 9 })
+    expect(input()).toHaveValue('555-67')
+    expect(input().selectionStart).toBe(2)
+  })
+
+  it('select-all then Backspace empties the field', async () => {
+    const user = userEvent.setup()
+    renderPhone()
+    await user.type(input(), '5551234567')
+    await user.tripleClick(input())
+    await user.type(input(), '{Backspace}', { skipClick: true })
+    expect(input()).toHaveValue('')
+  })
+})
+
 describe('PhoneField validation', () => {
   it('rejects an incomplete number with the default invalid message', async () => {
     const user = userEvent.setup()
