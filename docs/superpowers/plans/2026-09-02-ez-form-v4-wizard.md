@@ -18,6 +18,7 @@
 - Form-level `disabled` wins via `mergeDisabled` (`src/fields/mergeDisabled.ts`).
 - All three confirmations are **opt-in**: `Form confirm`, `Form guard`, `ClearButton confirm` are `undefined` by default and change nothing when unset.
 - Every new component ships `Component.tsx`, `Component.test.tsx`, `Component.stories.tsx`, `index.ts`, and an export line in `src/index.ts`.
+- **No styling in `src/`** (spec Section 5, added Sept 2 mid-implementation): no `sx`, ripple props, or literal `variant`/`size`/`color`/`direction`/`spacing` in JSX. Defaults go through `useDefaultProps({ props, name: 'Ez<Component>' })`, structural styles through `styled(Base, { name, slot })`, class hooks through `generateUtilityClasses`, and every `Ez*` name is added to MUI's `ComponentsPropsList` / `ComponentNameToClassKey` / `Components` in `src/theme/augmentation.ts`. Tasks 7 and 8 build to this; Task 6b retrofits Tasks 1, 3, 6 and v1's `SubmitButton`.
 - Tests: `pnpm test` (vitest, jsdom). Types: `pnpm typecheck`. Format: `pnpm format`.
 - Commit messages end with:
   ```
@@ -1981,6 +1982,23 @@ pnpm typecheck && pnpm format
 git add src/Wizard
 git commit -m "feat(Wizard): WizardStepper on MUI Stepper, horizontal and vertical"
 ```
+
+---
+
+### Task 6b: Theming retrofit (added Sept 2 after Steve's no-styling rule)
+
+**Files:**
+- Modify: `src/ConfirmDialog/ConfirmDialog.tsx`, `src/ClearButton/ClearButton.tsx`, `src/SubmitButton/SubmitButton.tsx`, `src/Wizard/WizardStepper.tsx` (+ their tests and `index.ts` files)
+- Create: `src/theme/augmentation.ts`
+- Modify: `src/index.ts`
+
+**Interfaces:**
+- Produces: `confirmDialogClasses`, `clearButtonClasses`, `submitButtonClasses`, `wizardStepperClasses`; theme keys `EzConfirmDialog`, `EzClearButton`, `EzSubmitButton`, `EzWizardStepper` (plus `EzWizardNav`, `EzReadOnlyField` filled in by Tasks 7/8/10).
+
+- [ ] **Step 1:** Follow the pattern and checklist in `.superpowers/sdd/2026-09-02-ez-form-v4-wizard/theming-pattern.md` (the pattern is also summarized in spec Section 5). For each component: themeability test first (RED), then `useDefaultProps` + `styled` slots + `generateUtilityClasses` (GREEN); remove every `sx`, ripple prop, and literal variant. Existing tests stay green.
+- [ ] **Step 2:** `pnpm typecheck && pnpm format && pnpm test`; commit.
+
+Split across worktrees: A does ConfirmDialog / ClearButton / SubmitButton / augmentation; C does WizardStepper.
 
 ---
 
