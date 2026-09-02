@@ -31,3 +31,4 @@ export {
   useConfirm,
   type UseConfirmReturn,
 } from './ConfirmDialog'
+export { ClearButton, type ClearButtonProps } from './ClearButton'
