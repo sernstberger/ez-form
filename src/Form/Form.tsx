@@ -1,5 +1,6 @@
 import {
   useCallback,
+  forwardRef,
   Fragment,
   useEffect,
   useId,
@@ -138,7 +139,10 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
   children: ReactNode
 }
 
-export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut>) {
+function FormImpl<TIn extends FieldValues, TOut>(
+  inProps: FormProps<TIn, TOut>,
+  forwardedRef: Ref<FormMethods<TIn, TOut>>,
+) {
   const {
     schema,
     onSubmit,
@@ -146,7 +150,11 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
     values,
     resetOptions,
     onDefaultValuesError,
-    ref,
+    // `ref` stays in `FormProps` because that is the consumer-facing type, but it is never
+    // read from props here: React removes it before props reach a `forwardRef` render
+    // function and hands it over as the second argument instead, on both majors. Pulled
+    // out of the rest anyway so a stray one could never land on the DOM `<form>`.
+    ref: _ref,
     mode = 'onSubmit',
     disabled = false,
     confirm,
@@ -303,7 +311,7 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
     }
     setLoading(isLoading)
   }, [isLoading, onDefaultValuesError])
-  useImperativeHandle(ref, () => methods, [methods])
+  useImperativeHandle(forwardedRef, () => methods, [methods])
 
   const { confirm: ask, dialog } = useConfirm()
   const confirmOptions: ConfirmOptions | undefined =
@@ -400,3 +408,22 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
     </FormProvider>
   )
 }
+
+/**
+ * The form. See `FormProps` for the API.
+ *
+ * Wrapped in `forwardRef` so `ref` reaches the imperative handle on React 18 as well as
+ * 19 (#71): on 19 a function component receives `ref` as an ordinary prop, but on 18 it
+ * does not — a plain `Form` would silently never populate the consumer's ref there, while
+ * the peer range advertises `^18 || ^19`. `forwardRef` delivers it on both.
+ *
+ * `forwardRef` erases the generics (it returns a non-generic exotic component), so the
+ * result is cast back to a callable generic signature — the same thing MUI does for its
+ * own generic components (see `@mui/material/Autocomplete`, whose `forwardRef` result is
+ * cast to a generic call signature). The cast is the only way to keep `Form<TIn, TOut>`
+ * inferring from `schema`/`defaultValues`; it changes no runtime behaviour, and
+ * `FormProps` (including its `ref` field) is unchanged for consumers.
+ */
+export const Form = forwardRef(FormImpl) as <TIn extends FieldValues, TOut>(
+  props: FormProps<TIn, TOut>,
+) => ReactNode

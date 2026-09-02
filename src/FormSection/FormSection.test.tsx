@@ -195,6 +195,33 @@ describe('FormSection', () => {
     })
   })
 
+  it('gives a ref callback the fieldset element', () => {
+    const received: HTMLFieldSetElement[] = []
+    wrap(
+      <FormSection
+        title="Address"
+        ref={(fieldset) => {
+          if (fieldset) received.push(fieldset)
+        }}
+      >
+        <TextField name="street" label="Street" />
+      </FormSection>,
+    )
+    expect(received).toHaveLength(1)
+    expect(received[0]).toBe(screen.getByRole('group', { name: 'Address' }))
+  })
+
+  // #71: the suite runs React 19, where a plain function component receives `ref` as an
+  // ordinary prop, so the test above would pass with or without the fix. React 18 does not
+  // pass `ref` through props at all — only a `forwardRef` component gets it there — and the
+  // peer range advertises `^18 || ^19`. Asserting the exotic type is what actually pins the
+  // React 18 support down without installing a second React.
+  it('is a forwardRef component, so ref works on React 18 as well as 19', () => {
+    expect((FormSection as unknown as { $$typeof: symbol }).$$typeof).toBe(
+      Symbol.for('react.forward_ref'),
+    )
+  })
+
   it('a section without a title does not deepen its children (heading-order stays valid)', () => {
     wrap(
       <FormSection aria-label="wrapper">

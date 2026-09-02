@@ -229,6 +229,33 @@ describe('Form', () => {
     await user.click(screen.getByRole('button', { name: 'Load' }))
     expect(screen.getByLabelText('Email')).toHaveValue('r@s.co')
   })
+
+  it('calls a ref callback with the form methods', () => {
+    const received: FormMethods<{ email: string }, { email: string }>[] = []
+    render(
+      <Form
+        ref={(methods) => {
+          if (methods) received.push(methods)
+        }}
+        schema={schema}
+        defaultValues={{ email: '' }}
+        onSubmit={() => {}}
+      >
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    expect(received).toHaveLength(1)
+    expect(typeof received[0]?.reset).toBe('function')
+  })
+
+  // #71: the suite runs React 19, where a plain function component receives `ref` as an
+  // ordinary prop, so the two tests above would pass with or without the fix. React 18 does
+  // not pass `ref` through props at all — only a `forwardRef` component gets it there — and
+  // the peer range advertises `^18 || ^19`. Asserting the exotic type is what actually
+  // pins the React 18 support down without installing a second React.
+  it('is a forwardRef component, so ref works on React 18 as well as 19', () => {
+    expect((Form as unknown as { $$typeof: symbol }).$$typeof).toBe(Symbol.for('react.forward_ref'))
+  })
 })
 
 describe('Form with every component', () => {

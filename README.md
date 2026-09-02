@@ -78,6 +78,8 @@ pnpm add ez-form @mui/material @mui/icons-material @mui/x-date-pickers @emotion/
 
 Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >= 5.4 (the types use `NoInfer`).
 
+React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form methods) and `<FormSection ref>` (the `<fieldset>`) are populated the same way on either major.
+
 ## Components
 
 | Component                                      | Wraps                                         | Extra props                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
