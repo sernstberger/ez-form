@@ -25,7 +25,6 @@ export type SwitchProps = Omit<MuiSwitchProps, 'name' | 'checked' | 'required'> 
  * recorded on submit. If the page has a Submit button, use `Checkbox`
  * instead.
  */
-// MUI 9's Switch sets role="switch" on the input itself; nothing to add here.
 export function Switch({
   name,
   label,

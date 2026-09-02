@@ -12,14 +12,14 @@ const meta = {
   component: Checkbox,
   args: { name: 'tos', label: 'I accept the terms' },
   parameters: {
-    form: { schema, defaultValues: { tos: false } } satisfies FormParameters['form'],
+    form: { schema, defaultValues: { tos: false } },
     docs: {
       description: {
         component:
           'A yes/no answer or opt-in recorded when the form is submitted — "I accept the terms", "Same as shipping", "Insure a vehicle" — or one of several independent options (`CheckboxGroup`). If the page has a Submit button, this is almost always the right control; see README "Checkbox vs Switch" for the full rule. Prefer `Switch` only for a setting that takes effect immediately, with no submit step.',
       },
     },
-  },
+  } satisfies FormParameters,
 } satisfies Meta<typeof Checkbox>
 
 export default meta

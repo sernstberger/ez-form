@@ -15,14 +15,14 @@ const meta = {
   component: Switch,
   args: { name: 'darkMode', label: 'Dark mode' },
   parameters: {
-    form: { schema, defaultValues: { darkMode: false } } satisfies FormParameters['form'],
+    form: { schema, defaultValues: { darkMode: false } },
     docs: {
       description: {
         component:
           'A setting that takes effect immediately, with no submit step — dark mode, notifications on a settings page that autosaves, a UI mode toggle whose `onChange` does the work. `role="switch"` makes assistive tech announce "on/off", correct here but wrong for an answer only recorded on submit. If the page has a Submit button, use `Checkbox` instead; see README "Checkbox vs Switch" for the full rule.',
       },
     },
-  },
+  } satisfies FormParameters,
 } satisfies Meta<typeof Switch>
 
 export default meta
