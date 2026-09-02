@@ -378,6 +378,42 @@ describe('useEzFormContext', () => {
       expect(await screen.findByRole('alertdialog')).toBeInTheDocument()
       expect(onSubmit).not.toHaveBeenCalled()
     })
+
+    it('a rejecting resolver rethrows like the non-confirm path; nothing is left stranded', async () => {
+      // A field-level `validate` rule that throws makes `methods.trigger()` (the confirm
+      // path's own pre-validation, run before the dialog) reject. Like handleSubmit's own
+      // resolver call, this handler has no try/catch, so the rejection surfaces as an
+      // unhandled rejection — the same behavior as the non-confirm path. Nothing here should
+      // strand any state: `submitting` and the dialog are only set after this call succeeds.
+      const unhandled: unknown[] = []
+      const onUnhandledRejection = (error: unknown) => unhandled.push(error)
+      process.on('unhandledRejection', onUnhandledRejection)
+      try {
+        const user = userEvent.setup()
+        const onSubmit = vi.fn()
+        const boom = new Error('boom')
+        render(
+          <Form schema={schema} defaultValues={{ email: 'a@b.co' }} onSubmit={onSubmit} confirm>
+            <TextField
+              name="email"
+              label="Email"
+              validate={() => {
+                throw boom
+              }}
+            />
+            <SubmitButton />
+          </Form>,
+        )
+        await user.click(screen.getByRole('button', { name: 'Submit' }))
+        await waitFor(() => expect(unhandled).toEqual([boom]))
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+        expect(onSubmit).not.toHaveBeenCalled()
+        expect(screen.getByLabelText('Email')).toBeEnabled()
+        expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled()
+      } finally {
+        process.off('unhandledRejection', onUnhandledRejection)
+      }
+    })
   })
 
   describe('guard', () => {

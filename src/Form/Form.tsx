@@ -50,9 +50,10 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
   resetOptions?: KeepStateOptions
   /**
    * Called when the async `defaultValues` function rejects. The form
-   * re-enables with its fields empty (no defaults were applied). If omitted,
-   * the rejection is rethrown so it surfaces as an unhandled rejection; the
-   * form still re-enables either way.
+   * re-enables with its fields empty (no defaults were applied), subject to
+   * `resetOptions` (hookform applies it on this reset too). If omitted, the
+   * rejection is rethrown so it surfaces as an unhandled rejection; the form
+   * still re-enables either way.
    */
   onDefaultValuesError?: (error: unknown) => void
   /** The form methods, for `reset` / `setValue` / `setError` from a parent. */
@@ -109,6 +110,9 @@ export function Form<TIn extends FieldValues, TOut>({
   // .catch, so isLoading (and this form's `loading`) never clears on rejection. Wrap it
   // so a rejection still clears `loading`, then either report it or rethrow so it
   // surfaces as an unhandled rejection (current JS norm) — either way the form re-enables.
+  // Recreating this wrapper on every render is safe: useForm only reads the function-form
+  // defaultValues once, at mount (createFormControl runs once, guarded by !_formControl.current),
+  // so a new closure identity here each render never triggers an extra reset.
   const wrappedDefaultValues =
     typeof defaultValues === 'function'
       ? () =>
@@ -169,6 +173,10 @@ export function Form<TIn extends FieldValues, TOut>({
                 // Validate first (focusing the first error like handleSubmit does) so an
                 // invalid form never asks; handleSubmit re-validates on Confirm, which is
                 // cheap and keeps hookform's isSubmitting confined to the real submit.
+                // No try/catch: a rejecting resolver here (e.g. a throwing `validate` rule)
+                // propagates like the non-confirm path's handleSubmit does. Nothing is
+                // stranded either way — `submitting` and the dialog only ever get set after
+                // this awaits successfully (`ask` itself never rejects, see useConfirm).
                 const valid = await methods.trigger(undefined, { shouldFocus: true })
                 if (!valid) return
                 if (await ask(confirmOptions)) await submit(event)

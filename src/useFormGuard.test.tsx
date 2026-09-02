@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from './Form'
 import { TextField } from './fields/TextField'
+import { SubmitButton } from './SubmitButton'
 import { useFormGuard, type FormGuardBlocker } from './useFormGuard'
 
 const schema = z.object({ email: z.string() })
@@ -64,6 +65,32 @@ describe('useFormGuard', () => {
     await user.type(screen.getByRole('textbox', { name: 'Email' }), 'a')
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('blocked'))
     await user.click(screen.getByRole('button', { name: 'Go' }))
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('free'))
+  })
+
+  it('stops blocking after a confirmed submit through <Form confirm>', async () => {
+    // Verified directly: react-hook-form does NOT reset `isDirty` on a successful submit
+    // by itself (fields still hold the typed values, and this onSubmit never calls
+    // `reset`) — `isDirty` stays `true` afterwards. It's `isSubmitSuccessful` flipping to
+    // `true` inside handleSubmit that drops `shouldBlock` (isDirty && !isSubmitting &&
+    // !isSubmitSuccessful), which is what releases the guard here.
+    const user = userEvent.setup()
+    const fake = makeFakeBlocker()
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}} guard confirm>
+        <TextField name="email" label="Email" />
+        <Probe useBlocker={fake.useBlocker} />
+        <SubmitButton />
+      </Form>,
+    )
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'a')
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('blocked'))
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    expect(await screen.findByRole('alertdialog', { name: 'Submit?' })).toBeInTheDocument()
+    // Still dirty while the dialog is up: the guard doesn't drop just because a submit
+    // is in flight toward confirmation, only once the submit actually completes.
+    expect(screen.getByTestId('state')).toHaveTextContent('blocked')
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('free'))
   })
 
