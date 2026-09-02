@@ -174,4 +174,93 @@ describe('Autocomplete', () => {
     expect(await screen.findByText('Role is required.')).toBeInTheDocument()
     expect(combobox()).toHaveFocus()
   })
+
+  describe('default isOptionEqualToValue (#29)', () => {
+    const objectSchema = z.object({ role: z.object({ value: z.string(), label: z.string() }) })
+    const objectMultiSchema = z.object({
+      roles: z.array(z.object({ value: z.string(), label: z.string() })),
+    })
+
+    it('shows a structurally-equal default value as selected, without an MUI console warning', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      render(
+        <Form
+          schema={objectSchema}
+          // A fresh object, structurally equal to `roles[0]` but not the same reference
+          // (e.g. as returned by a server round-trip).
+          defaultValues={{ role: { value: 'admin', label: 'Admin' } }}
+          onSubmit={() => {}}
+        >
+          <Autocomplete name="role" label="Role" options={roles} getOptionValue={(o) => o} />
+        </Form>,
+      )
+      expect(combobox()).toHaveValue('Admin')
+      expect(warnSpy).not.toHaveBeenCalled()
+      expect(errorSpy).not.toHaveBeenCalled()
+      warnSpy.mockRestore()
+      errorSpy.mockRestore()
+    })
+
+    it('renders both chips for structurally-equal default values under multiple', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      render(
+        <Form
+          schema={objectMultiSchema}
+          defaultValues={{
+            roles: [
+              { value: 'admin', label: 'Admin' },
+              { value: 'user', label: 'User' },
+            ],
+          }}
+          onSubmit={() => {}}
+        >
+          <Autocomplete
+            name="roles"
+            label="Role"
+            options={roles}
+            getOptionValue={(o) => o}
+            multiple
+          />
+        </Form>,
+      )
+      expect(screen.getByRole('button', { name: 'Admin' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'User' })).toBeInTheDocument()
+      expect(warnSpy).not.toHaveBeenCalled()
+      expect(errorSpy).not.toHaveBeenCalled()
+      warnSpy.mockRestore()
+      errorSpy.mockRestore()
+    })
+
+    it('uses a consumer-supplied isOptionEqualToValue instead of the default', async () => {
+      const user = userEvent.setup()
+      const isOptionEqualToValue = vi.fn(
+        (option: (typeof roles)[number], value: (typeof roles)[number]) =>
+          option.value === value.value,
+      )
+      render(
+        <Form
+          schema={objectSchema}
+          defaultValues={{ role: { value: 'admin', label: 'Admin' } }}
+          onSubmit={() => {}}
+        >
+          <Autocomplete
+            name="role"
+            label="Role"
+            options={roles}
+            getOptionValue={(o) => o}
+            isOptionEqualToValue={isOptionEqualToValue}
+          />
+        </Form>,
+      )
+      expect(combobox()).toHaveValue('Admin')
+      await user.click(combobox())
+      expect(await screen.findByRole('option', { name: 'Admin' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      )
+      expect(isOptionEqualToValue).toHaveBeenCalled()
+    })
+  })
 })
