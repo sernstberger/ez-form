@@ -51,6 +51,13 @@ function errorFieldPaths(errors: unknown, prefix = ''): string[] {
  * (and hand out a new array reference for) `steps` — invalidating every context
  * consumer — on every keystroke. Memoizing on `mask` instead means the array keeps its
  * reference until a predicate's answer actually flips.
+ *
+ * `useEzFormContext` runs first, purely for its guard: a bare `useWatch()` outside
+ * `<Form>` throws react-hook-form's own opaque `TypeError` (it reads off a context that
+ * doesn't exist) before this ever gets to render `WizardBody`, whose "must be rendered
+ * inside <Form>" error is what a consumer of this library should actually see. Calling
+ * `useEzFormContext('Wizard')` here means that clear error wins even when the wizard
+ * has a `when` and so takes this branch instead of going straight to `WizardBody`.
  */
 function WizardWhenBridge<TIn extends FieldValues>({
   allSteps,
@@ -59,17 +66,18 @@ function WizardWhenBridge<TIn extends FieldValues>({
   allSteps: readonly WizardStepDef<TIn>[]
   children: (steps: readonly WizardStepDef<TIn>[]) => ReactNode
 }) {
-  const values = useWatch<TIn>()
+  // `control` from `useEzFormContext` is untyped (`Control<FieldValues>`): `useWatch` is
+  // called with that erased type and the snapshot is restored to `TIn` where a step's
+  // `when` reads it, the same erase-and-restore already used for `trigger`'s `fields`
+  // argument in `WizardBody` below.
+  const { control } = useEzFormContext('Wizard')
+  const values = useWatch({ control })
   const mask = allSteps.map((s) => (!s.when || s.when(values as TIn) ? '1' : '0')).join('')
-  const steps = useMemo(
-    () => allSteps.filter((_, i) => mask[i] === '1'),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the mask string
-    // (identity-stable across renders where no predicate's answer changed), not `allSteps`
-    // itself: `allSteps` is already required to be a stable reference (see `WizardProps.steps`),
-    // so re-deriving on the rare occasion it does change is still covered by `mask` changing
-    // too (a different `allSteps` recomputes `mask` on this same render).
-    [mask],
-  )
+  // `allSteps` is already required to be a stable reference (see `WizardProps.steps`), so
+  // including it here costs nothing on the common render and removes the latent stale-
+  // closure risk of filtering a *previous* `allSteps` against a *current* `mask` on the
+  // rare render where the prop does change.
+  const steps = useMemo(() => allSteps.filter((_, i) => mask[i] === '1'), [allSteps, mask])
   return children(steps)
 }
 

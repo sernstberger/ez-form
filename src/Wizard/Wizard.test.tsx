@@ -780,6 +780,17 @@ describe('Wizard', () => {
       expect(useWatchSpy).not.toHaveBeenCalled()
     })
 
+    it('a wizard with a `when` step does call useWatch (positive control for the test above)', () => {
+      render(
+        <Form schema={conditionalSchema} defaultValues={conditionalFilled} onSubmit={() => {}}>
+          <Wizard steps={conditionalSteps}>
+            <ConditionalSteps />
+          </Wizard>
+        </Form>,
+      )
+      expect(useWatchSpy).toHaveBeenCalled()
+    })
+
     it('a step whose `when` is false is absent from the effective steps and stepper', () => {
       render(
         <Form schema={conditionalSchema} defaultValues={conditionalFilled} onSubmit={() => {}}>
@@ -1069,6 +1080,17 @@ describe('Wizard', () => {
         </Form>,
       ),
     ).toThrow('ez-form: <Controls> must be rendered inside <Wizard>')
+  })
+
+  it('a wizard with a `when` step also throws the ez-form message outside <Form> (not a bare useWatch TypeError)', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(() =>
+      render(
+        <Wizard steps={conditionalSteps}>
+          <p />
+        </Wizard>,
+      ),
+    ).toThrow('ez-form: <Wizard> must be rendered inside <Form>')
   })
 })
 
