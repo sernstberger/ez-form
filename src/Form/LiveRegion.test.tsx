@@ -78,6 +78,14 @@ describe('LiveRegion', () => {
     expect(screen.getByRole('status')).toBe(first)
   })
 
+  it('a directly-passed aria-live wins over politeness, and the role follows it', () => {
+    render(<LiveRegion message="Urgent" aria-live="assertive" />)
+    // Without this, the attribute would be silently dropped: `aria-live` is set
+    // after the prop spread. The role tracks it so the two never disagree.
+    const region = screen.getByRole('alert')
+    expect(region).toHaveAttribute('aria-live', 'assertive')
+  })
+
   it('forwards arbitrary span props', () => {
     render(<LiveRegion message="x" id="announcer" data-testid="live" />)
     expect(document.getElementById('announcer')).toBe(screen.getByTestId('live'))

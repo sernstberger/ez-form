@@ -217,6 +217,14 @@ alongside its text: a region that appears in the same commit as its content has 
 change _from_, and that first announcement is unreliable. `Form`, `FieldArray`,
 `ResendCodeButton` and `PasswordStrength` all use this same component internally.
 
+Because several of them can be on screen at once, one form may hold more than one
+`role="status"` region — so in a test, query the one you mean by its slot class rather than by
+role. The form's own submit-status region is `formClasses.status`:
+
+```tsx
+document.querySelector(`.${formClasses.status}`) // the form's, not a field's
+```
+
 ## Field arrays
 
 `FieldArray` repeats a group of fields over a hookform `useFieldArray`. The array

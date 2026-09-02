@@ -27,6 +27,7 @@ export interface LiveRegionProps extends Omit<ComponentProps<'span'>, 'children'
   /**
    * `'polite'` (default) waits for a pause in speech; `'assertive'` interrupts.
    * Drives both `aria-live` and the matching implicit role (`status` / `alert`).
+   * A directly-passed `aria-live` wins, and the role follows it.
    */
   politeness?: 'polite' | 'assertive'
   /**
@@ -90,8 +91,16 @@ export function LiveRegion(inProps: LiveRegionProps) {
     visuallyHidden = true,
     component,
     className,
+    'aria-live': ariaLive,
     ...rest
   } = useDefaultProps({ props: inProps, name: 'EzLiveRegion' })
+
+  // A consumer's explicit `aria-live` wins over `politeness` (it would otherwise
+  // be silently dropped, since these attributes are set after the spread), and
+  // the role follows it so the two never disagree — an `aria-live="assertive"`
+  // region labelled `role="status"` is a contradiction assistive tech resolves
+  // unpredictably.
+  const live = ariaLive ?? politeness
 
   return (
     <LiveRegionRoot
@@ -101,8 +110,8 @@ export function LiveRegion(inProps: LiveRegionProps) {
       as={component}
       {...rest}
       ownerState={{ visuallyHidden }}
-      role={politeness === 'assertive' ? 'alert' : 'status'}
-      aria-live={politeness}
+      role={live === 'assertive' ? 'alert' : 'status'}
+      aria-live={live}
       className={`${liveRegionClasses.root}${className ? ` ${className}` : ''}`}
     >
       {message}

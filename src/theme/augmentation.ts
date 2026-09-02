@@ -55,7 +55,7 @@ declare module '@mui/material/styles' {
     EzWizardNav: 'root' | 'prev' | 'next' | 'submit'
     EzReadOnlyField: 'root' | 'header' | 'label' | 'value' | 'edit'
     EzNumberField: 'root' | 'steppers' | 'increment' | 'decrement'
-    EzForm: 'root' | 'title' | 'description'
+    EzForm: 'root' | 'title' | 'description' | 'status'
     EzFormError: 'root'
     EzLiveRegion: 'root'
     EzFormErrorSummary: 'root' | 'heading' | 'list' | 'item' | 'link'

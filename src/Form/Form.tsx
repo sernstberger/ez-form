@@ -42,7 +42,12 @@ import { shouldBlockUnsavedChanges } from '../useFormGuard'
  */
 export type FormMethods<TIn extends FieldValues, TOut> = UseFormReturn<TIn, unknown, TOut>
 
-export const formClasses = generateUtilityClasses('EzForm', ['root', 'title', 'description'])
+export const formClasses = generateUtilityClasses('EzForm', [
+  'root',
+  'title',
+  'description',
+  'status',
+])
 
 /** Typography plus `component`, so a slot can pick its element (heading level). */
 export type FormTextSlotProps = TypographyProps & { component?: ElementType }
@@ -50,6 +55,12 @@ export type FormTextSlotProps = TypographyProps & { component?: ElementType }
 const FormRoot = styled('form', { name: 'EzForm', slot: 'Root' })({})
 const FormTitle = styled(Typography, { name: 'EzForm', slot: 'Title' })({})
 const FormDescription = styled(Typography, { name: 'EzForm', slot: 'Description' })({})
+// The submit-status region gets its own EzForm slot rather than rendering a bare
+// LiveRegion: every migrated call site now carries `EzLiveRegion-root` too, so
+// that class alone no longer identifies *this* region — a form containing a
+// FieldArray or ResendCodeButton has several, and this one renders last.
+// `formClasses.status` is what names it, for a theme and for a test query.
+const FormStatus = styled(LiveRegion, { name: 'EzForm', slot: 'Status' })({})
 
 export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
   FormHTMLAttributes<HTMLFormElement>,
@@ -449,10 +460,11 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
             the DOM before its text arrives, or assistive tech has no prior
             content to observe changing and the first announcement is missed.
           */}
-          <LiveRegion
+          <FormStatus
             {...slotProps?.liveRegion}
             message={announcement.text}
             announcementKey={announcement.seq}
+            className={`${formClasses.status}${slotProps?.liveRegion?.className ? ` ${slotProps.liveRegion.className}` : ''}`}
           />
           {dialog}
         </FormRoot>
