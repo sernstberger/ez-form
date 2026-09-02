@@ -57,3 +57,4 @@ export {
   readOnlyFieldClasses,
   type ReadOnlyFieldProps,
 } from './fields/ReadOnlyField'
+export { FormError, formErrorClasses, type FormErrorProps } from './FormError'

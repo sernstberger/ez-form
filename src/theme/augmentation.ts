@@ -7,6 +7,7 @@ import type { WizardNavProps } from '../Wizard/WizardNav'
 import type { ReadOnlyFieldProps } from '../fields/ReadOnlyField'
 import type { NumberFieldControlProps } from '../fields/NumberField/NumberFieldControl'
 import type { FormProps } from '../Form'
+import type { FormErrorProps } from '../FormError'
 
 declare module '@mui/material/styles' {
   interface ComponentsPropsList {
@@ -19,6 +20,7 @@ declare module '@mui/material/styles' {
     EzNumberField: Partial<NumberFieldControlProps>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     EzForm: Partial<FormProps<any, any>>
+    EzFormError: Partial<FormErrorProps>
   }
 
   interface ComponentNameToClassKey {
@@ -30,6 +32,7 @@ declare module '@mui/material/styles' {
     EzReadOnlyField: 'root' | 'header' | 'label' | 'value' | 'edit'
     EzNumberField: 'root' | 'steppers' | 'increment' | 'decrement'
     EzForm: 'root' | 'title' | 'description'
+    EzFormError: 'root'
   }
 
   interface Components<Theme = unknown> {
@@ -64,6 +67,10 @@ declare module '@mui/material/styles' {
     EzForm?: {
       defaultProps?: ComponentsProps['EzForm']
       styleOverrides?: ComponentsOverrides<Theme>['EzForm']
+    }
+    EzFormError?: {
+      defaultProps?: ComponentsProps['EzFormError']
+      styleOverrides?: ComponentsOverrides<Theme>['EzFormError']
     }
   }
 }

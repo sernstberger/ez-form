@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `FormError`: renders `formState.errors.root` (set via `form.setError('root.<key>',
+{ message })`, e.g. a rejected async `onSubmit`) as an MUI `Alert`; renders nothing
+  when there is no root error. `EzFormError` theme key (`defaultProps`,
+  `styleOverrides.root`) and the `formErrorClasses` export — #60.
 - `EzNumberField` theme key (`defaultProps`, `styleOverrides` for `root`, `steppers`,
   `increment`, `decrement`) and the `numberFieldClasses` export; NumberField renders
   through MUI `TextField` — #26.
