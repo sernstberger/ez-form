@@ -6,6 +6,7 @@ import Typography, { type TypographyProps } from '@mui/material/Typography'
 import { useWatch } from 'react-hook-form'
 import { useEzFormContext } from '../../useEzFormContext'
 import { scorePassword } from './score'
+import { LiveRegion, type LiveRegionProps } from '../../Form/LiveRegion'
 
 export type PasswordStrengthScore = 0 | 1 | 2 | 3 | 4
 
@@ -38,7 +39,7 @@ export interface PasswordStrengthProps {
   slotProps?: {
     root?: React.ComponentProps<'div'>
     bar?: LinearProgressProps
-    label?: TypographyProps
+    label?: Omit<LiveRegionProps, 'message' | 'announcementKey'> & TypographyProps
   }
 }
 
@@ -53,7 +54,12 @@ const PasswordStrengthBar = styled(LinearProgress, {
   name: 'EzPasswordStrength',
   slot: 'Bar',
 })({})
-const PasswordStrengthLabel = styled(Typography, {
+// The tier label is the visible caption *and* the announcement, so the slot is a
+// `LiveRegion` (opted out of its visually-hidden default) rendered *as* a
+// Typography, which keeps `variant` and the theme's typography scale while the
+// region contributes the role/aria-live. No `announcementKey`: consecutive tiers
+// are always different strings, so every change is already a content change.
+const PasswordStrengthLabel = styled(LiveRegion, {
   name: 'EzPasswordStrength',
   slot: 'Label',
 })({})
@@ -100,13 +106,13 @@ export function PasswordStrength(inProps: PasswordStrengthProps) {
         className={`${passwordStrengthClasses.bar}${slotProps?.bar?.className ? ` ${slotProps.bar.className}` : ''}`}
       />
       <PasswordStrengthLabel
+        component={Typography}
         variant="caption" // guardrail: allow #59 default before the slot spread, overridable
-        aria-live="polite"
+        visuallyHidden={false}
         {...slotProps?.label}
+        message={label}
         className={`${passwordStrengthClasses.label}${slotProps?.label?.className ? ` ${slotProps.label.className}` : ''}`}
-      >
-        {label}
-      </PasswordStrengthLabel>
+      />
     </PasswordStrengthRoot>
   )
 }

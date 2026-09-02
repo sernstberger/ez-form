@@ -1,9 +1,10 @@
 import { createRef } from 'react'
-import { render, renderHook, screen, waitFor } from '@testing-library/react'
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { z } from 'zod'
 import { Form, formClasses, type FormMethods } from './Form'
+import { liveRegionClasses } from './LiveRegion'
 import { SubmitButton } from '../SubmitButton'
 import { TextField } from '../fields/TextField'
 import { Select } from '../fields/Select'
@@ -948,5 +949,216 @@ describe('requiredIndicator', () => {
     expect(screen.getByRole('checkbox', { name: 'I accept the terms' })).toBeRequired()
     expect(screen.getByLabelText('Send me the newsletter (optional)')).toBeInTheDocument()
     expect(asterisk(container)).toBeNull()
+  })
+  describe('submit status announcements', () => {
+    // The form's own live region, distinguished from any status region a field
+    // renders (FieldArray, ResendCodeButton) by its EzLiveRegion class.
+    const liveRegion = () => document.querySelector<HTMLElement>(`.${liveRegionClasses.root}`)!
+
+    // A rejecting `onSubmit` is rethrown by handleSubmit (existing Form behavior,
+    // so a consumer's error reporting still sees it) and nothing observes it —
+    // a genuine unhandled rejection. Observe it the way the runner does, as the
+    // async-defaultValues tests above already do, so the run stays pristine.
+    const withUnhandledRejection = async (boom: Error, body: () => Promise<void>) => {
+      const unhandled: unknown[] = []
+      const onUnhandledRejection = (error: unknown) => unhandled.push(error)
+      process.on('unhandledRejection', onUnhandledRejection)
+      try {
+        await body()
+        await waitFor(() => expect(unhandled).toEqual([boom]))
+      } finally {
+        process.off('unhandledRejection', onUnhandledRejection)
+      }
+    }
+
+    const deferred = () => {
+      let resolve!: () => void
+      let reject!: (error: unknown) => void
+      const promise = new Promise<void>((res, rej) => {
+        resolve = res
+        reject = rej
+      })
+      return { promise, resolve, reject }
+    }
+
+    it('is present and empty before any submit', () => {
+      render(
+        <Form schema={schema} defaultValues={{ email: 'a@b.co' }} onSubmit={() => {}}>
+          <SubmitButton>Go</SubmitButton>
+        </Form>,
+      )
+      // Present from the first render on purpose: a region that appears in the
+      // same commit as its text has no prior content to change from, and the
+      // first announcement is unreliable.
+      expect(liveRegion()).toBeInTheDocument()
+      expect(liveRegion()).toBeEmptyDOMElement()
+      expect(liveRegion()).toHaveAttribute('aria-live', 'polite')
+    })
+
+    it('announces the pending text while onSubmit is in flight, then the success text', async () => {
+      const user = userEvent.setup()
+      const { promise, resolve } = deferred()
+      render(
+        <Form schema={schema} defaultValues={{ email: 'a@b.co' }} onSubmit={() => promise}>
+          <SubmitButton>Go</SubmitButton>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      await waitFor(() => expect(liveRegion()).toHaveTextContent('Submitting…'))
+
+      await act(async () => {
+        resolve()
+        await promise
+      })
+      await waitFor(() => expect(liveRegion()).toHaveTextContent('Submitted.'))
+    })
+
+    it('announces the error text when onSubmit rejects', async () => {
+      const boom = new Error('server down')
+      await withUnhandledRejection(boom, async () => {
+        const user = userEvent.setup()
+        render(
+          <Form
+            schema={schema}
+            defaultValues={{ email: 'a@b.co' }}
+            onSubmit={() => Promise.reject(boom)}
+          >
+            <SubmitButton>Go</SubmitButton>
+          </Form>,
+        )
+        await user.click(screen.getByRole('button', { name: 'Go' }))
+        await waitFor(() => expect(liveRegion()).toHaveTextContent('Submit failed.'))
+      })
+    })
+
+    it('re-announces an identical repeated failure (the region node is replaced)', async () => {
+      const boom = new Error('server down')
+      const unhandled: unknown[] = []
+      const onUnhandledRejection = (error: unknown) => unhandled.push(error)
+      process.on('unhandledRejection', onUnhandledRejection)
+      try {
+        const user = userEvent.setup()
+        render(
+          <Form
+            schema={schema}
+            defaultValues={{ email: 'a@b.co' }}
+            onSubmit={() => Promise.reject(boom)}
+          >
+            <SubmitButton>Go</SubmitButton>
+          </Form>,
+        )
+        const button = screen.getByRole('button', { name: 'Go' })
+        await user.click(button)
+        await waitFor(() => expect(liveRegion()).toHaveTextContent('Submit failed.'))
+        const first = liveRegion()
+
+        // The same string twice: only a replaced node makes the second one audible.
+        await user.click(button)
+        await waitFor(() => expect(liveRegion()).not.toBe(first))
+        expect(liveRegion()).toHaveTextContent('Submit failed.')
+        await waitFor(() => expect(unhandled).toEqual([boom, boom]))
+      } finally {
+        process.off('unhandledRejection', onUnhandledRejection)
+      }
+    })
+
+    it('announces nothing when validation fails — FormErrorSummary owns that case', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={schema} defaultValues={{ email: 'not-an-email' }} onSubmit={onSubmit}>
+          <TextField name="email" label="Email" />
+          <SubmitButton>Go</SubmitButton>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      await screen.findByText(/invalid/i)
+      expect(onSubmit).not.toHaveBeenCalled()
+      // Not "Submit failed.": the submit never started, so nothing is announced.
+      expect(liveRegion()).toBeEmptyDOMElement()
+    })
+
+    it('false suppresses an individual message', async () => {
+      const user = userEvent.setup()
+      const { promise, resolve } = deferred()
+      render(
+        <Form
+          schema={schema}
+          defaultValues={{ email: 'a@b.co' }}
+          onSubmit={() => promise}
+          submitPendingText={false}
+          submitSuccessText="All done"
+        >
+          <SubmitButton>Go</SubmitButton>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      // Pending is suppressed, so the region stays empty until the success text.
+      expect(liveRegion()).toBeEmptyDOMElement()
+
+      await act(async () => {
+        resolve()
+        await promise
+      })
+      await waitFor(() => expect(liveRegion()).toHaveTextContent('All done'))
+    })
+
+    it('custom texts replace the defaults', async () => {
+      const boom = new Error('nope')
+      await withUnhandledRejection(boom, async () => {
+        const user = userEvent.setup()
+        render(
+          <Form
+            schema={schema}
+            defaultValues={{ email: 'a@b.co' }}
+            onSubmit={() => Promise.reject(boom)}
+            submitErrorText="Could not save"
+          >
+            <SubmitButton>Go</SubmitButton>
+          </Form>,
+        )
+        await user.click(screen.getByRole('button', { name: 'Go' }))
+        await waitFor(() => expect(liveRegion()).toHaveTextContent('Could not save'))
+      })
+    })
+
+    it('announces on the confirm path once confirmed, and not when cancelled', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={schema} defaultValues={{ email: 'a@b.co' }} onSubmit={() => {}} confirm>
+          <SubmitButton>Go</SubmitButton>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      await user.click(await screen.findByRole('button', { name: 'Cancel' }))
+      // Cancelling never reaches handleSubmit, so there is nothing to announce.
+      expect(liveRegion()).toBeEmptyDOMElement()
+      // The dialog's closing transition still overlays the form; wait it out
+      // before the second attempt so the submit button is reachable again.
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      await user.click(await screen.findByRole('button', { name: 'Confirm' }))
+      await waitFor(() => expect(liveRegion()).toHaveTextContent('Submitted.'))
+    })
+
+    it('has no accessibility violations with an announcement showing', async () => {
+      const boom = new Error('nope')
+      await withUnhandledRejection(boom, async () => {
+        const user = userEvent.setup()
+        const { container } = render(
+          <Form
+            schema={schema}
+            defaultValues={{ email: 'a@b.co' }}
+            onSubmit={() => Promise.reject(boom)}
+          >
+            <SubmitButton>Go</SubmitButton>
+          </Form>,
+        )
+        await user.click(screen.getByRole('button', { name: 'Go' }))
+        await waitFor(() => expect(liveRegion()).toHaveTextContent('Submit failed.'))
+        await expectNoA11yViolations(container)
+      })
+    })
   })
 })

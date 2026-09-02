@@ -130,6 +130,63 @@ export const AsyncSubmit: Story = {
   ),
 }
 
+const filledValues: DefaultValues<SignupIn> = {
+  name: 'Ada',
+  email: 'ada@example.com',
+  role: 'admin',
+  plan: 1,
+  team: 'core',
+  seats: 5,
+  tos: true,
+  newsletter: true,
+}
+
+const failingSubmit = fn(
+  () =>
+    new Promise<void>((_resolve, reject) =>
+      setTimeout(() => reject(new Error('The server said no')), 1200),
+    ),
+)
+
+export const SubmitAnnouncements: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'The form announces its submit lifecycle in a visually hidden live region: "Submitting…" while `onSubmit` is in flight, then "Submitted." or "Submit failed.". Nothing is visible — turn on a screen reader, or inspect the `EzLiveRegion-root` span, to observe it. Each string is a prop (`submitPendingText`, `submitSuccessText`, `submitErrorText`); `false` suppresses one. A *validation* failure announces nothing here, since `FormErrorSummary` already covers it.',
+      },
+    },
+  },
+  args: { defaultValues: filledValues, onSubmit: slowSubmit },
+  render: (args) => (
+    <Form {...args}>
+      <SignupFields submitLabel="Save (announces)" />
+    </Form>
+  ),
+}
+
+export const SubmitAnnouncementsCustomText: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'The same region with its own copy: the pending message is suppressed with `false`, and a rejected submit announces a custom `submitErrorText`. Submitting here rejects after 1.2s.',
+      },
+    },
+  },
+  args: {
+    defaultValues: filledValues,
+    onSubmit: failingSubmit,
+    submitPendingText: false,
+    submitErrorText: 'Could not save your details. Please try again.',
+  },
+  render: (args) => (
+    <Form {...args}>
+      <SignupFields submitLabel="Save (fails in 1.2s)" />
+    </Form>
+  ),
+}
+
 type SignupIn = z.input<typeof schema>
 
 const savedUser: SignupIn = {
