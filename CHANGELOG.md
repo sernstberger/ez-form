@@ -47,7 +47,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   missing a README Components row; allow-listed via a trailing `// guardrail: allow <reason>`
   comment. Wired into CI alongside its own `pnpm test:scripts` suite — #44.
 
-> > > > > > > feat/guardrail
 
 ### Changed
 
