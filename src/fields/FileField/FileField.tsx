@@ -43,10 +43,10 @@ export const fileFieldClasses = generateUtilityClasses('EzFileField', ['root', '
 // button — the component's minimum layout so the list doesn't collide with
 // it — so it lives on the styled slot's default style block, still
 // overridable via `theme.components.EzFileField.styleOverrides.fileList`.
-const FileFieldList = styled(Stack, { name: 'EzFileField', slot: 'FileList' })({
+const FileFieldList = styled(Stack, { name: 'EzFileField', slot: 'FileList' })(({ theme }) => ({
   flexWrap: 'wrap',
-  marginTop: 8,
-})
+  marginTop: theme.spacing(1),
+}))
 
 export type FileFieldValue = File | null | File[]
 
