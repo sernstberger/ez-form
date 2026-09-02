@@ -92,6 +92,7 @@ const meta = {
       schema={schema}
       defaultValues={emptyValues}
       onSubmit={onSubmit}
+      title="Create your account"
       confirm={{ title: 'Create account?' }}
     >
       <Stack spacing={3} sx={{ width: 480 }}>
@@ -126,6 +127,7 @@ export const PageLayout: Story = {
       schema={schema}
       defaultValues={emptyValues}
       onSubmit={onSubmit}
+      title="Create your account"
       confirm={{ title: 'Create account?' }}
     >
       <Stack spacing={3} sx={{ width: 480 }}>
@@ -150,6 +152,7 @@ export const PageLayoutNestedSections: Story = {
       schema={schema}
       defaultValues={emptyValues}
       onSubmit={onSubmit}
+      title="Create your account"
       confirm={{ title: 'Create account?' }}
     >
       <Stack spacing={3} sx={{ width: 480 }}>
@@ -209,6 +212,7 @@ export const Resume: Story = {
       <Form
         schema={schema}
         defaultValues={values}
+        title="Create your account"
         onSubmit={(v, form) => {
           onSubmit(v)
           localStorage.removeItem(key)

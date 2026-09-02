@@ -24,7 +24,7 @@ export const WrongPassword: Story = {
   },
   play: async ({ canvas, userEvent }) => {
     await userEvent.type(canvas.getByLabelText(/email/i), 'ada@example.com')
-    await userEvent.type(canvas.getByLabelText(/password/i), LOGIN_BAD_PASSWORD)
+    await userEvent.type(canvas.getByLabelText(/^password/i), LOGIN_BAD_PASSWORD)
     await userEvent.click(canvas.getByRole('button', { name: /sign in/i }))
     await canvas.findByRole('alert')
   },
@@ -40,7 +40,7 @@ export const SignedIn: Story = {
   },
   play: async ({ canvas, userEvent }) => {
     await userEvent.type(canvas.getByLabelText(/email/i), 'ada@example.com')
-    await userEvent.type(canvas.getByLabelText(/password/i), 'correct-horse-battery-staple')
+    await userEvent.type(canvas.getByLabelText(/^password/i), 'correct-horse-battery-staple')
     await userEvent.click(canvas.getByRole('button', { name: /sign in/i }))
   },
 }

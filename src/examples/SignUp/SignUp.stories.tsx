@@ -24,7 +24,7 @@ export const MismatchedPasswords: Story = {
   },
   play: async ({ canvas, userEvent }) => {
     await userEvent.type(canvas.getByLabelText(/^email/i), 'ada@example.com')
-    await userEvent.type(canvas.getByLabelText(/^password/i), 'correct-horse-1')
+    await userEvent.type(canvas.getByLabelText(/^password(?! strength)/i), 'correct-horse-1')
     await userEvent.type(canvas.getByLabelText(/confirm password/i), 'different-1')
     await userEvent.type(canvas.getByLabelText(/display name/i), 'Ada Lovelace')
     await userEvent.click(canvas.getByRole('checkbox', { name: /terms/i }))
@@ -44,7 +44,7 @@ export const WrongCode: Story = {
   },
   play: async ({ canvas, userEvent }) => {
     await userEvent.type(canvas.getByLabelText(/^email/i), 'ada@example.com')
-    await userEvent.type(canvas.getByLabelText(/^password/i), 'correct-horse-1')
+    await userEvent.type(canvas.getByLabelText(/^password(?! strength)/i), 'correct-horse-1')
     await userEvent.type(canvas.getByLabelText(/confirm password/i), 'correct-horse-1')
     await userEvent.type(canvas.getByLabelText(/display name/i), 'Ada Lovelace')
     await userEvent.click(canvas.getByRole('checkbox', { name: /terms/i }))
@@ -66,7 +66,7 @@ export const Verified: Story = {
   },
   play: async ({ canvas, userEvent }) => {
     await userEvent.type(canvas.getByLabelText(/^email/i), 'ada@example.com')
-    await userEvent.type(canvas.getByLabelText(/^password/i), 'correct-horse-1')
+    await userEvent.type(canvas.getByLabelText(/^password(?! strength)/i), 'correct-horse-1')
     await userEvent.type(canvas.getByLabelText(/confirm password/i), 'correct-horse-1')
     await userEvent.type(canvas.getByLabelText(/display name/i), 'Ada Lovelace')
     await userEvent.click(canvas.getByRole('checkbox', { name: /terms/i }))
