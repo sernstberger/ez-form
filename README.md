@@ -97,6 +97,7 @@ React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form
 | `NumberField`                                  | Base UI `NumberField` through MUI `TextField` | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max` (also the stepper bounds), `validate`. Value is `number \| null`; digits group while typing (new in v2.1), and `format={{ useGrouping: false }}` turns that off                                                                                                                                                                                                                                         |
 | `MoneyField`                                   | `NumberField` pinned to USD                   | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max`, `validate`. Value is a `number` in dollars, rounded to the cent; shows `$1,234.50` on blur                                                                                                                                                                                                                                                                                                             |
 | `ZipField`                                     | `TextField`                                   | `name`; same rules as TextField, plus a built-in "5 digits" rule (`invalidMessage?`, default `'Enter a 5-digit ZIP code'`). Digits only, capped at 5 (anything else is stripped on type/paste); `inputMode="numeric"`, `autoComplete` defaults to `'postal-code'`. Value is the digit string                                                                                                                                                                                     |
+| `FeinField`                                    | ez-form `TextField`                           | `name`; same rules as TextField, plus `format?` (a `#` template, default `'##-#######'`) and `invalidMessage?` (default `'Enter a 9-digit employer identification number'`). The form value is digits only (`'123456789'`); `inputMode="numeric"`, `autoComplete` defaults to `'off'`                                                                                                                                                                                            |
 | `StateSelect`                                  | `Select`                                      | `name`; same rules as Select. Options are the 50 states + DC by default; `territories?` adds PR, GU, VI, AS, MP. `autoComplete` defaults to `'address-level1'`. Value is the USPS abbreviation; also exports `US_STATES`/`US_TERRITORIES` option arrays                                                                                                                                                                                                                          |
 | `DatePicker` / `TimePicker` / `DateTimePicker` | MUI X pickers                                 | `name`, `label?`, `helperText?`, `errorMessages?`; rules `required`, `validate`. The picker's own props (`minDate`, `disablePast`, `views`, …) pass through. Value is the adapter's date type or `null`                                                                                                                                                                                                                                                                          |
 | `OtpField`                                     | Base UI `OTPField` in MUI's outlined style    | `name`, `label?`, `helperText?`, `length?` (6), `mask?`, `validationType?`, `size?`; rules `required`, `validate`. Value is the code string; a partial code fails with `<label> must be <length> characters.`                                                                                                                                                                                                                                                                    |
@@ -747,6 +748,7 @@ Themeable under `EzTextareaField` (`root`, `counter`, exported as `textareaField
 | `OtpField`    | first slot only, from Base UI itself, not duplicated here             | `one-time-code` | `numeric`       |
 | `PhoneField`  | always — set by the field itself, not the `type="tel"` fallback       | `tel`           | `tel`           |
 | `EmailField`  | always — set by the field itself, via its fixed `type="email"`        | `email`         | `email`         |
+| `FeinField`   | always — a tax ID has no autofill token worth guessing                | `off`           | `numeric`       |
 
 `TextField` never guesses a token from `name` — a wrong guess is worse than none, so only these unambiguous `type`s get a default. `PasswordField` covers `autoComplete="current-password"` / `"new-password"` on its own, above. `PhoneField` sets `type="tel"`, `inputMode="tel"` and its `autoComplete` default itself rather than relying on the `type`-derived fallback — the two agree, but the field owns them — and its `autoComplete` takes a sectioned token (`"shipping tel"`, `"work tel"`) for forms with more than one number. `EmailField` fixes `type="email"` (so `inputMode="email"` comes from `TextField`'s own `type` mapping) and defaults `autoComplete` to `'email'`, which likewise takes a sectioned token (`"work email"`). The remaining v8 date/time/address fields (#17–#19) will extend this table.
 
@@ -809,7 +811,7 @@ A built-in rule rejects a non-empty value that is not a valid address, using **H
 
 ## US fields
 
-`PhoneField` is the first of the US-shaped fields. They share one rule: **the form value is the bare digits, and the template only decides how they are displayed.** So a zod schema stays a plain `z.string()` with no regex — the field itself owns completeness — and the value you submit, store and compare is always canonical, whatever the user typed or pasted.
+`PhoneField` and `FeinField` are the template-shaped US fields (`ZipField` and `StateSelect` are below). They share one rule: **the form value is the bare digits, and the template only decides how they are displayed.** So a zod schema stays a plain `z.string()` with no regex — the field itself owns completeness — and the value you submit, store and compare is always canonical, whatever the user typed or pasted.
 
 ```tsx
 const schema = z.object({ phone: z.string() })
@@ -842,6 +844,21 @@ A value that is non-empty but incomplete fails on submit with `invalidMessage`, 
 ```
 
 `format`, `invalidMessage` and `autoComplete` are all settable app-wide through `theme.components.EzPhoneField.defaultProps`; a prop on the element always wins. `PhoneField` adds no styled slot of its own — it renders a `TextField`, so MUI's own `MuiTextField` / `MuiOutlinedInput` style keys reach it unchanged.
+
+### FeinField
+
+`FeinField` is the same machinery on the IRS's own two-then-seven shape — the form value is the bare nine digits, `format` (default `'##-#######'`) decides only how they are drawn:
+
+```tsx
+const schema = z.object({ ein: z.string() })
+
+<FeinField name="ein" label="EIN" required />
+// user types 123456789 → shows "12-3456789", submits { ein: '123456789' }
+```
+
+Everything `PhoneField` does with typing, pasting, the caret and Backspace-onto-a-separator applies here unchanged; the two share `formatTemplate` and `resolveTemplateEdit`. What differs is the defaults: `inputMode="numeric"` (there is no `type="tel"` keypad to inherit), `autoComplete="off"` — no autofill token exists for a tax ID, and a browser guessing one over a federal identifier is worse than none — and `invalidMessage`, which defaults to `Enter a 9-digit employer identification number`. `type` stays `text`, so a leading zero is never dropped.
+
+`format`, `invalidMessage` and `autoComplete` are settable app-wide through `theme.components.EzFeinField.defaultProps`; a prop on the element always wins.
 
 ## PasswordStrength
 

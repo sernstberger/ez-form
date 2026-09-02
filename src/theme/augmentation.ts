@@ -21,6 +21,7 @@ import type { TextareaFieldProps } from '../fields/TextareaField/TextareaField'
 import type { ResendCodeButtonProps } from '../fields/OtpField/ResendCodeButton'
 import type { PhoneFieldProps } from '../fields/PhoneField'
 import type { EmailFieldProps } from '../fields/EmailField'
+import type { FeinFieldProps } from '../fields/FeinField'
 
 declare module '@mui/material/styles' {
   interface ComponentsPropsList {
@@ -49,6 +50,7 @@ declare module '@mui/material/styles' {
     EzResendCodeButton: Partial<ResendCodeButtonProps>
     EzPhoneField: Partial<PhoneFieldProps>
     EzEmailField: Partial<EmailFieldProps>
+    EzFeinField: Partial<FeinFieldProps>
   }
 
   interface ComponentNameToClassKey {
@@ -164,6 +166,12 @@ declare module '@mui/material/styles' {
     // `autoComplete` theme-settable.
     EzEmailField?: {
       defaultProps?: ComponentsProps['EzEmailField']
+    }
+    // Also a plain `TextField` with no styled slot of its own: `defaultProps`
+    // only, which is what makes `format` / `invalidMessage` / `autoComplete`
+    // theme-settable.
+    EzFeinField?: {
+      defaultProps?: ComponentsProps['EzFeinField']
     }
   }
 }
