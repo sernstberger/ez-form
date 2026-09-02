@@ -159,7 +159,7 @@ describe('DateField', () => {
     expect(document.querySelector('.consumer-input')).toBeInTheDocument()
   })
 
-  it('runs a consumer onBlur after the form handler', async () => {
+  it('runs a consumer slotProps.textField.onBlur after the form handler', async () => {
     const user = userEvent.setup()
     // The form's handler must run first; `touchedFields` is set synchronously by
     // it, so reading it from inside the consumer's onBlur proves the ordering.
@@ -178,7 +178,7 @@ describe('DateField', () => {
             form = methods
           }}
         >
-          <DateField name="birthday" label="Birthday" onBlur={onBlur} />
+          <DateField name="birthday" label="Birthday" slotProps={{ textField: { onBlur } }} />
           <button type="submit">Go</button>
         </Form>,
       ),
@@ -187,6 +187,40 @@ describe('DateField', () => {
     await user.tab()
     expect(onBlur).toHaveBeenCalledTimes(1)
     expect(order).toEqual(['form-first'])
+  })
+
+  it("keeps the form's required/error/helperText when a consumer's slotProps.textField sets its own", async () => {
+    // A consumer `slotProps.textField.{helperText,error,required}` must never
+    // win over the form's own — MUI's `useSlotProps` merges `slotProps.textField`
+    // *after* the flat props (`{ ...forwarded, ...slotProps }`), so if the form's
+    // values were spread before the consumer's, the consumer's would silently
+    // replace the error text (inside the same role="alert" node), clear
+    // `aria-invalid`, and drop the required marker. `DatePicker` never regresses
+    // this because `usePickerField` always spreads the form's own values last.
+    const user = userEvent.setup()
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ birthday: null }} onSubmit={() => {}}>
+          <DateField
+            name="birthday"
+            label="Birthday"
+            required
+            slotProps={{
+              textField: { helperText: 'consumer hint', error: false, required: false },
+            }}
+          />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    // Before submit: the consumer's helperText never shows — the form owns the slot.
+    expect(screen.queryByText('consumer hint')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    // After submit: the form's error message wins, inside role="alert", and
+    // aria-invalid stays true — neither is knocked out by the consumer's props.
+    expect(await screen.findByRole('alert')).toHaveTextContent('Birthday is required.')
+    expect(screen.queryByText('consumer hint')).not.toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Birthday' })).toHaveAttribute('aria-invalid', 'true')
   })
 
   it('clears the picker error once the value comes back in range', async () => {

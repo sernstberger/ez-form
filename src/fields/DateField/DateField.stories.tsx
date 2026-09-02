@@ -49,15 +49,16 @@ export const Birthday: Story = {
  * for a date near today (a calendar is faster to scan than typing).
  */
 export const BirthdayVsDatePicker: Story = {
-  render: () => (
+  args: {
+    name: 'birthday',
+    label: 'Birthday (DateField)',
+    disableFuture: true,
+    minDate: new Date(1900, 0, 1),
+    required: true,
+  },
+  render: (args) => (
     <>
-      <DateField
-        name="birthday"
-        label="Birthday (DateField)"
-        disableFuture
-        minDate={new Date(1900, 0, 1)}
-        required
-      />
+      <DateField {...args} />
       <DatePicker name="start" label="Start date (DatePicker)" />
     </>
   ),
