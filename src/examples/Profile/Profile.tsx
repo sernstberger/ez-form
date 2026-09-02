@@ -96,16 +96,11 @@ export function Profile({ onSuccess, loadSeed }: ProfileProps) {
           values={reloaded}
           resetOptions={{ keepDirtyValues: true }}
           onDefaultValuesError={(error) => {
-            // Deferred: hookform's own rejection handling resets the form (to `{}`)
-            // right after this callback runs, which would otherwise clear a
-            // `setError` called synchronously here — see #70 (filed alongside this
-            // example). Queuing a macrotask lets that reset finish first, so the
-            // error survives long enough for FormError to render it.
-            setTimeout(() => {
-              form.current?.setError('root.server', {
-                message: error instanceof Error ? error.message : 'Could not load your profile',
-              })
-            }, 0)
+            // Form guarantees this runs after hookform's post-rejection reset (#70),
+            // so a synchronous setError survives for FormError to render.
+            form.current?.setError('root.server', {
+              message: error instanceof Error ? error.message : 'Could not load your profile',
+            })
           }}
           title="Your profile"
           description="Update how you appear to other members. Fields marked with * are required."
