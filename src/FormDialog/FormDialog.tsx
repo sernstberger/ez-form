@@ -16,7 +16,7 @@ import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import { styled } from '@mui/material/styles'
 import { useFormState, type FieldValues } from 'react-hook-form'
-import { Form, type FormProps } from '../Form'
+import { Form, willRenderFormDescription, type FormProps } from '../Form'
 import { SubmitButton, type SubmitButtonProps } from '../SubmitButton'
 import { useConfirm, type ConfirmOptions } from '../ConfirmDialog'
 import { mergeDisabled } from '../fields/mergeDisabled'
@@ -107,6 +107,41 @@ export interface FormDialogProps<TIn extends FieldValues, TOut>
   }
 }
 
+/**
+ * Every `Form` binding prop, by name, so the two halves of `FormDialogProps` can
+ * be split at runtime instead of hand-destructured.
+ *
+ * Ruling: a `satisfies Record<keyof FormBindingProps<…>, true>` guard rather than
+ * a hand-maintained destructure — a prop added to `FormProps` upstream used to
+ * fall through into `...dialogProps` and land on the MUI `Dialog`'s `div` (React
+ * then warns, or silently drops it). Merging #3/#4 did exactly that with
+ * `submitPendingText` / `submitSuccessText` / `submitErrorText`. Now a new `Form`
+ * prop fails typecheck here until it is listed. Cost if wrong: nothing silent —
+ * the build breaks and names the missing key.
+ */
+const FORM_PROP_KEYS = {
+  schema: true,
+  onSubmit: true,
+  defaultValues: true,
+  values: true,
+  resetOptions: true,
+  onDefaultValuesError: true,
+  ref: true,
+  mode: true,
+  disabled: true,
+  confirm: true,
+  guard: true,
+  description: true,
+  requiredIndicator: true,
+  optionalText: true,
+  requiredIndicatorText: true,
+  submitPendingText: true,
+  submitSuccessText: true,
+  submitErrorText: true,
+  children: true,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+} satisfies Record<keyof FormBindingProps<any, any>, true>
+
 const FormDialogRoot = styled(Dialog, { name: 'EzFormDialog', slot: 'Root' })({})
 // MUI's dialog paper is a flex column capped at `calc(100% - 64px)`, and
 // `DialogContent`'s own `flex: 1 1 auto; overflow-y: auto` is what makes long
@@ -159,14 +194,26 @@ function CancelButton({
   className,
   disabled,
   children,
+  onClick,
   ...rest
 }: ComponentProps<typeof Button> & { onCancel: (event: object) => void }) {
   const { disabled: formDisabled } = useFormState()
   return (
     <Button
-      type="button"
-      onClick={onCancel}
       {...rest}
+      type="button"
+      onClick={(event) => {
+        // The consumer's handler runs first and can veto the close with
+        // `event.preventDefault()` — the native cancel idiom, and the only way
+        // to keep a dialog open from a `slotProps.cancel.onClick`. It is
+        // destructured out of `rest` (rather than left to the spread) so it can
+        // never silently replace the close gate: before this, a consumer
+        // `onClick` took the button over and Escape/backdrop were the only ways
+        // out. Same shape as `ClearButton`'s handler composition (#75).
+        onClick?.(event)
+        if (event.defaultPrevented) return
+        onCancel(event)
+      }}
       disabled={mergeDisabled(disabled, formDisabled)}
       className={`${formDialogClasses.cancel}${className ? ` ${className}` : ''}`}
     >
@@ -197,28 +244,32 @@ export function FormDialog<TIn extends FieldValues, TOut>(inProps: FormDialogPro
     closeOnSubmit = true,
     slotProps,
     className,
-    children,
     'aria-labelledby': ariaLabelledBy,
     'aria-describedby': ariaDescribedBy,
-    // Form's
-    schema,
-    onSubmit,
-    defaultValues,
-    values,
-    resetOptions,
-    onDefaultValuesError,
-    ref,
-    mode,
-    disabled,
-    confirm,
-    guard,
+    // `description` and `requiredIndicatorText` are read here *as well as* being
+    // forwarded in `formProps` below: the dialog needs them to decide whether
+    // Form will render a description worth pointing `aria-describedby` at.
     description,
-    requiredIndicator,
-    optionalText,
     requiredIndicatorText,
-    // Dialog's
-    ...dialogProps
+    ...rest
   } = props
+  // Split what is left by name rather than by hand: everything named in
+  // `FORM_PROP_KEYS` goes to `<Form>`, everything else to the MUI `Dialog`. The
+  // two buckets are disjoint by construction, so the casts below only recover
+  // the types that `Object.entries` erases — they assert nothing new.
+  const formBucket: Record<string, unknown> = {}
+  const dialogBucket: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(rest)) {
+    ;(key in FORM_PROP_KEYS ? formBucket : dialogBucket)[key] = value
+  }
+  const { children, onSubmit, ...formOwnProps } = formBucket as unknown as FormBindingProps<
+    TIn,
+    TOut
+  >
+  const dialogProps = dialogBucket as Omit<
+    DialogProps,
+    'title' | 'onClose' | 'open' | 'slotProps' | 'children' | 'ref' | 'onSubmit'
+  >
   const baseId = useId()
   const titleId = `${baseId}-title`
   const descriptionId = `${baseId}-description`
@@ -231,6 +282,8 @@ export function FormDialog<TIn extends FieldValues, TOut>(inProps: FormDialogPro
     submit: submitSlot,
     ...dialogSlotProps
   } = slotProps ?? {}
+
+  const describedByForm = willRenderFormDescription({ description, requiredIndicatorText })
 
   const dirtyRef = useRef(false)
   const { confirm: ask, dialog: exitDialog } = useConfirm()
@@ -265,9 +318,13 @@ export function FormDialog<TIn extends FieldValues, TOut>(inProps: FormDialogPro
         open={open}
         onClose={(event, reason) => void requestClose(event, reason)}
         aria-labelledby={ariaLabelledBy ?? (title != null ? titleId : undefined)}
-        // `description` renders inside the <form>, but it describes the dialog:
-        // the `dialog` role lives on the paper, so the reference has to be here.
-        aria-describedby={ariaDescribedBy ?? (description != null ? descriptionId : undefined)}
+        // The description renders inside the <form>, but it describes the
+        // dialog: the `dialog` role lives on the paper, so the reference has to
+        // be here. `description != null` is the wrong test — the
+        // requiredIndicator convention is stated in that same slot and is on by
+        // default in both modes (#4), so a dialog with no `description` still
+        // gets one. Ask Form's own predicate instead of guessing.
+        aria-describedby={ariaDescribedBy ?? (describedByForm ? descriptionId : undefined)}
         className={`${formDialogClasses.root}${className ? ` ${className}` : ''}`}
         slotProps={dialogSlotProps}
       >
@@ -281,7 +338,9 @@ export function FormDialog<TIn extends FieldValues, TOut>(inProps: FormDialogPro
           </FormDialogTitle>
         )}
         <FormDialogForm
-          schema={schema}
+          {...formOwnProps}
+          description={description}
+          requiredIndicatorText={requiredIndicatorText}
           onSubmit={async (submitted, form) => {
             await onSubmit(submitted, form)
             // Only after the consumer's own handler resolves: a save that
@@ -293,19 +352,6 @@ export function FormDialog<TIn extends FieldValues, TOut>(inProps: FormDialogPro
             // consulted on this path: a submitted form has nothing unsaved.
             if (closeOnSubmit) onClose({}, 'submit')
           }}
-          defaultValues={defaultValues}
-          values={values}
-          resetOptions={resetOptions}
-          onDefaultValuesError={onDefaultValuesError}
-          ref={ref}
-          mode={mode}
-          disabled={disabled}
-          confirm={confirm}
-          guard={guard}
-          description={description}
-          requiredIndicator={requiredIndicator}
-          optionalText={optionalText}
-          requiredIndicatorText={requiredIndicatorText}
           {...formSlot}
           slotProps={{
             ...formSlot?.slotProps,

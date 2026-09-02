@@ -53,6 +53,27 @@ export const formClasses = generateUtilityClasses('EzForm', [
 /** Typography plus `component`, so a slot can pick its element (heading level). */
 export type FormTextSlotProps = TypographyProps & { component?: ElementType }
 
+/**
+ * Whether `<Form>` will render its description element, given the props that
+ * feed it. `description` alone is not the answer: the requiredIndicator
+ * convention is stated in that same slot and is on by default in *both* modes
+ * (#4), so a form with no `description` at all still renders one.
+ *
+ * Ruling: shared with `FormDialog` rather than repeated there — the dialog's
+ * `aria-describedby` lives on the paper (the `dialog` role is there, not on the
+ * `<form>`), so it has to predict this from outside, and a copy would silently
+ * desync the next time the default copy or its modes change. The same reason
+ * `shouldBlockUnsavedChanges` is shared by the two guards (#74). Cost if wrong:
+ * the dialog points `aria-describedby` at an element that never renders, or
+ * misses one that does.
+ */
+export function willRenderFormDescription(props: {
+  description?: ReactNode
+  requiredIndicatorText?: ReactNode | false
+}): boolean {
+  return props.description != null || props.requiredIndicatorText !== false
+}
+
 const FormRoot = styled('form', { name: 'EzForm', slot: 'Root' })({})
 const FormTitle = styled(Typography, { name: 'EzForm', slot: 'Title' })({})
 const FormDescription = styled(Typography, { name: 'EzForm', slot: 'Description' })({})

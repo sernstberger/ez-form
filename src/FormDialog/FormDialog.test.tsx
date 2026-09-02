@@ -352,10 +352,112 @@ describe('FormDialog', () => {
     const onSubmit = vi.fn()
     render(<Harness description="Who is this?" confirm onSubmit={onSubmit} />)
     const dialog = await openDialog(user)
-    expect(dialog).toHaveAccessibleDescription('Who is this?')
+    // Form appends the requiredIndicator convention to `description` (#4), and
+    // the whole thing describes the *dialog*, not just the inner <form>.
+    expect(dialog).toHaveAccessibleDescription(
+      'Who is this? Required fields are marked with an asterisk (*).',
+    )
     await type(user, 'Ada')
     await user.click(screen.getByRole('button', { name: 'Submit' }))
     await user.click(await screen.findByRole('button', { name: 'Confirm' }))
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+  })
+
+  // Finding 1: `description != null` was the wrong gate — Form states the
+  // requiredIndicator convention in that same slot, on by default in BOTH modes.
+  it('describes the dialog with the requiredIndicator text even with no description', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    const dialog = await openDialog(user)
+    expect(dialog).toHaveAccessibleDescription('Required fields are marked with an asterisk (*).')
+  })
+
+  it('describes the dialog with the optional-mode convention text', async () => {
+    const user = userEvent.setup()
+    render(<Harness requiredIndicator="optional" />)
+    const dialog = await openDialog(user)
+    expect(dialog).toHaveAccessibleDescription('All fields are required unless marked optional.')
+  })
+
+  it('leaves the dialog undescribed when both description and the convention text are off', async () => {
+    const user = userEvent.setup()
+    render(<Harness requiredIndicatorText={false} />)
+    const dialog = await openDialog(user)
+    expect(dialog).not.toHaveAttribute('aria-describedby')
+  })
+
+  // Finding 2: a consumer onClick used to replace the close gate outright.
+  it('slotProps.cancel.onClick runs and still reaches the exit prompt on a dirty form', async () => {
+    const user = userEvent.setup()
+    const onClick = vi.fn()
+    const onClosed = vi.fn()
+    render(<Harness slotProps={{ cancel: { onClick } }} onClosed={onClosed} />)
+    await openDialog(user)
+    await type(user, 'Ada')
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(onClick).toHaveBeenCalledTimes(1)
+    expect(await screen.findByRole('alertdialog', { name: 'Discard changes?' })).toBeInTheDocument()
+    expect(onClosed).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Discard' }))
+    expect(onClosed).toHaveBeenCalledWith('cancelClick')
+  })
+
+  it('a slotProps.cancel.onClick that calls preventDefault vetoes the close', async () => {
+    const user = userEvent.setup()
+    const onClosed = vi.fn()
+    render(
+      <Harness
+        slotProps={{ cancel: { onClick: (event) => event.preventDefault() } }}
+        onClosed={onClosed}
+      />,
+    )
+    await openDialog(user)
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(onClosed).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: 'Edit contact' })).toBeInTheDocument()
+  })
+
+  // Finding 3: a Form prop must reach <Form>, not the Dialog's div. React
+  // silently drops an unknown prop rather than rendering it, so the attribute
+  // alone proves nothing — its "does not recognize the X prop on a DOM element"
+  // warning is the actual signal, and this asserts on that.
+  it('forwards Form-only props to the form, never onto the dialog element', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    render(<Harness submitPendingText="Saving your contact…" onSubmit={onSubmit} />)
+    await openDialog(user)
+    await type(user, 'Ada')
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+    const messages = consoleError.mock.calls.map((call) => call.join(' '))
+    expect(messages.filter((m) => m.includes('does not recognize'))).toEqual([])
+    expect(messages.filter((m) => m.toLowerCase().includes('submitpendingtext'))).toEqual([])
+  })
+
+  // Finding 4: two stacked modals — Escape must peel one layer at a time.
+  it('Escape on the exit prompt closes only the prompt, and prompts again on a second Escape', async () => {
+    const user = userEvent.setup()
+    const onClosed = vi.fn()
+    render(<Harness onClosed={onClosed} />)
+    await openDialog(user)
+    await type(user, 'Ada')
+
+    await user.keyboard('{Escape}')
+    await screen.findByRole('alertdialog', { name: 'Discard changes?' })
+
+    // First Escape dismisses the prompt only; the form dialog is still there.
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+    expect(onClosed).not.toHaveBeenCalled()
+    await waitFor(() =>
+      expect(screen.getByRole('dialog', { name: 'Edit contact' })).toBeInTheDocument(),
+    )
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Ada')
+
+    // Still dirty, so a second Escape asks again rather than closing silently.
+    await user.keyboard('{Escape}')
+    expect(await screen.findByRole('alertdialog', { name: 'Discard changes?' })).toBeInTheDocument()
+    expect(onClosed).not.toHaveBeenCalled()
   })
 })

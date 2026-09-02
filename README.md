@@ -493,12 +493,16 @@ DOM order; `cancelLabel` / `submitLabel` rename them and `slotProps.cancel` /
 `slotProps.submit` reach them. Pass `actions` to replace both with your own — a
 `type="submit"` button inside still submits the form. Cancel is disabled while a
 submit is pending, since cancelling then would abandon a save already in flight.
+A `slotProps.cancel.onClick` runs _before_ the close gate and does not replace it;
+call `event.preventDefault()` in it to veto the close and keep the dialog open.
 
 **Layout.** ARIA does not allow `role="dialog"` on a `<form>`, so the dialog's
 paper stays a `div` and the `<form>` sits just inside it, carrying the paper's
 flex layout through — long content still scrolls inside `DialogContent` while the
 title and actions stay put. `title` names the dialog (`aria-labelledby`) and
-`Form`'s `description` describes it (`aria-describedby`).
+whatever `Form` renders in its description slot describes it (`aria-describedby`) —
+that includes the required-fields convention `Form` states by default, so the
+dialog is described even when you pass no `description` of your own.
 
 Theme it through `theme.components.EzFormDialog` (`defaultProps`, and
 `styleOverrides` for the `root`, `form`, `title`, `content`, `actions`, `cancel`
@@ -886,6 +890,7 @@ const schema = z.object({ zip: z.string().min(1) })
 | `StateSelect` | —           | `address-level1`       |
 
 `inputMode="numeric"` on `ZipField` brings up the numeric keypad on mobile without changing the underlying `type` (still `text`, so a leading zero like `02134` is never dropped). `StateSelect`'s `autoComplete` reaches the hidden native `<input>` MUI's `Select` renders for autofill via `slotProps.htmlInput` — the same slot a plain `TextField` uses (MUI 9 has no `SelectProps`/native `inputProps` shortcut for this).
+
 ## Developer warnings
 
 Three mistakes leave a form that renders and submits perfectly while quietly failing the
