@@ -115,6 +115,58 @@ describe('SsnField reveal', () => {
     expectTargetSize(showToggle())
   })
 
+  // A real browser re-creates the editing context on a password↔text `type`
+  // swap, which drops the selection; the click that flipped it has already
+  // moved focus to the button. jsdom models neither, so these assert the
+  // restoration this field performs — which is the same code that repairs the
+  // real reset — rather than the reset itself.
+  it('returns focus to the input and restores the caret after revealing', async () => {
+    const user = userEvent.setup()
+    renderSsn()
+    await user.type(input(), '123456789')
+    // Caret parked mid-value, where a user checking a digit would leave it.
+    input().setSelectionRange(4, 4)
+    await user.click(showToggle())
+    expect(input()).toHaveFocus()
+    expect(input().selectionStart).toBe(4)
+    expect(input().selectionEnd).toBe(4)
+  })
+
+  it('restores a non-collapsed selection after revealing', async () => {
+    const user = userEvent.setup()
+    renderSsn()
+    await user.type(input(), '123456789')
+    input().setSelectionRange(4, 6)
+    await user.click(showToggle())
+    expect(input()).toHaveFocus()
+    expect(input().selectionStart).toBe(4)
+    expect(input().selectionEnd).toBe(6)
+  })
+
+  it('restores focus and caret on the way back to hidden too', async () => {
+    const user = userEvent.setup()
+    renderSsn()
+    await user.type(input(), '123456789')
+    await user.click(showToggle())
+    input().setSelectionRange(2, 2)
+    await user.click(hideToggle())
+    expect(input()).toHaveFocus()
+    expect(input().selectionStart).toBe(2)
+  })
+
+  it('leaves focus on the toggle when the input did not have it', async () => {
+    const user = userEvent.setup()
+    renderSsn()
+    await user.type(input(), '123456789')
+    // Reached by keyboard with focus already on the button: the user put focus
+    // there deliberately, so yanking it into the input would be wrong.
+    input().blur()
+    showToggle().focus()
+    await user.keyboard('{Enter}')
+    expect(hideToggle()).toHaveFocus()
+    expect(input()).not.toHaveFocus()
+  })
+
   it('resets to hidden on unmount (a remount starts hidden again)', async () => {
     const user = userEvent.setup()
     const { unmount } = renderSsn()
@@ -351,6 +403,27 @@ describe('SsnField input attributes', () => {
     renderSsn({ slotProps: { input: { readOnly: true } } })
     expect(showToggle()).toBeInTheDocument()
     expect(input()).toHaveAttribute('readonly')
+  })
+
+  it("a consumer's slotProps.htmlInput.ref is called and caret restoration still works", async () => {
+    const user = userEvent.setup()
+    const consumerRef = vi.fn()
+    renderSsn({ slotProps: { htmlInput: { ref: consumerRef } } })
+    // The consumer's ref is composed with the field's two internal refs rather
+    // than replaced by them — all three reach the same element.
+    expect(consumerRef).toHaveBeenCalledWith(input())
+
+    // And the internal refs still do their jobs: reformat-caret …
+    await user.type(input(), '123456789')
+    await user.type(input(), '{Backspace}', { initialSelectionStart: 7, initialSelectionEnd: 7 })
+    expect(input()).toHaveValue('123-46-789')
+    expect(input().selectionStart).toBe(5)
+
+    // … and reveal-caret.
+    input().setSelectionRange(4, 4)
+    await user.click(showToggle())
+    expect(input()).toHaveFocus()
+    expect(input().selectionStart).toBe(4)
   })
 })
 

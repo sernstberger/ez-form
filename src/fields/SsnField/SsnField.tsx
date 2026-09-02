@@ -1,14 +1,15 @@
-import { useState } from 'react'
 import { useFormState } from 'react-hook-form'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import IconButton, { type IconButtonProps } from '@mui/material/IconButton'
 import { styled } from '@mui/material/styles'
-import { mergeSlotProps } from '@mui/material/utils'
+import { mergeSlotProps, useForkRef } from '@mui/material/utils'
 import { TextField, type TextFieldProps } from '../TextField'
 import { mergeDisabled } from '../mergeDisabled'
 import { RevealToggle, type RevealIcons } from '../RevealToggle'
+import { useRevealState } from '../useRevealState'
 import { useEzFormContext } from '../../useEzFormContext'
+import { cx } from '../../cx'
 import { templateDigitCount } from '../formatTemplate'
 import { useTemplateField } from '../useTemplateField'
 
@@ -97,7 +98,8 @@ export function SsnField(inProps: SsnFieldProps) {
   } = props
 
   // Local only: never reaches the form value, and resets on unmount since it starts false again.
-  const [revealed, setRevealed] = useState(false)
+  // The hook also owns the focus/caret restoration the `type` swap would otherwise destroy.
+  const { revealed, toggle, inputRef: revealInputRef, recordFocus } = useRevealState()
   const { toggle: toggleSlotProps, ...restSlotProps } = slotProps ?? {}
 
   // No per-field disable registration exists in this codebase (see TextField/NumberField/etc,
@@ -111,6 +113,18 @@ export function SsnField(inProps: SsnFieldProps) {
     format: SSN_FORMAT,
     capacity: SSN_CAPACITY,
   })
+
+  // Three refs want this one input: the template hook's (caret restoration
+  // after a reformat), the reveal hook's (caret restoration after a `type`
+  // swap), and whatever the consumer passed. `useForkRef` is MUI's own
+  // composer, already used in `NumberFieldControl` and `WizardStep`.
+  const { ref: templateInputRef, ...templateInputProps } = htmlInputProps
+  const inputRef = useForkRef(
+    useForkRef(templateInputRef, revealInputRef),
+    restSlotProps?.htmlInput && 'ref' in restSlotProps.htmlInput
+      ? (restSlotProps.htmlInput.ref as React.Ref<HTMLInputElement>)
+      : null,
+  )
 
   const consumerValidate =
     validate === undefined ? {} : typeof validate === 'function' ? { validate } : validate
@@ -127,7 +141,7 @@ export function SsnField(inProps: SsnFieldProps) {
       autoComplete="off"
       disabled={disabled}
       displayValue={displayValue}
-      className={`${ssnFieldClasses.root}${className ? ` ${className}` : ''}`}
+      className={cx(ssnFieldClasses.root, className)}
       validate={{
         // Consumer entries first: a built-in key must not be silently replaced.
         ...consumerValidate,
@@ -147,7 +161,8 @@ export function SsnField(inProps: SsnFieldProps) {
             <RevealToggle
               component={SsnFieldToggle}
               revealed={revealed}
-              onToggle={() => setRevealed((r) => !r)}
+              onToggle={toggle}
+              onRecordFocus={recordFocus}
               showLabel={showLabel}
               hideLabel={hideLabel}
               disabled={toggleDisabled}
@@ -157,10 +172,17 @@ export function SsnField(inProps: SsnFieldProps) {
             />
           ) : undefined,
         },
-        htmlInput: mergeSlotProps(restSlotProps?.htmlInput, {
-          inputMode: 'numeric',
-          ...htmlInputProps,
-        }),
+        htmlInput: {
+          ...mergeSlotProps(restSlotProps?.htmlInput, {
+            inputMode: 'numeric',
+            ...templateInputProps,
+          }),
+          // After the merge, deliberately: `mergeSlotProps` spreads the
+          // consumer's props last, so a consumer `ref` would replace the forked
+          // one and silently disable both caret restorations. `inputRef`
+          // already includes that consumer ref, so nothing is dropped.
+          ref: inputRef,
+        },
       }}
     />
   )

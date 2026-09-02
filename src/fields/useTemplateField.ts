@@ -35,7 +35,14 @@ export interface TemplateFieldOptions {
 export interface TemplateFieldBinding {
   /** The formatted text to pass to `TextField`'s `displayValue`. */
   displayValue: string
-  /** `onChange`/`onKeyDown`/`onSelect`/`ref` for `slotProps.htmlInput`. */
+  /**
+   * `onChange`/`onKeyDown`/`onSelect`/`ref` for `slotProps.htmlInput`.
+   *
+   * `ref` must reach the `<input>` for caret restoration to work at all. Spread
+   * these *after* a consumer's `slotProps.htmlInput` and compose the two refs
+   * (`useForkRef`) rather than letting either replace the other — a consumer
+   * ref that silently won would disable caret restoration with no error.
+   */
   htmlInputProps: {
     onChange: (event: ChangeEvent<HTMLInputElement>) => void
     onKeyDown: (event: SyntheticEvent<HTMLInputElement>) => void

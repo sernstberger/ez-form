@@ -81,6 +81,102 @@ describe('PasswordField', () => {
     )
   })
 
+  // A real browser re-creates the editing context on a password↔text `type`
+  // swap, which drops the selection; the click that flipped it has already
+  // moved focus to the button. jsdom models neither, so these assert the
+  // restoration this field performs — the same code that repairs the real
+  // reset — rather than the reset itself.
+  it('returns focus to the input and restores the caret after revealing', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    await user.type(input(), 'hunter2')
+    input().setSelectionRange(3, 3)
+    await user.click(screen.getByRole('button', { name: 'Show password' }))
+    expect(input()).toHaveFocus()
+    expect(input().selectionStart).toBe(3)
+    expect(input().selectionEnd).toBe(3)
+  })
+
+  it('restores a non-collapsed selection, and does so on the way back to hidden', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    await user.type(input(), 'hunter2')
+    input().setSelectionRange(1, 4)
+    await user.click(screen.getByRole('button', { name: 'Show password' }))
+    expect(input()).toHaveFocus()
+    expect(input().selectionStart).toBe(1)
+    expect(input().selectionEnd).toBe(4)
+
+    input().setSelectionRange(2, 2)
+    await user.click(screen.getByRole('button', { name: 'Hide password' }))
+    expect(input()).toHaveFocus()
+    expect(input().selectionStart).toBe(2)
+  })
+
+  it('leaves focus on the toggle when the input did not have it', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    await user.type(input(), 'hunter2')
+    // Focus put on the button deliberately (keyboard): yanking it into the
+    // input would fight the user.
+    input().blur()
+    screen.getByRole('button', { name: 'Show password' }).focus()
+    await user.keyboard('{Enter}')
+    expect(screen.getByRole('button', { name: 'Hide password' })).toHaveFocus()
+    expect(input()).not.toHaveFocus()
+  })
+
+  it("a consumer's slotProps.htmlInput.ref is called and caret restoration still works", async () => {
+    const user = userEvent.setup()
+    const consumerRef = vi.fn()
+    render(
+      <Form schema={schema} defaultValues={{ password: '' }} onSubmit={() => {}}>
+        <PasswordField
+          name="password"
+          label="Password"
+          slotProps={{ htmlInput: { ref: consumerRef } }}
+        />
+      </Form>,
+    )
+    expect(consumerRef).toHaveBeenCalledWith(input())
+
+    await user.type(input(), 'hunter2')
+    input().setSelectionRange(3, 3)
+    await user.click(screen.getByRole('button', { name: 'Show password' }))
+    expect(input()).toHaveFocus()
+    expect(input().selectionStart).toBe(3)
+  })
+
+  it('takes custom toggle labels', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{ password: '' }} onSubmit={() => {}}>
+        <PasswordField
+          name="password"
+          label="Password"
+          showLabel="Reveal password"
+          hideLabel="Conceal password"
+        />
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Reveal password' }))
+    expect(screen.getByRole('button', { name: 'Conceal password' })).toBeInTheDocument()
+  })
+
+  it('is themeable: EzPasswordField defaultProps sets the toggle labels app-wide', () => {
+    const theme = createTheme({
+      components: { EzPasswordField: { defaultProps: { showLabel: 'Mostrar contraseña' } } },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{ password: '' }} onSubmit={() => {}}>
+          <PasswordField name="password" label="Password" />
+        </Form>
+      </ThemeProvider>,
+    )
+    expect(screen.getByRole('button', { name: 'Mostrar contraseña' })).toBeInTheDocument()
+  })
+
   it('does not render a toggle when revealable={false}', () => {
     render(
       <Form schema={schema} defaultValues={{ password: '' }} onSubmit={() => {}}>

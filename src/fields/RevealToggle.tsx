@@ -19,6 +19,12 @@ export interface RevealToggleProps {
   /** Whether the value is currently visible: drives the label, `aria-pressed` and the icon. */
   revealed: boolean
   onToggle: () => void
+  /**
+   * `useRevealState`'s `recordFocus`: called on pointerdown/keydown, before the
+   * browser moves focus to this button, so the toggle can tell whether the user
+   * was in the input and put the caret back after the `type` swap.
+   */
+  onRecordFocus?: () => void
   /** Accessible name while hidden, e.g. `'Show password'`. */
   showLabel: string
   /** Accessible name while revealed, e.g. `'Hide password'`. */
@@ -51,6 +57,7 @@ export interface RevealToggleProps {
 export function RevealToggle({
   revealed,
   onToggle,
+  onRecordFocus,
   showLabel,
   hideLabel,
   disabled,
@@ -68,6 +75,19 @@ export function RevealToggle({
         aria-pressed={revealed}
         edge="end"
         disabled={disabled}
+        // Capture phase, and on the events that *precede* the focus move: a
+        // click focuses the button on pointerdown, so `onClick` is already too
+        // late to see where focus was. Keyboard activation (Space/Enter) fires
+        // keydown first, and the toggle may already hold focus there — which
+        // `recordFocus` reads correctly as "not in the input".
+        onPointerDownCapture={(e) => {
+          onRecordFocus?.()
+          slotProps?.onPointerDownCapture?.(e)
+        }}
+        onKeyDownCapture={(e) => {
+          onRecordFocus?.()
+          slotProps?.onKeyDownCapture?.(e)
+        }}
         onClick={(e) => {
           onToggle()
           slotProps?.onClick?.(e)
