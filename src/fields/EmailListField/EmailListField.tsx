@@ -15,6 +15,8 @@ import { useWatch } from 'react-hook-form'
 import type { Message } from 'react-hook-form'
 import { Autocomplete, type AutocompleteProps } from '../Autocomplete'
 import { useEzFormContext } from '../../useEzFormContext'
+import { useAssisted } from '../../Form/AssistedContext'
+import { resolveAutoComplete } from '../resolveAutoComplete'
 import { LiveRegion, type LiveRegionProps } from '../../Form/LiveRegion'
 import { cx } from '../../cx'
 import { isEmail } from '../emailPattern'
@@ -53,6 +55,11 @@ export type EmailListFieldProps = Omit<
   | 'renderValue'
   | 'inputValue'
   | 'slotProps'
+  // MUI's `autoComplete` on Autocomplete is a *boolean* — its inline-completion
+  // behaviour, unrelated to the HTML autofill token. Omitted and re-declared
+  // below as a string, the way `PhoneField` and `ZipField` declare theirs, since
+  // an autofill token is what a consumer means on an email field.
+  | 'autoComplete'
 > & {
   /**
    * Looks addresses up as the user types — a directory, a contacts API, recent
@@ -82,12 +89,29 @@ export type EmailListFieldProps = Omit<
   invalidMessage?: string
   /** Announced when a typed address is already in the list. Default `'Already added'`. */
   duplicateMessage?: string
-  /** Announced when an address is added. Default `` `<email> added` ``. */
+  /** Announced when one address is added. Default `` `<email> added` ``. */
   addedMessage?: (email: string) => string
-  /** Announced when an address is removed. Default `` `<email> removed` ``. */
+  /** Announced when several are added at once (a paste). Default `` `<n> addresses added` ``. */
+  addedManyMessage?: (count: number) => string
+  /** Announced when one address is removed. Default `` `<email> removed` ``. */
   removedMessage?: (email: string) => string
+  /** Announced when several are removed at once (Clear). Default `` `<n> addresses removed` ``. */
+  removedManyMessage?: (count: number) => string
+  /**
+   * The input's autofill token. Defaults to `'email'`; under `<Form assisted>`
+   * that default becomes `'off'`, since the person filling the form is not
+   * necessarily the person the addresses belong to. An explicit value always wins.
+   */
+  autoComplete?: string
   slotProps?: {
-    chip?: ChipProps
+    /**
+     * Extra props for each chip, merged *under* the ones that make it removable
+     * and keyboard-reachable. `onDelete` composes with the field's own (call
+     * `preventDefault()` to veto a removal); `deleteIcon` is the field's, since
+     * its accessible name is part of this field's a11y contract — restyle it via
+     * `styleOverrides.deleteIcon`.
+     */
+    chip?: Omit<ChipProps, 'deleteIcon'>
     status?: Omit<LiveRegionProps, 'message' | 'announcementKey'>
   }
 }
@@ -133,6 +157,7 @@ const COMMIT_KEYS = new Set([',', ';'])
 export function EmailListField(inProps: EmailListFieldProps) {
   // Ahead of Autocomplete's own guard, so the "outside <Form>" error names <EmailListField>.
   const form = useEzFormContext('EmailListField')
+  const assisted = useAssisted()
   const {
     loadOptions,
     debounceMs = 250,
@@ -140,8 +165,11 @@ export function EmailListField(inProps: EmailListFieldProps) {
     invalidMessage = 'Enter a valid email address',
     duplicateMessage = 'Already added',
     addedMessage = (email: string) => `${email} added`,
+    addedManyMessage = (count: number) => `${count} addresses added`,
     removedMessage = (email: string) => `${email} removed`,
+    removedManyMessage = (count: number) => `${count} addresses removed`,
     name,
+    autoComplete: autoCompleteProp,
     validate,
     onChange,
     onInputChange,
@@ -149,6 +177,10 @@ export function EmailListField(inProps: EmailListFieldProps) {
     slotProps,
     ...rest
   } = useDefaultProps({ props: inProps, name: 'EzEmailListField' })
+
+  // Placed here, not in the destructuring default, so `resolveAutoComplete` only
+  // ever sees this field's own fallback — a consumer's explicit token bypasses it.
+  const autoComplete = autoCompleteProp ?? resolveAutoComplete('email', assisted)
 
   const [inputValue, setInputValue] = useState('')
   const [options, setOptions] = useState<EmailOption[]>([])
@@ -239,24 +271,40 @@ export function EmailListField(inProps: EmailListFieldProps) {
    * candidates in the same batch, so one paste cannot add the same address
    * twice), and keeps everything else — including addresses that fail
    * validation, which become errored chips rather than vanishing.
+   *
+   * Reports `skipped` separately from the resulting list: "nothing was added"
+   * and "something was rejected as a duplicate" are different events, and only
+   * the second one is worth announcing.
    */
   const fold = (base: readonly string[], candidates: readonly string[]) => {
     const next = [...base]
+    let skipped = false
     for (const raw of candidates) {
       for (const candidate of raw.split(SEPARATORS).filter(Boolean)) {
-        if (next.some((e) => e.toLowerCase() === candidate.toLowerCase())) continue
+        if (next.some((e) => e.toLowerCase() === candidate.toLowerCase())) {
+          skipped = true
+          continue
+        }
         next.push(candidate)
       }
     }
-    return next
+    return { next, skipped }
   }
 
   /**
-   * Writes `next` to the form and announces the difference from `previous`.
+   * Writes `next` to the form and announces how it differs from `previous`.
+   * `skippedDuplicate` says whether a candidate was dropped for already being
+   * present, which is announced on its own terms rather than inferred from
+   * "nothing changed" — a no-op has other causes (re-selecting the same option).
+   *
    * Returns whether anything actually changed, so a caller that owns the input
-   * text (the punctuation and blur commits) knows whether to clear it.
+   * text (the punctuation, paste and blur commits) knows whether to clear it.
    */
-  const applyChange = (previous: readonly string[], next: readonly string[]) => {
+  const applyChange = (
+    previous: readonly string[],
+    next: readonly string[],
+    skippedDuplicate = false,
+  ) => {
     const added = next.filter((e) => !previous.includes(e))
     const gone = previous.filter((e) => !next.includes(e))
     // The write happens even when the folded list equals `previous`. This runs
@@ -268,21 +316,35 @@ export function EmailListField(inProps: EmailListFieldProps) {
     // becomes knowable: the chip's error state and the field's message have to
     // settle in the same commit.
     form.setValue(name, next, { shouldValidate: true, shouldDirty: true, shouldTouch: true })
-    if (added.length === 0 && gone.length === 0) {
-      announce(duplicateMessage)
-      return false
-    }
+
+    // Both halves are announced: one action can add and remove at once (picking
+    // an option while a chip is deselected, or a `renderValue` edit), and a
+    // message that could only describe one of them would silently lose the other.
+    const parts: string[] = []
     const [addedOne] = added
+    if (added.length === 1 && addedOne !== undefined) parts.push(addedMessage(addedOne))
+    else if (added.length > 1) parts.push(addedManyMessage(added.length))
     const [goneOne] = gone
-    if (added.length === 1 && addedOne !== undefined) announce(addedMessage(addedOne))
-    else if (added.length > 1) announce(`${added.length} addresses added`)
-    else if (gone.length === 1 && goneOne !== undefined) announce(removedMessage(goneOne))
-    else if (gone.length > 1) announce(`${gone.length} addresses removed`)
-    return true
+    if (gone.length === 1 && goneOne !== undefined) parts.push(removedMessage(goneOne))
+    else if (gone.length > 1) parts.push(removedManyMessage(gone.length))
+    if (skippedDuplicate) parts.push(duplicateMessage)
+
+    if (parts.length > 0) announce(parts.join(' '))
+    return added.length > 0 || gone.length > 0
   }
 
-  /** Commits typed text (one address, or several separated) onto the current value. */
-  const commit = (text: string) => applyChange(value, fold(value, [text]))
+  /**
+   * Commits typed text (one address, or several separated) onto the current
+   * value, and reports whether the input should now be cleared. A commit that
+   * only rejected duplicates still clears: the addresses *are* in the list, so
+   * leaving the text behind reads as "not accepted" and, on blur, strands text
+   * that is then silently dropped at submit.
+   */
+  const commit = (text: string) => {
+    const { next, skipped } = fold(value, [text])
+    applyChange(value, next, skipped)
+    return true
+  }
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     const text = inputValue
@@ -368,9 +430,13 @@ export function EmailListField(inProps: EmailListFieldProps) {
           const proposed = (next as (EmailOption | string)[]).map((v) =>
             typeof v === 'string' ? v : v.value,
           )
-          const removing = reason === 'removeOption' || reason === 'clear'
           // A removal is already exactly what it should be; only additions need folding.
-          applyChange(value, removing ? proposed : fold(value, proposed.slice(value.length)))
+          if (reason === 'removeOption' || reason === 'clear') {
+            applyChange(value, proposed)
+          } else {
+            const { next: folded, skipped } = fold(value, proposed.slice(value.length))
+            applyChange(value, folded, skipped)
+          }
           onChange?.(event, next, reason, details)
         }}
         renderValue={(items, getItemProps) =>
@@ -386,11 +452,19 @@ export function EmailListField(inProps: EmailListFieldProps) {
                 // itself, so a long list says *which* entry is wrong rather than
                 // only that one of them is.
                 color={isAccepted(email) ? chipProps?.color : 'error'}
-                // Chip clones this element with its own onClick; the default icon
-                // has no accessible name, and SvgIcon defaults aria-hidden to true
-                // unless overridden here. Without a name the only way to drop a
-                // chip by keyboard is Backspace, and a screen reader announces
-                // nothing about what the icon would remove.
+                // Consumer props first, then MUI's: `itemProps` carries the
+                // `onDelete`, `tabIndex` and `data-tag-index` that make a chip
+                // removable and keyboard-reachable, so letting a consumer's
+                // `slotProps.chip` land on top of them silently breaks deletion.
+                {...chipProps}
+                {...itemProps}
+                // After both spreads, because the accessible name is part of this
+                // field's a11y contract and not a consumer's to drop. Chip clones
+                // this element with its own onClick; MUI's default icon has no
+                // name, and SvgIcon defaults aria-hidden to true unless overridden
+                // here. Without a name the only way to drop a chip by keyboard is
+                // Backspace, and a screen reader says nothing about what the icon
+                // would remove. Restyle it via `styleOverrides.deleteIcon`.
                 deleteIcon={
                   <EmailListFieldDeleteIcon
                     role="button"
@@ -399,8 +473,13 @@ export function EmailListField(inProps: EmailListFieldProps) {
                     className={emailListFieldClasses.deleteIcon}
                   />
                 }
-                {...itemProps}
-                {...chipProps}
+                // …with `onDelete` composed rather than replaced, so a consumer
+                // can observe (or veto, via `preventDefault`) a removal without
+                // having to reimplement it.
+                onDelete={(event) => {
+                  chipProps?.onDelete?.(event)
+                  if (!event.defaultPrevented) itemProps.onDelete?.(event)
+                }}
                 className={cx(emailListFieldClasses.chip, chipProps?.className)}
               />
             )
@@ -411,7 +490,7 @@ export function EmailListField(inProps: EmailListFieldProps) {
         // MUI rebuilds the input's props from `getInputProps()` on every render,
         // so a handler on the wrapper would only ever see what bubbled.
         inputProps={{
-          autoComplete: 'email',
+          autoComplete,
           onKeyDown: handleKeyDown,
           onPaste: handlePaste,
           onBlur: handleBlur,

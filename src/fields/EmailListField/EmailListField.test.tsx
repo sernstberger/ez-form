@@ -212,6 +212,108 @@ describe('EmailListField', () => {
     })
   })
 
+  it('clears the input and announces when a duplicate is rejected at blur', async () => {
+    const { user, onSubmit } = setup(<EmailListField name="to" label="To" />)
+    await user.type(combobox(), 'ada@example.com{Enter}')
+    await user.type(combobox(), 'ADA@example.com')
+    await user.tab()
+    // The address is already in the list, so the text must not be stranded in
+    // the box where submit would silently drop it.
+    expect(combobox()).toHaveValue('')
+    expect(chipLabels()).toEqual(['ada@example.com'])
+    expect(status()).toHaveTextContent('Already added')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(onSubmit).toHaveBeenCalledWith({ to: ['ada@example.com'] }, expect.anything())
+  })
+
+  it('clears the input and announces when a duplicate is rejected by comma', async () => {
+    const { user } = setup(<EmailListField name="to" label="To" />)
+    await user.type(combobox(), 'ada@example.com{Enter}')
+    await user.type(combobox(), 'ada@example.com,')
+    expect(combobox()).toHaveValue('')
+    expect(chipLabels()).toEqual(['ada@example.com'])
+    expect(status()).toHaveTextContent('Already added')
+  })
+
+  it('clears the input and announces when a pasted list is entirely duplicates', async () => {
+    const { user } = setup(<EmailListField name="to" label="To" />)
+    await user.click(combobox())
+    await user.paste('a@x.com, b@y.com')
+    await user.paste('A@X.com; b@Y.com')
+    expect(combobox()).toHaveValue('')
+    expect(chipLabels()).toEqual(['a@x.com', 'b@y.com'])
+    expect(status()).toHaveTextContent('Already added')
+  })
+
+  it('announces the added addresses and the rejected duplicate together', async () => {
+    const { user } = setup(<EmailListField name="to" label="To" />)
+    await user.type(combobox(), 'a@x.com{Enter}')
+    await user.click(combobox())
+    await user.paste('a@x.com, b@y.com')
+    // One was new and one was already there; neither half may be lost.
+    expect(status()).toHaveTextContent('b@y.com added Already added')
+    expect(chipLabels()).toEqual(['a@x.com', 'b@y.com'])
+  })
+
+  it('does not announce a duplicate when nothing was actually skipped', async () => {
+    const { user } = setup(<EmailListField name="to" label="To" />)
+    await user.type(combobox(), 'a@x.com{Enter}')
+    expect(status()).toHaveTextContent('a@x.com added')
+    expect(status()).not.toHaveTextContent('Already added')
+  })
+
+  it('takes custom plural announcement strings', async () => {
+    const { user } = setup(
+      <EmailListField
+        name="to"
+        label="To"
+        addedManyMessage={(n) => `${n} agregadas`}
+        removedManyMessage={(n) => `${n} eliminadas`}
+      />,
+    )
+    await user.click(combobox())
+    await user.paste('a@x.com, b@y.com')
+    expect(status()).toHaveTextContent('2 agregadas')
+    await user.click(screen.getByRole('button', { name: 'Clear' }))
+    expect(status()).toHaveTextContent('2 eliminadas')
+  })
+
+  it('keeps chips deletable when a consumer passes slotProps.chip', async () => {
+    const onDelete = vi.fn()
+    const { user } = setup(
+      <EmailListField name="to" label="To" slotProps={{ chip: { onDelete } }} />,
+    )
+    await user.type(combobox(), 'ada@example.com{Enter}')
+    await user.click(screen.getByRole('button', { name: 'Remove ada@example.com' }))
+    // The consumer's handler runs, and MUI's removal still happens.
+    expect(onDelete).toHaveBeenCalledTimes(1)
+    expect(chips()).toHaveLength(0)
+  })
+
+  it('lets a consumer veto a removal with preventDefault', async () => {
+    const { user } = setup(
+      <EmailListField
+        name="to"
+        label="To"
+        slotProps={{ chip: { onDelete: (e) => e.preventDefault() } }}
+      />,
+    )
+    await user.type(combobox(), 'ada@example.com{Enter}')
+    await user.click(screen.getByRole('button', { name: 'Remove ada@example.com' }))
+    expect(chipLabels()).toEqual(['ada@example.com'])
+  })
+
+  it('keeps the delete control named even when slotProps.chip is supplied', async () => {
+    // `deleteIcon` is excluded from the slot's type (the accessible name is part
+    // of the field's a11y contract); everything else on the chip still merges.
+    const { user } = setup(
+      <EmailListField name="to" label="To" slotProps={{ chip: { className: 'probe' } }} />,
+    )
+    await user.type(combobox(), 'ada@example.com{Enter}')
+    expect(screen.getByRole('button', { name: 'Remove ada@example.com' })).toBeInTheDocument()
+    expect(chips()[0]).toHaveClass('probe')
+  })
+
   it("gives each chip's delete control a name and a 24x24 target", async () => {
     const { user } = setup(<EmailListField name="to" label="To" />)
     await user.type(combobox(), 'ada@example.com{Enter}')
@@ -222,6 +324,24 @@ describe('EmailListField', () => {
   it('sets autoComplete="email" on the input', () => {
     setup(<EmailListField name="to" label="To" />)
     expect(combobox()).toHaveAttribute('autocomplete', 'email')
+  })
+
+  it('drops autoComplete to "off" under <Form assisted>', () => {
+    render(
+      <Form schema={schema} defaultValues={{ to: [] }} onSubmit={vi.fn()} assisted>
+        <EmailListField name="to" label="To" />
+      </Form>,
+    )
+    expect(combobox()).toHaveAttribute('autocomplete', 'off')
+  })
+
+  it('lets an explicit autoComplete win, even under assisted', () => {
+    render(
+      <Form schema={schema} defaultValues={{ to: [] }} onSubmit={vi.fn()} assisted>
+        <EmailListField name="to" label="To" autoComplete="work email" />
+      </Form>,
+    )
+    expect(combobox()).toHaveAttribute('autocomplete', 'work email')
   })
 
   it('has no accessibility violations with chips and an open listbox', async () => {
