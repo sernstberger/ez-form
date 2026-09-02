@@ -137,7 +137,7 @@ export const emptyValues: Input = {
   deductible: 500,
   coverageAmount: null as unknown as number,
   hasVehicle: false,
-  vehicle: { make: '', model: '', year: null as unknown as number, plate: '' },
+  vehicle: { make: '', model: '', year: null, plate: '' },
   driver: { name: '', licenseNumber: '', licenseDate: null as unknown as Date },
   claims: '',
   priorIncidents: [],

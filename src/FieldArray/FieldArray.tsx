@@ -243,7 +243,7 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
     const row = typeof emptyRow === 'function' ? (emptyRow as () => TRow)() : emptyRow
     // hookform focuses the input it registered for the new row; this component
     // focuses the row's first focusable control itself, in the effect above.
-    append(row as never, { shouldFocus: false })
+    append(row, { shouldFocus: false })
     // Resolve the target at commit time rather than storing `fields.length`
     // from this render's closure: a double invoke would read the same stale
     // length twice and aim at a row that is no longer the appended one.

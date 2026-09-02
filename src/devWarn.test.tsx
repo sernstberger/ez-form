@@ -91,7 +91,7 @@ describe('dev warning: a field with no accessible name', () => {
     await user.type(screen.getAllByRole('textbox')[0]!, 'abc')
     const hits = messagesMatching(/no accessible name/)
     expect(hits).toHaveLength(2)
-    expect(hits.map((m) => m.match(/name="(\w+)"/)?.[1])).toEqual(['email', 'role'])
+    expect(hits.map((m) => /name="(\w+)"/.exec(m)?.[1])).toEqual(['email', 'role'])
   })
 
   /**

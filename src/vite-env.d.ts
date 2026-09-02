@@ -21,7 +21,6 @@ declare module '*.md?raw' {
  * surface in scope for a package that never runs there.
  */
 declare global {
-  // eslint-disable-next-line no-var
   var process: { env: { NODE_ENV?: string } }
 }
 

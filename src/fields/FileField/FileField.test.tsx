@@ -15,8 +15,7 @@ const jpg = new File(['jpg'], 'b.jpg', { type: 'image/jpeg' })
 
 // The button's accessible name includes the required asterisk span
 // ("Resume *"), so match a label that only starts with the given text.
-const fileInput = (label: string) =>
-  screen.getByLabelText(new RegExp(`^${label}`)) as HTMLInputElement
+const fileInput = (label: string) => screen.getByLabelText(new RegExp(`^${label}`))
 
 describeFieldContract({
   componentName: 'FileField',
@@ -209,7 +208,7 @@ describe('FileField', () => {
     const chip = screen.getByText('resume.pdf')
     const fileList = chip.closest(`.${fileFieldClasses.fileList}`)
     expect(fileList).not.toBeNull()
-    expect(getComputedStyle(fileList as Element).marginTop).toBe('9px')
+    expect(getComputedStyle(fileList!).marginTop).toBe('9px')
   })
 
   it('Form requiredIndicator="optional": required stays required with no asterisk in the label', () => {
@@ -223,7 +222,7 @@ describe('FileField', () => {
         <FileField name="resume" label="Resume" required />
       </Form>,
     )
-    const input = screen.getByLabelText('Resume') as HTMLInputElement
+    const input = screen.getByLabelText('Resume')
     expect(input).toBeRequired()
   })
 

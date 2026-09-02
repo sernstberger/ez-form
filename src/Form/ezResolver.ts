@@ -55,21 +55,21 @@ export async function validateRules(
     return { type: 'required', message: rules.required.message }
   }
   if (!isEmpty(value)) {
-    if (rules.min && outOfRange(value, rules.min.value as number | string, 'min')) {
+    if (rules.min && outOfRange(value, rules.min.value!, 'min')) {
       return { type: 'min', message: rules.min.message }
     }
-    if (rules.max && outOfRange(value, rules.max.value as number | string, 'max')) {
+    if (rules.max && outOfRange(value, rules.max.value!, 'max')) {
       return { type: 'max', message: rules.max.message }
     }
     if (typeof value === 'string') {
-      if (rules.maxLength && value.length > (rules.maxLength.value as number)) {
+      if (rules.maxLength && value.length > rules.maxLength.value!) {
         return { type: 'maxLength', message: rules.maxLength.message }
       }
-      if (rules.minLength && value.length < (rules.minLength.value as number)) {
+      if (rules.minLength && value.length < rules.minLength.value!) {
         return { type: 'minLength', message: rules.minLength.message }
       }
       if (rules.pattern) {
-        const regex = rules.pattern.value as RegExp
+        const regex = rules.pattern.value!
         regex.lastIndex = 0
         if (!regex.test(value)) return { type: 'pattern', message: rules.pattern.message }
       }

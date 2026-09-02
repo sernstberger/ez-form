@@ -205,7 +205,7 @@ function FormImpl<TIn extends FieldValues, TOut>(
     'aria-labelledby': ariaLabelledBy,
     'aria-describedby': ariaDescribedBy,
     ...formProps
-  } = useDefaultProps({ props: inProps, name: 'EzForm' }) as FormProps<TIn, TOut>
+  } = useDefaultProps({ props: inProps, name: 'EzForm' })
   const baseId = useId()
   const titleId = `${baseId}-title`
   const descriptionId = `${baseId}-description`

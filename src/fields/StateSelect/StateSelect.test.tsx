@@ -63,7 +63,7 @@ describe('StateSelect', () => {
 
   it('sets autoComplete="address-level1" on the hidden native input by default', () => {
     renderForm()
-    const hidden = document.querySelector('input[name="state"]') as HTMLInputElement
+    const hidden = document.querySelector('input[name="state"]')!
     expect(hidden).toHaveAttribute('autoComplete', 'address-level1')
   })
 
@@ -73,7 +73,7 @@ describe('StateSelect', () => {
         <StateSelect name="state" label="State" autoComplete="off" />
       </Form>,
     )
-    const hidden = document.querySelector('input[name="state"]') as HTMLInputElement
+    const hidden = document.querySelector('input[name="state"]')!
     expect(hidden).toHaveAttribute('autoComplete', 'off')
   })
 

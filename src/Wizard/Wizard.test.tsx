@@ -26,7 +26,7 @@ vi.mock('react-hook-form', async (importOriginal) => {
     ...actual,
     useWatch: (...args: Parameters<typeof actual.useWatch>) => {
       useWatchSpy(...args)
-      return actual.useWatch(...(args as unknown as []))
+      return actual.useWatch(...args)
     },
   }
 })

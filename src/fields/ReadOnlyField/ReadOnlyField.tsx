@@ -202,6 +202,6 @@ export function ReadOnlyField(inProps: ReadOnlyFieldProps) {
   return 'value' in props && props.value !== undefined ? (
     <StaticReadOnlyField {...props} value={props.value} />
   ) : (
-    <WatchedReadOnlyField {...props} name={props.name as string} />
+    <WatchedReadOnlyField {...props} name={props.name!} />
   )
 }
