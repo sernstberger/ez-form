@@ -66,6 +66,7 @@ Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >
 | `Switch`       | MUI `Switch`           | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                        |
 | `ToggleButtonGroup` | MUI `ToggleButtonGroup` | `name`, `label` (legend), `options: readonly Option[]`, `exclusive?`, `helperText?`; rules `required`, `validate`. Value is `Option['value'] \| null` when exclusive, else `Option['value'][]` |
 | `Rating`       | MUI `Rating`           | `name`, `label` (legend), `helperText?`; rules `required`, `validate`. Value is `number \| null`                                                     |
+| `DatePicker` / `TimePicker` / `DateTimePicker` | MUI X pickers | `name`, `label?`, `helperText?`, `errorMessages?`; rules `required`, `validate`. The picker's own props (`minDate`, `disablePast`, `views`, …) pass through. Value is the adapter's date type or `null` |
 | `SubmitButton` | MUI `Button`           | `loading` while submitting, disabled while the form is                                                                                              |
 
 Every field shows its zod message as helper text (linked to the input with `aria-describedby`; the first invalid field is focused on submit). The error text is a live region (`role="alert"`), so it is announced in `onChange`/`onBlur` modes as well. Fields must be rendered inside `<Form>`. Consumer `onChange`/`onBlur` handlers run after the form's own.
@@ -127,6 +128,23 @@ Every field also takes hookform-style rules as props. A bare value gets a messag
 | `validate`                | all                               | a returned string; `false` gives `<label> is invalid.`                                |
 
 `required` fails on empty or `false`; `min`/`max`/length/`pattern` rules are skipped while the value is empty; `validate` always runs (so `validate={(v) => v || 'You must opt in'}` works on an unchecked checkbox). Rules run in hookform's order, first failure wins.
+
+## Date pickers
+
+`DatePicker`, `TimePicker`, and `DateTimePicker` wrap MUI X. Wrap your app in MUI X's `LocalizationProvider` with the adapter you use; the form stores whatever that adapter produces (a `Date` under `AdapterDateFns`, a `Dayjs` under `AdapterDayjs`), so type the field accordingly (`z.date()`, or `z.custom<Dayjs>()`).
+
+```tsx
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
+
+<LocalizationProvider dateAdapter={AdapterDateFns}>
+  <Form schema={z.object({ start: z.date().nullable() })} defaultValues={{ start: null }} onSubmit={save}>
+    <DatePicker name="start" label="Start" minDate={new Date()} required />
+  </Form>
+</LocalizationProvider>
+```
+
+The picker's own validation (`minDate`, `disablePast`, an unparsable date, …) shows through the field like any rule: `Start is too early.`, `Start must be in the future.`, `Start is invalid.`, `Start is not available.` Override per code with `errorMessages={{ minDate: 'Pick a later day' }}`.
 
 ## Autocomplete
 
