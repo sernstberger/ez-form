@@ -94,6 +94,7 @@ React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form
 | `Slider`                                       | MUI `Slider`                                  | `name`, `label` (legend), `helperText?`; rules `min`, `max` (also the slider bounds), `validate` — no `required`, since a slider always reports a value. Value is a `number`, or `[number, number]` for a range                                                                                                                                                                                                                                                                  |
 | `Rating`                                       | MUI `Rating`                                  | `name`, `label` (legend), `helperText?`; rules `required`, `validate`. Value is `number \| null`                                                                                                                                                                                                                                                                                                                                                                                 |
 | `Autocomplete`                                 | MUI `Autocomplete`                            | `name`, `options`, `getOptionValue?` (default `o => o.value`; return `o` to store objects), `multiple`, `freeSolo`, `textFieldProps?`; all TextField rules. Options may carry extra fields (they reach `onChange`)                                                                                                                                                                                                                                                               |
+| `EmailListField`                               | ez-form `Autocomplete`                        | `name`; a `string[]` of addresses. `loadOptions?(query, signal)` for an async directory (debounced by `debounceMs?`, default 250, and aborted on the next keystroke), `allowNew?` (default `true`), `invalidMessage?`, `duplicateMessage?`, `addedMessage?`/`removedMessage?`, `slotProps?` (`chip`, `status`). Enter, comma, semicolon, space and blur commit; paste splits; duplicates collapse case-insensitively                                                             |
 | `NumberField`                                  | Base UI `NumberField` through MUI `TextField` | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max` (also the stepper bounds), `validate`. Value is `number \| null`; digits group while typing (new in v2.1), and `format={{ useGrouping: false }}` turns that off                                                                                                                                                                                                                                         |
 | `MoneyField`                                   | `NumberField` pinned to USD                   | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max`, `validate`. Value is a `number` in dollars, rounded to the cent; shows `$1,234.50` on blur                                                                                                                                                                                                                                                                                                             |
 | `ZipField`                                     | `TextField`                                   | `name`; same rules as TextField, plus a built-in "5 digits" rule (`invalidMessage?`, default `'Enter a 5-digit ZIP code'`). Digits only, capped at 5 (anything else is stripped on type/paste); `inputMode="numeric"`, `autoComplete` defaults to `'postal-code'`. Value is the digit string                                                                                                                                                                                     |
@@ -807,6 +808,77 @@ Address lookup (Places-style): the options list is fed by an async lookup, and t
 ```
 
 The form stores the address string (`z.string()`); `placeId` reaches `onChange` but isn't stored. For objects in form state use `getOptionValue={(o) => o}` and a `z.object` schema.
+
+## EmailListField
+
+A "To:" line: many addresses, each one a chip, and the form value is a plain
+`string[]`. It extends `Autocomplete` (`multiple` + `freeSolo`), so every rule and
+every prop that field takes still applies.
+
+```tsx
+<EmailListField name="to" label="To" />
+```
+
+```ts
+const schema = z.object({ to: z.array(z.string()).min(1, 'Add at least one recipient') })
+```
+
+**Entry** follows what mail clients have taught people to expect. Enter, a comma, a
+semicolon, a space _after a complete address_, and blurring the field all commit what is
+typed — a space is deliberately conditional, so typing a display name doesn't commit a
+fragment. Pasting `a@x.com, b@y.com; c@z.com` splits into three chips at once, and
+duplicates collapse case-insensitively (compared lowercased, stored exactly as typed).
+
+An address that fails validation **stays as a chip**, in its error state, with the field
+errored and submit blocked — rather than disappearing. A wrong address you can see is
+fixable; one that vanished is a guess. The message is `invalidMessage` (default
+`'Enter a valid email address'`); a rejected duplicate announces `duplicateMessage`
+(default `'Already added'`) instead.
+
+Validity is the WHATWG `<input type="email">` rule, exported as `isEmail` / `EMAIL_PATTERN` —
+the same regex a browser applies, so the field and the browser never disagree about a string.
+
+### Async lookup
+
+`loadOptions` turns the dropdown into a directory search. It gets the current input text and
+an `AbortSignal`, is debounced by `debounceMs` (default 250), and the signal is aborted the
+moment the next keystroke supersedes the query — so a slow response can never overwrite a
+newer one:
+
+```tsx
+<EmailListField
+  name="to"
+  label="To"
+  loadOptions={(query, signal) =>
+    fetch(`/api/people?q=${encodeURIComponent(query)}`, { signal })
+      .then((r) => r.json())
+      .then((people) =>
+        people.map((p) => ({ value: p.email, label: `${p.name} <${p.email}>`, id: p.id })),
+      )
+  }
+/>
+```
+
+A chip from a result reads as its option `label` (`Ada Lovelace <ada@example.com>`); **only
+the address is stored**. Extra fields on an option (`id` above) reach your `onChange` untouched.
+
+`allowNew={false}` makes it a picker over the lookup's results only — a well-formed address
+the directory never returned is rejected with `invalidMessage`:
+
+```tsx
+<EmailListField name="to" label="To" loadOptions={search} allowNew={false} />
+```
+
+### Announcements
+
+Adds and removes go through a `role="status"` region the field renders itself, so a screen
+reader hears each chip appear and disappear. The strings are props — `addedMessage`,
+`removedMessage` (both `(email) => string`) and `duplicateMessage` — so they localise.
+
+Each chip's delete control carries an accessible name (`Remove <label>`) and a 24×24 target.
+
+Themeable under `EzEmailListField` (`defaultProps`, and `styleOverrides` for `chip`,
+`deleteIcon` and `status`, exported as `emailListFieldClasses`).
 
 ## TextareaField
 
