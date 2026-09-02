@@ -27,10 +27,25 @@ function renderForm() {
   )
 }
 
+/**
+ * The summary root carries no ARIA `role` (see FormErrorSummary's doc: GOV.UK's own pattern
+ * drops `role="alert"` to avoid a double announcement alongside the per-field `role="alert"`
+ * helper texts — the heading receiving focus is what announces it), so tests find it by its
+ * heading and walk up to the labelled container instead of querying a role.
+ */
+function findSummary(name = 'There is a problem') {
+  return screen.findByRole('heading', { name }).then((heading) => heading.parentElement!)
+}
+
+function querySummary(name = 'There is a problem') {
+  const heading = screen.queryByRole('heading', { name })
+  return heading?.parentElement ?? null
+}
+
 describe('FormErrorSummary', () => {
   it('renders nothing before any submit', () => {
     renderForm()
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(querySummary()).toBeNull()
   })
 
   it('renders nothing when the form has no errors, even after a successful submit', async () => {
@@ -44,19 +59,18 @@ describe('FormErrorSummary', () => {
       </Form>,
     )
     await user.click(screen.getByRole('button', { name: 'Submit' }))
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(querySummary()).toBeNull()
   })
 
   it('lists one item per invalid field with its message after a failed submit', async () => {
     const user = userEvent.setup()
     renderForm()
     await user.click(screen.getByRole('button', { name: 'Submit' }))
-    const alert = await screen.findByRole('alert', { name: 'There is a problem' })
-    expect(within(alert).getByText('There is a problem')).toBeInTheDocument()
-    const items = within(alert).getAllByRole('listitem')
+    const summary = await findSummary()
+    const items = within(summary).getAllByRole('listitem')
     expect(items).toHaveLength(2)
-    expect(within(alert).getByRole('link', { name: 'Name is required' })).toBeInTheDocument()
-    expect(within(alert).getByRole('link', { name: 'Invalid email address' })).toBeInTheDocument()
+    expect(within(summary).getByRole('link', { name: 'Name is required' })).toBeInTheDocument()
+    expect(within(summary).getByRole('link', { name: 'Invalid email address' })).toBeInTheDocument()
   })
 
   it('moves focus to the heading after a failed submit', async () => {
@@ -72,7 +86,7 @@ describe('FormErrorSummary', () => {
     const user = userEvent.setup()
     renderForm()
     await user.click(screen.getByRole('button', { name: 'Submit' }))
-    await screen.findByRole('alert', { name: 'There is a problem' })
+    await findSummary()
     expect(screen.getByLabelText('Name')).not.toHaveFocus()
   })
 
@@ -80,8 +94,8 @@ describe('FormErrorSummary', () => {
     const user = userEvent.setup()
     renderForm()
     await user.click(screen.getByRole('button', { name: 'Submit' }))
-    const alert = await screen.findByRole('alert', { name: 'There is a problem' })
-    const link = within(alert).getByRole('link', { name: 'Name is required' })
+    const summary = await findSummary()
+    const link = within(summary).getByRole('link', { name: 'Name is required' })
     await user.click(link)
     await waitFor(() => expect(screen.getByLabelText('Name')).toHaveFocus())
   })
@@ -90,39 +104,40 @@ describe('FormErrorSummary', () => {
     const user = userEvent.setup()
     renderForm()
     await user.click(screen.getByRole('button', { name: 'Submit' }))
-    const alert = await screen.findByRole('alert', { name: 'There is a problem' })
-    const link = within(alert).getByRole('link', { name: 'Name is required' })
+    const summary = await findSummary()
+    const link = within(summary).getByRole('link', { name: 'Name is required' })
     const nameInput = screen.getByLabelText('Name')
-    expect(link).toHaveAttribute('href', `#${nameInput.id}`)
+    await waitFor(() => expect(link).toHaveAttribute('href', `#${nameInput.id}`))
   })
 
   it('drops items as their fields become valid, and removes the summary once none remain', async () => {
     const user = userEvent.setup()
     renderForm()
     await user.click(screen.getByRole('button', { name: 'Submit' }))
-    let alert = await screen.findByRole('alert', { name: 'There is a problem' })
-    expect(within(alert).getAllByRole('listitem')).toHaveLength(2)
+    let summary = await findSummary()
+    expect(within(summary).getAllByRole('listitem')).toHaveLength(2)
 
     await user.type(screen.getByLabelText('Name'), 'Ada')
     await user.tab()
-    alert = await screen.findByRole('alert', { name: 'There is a problem' })
-    await waitFor(() => expect(within(alert).getAllByRole('listitem')).toHaveLength(1))
-    expect(within(alert).getByRole('link', { name: 'Invalid email address' })).toBeInTheDocument()
+    summary = await findSummary()
+    await waitFor(() => expect(within(summary).getAllByRole('listitem')).toHaveLength(1))
+    expect(within(summary).getByRole('link', { name: 'Invalid email address' })).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('Email'), 'a@b.co')
     await user.tab()
-    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+    await waitFor(() => expect(querySummary()).toBeNull())
   })
 
   it('has no accessibility violations after a failed submit', async () => {
     const user = userEvent.setup()
     const { container } = renderForm()
     await user.click(screen.getByRole('button', { name: 'Submit' }))
-    await screen.findByRole('alert', { name: 'There is a problem' })
+    await findSummary()
     await expectNoA11yViolations(container)
   })
 
-  it('custom title, and theme-driven heading level via slotProps', () => {
+  it('custom title and a theme-driven heading level via slotProps', async () => {
+    const user = userEvent.setup()
     const { unmount } = render(
       <Form schema={schema} defaultValues={{ name: '', email: '' }} onSubmit={() => {}}>
         <FormErrorSummary title="Fix these" slotProps={{ heading: { component: 'h3' } }} />
@@ -130,7 +145,10 @@ describe('FormErrorSummary', () => {
         <SubmitButton>Submit</SubmitButton>
       </Form>,
     )
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    expect(await screen.findByRole('heading', { level: 3, name: 'Fix these' })).toBeInTheDocument()
     unmount()
+
     const theme = createTheme({
       components: {
         EzFormErrorSummary: { defaultProps: { title: 'Themed title' } },
@@ -145,6 +163,8 @@ describe('FormErrorSummary', () => {
         </Form>
       </ThemeProvider>,
     )
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    expect(await screen.findByRole('heading', { name: 'Themed title' })).toBeInTheDocument()
   })
 
   it('forwards className and root props, and applies formErrorSummaryClasses', async () => {
@@ -157,9 +177,30 @@ describe('FormErrorSummary', () => {
       </Form>,
     )
     await user.click(screen.getByRole('button', { name: 'Submit' }))
-    const alert = await screen.findByTestId('summary')
-    expect(alert).toHaveClass('mine')
-    expect(alert).toHaveClass(formErrorSummaryClasses.root)
+    const summary = await screen.findByTestId('summary')
+    expect(summary).toHaveClass('mine')
+    expect(summary).toHaveClass(formErrorSummaryClasses.root)
+  })
+
+  describe('with confirm', () => {
+    it('renders the summary and focuses its heading instead of the first field; no dialog opens', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={schema} defaultValues={{ name: '', email: '' }} onSubmit={onSubmit} confirm>
+          <FormErrorSummary />
+          <TextField name="name" label="Name" />
+          <TextField name="email" label="Email" />
+          <SubmitButton>Submit</SubmitButton>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      const heading = await screen.findByRole('heading', { name: 'There is a problem' })
+      await waitFor(() => expect(heading).toHaveFocus())
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+      expect(screen.getByLabelText('Name')).not.toHaveFocus()
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
   })
 })
 
@@ -202,11 +243,11 @@ describe('FormErrorSummary inside a Wizard', () => {
     const user = userEvent.setup()
     renderWizard()
     await user.click(screen.getByRole('button', { name: 'Next' }))
-    const alert = await screen.findByRole('alert', { name: 'There is a problem' })
-    const items = within(alert).getAllByRole('listitem')
+    const summary = await findSummary()
+    const items = within(summary).getAllByRole('listitem')
     expect(items).toHaveLength(2)
-    expect(within(alert).getByRole('link', { name: 'Name is required' })).toBeInTheDocument()
-    expect(within(alert).getByRole('link', { name: 'Invalid email address' })).toBeInTheDocument()
+    expect(within(summary).getByRole('link', { name: 'Name is required' })).toBeInTheDocument()
+    expect(within(summary).getByRole('link', { name: 'Invalid email address' })).toBeInTheDocument()
   })
 
   it('renders nothing on the plan step, which has no failures yet', async () => {
@@ -216,7 +257,37 @@ describe('FormErrorSummary inside a Wizard', () => {
     await user.type(screen.getByLabelText('Email'), 'a@b.co')
     await user.click(screen.getByRole('button', { name: 'Next' }))
     await waitFor(() => expect(screen.getByLabelText('Plan')).toBeInTheDocument())
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(querySummary()).toBeNull()
+  })
+
+  it('re-focuses the heading on a second failed Next against the same step', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    const heading = await screen.findByRole('heading', { name: 'There is a problem' })
+    await waitFor(() => expect(heading).toHaveFocus())
+
+    // Move focus elsewhere, then fail Next again with nothing fixed: the same fields are still
+    // invalid, but the heading must still receive focus a second time.
+    screen.getByLabelText('Name').focus()
+    expect(heading).not.toHaveFocus()
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => expect(heading).toHaveFocus())
+  })
+
+  it('a failed final submit lists the last step errors and focuses the heading', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await user.type(screen.getByLabelText('Name'), 'Ada')
+    await user.type(screen.getByLabelText('Email'), 'a@b.co')
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => expect(screen.getByLabelText('Plan')).toBeInTheDocument())
+
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    const summary = await findSummary()
+    expect(within(summary).getByRole('link', { name: 'Plan is required' })).toBeInTheDocument()
+    const heading = within(summary).getByRole('heading', { name: 'There is a problem' })
+    await waitFor(() => expect(heading).toHaveFocus())
   })
 })
 

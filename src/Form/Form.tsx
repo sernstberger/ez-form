@@ -175,7 +175,13 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
     setErrorSummaryCount((n) => n + 1)
     return () => setErrorSummaryCount((n) => n - 1)
   }, [])
-  const errorSummaryContext = useMemo(() => ({ registerErrorSummary }), [registerErrorSummary])
+  // Bumped when the confirm path's own pre-submit trigger() (below) comes back invalid — see
+  // ErrorSummaryContext's failedConfirmAttempt doc for why a plain form's summary needs this.
+  const [failedConfirmAttempt, setFailedConfirmAttempt] = useState(0)
+  const errorSummaryContext = useMemo(
+    () => ({ registerErrorSummary, errorSummaryCount, failedConfirmAttempt }),
+    [registerErrorSummary, errorSummaryCount, failedConfirmAttempt],
+  )
   const methods = useForm<TIn, unknown, TOut>({
     resolver: ezResolver(schema),
     defaultValues: wrappedDefaultValues,
@@ -183,21 +189,14 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
     resetOptions,
     mode,
     disabled: disabled || submitting || loading,
-    // Read once, at mount, like every other useForm option normally would be — kept live below.
+    // Ruling: passed directly to useForm rather than written into control._options by a
+    // separate effect — react-hook-form's own useForm re-assigns `control._options = props`
+    // on every render (unconditionally, not just at mount; see its source), so this option is
+    // already live as errorSummaryCount changes with no extra wiring needed. Cost if wrong: a
+    // summary mounted after the initial render would fail to suppress hookform's own
+    // first-invalid-field focus, so both it and the summary heading would compete for focus.
     shouldFocusError: errorSummaryCount === 0,
   })
-  // Ruling: hookform's `_focusError` reads `_options.shouldFocusError` fresh on every
-  // submit rather than capturing the value passed to `useForm()`, so mutating the private
-  // `control._options` in an effect (rather than only setting it once, at mount) is enough
-  // to keep it correct as summaries mount/unmount later — verified against
-  // react-hook-form's source (`_focusError = () => _options.shouldFocusError && …`).
-  // Cost if wrong: a summary mounted after the initial render would fail to suppress
-  // hookform's own first-invalid-field focus, so both it and the summary heading would
-  // compete for focus after a failed submit.
-  useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(methods.control as any)._options.shouldFocusError = errorSummaryCount === 0
-  }, [methods.control, errorSummaryCount])
   const { isLoading, isDirty, isSubmitting } = useFormState({ control: methods.control })
   useEffect(() => {
     setLoading(isLoading)
@@ -239,15 +238,24 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
             confirmOptions
               ? async (event) => {
                   event.preventDefault()
-                  // Validate first (focusing the first error like handleSubmit does) so an
-                  // invalid form never asks; handleSubmit re-validates on Confirm, which is
-                  // cheap and keeps hookform's isSubmitting confined to the real submit.
-                  // No try/catch: a rejecting resolver here (e.g. a throwing `validate` rule)
-                  // propagates like the non-confirm path's handleSubmit does. Nothing is
-                  // stranded either way — `submitting` and the dialog only ever get set after
-                  // this awaits successfully (`ask` itself never rejects, see useConfirm).
-                  const valid = await methods.trigger(undefined, { shouldFocus: true })
-                  if (!valid) return
+                  // Validate first (focusing the first error like handleSubmit does, unless a
+                  // mounted summary is handling that instead) so an invalid form never asks;
+                  // handleSubmit re-validates on Confirm, which is cheap and keeps hookform's
+                  // isSubmitting confined to the real submit. No try/catch: a rejecting
+                  // resolver here (e.g. a throwing `validate` rule) propagates like the
+                  // non-confirm path's handleSubmit does. Nothing is stranded either way —
+                  // `submitting` and the dialog only ever get set after this awaits
+                  // successfully (`ask` itself never rejects, see useConfirm).
+                  const valid = await methods.trigger(undefined, {
+                    shouldFocus: errorSummaryCount === 0,
+                  })
+                  if (!valid) {
+                    // This path never reaches handleSubmit, so submitCount never increments —
+                    // a plain form's <FormErrorSummary> (outside a Wizard) needs its own signal
+                    // that an attempt just failed. See ErrorSummaryContext.failedConfirmAttempt.
+                    setFailedConfirmAttempt((n) => n + 1)
+                    return
+                  }
                   if (await ask(confirmOptions)) await submit(event)
                 }
               : submit

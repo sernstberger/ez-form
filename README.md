@@ -195,12 +195,15 @@ plain form's should not:
 ```
 
 It renders nothing until a submit (or, inside a `Wizard`, a `Next`/step change) has failed, then
-lists the errors from that attempt as a `role="alert"` region: a heading ("There is a problem" by
-default, `title` to override) that receives focus, and one link per invalid field showing its
-message — activating a link (click or Enter) focuses that field via `setFocus`, so it works even
-without a native `href` target. Items disappear as their fields become valid, and the whole
-summary disappears once none are left. While a summary is mounted, `<Form>` suppresses
-react-hook-form's own "focus the first invalid field" behavior so the two don't fight over focus.
+lists the errors from that attempt: a heading ("There is a problem" by default, `title` to
+override) that receives focus — the move to the heading is what announces the summary, GOV.UK's
+own pattern deliberately omits `role="alert"` here so a screen reader doesn't announce it twice
+alongside each field's own `role="alert"` helper text — and one link per invalid field showing
+its message. Activating a link (click or Enter) focuses that field via `setFocus`, so it works
+even without a native `href` target. Items disappear as their fields become valid, and the whole
+summary disappears once none are left. While a summary is mounted, `<Form>` (and, inside a
+`Wizard`, `Next`'s own step validation) suppresses react-hook-form's own "focus the first invalid
+field" behavior so the two don't fight over focus.
 
 Inside a `Wizard`, place one `<FormErrorSummary />` per `WizardStep`: each shows only that step's
 own `fields` from its last failed `Next`, not the whole form's errors.
