@@ -121,6 +121,60 @@ describe('NumberField', () => {
     expect(input()).toHaveFocus()
   })
 
+  it('groups digits while typing and submits the number', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={onSubmit}>
+        <NumberField name="age" label="Age" />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.type(input(), '1234567')
+    expect(input()).toHaveValue('1,234,567')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(onSubmit).toHaveBeenCalledWith({ age: 1234567 }, expect.anything())
+  })
+
+  it('leaves the fraction alone while grouping the integer digits', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={onSubmit}>
+        <NumberField name="age" label="Age" />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.type(input(), '1234.5')
+    expect(input()).toHaveValue('1,234.5')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(onSubmit).toHaveBeenCalledWith({ age: 1234.5 }, expect.anything())
+  })
+
+  it('does not group when format disables grouping', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <NumberField name="age" label="Age" format={{ useGrouping: false }} />
+      </Form>,
+    )
+    await user.type(input(), '1000')
+    expect(input()).toHaveValue('1000')
+  })
+
+  it('backspaces the last digit of a grouped value', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <NumberField name="age" label="Age" />
+      </Form>,
+    )
+    await user.type(input(), '1000')
+    expect(input()).toHaveValue('1,000')
+    await user.keyboard('{Backspace}')
+    expect(input()).toHaveValue('100')
+  })
+
   it('calls a consumer onValueChange after updating the form', async () => {
     const user = userEvent.setup()
     const onValueChange = vi.fn()

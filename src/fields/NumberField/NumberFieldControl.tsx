@@ -1,5 +1,9 @@
 import {
   useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  type ChangeEvent,
   type ComponentPropsWithRef,
   type FocusEvent,
   type FocusEventHandler,
@@ -15,6 +19,7 @@ import InputLabel from '@mui/material/InputLabel'
 import OutlinedInput from '@mui/material/OutlinedInput'
 import SvgIcon, { type SvgIconProps } from '@mui/material/SvgIcon'
 import { useForkRef } from '@mui/material/utils'
+import { getSeparators, groupWhileTyping, type Separators } from './groupWhileTyping'
 
 // Inline copies of @mui/icons-material KeyboardArrowUp / KeyboardArrowDown.
 const ArrowUpIcon = (props: SvgIconProps) => (
@@ -62,6 +67,8 @@ interface NumberInputProps {
   size: 'small' | 'medium'
   inputRef: Ref<HTMLInputElement> | undefined
   inputProps: NumberFieldInputProps | undefined
+  /** null turns live grouping off (`format.useGrouping === false`). */
+  separators: Separators | null
 }
 
 // Module-level so useForkRef is a stable hook call, not one inside Base UI's render callback.
@@ -72,9 +79,22 @@ function NumberInput({
   size,
   inputRef,
   inputProps,
+  separators,
 }: NumberInputProps) {
   const { ref, ...rest } = baseProps
-  const handleRef = useForkRef(ref, inputRef)
+  const inputElementRef = useRef<HTMLInputElement | null>(null)
+  const handleRef = useForkRef(useForkRef(ref, inputRef), inputElementRef)
+  // Caret to restore after Base UI re-renders the controlled input with our grouped text.
+  const pendingCaret = useRef<number | null>(null)
+
+  useLayoutEffect(() => {
+    const caret = pendingCaret.current
+    pendingCaret.current = null
+    const element = inputElementRef.current
+    if (caret === null || !element || document.activeElement !== element) return
+    element.setSelectionRange(caret, caret)
+  }, [inputValue])
+
   return (
     <OutlinedInput
       label={label}
@@ -86,6 +106,24 @@ function NumberInput({
       inputProps={{
         ...rest,
         ...inputProps,
+        onChange: (e) => {
+          const event = e as ChangeEvent<HTMLInputElement>
+          if (separators) {
+            const typed = event.target.value
+            const { text, caret } = groupWhileTyping(
+              typed,
+              event.target.selectionStart ?? typed.length,
+              separators,
+            )
+            if (text !== typed) {
+              // Base UI reads event.target.value and parses grouped text fine; the caret it
+              // would otherwise leave behind is restored by the layout effect above.
+              event.target.value = text
+              pendingCaret.current = caret
+            }
+          }
+          rest.onChange?.(event)
+        },
         onBlur: (e) => {
           // InputBase types the event for input | textarea; this slot is always an <input>.
           const event = e as FocusEvent<HTMLInputElement>
@@ -142,6 +180,11 @@ export function NumberFieldControl({
 }: NumberFieldControlProps) {
   const generatedId = useId()
   const id = idProp ?? generatedId
+  const { locale, format } = rootProps
+  const separators = useMemo(
+    () => (format?.useGrouping === false ? null : getSeparators(locale, format)),
+    [locale, format],
+  )
   return (
     // Root's `id` is the input's id; via context it also becomes the steppers' `aria-controls`.
     <BaseNumberField.Root
@@ -171,6 +214,7 @@ export function NumberFieldControl({
             size={size}
             inputRef={inputRef}
             inputProps={inputProps}
+            separators={separators}
           />
         )}
       />

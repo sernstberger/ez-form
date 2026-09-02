@@ -37,6 +37,17 @@ describe('MoneyField', () => {
     expect(onSubmit).toHaveBeenCalledWith({ price: 1234.5 }, expect.anything())
   })
 
+  it('groups digits while typing, before any blur', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <MoneyField name="price" label="Price" />
+      </Form>,
+    )
+    await user.type(input(), '1234')
+    expect(input()).toHaveValue('1,234')
+  })
+
   it('throws outside <Form> naming MoneyField', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(() => render(<MoneyField name="price" label="Price" />)).toThrow(
