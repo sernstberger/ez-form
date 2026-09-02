@@ -46,6 +46,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and literal `variant`/`size`/`color` JSX attributes in `src/`, and on exported components
   missing a README Components row; allow-listed via a trailing `// guardrail: allow <reason>`
   comment. Wired into CI alongside its own `pnpm test:scripts` suite — #44.
+- WCAG 2.5.8 Target Size (Minimum): `NumberField`'s steppers and `FileField`'s chip
+  delete icon now declare `minWidth`/`minHeight: 24` (the two controls whose rendered
+  box could fall under 24×24 CSS px); `src/test/targetSize.ts` exports
+  `expectTargetSize`, a shared test helper asserting a control's declared CSS
+  guarantees the floor, called from every affected component's test file — #12.
 
 > > > > > > > feat/guardrail
 

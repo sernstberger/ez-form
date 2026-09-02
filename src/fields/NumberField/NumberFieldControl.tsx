@@ -93,6 +93,12 @@ const stepperButton = ({ theme }: { theme: Theme }) => {
     paddingBottom: 0,
     flex: 1,
     borderRadius: `calc(${typeof radius === 'number' ? `${radius}px` : radius} / 2)`,
+    // WCAG 2.5.8: zeroing the vertical padding above (the divided-column
+    // layout's minimum) can shrink a small stepper's box below the 24×24 CSS
+    // px target on its own; this is the functional floor, still overridable
+    // via `theme.components.EzNumberField.styleOverrides.increment/decrement`.
+    minWidth: 24,
+    minHeight: 24,
   }
 }
 const NumberFieldIncrement = styled(IconButton, { name: 'EzNumberField', slot: 'Increment' })(

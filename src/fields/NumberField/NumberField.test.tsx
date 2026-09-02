@@ -8,6 +8,7 @@ import { NumberField } from './NumberField'
 import { numberFieldClasses } from './NumberFieldControl'
 import { getSeparators } from './groupWhileTyping'
 import { describeFieldContract } from '../../test/describeFieldContract'
+import { expectTargetSize } from '../../test/targetSize'
 
 const schema = z.object({ age: z.number({ error: 'Enter your age' }) })
 const input = () => screen.getByRole('textbox', { name: 'Age' })
@@ -476,6 +477,16 @@ describe('NumberField', () => {
       numberFieldClasses.decrement,
     )
     expect(container.querySelector(`.${numberFieldClasses.root}`)).toBeInTheDocument()
+  })
+
+  it.each(['medium', 'small'] as const)('%s: meets 24×24 target size', (size) => {
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <NumberField name="age" label="Age" size={size} />
+      </Form>,
+    )
+    expectTargetSize(screen.getByRole('button', { name: 'Increase' }))
+    expectTargetSize(screen.getByRole('button', { name: 'Decrease' }))
   })
 
   it('calls a consumer onValueChange after updating the form', async () => {

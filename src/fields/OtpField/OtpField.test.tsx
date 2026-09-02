@@ -6,6 +6,7 @@ import { Form } from '../../Form'
 import { OtpField } from './OtpField'
 import { otpFieldClasses } from './OtpFieldControl'
 import { describeFieldContract } from '../../test/describeFieldContract'
+import { expectTargetSize } from '../../test/targetSize'
 
 const schema = z.object({ code: z.string() })
 const inputs = () => screen.getAllByRole('textbox') as HTMLInputElement[]
@@ -39,6 +40,15 @@ describe('OtpField', () => {
     expect(inputs().map((i) => i.value)).toEqual(['1', '2', '3', '4'])
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(onSubmit).toHaveBeenCalledWith({ code: '1234' }, expect.anything())
+  })
+
+  it.each(['medium', 'small'] as const)('%s: meets 24×24 target size', (size) => {
+    render(
+      <Form schema={schema} defaultValues={{ code: '' }} onSubmit={() => {}}>
+        <OtpField name="code" label="Code" length={4} size={size} />
+      </Form>,
+    )
+    inputs().forEach(expectTargetSize)
   })
 
   it('accepts a pasted code', async () => {

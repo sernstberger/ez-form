@@ -46,7 +46,7 @@ declare module '@mui/material/styles' {
     EzPasswordField: 'root' | 'toggle'
     EzPasswordStrength: 'root' | 'bar' | 'label'
     EzOtpField: 'root' | 'helperText'
-    EzFileField: 'root' | 'fileList'
+    EzFileField: 'root' | 'fileList' | 'deleteIcon'
     EzTextareaField: 'root' | 'counter'
   }
 

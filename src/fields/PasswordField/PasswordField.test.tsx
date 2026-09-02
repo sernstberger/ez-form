@@ -7,6 +7,7 @@ import { PasswordField } from './PasswordField'
 import { passwordFieldClasses } from './PasswordField'
 import { describeFieldContract } from '../../test/describeFieldContract'
 import { expectNoA11yViolations } from '../../test/axe'
+import { expectTargetSize } from '../../test/targetSize'
 
 const schema = z.object({ password: z.string().min(1, { error: 'Password is required' }) })
 // A password input exposes no `textbox` role (unlike TextField's own contract test, which
@@ -146,6 +147,11 @@ describe('PasswordField', () => {
   it('carries the root class hook for CSS / styleOverrides.root', () => {
     const { container } = renderForm()
     expect(container.querySelector(`.${passwordFieldClasses.root}`)).toBeInTheDocument()
+  })
+
+  it('meets 24×24 target size', () => {
+    renderForm()
+    expectTargetSize(screen.getByRole('button', { name: 'Show password' }))
   })
 
   it('has no accessibility violations with the value revealed', async () => {
