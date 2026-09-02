@@ -633,6 +633,24 @@ const schema = z.object({ bio: z.string().max(500) })
 
 Themeable under `EzTextareaField` (`root`, `counter`, exported as `textareaFieldClasses`).
 
+## Mobile keyboards & autofill
+
+`TextField`, `NumberField`, `MoneyField`, and `OtpField` set `autoComplete` / `inputMode` defaults so mobile keyboards and password managers do the right thing without per-field wiring. A default only applies when the consumer sets neither the prop nor its `slotProps.htmlInput` equivalent — an explicit value always wins.
+
+| Component     | Condition                                                             | `autoComplete`  | `inputMode`     |
+| ------------- | --------------------------------------------------------------------- | --------------- | --------------- |
+| `TextField`   | `type="email"`                                                        | `email`         | `email`         |
+| `TextField`   | `type="tel"`                                                          | `tel`           | `tel`           |
+| `TextField`   | `type="url"`                                                          | `url`           | `url`           |
+| `TextField`   | `type="search"`                                                       | — (not guessed) | `search`        |
+| `TextField`   | any other `type` (including no `type`)                                | — (not guessed) | — (not guessed) |
+| `NumberField` | integer-only (no fractional `step`, no `format` with fraction digits) | —               | `numeric`       |
+| `NumberField` | otherwise (fractional `step`, or a `format` with fraction digits)     | —               | `decimal`       |
+| `MoneyField`  | always (currency has cents)                                           | —               | `decimal`       |
+| `OtpField`    | first slot only, from Base UI itself, not duplicated here             | `one-time-code` | `numeric`       |
+
+`TextField` never guesses a token from `name` — a wrong guess is worse than none, so only these unambiguous `type`s get a default. `PasswordField` covers `autoComplete="current-password"` / `"new-password"` on its own, above. v8's date/time/phone/address fields (#16–#19) will extend this table.
+
 ## NumberField
 
 Digits group as you type for every consumer (new in v2.1): typing `1234` shows `1,234` before any blur. Pass `format={{ useGrouping: false }}` to turn grouping off. Pasted numbers group on blur rather than on paste, because Base UI handles the paste itself.

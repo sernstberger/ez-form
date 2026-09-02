@@ -169,3 +169,25 @@ describe('OtpField', () => {
     expect(screen.getByRole('textbox', { name: 'Code (optional)' })).toBeInTheDocument()
   })
 })
+
+describe('OtpField autoComplete/inputMode defaults (#6, #7)', () => {
+  // Base UI's OTPField.Root already defaults autoComplete="one-time-code" (first slot only)
+  // and, for the default validationType="numeric", inputMode="numeric" — nothing to add here,
+  // just verify the binding does not strip or duplicate them.
+  it('first slot gets autoComplete="one-time-code" and inputMode="numeric" from Base UI', () => {
+    render(
+      <Form schema={schema} defaultValues={{ code: '' }} onSubmit={() => {}}>
+        <OtpField name="code" label="Code" length={4} />
+      </Form>,
+    )
+    const [first, ...rest] = inputs()
+    expect(first).toHaveAttribute('autoComplete', 'one-time-code')
+    expect(first).toHaveAttribute('inputMode', 'numeric')
+    // Every slot type="password" masking aside, only the first slot carries autoComplete;
+    // later slots are explicitly 'off' so password managers don't prompt on every cell.
+    for (const slot of rest) {
+      expect(slot).toHaveAttribute('autoComplete', 'off')
+      expect(slot).toHaveAttribute('inputMode', 'numeric')
+    }
+  })
+})
