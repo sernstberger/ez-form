@@ -7,6 +7,11 @@ export { Checkbox, type CheckboxProps } from './fields/Checkbox'
 export { Switch, type SwitchProps } from './fields/Switch'
 export { RadioGroup, type RadioGroupProps } from './fields/RadioGroup'
 export { NumberField, numberFieldClasses, type NumberFieldProps } from './fields/NumberField'
+export {
+  TextareaField,
+  textareaFieldClasses,
+  type TextareaFieldProps,
+} from './fields/TextareaField'
 export { MoneyField, type MoneyFieldProps } from './fields/MoneyField'
 export {
   PasswordField,
