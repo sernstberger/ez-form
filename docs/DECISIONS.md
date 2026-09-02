@@ -103,3 +103,28 @@ A ruling is a judgement call recorded during implementation: `Ruling: <what> —
 - consumer disabled merges with `||` everywhere via one `mergeDisabled` helper (form lock wins) — cost if wrong: a consumer cannot force a field enabled inside a disabled form (correct behavior).
 - add "prepack": "pnpm build"; npm name ez-form is free (registry 404) — keep bare name.
 
+
+## [v5 a11y wave + US fields + strict mode — SDD ledger](superpowers/reviews/2026-09-02-v5-a11y-wave-sdd-ledger.md)
+
+- One `LiveRegion` replaces the three ad-hoc live nodes; Form's region has its own `EzForm` `status` slot so tests and themes can address it — cost if wrong: one slot key.
+- Step change focuses the step heading, not the first field — APG — cost if wrong: one extra Tab.
+- `actionsOrder` values named by button order (`'cancel-confirm'`, `'back-next'`) — cost if wrong: rename before publish.
+- `autoComplete`/`inputMode` derive from `type` only, never `name` — cost if wrong: one attribute per field.
+- Dev warnings: wizard check is "does the form know the name" (mount ∪ array ∪ value tree), not mount-only; `TextField` carries an `@internal` `componentName` so wrappers self-name — cost if wrong: an unmounted field present in `defaultValues` is not warned.
+- #4 ships "Required fields are marked with an asterisk (*)." on by default in asterisk mode via `requiredIndicatorText`; no per-field hidden text — cost if wrong: one prop to `false`.
+- #71 keeps the `^18 || ^19` peer and wraps in `forwardRef` — cost if wrong: boilerplate to remove.
+- `invalidMessage` on the digit fields is `string` (RHF `Message`) — cost if wrong: ReactNode via helperText.
+- Phone/SSN/ZIP/FEIN store digits only, display via a `#` template; no masking dependency; edits resolved from the pre-edit selection + `inputType`, never a length heuristic (the heuristic ate digits on paste-over-selection and forward Delete) — cost if wrong: an imask-class library later.
+- `formatTemplate` and `PHONE_FORMAT` are public — review screens need them — cost if wrong: two more public names.
+- `AddressField` is a composite of the real part fields under a nested object name; US only; Places stays #21 — cost if wrong: a flat-value variant later.
+- `StateSelect` ships 50 + DC, territories opt-in.
+- `FormDialog` nests the `<form>` inside the paper (`role="dialog"` is not allowed on `<form>`, axe `aria-allowed-role`); `FormDialogProps` drops Form's `FormHTMLAttributes` half (native attrs via `slotProps.form`); no `actionsOrder` since `actions` replaces the footer — cost if wrong: one wrapper, one prop.
+- FileField: drop zone is not a tab stop (the button is the keyboard path); under `multiple` a pick appends; the rejection rule registers only when a limit prop is set; rejection clears on every value change — cost if wrong: flip two branches.
+- `PercentField` formats through `Intl` `unit: 'percent'` (MoneyField pins Intl, has no adornment); scale converts in the field, not the schema — cost if wrong: an adornment slot later.
+- `EmailField` normalises on blur, not per keystroke; `NumberField.valueScale` is internal and `Omit`ted from every wrapper (`stripInternal` breaks API Extractor's d.ts) — cost if wrong: one more Omit.
+- `EmailListField`: a rejected duplicate clears the box and is announced; chip `deleteIcon` is not overridable via `slotProps` (it carries the accessible name) — cost if wrong: retain text / re-open the slot later.
+- Assisted mode forces `off` even on fields with no default token (Chromium name/id heuristics) — cost if wrong: narrow later.
+- Flake bar for #85 is the brief's (5 green runs beside one other vitest process), not determinism at 10× oversubscription — cost if wrong: cap cross-lane concurrency.
+- Meta-level Storybook `docs.description.component` is the right home for a component-wide usage rule — cost if wrong: move two blocks.
+- Docs-only or review-only ⚠️ items (jest-axe coverage via `describeFieldContract`, `useConfirm`/`ClearButton` sharing `ConfirmDialog`) resolved by controller inspection rather than a fix round.
+- Strict mode = React StrictMode + console-noise-fails-tests + stricter tsc + ESLint type-checked + builds fail on warnings; no test timeouts; TS 6 alias for the compiler-API tools while `tsc` runs TS 7 — cost if wrong: a rule relaxed with a comment.
