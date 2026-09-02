@@ -6,7 +6,7 @@ import { expectNoA11yViolations } from '../../test/axe'
 
 async function fillStepOne(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
-  await user.type(screen.getByLabelText(/^password/i), 'correct-horse-1')
+  await user.type(screen.getByLabelText(/^password(?! strength)/i), 'correct-horse-1')
   await user.type(screen.getByLabelText(/confirm password/i), 'correct-horse-1')
   await user.type(screen.getByLabelText(/display name/i), 'Ada Lovelace')
   await user.click(screen.getByRole('checkbox', { name: /terms/i }))
@@ -22,7 +22,8 @@ describe('SignUp', () => {
     render(<SignUp />)
     const account = screen.getByRole('group', { name: 'Account' })
     expect(within(account).getByLabelText(/^email/i)).toBeInTheDocument()
-    expect(within(account).getByLabelText(/^password/i)).toBeInTheDocument()
+    expect(within(account).getByLabelText(/^password(?! strength)/i)).toBeInTheDocument()
+    expect(within(account).getByRole('meter')).toBeInTheDocument()
     expect(within(account).getByLabelText(/confirm password/i)).toBeInTheDocument()
 
     const profile = screen.getByRole('group', { name: 'Profile' })
@@ -34,7 +35,7 @@ describe('SignUp', () => {
     const user = userEvent.setup()
     render(<SignUp />)
     await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
-    await user.type(screen.getByLabelText(/^password/i), 'correct-horse-1')
+    await user.type(screen.getByLabelText(/^password(?! strength)/i), 'correct-horse-1')
     await user.type(screen.getByLabelText(/confirm password/i), 'different-1')
     await user.type(screen.getByLabelText(/display name/i), 'Ada Lovelace')
     await user.click(screen.getByRole('checkbox', { name: /terms/i }))
@@ -47,7 +48,7 @@ describe('SignUp', () => {
     const user = userEvent.setup()
     render(<SignUp />)
     await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
-    await user.type(screen.getByLabelText(/^password/i), 'correct-horse-1')
+    await user.type(screen.getByLabelText(/^password(?! strength)/i), 'correct-horse-1')
     await user.type(screen.getByLabelText(/confirm password/i), 'correct-horse-1')
     await user.type(screen.getByLabelText(/display name/i), 'Ada Lovelace')
     await user.click(screen.getByRole('button', { name: /next/i }))

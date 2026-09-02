@@ -12,10 +12,10 @@ import { TextField } from '../../fields/TextField'
 import { PasswordField } from '../../fields/PasswordField'
 import { Checkbox } from '../../fields/Checkbox'
 import { OtpField } from '../../fields/OtpField'
+import { PasswordStrength } from '../../fields/PasswordStrength'
 import { Wizard, type WizardStepDef } from '../../Wizard'
 import { WizardStep } from '../../Wizard/WizardStep'
 import { WizardNav } from '../../Wizard/WizardNav'
-// TODO(#59): swap this raw PasswordField for a PasswordStrength meter once it lands.
 import { verifyCodeApi } from '../fakeApi'
 
 const schema = z
@@ -105,6 +105,7 @@ export function SignUp({ onSuccess }: SignUpProps) {
                         autoComplete="new-password"
                         required
                       />
+                      <PasswordStrength name="password" />
                       <PasswordField
                         name="confirmPassword"
                         label="Confirm password"
