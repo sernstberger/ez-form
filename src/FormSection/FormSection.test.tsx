@@ -115,4 +115,83 @@ describe('FormSection', () => {
     const group = screen.getByRole('group', { name: 'Address' })
     expect(group).toHaveAccessibleDescription('Where we ship')
   })
+
+  describe('nested legend heading depth', () => {
+    it('defaults to h3 at the top level', () => {
+      wrap(
+        <FormSection title="Address">
+          <TextField name="street" label="Street" />
+        </FormSection>,
+      )
+      expect(screen.getByRole('heading', { level: 3, name: 'Address' })).toBeInTheDocument()
+    })
+
+    it('a section nested one level in gets h4, and one nested inside that gets h5', () => {
+      wrap(
+        <FormSection title="Outer">
+          <FormSection title="Inner">
+            <FormSection title="Innermost">
+              <TextField name="street" label="Street" />
+            </FormSection>
+          </FormSection>
+        </FormSection>,
+      )
+      expect(screen.getByRole('heading', { level: 3, name: 'Outer' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 4, name: 'Inner' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 5, name: 'Innermost' })).toBeInTheDocument()
+    })
+
+    it('caps at h6 for deeply nested sections', () => {
+      wrap(
+        <FormSection title="L3">
+          <FormSection title="L4">
+            <FormSection title="L5">
+              <FormSection title="L6">
+                <FormSection title="L6-too">
+                  <TextField name="street" label="Street" />
+                </FormSection>
+              </FormSection>
+            </FormSection>
+          </FormSection>
+        </FormSection>,
+      )
+      expect(screen.getByRole('heading', { level: 6, name: 'L6' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 6, name: 'L6-too' })).toBeInTheDocument()
+    })
+
+    it('an explicit slotProps.legend.component overrides the depth default', () => {
+      wrap(
+        <FormSection title="Outer">
+          <FormSection title="Inner" slotProps={{ legend: { component: 'h2' } }}>
+            <TextField name="street" label="Street" />
+          </FormSection>
+        </FormSection>,
+      )
+      expect(screen.getByRole('heading', { level: 3, name: 'Outer' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 2, name: 'Inner' })).toBeInTheDocument()
+    })
+
+    it('a theme default for slotProps.legend.component wins over the depth default', () => {
+      const theme = createTheme({
+        components: {
+          EzFormSection: {
+            defaultProps: { slotProps: { legend: { component: 'h2' } } },
+          },
+        },
+      })
+      render(
+        <ThemeProvider theme={theme}>
+          <Form schema={schema} onSubmit={() => {}}>
+            <FormSection title="Outer">
+              <FormSection title="Inner">
+                <TextField name="city" label="City" />
+              </FormSection>
+            </FormSection>
+          </Form>
+        </ThemeProvider>,
+      )
+      expect(screen.getByRole('heading', { level: 2, name: 'Outer' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 2, name: 'Inner' })).toBeInTheDocument()
+    })
+  })
 })

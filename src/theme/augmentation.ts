@@ -4,6 +4,7 @@ import type { SubmitButtonProps } from '../SubmitButton'
 import type { ConfirmDialogProps } from '../ConfirmDialog'
 import type { WizardStepperProps } from '../Wizard/WizardStepper'
 import type { WizardNavProps } from '../Wizard/WizardNav'
+import type { WizardProps } from '../Wizard/Wizard'
 import type { ReadOnlyFieldProps } from '../fields/ReadOnlyField'
 import type { NumberFieldControlProps } from '../fields/NumberField/NumberFieldControl'
 import type { FormProps } from '../Form'
@@ -20,6 +21,8 @@ declare module '@mui/material/styles' {
     EzClearButton: Partial<ClearButtonProps>
     EzSubmitButton: Partial<SubmitButtonProps>
     EzConfirmDialog: Partial<ConfirmDialogProps>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    EzWizard: Partial<WizardProps<any>>
     EzWizardStepper: Partial<WizardStepperProps>
     EzWizardNav: Partial<WizardNavProps>
     EzReadOnlyField: Partial<ReadOnlyFieldProps>
@@ -65,6 +68,9 @@ declare module '@mui/material/styles' {
     EzConfirmDialog?: {
       defaultProps?: ComponentsProps['EzConfirmDialog']
       styleOverrides?: ComponentsOverrides<Theme>['EzConfirmDialog']
+    }
+    EzWizard?: {
+      defaultProps?: ComponentsProps['EzWizard']
     }
     EzWizardStepper?: {
       defaultProps?: ComponentsProps['EzWizardStepper']

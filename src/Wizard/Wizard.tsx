@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import { useFormState, type FieldValues, type Path } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
 import {
@@ -65,6 +66,14 @@ export interface WizardProps<TIn extends FieldValues> {
   visited?: readonly string[]
   onVisitedChange?: (ids: readonly string[]) => void
   orientation?: 'horizontal' | 'vertical'
+  /**
+   * `'steps'` (default): the usual one-step-at-a-time wizard. `'page'`:
+   * every `WizardStep` renders at once, in step order, as a page of
+   * `FormSection`s — the same content, without the stepper/nav chrome.
+   * `WizardStepper` and `WizardNav` render nothing in this layout;
+   * `SubmitButton` validates the whole schema, same as always.
+   */
+  layout?: 'steps' | 'page'
   children: ReactNode
 }
 
@@ -74,15 +83,23 @@ export interface WizardProps<TIn extends FieldValues> {
  * Next validates the current step's `fields` with `trigger`; submit (the
  * whole schema) is `<SubmitButton>` on the last step.
  */
-export function Wizard<TIn extends FieldValues>({
-  steps,
-  step,
-  onStepChange,
-  visited: visitedProp,
-  onVisitedChange,
-  orientation = 'horizontal',
-  children,
-}: WizardProps<TIn>) {
+export function Wizard<TIn extends FieldValues>(inProps: WizardProps<TIn>) {
+  // `useDefaultProps` is untyped in `TIn` (it only cares about `layout`/
+  // `orientation`, neither of which mentions the field type), so the cast
+  // erases `TIn` for this call only and restores it on the result.
+  const {
+    steps,
+    step,
+    onStepChange,
+    visited: visitedProp,
+    onVisitedChange,
+    orientation = 'horizontal',
+    layout = 'steps',
+    children,
+  } = useDefaultProps({
+    props: inProps as WizardProps<FieldValues>,
+    name: 'EzWizard',
+  }) as WizardProps<TIn>
   const { trigger, control, setFocus } = useEzFormContext('Wizard')
   const { errors, submitCount } = useFormState({ control })
   const id = useId()
@@ -145,19 +162,25 @@ export function Wizard<TIn extends FieldValues>({
     }
   }, [current, trigger])
 
+  // In `page` layout every step is already visible at once, so Next/Prev/go
+  // have nothing to do — the whole schema is validated by `<SubmitButton>`
+  // instead, same as the last step of a `steps` wizard.
   const next = useCallback(async () => {
+    if (layout === 'page') return false
     if (index >= steps.length - 1) return false
     if (!(await validateCurrent())) return false
     move(index + 1)
     return true
-  }, [index, steps.length, validateCurrent, move])
+  }, [layout, index, steps.length, validateCurrent, move])
 
   const prev = useCallback(() => {
+    if (layout === 'page') return
     if (index > 0) move(index - 1)
-  }, [index, move])
+  }, [layout, index, move])
 
   const go = useCallback(
     async (id: string) => {
+      if (layout === 'page') return false
       const to = indexOf(id)
       if (to === -1 || to === index) return false
       const allowed = visited.includes(id) || to === lastVisitedIndex + 1
@@ -166,7 +189,7 @@ export function Wizard<TIn extends FieldValues>({
       move(to)
       return true
     },
-    [indexOf, index, visited, lastVisitedIndex, validateCurrent, move],
+    [layout, indexOf, index, visited, lastVisitedIndex, validateCurrent, move],
   )
 
   const errorPaths = useMemo(() => errorFieldPaths(errors), [errors])
@@ -215,6 +238,10 @@ export function Wizard<TIn extends FieldValues>({
       return
     }
     handledSubmit.current = submitCount
+    // `page` layout has every step mounted at once already — hookform's own submit-time
+    // focus lands on the right field without the wizard steering anything, and `current`
+    // stays the first step by contract.
+    if (layout === 'page') return
     if (!errorPaths.length) return
     // The earliest owning step wins; among that step's errors, the first in schema order.
     const owned = errorPaths.map((path) => ({ path, to: ownerIndex(path) }))
@@ -222,7 +249,7 @@ export function Wizard<TIn extends FieldValues>({
     if (to === index) return
     move(to)
     setFocusTarget({ id: steps[to]!.id, path: owned.find((o) => o.to === to)!.path })
-  }, [submitCount, errorPaths, ownerIndex, index, move, steps])
+  }, [submitCount, errorPaths, ownerIndex, index, move, steps, layout])
 
   useEffect(() => {
     if (!focusTarget) return
@@ -251,6 +278,7 @@ export function Wizard<TIn extends FieldValues>({
       index,
       visited,
       orientation,
+      layout,
       isFirst: index === 0,
       isLast: index === steps.length - 1,
       pending,
@@ -267,6 +295,7 @@ export function Wizard<TIn extends FieldValues>({
       current,
       index,
       visited,
+      layout,
       orientation,
       pending,
       next,

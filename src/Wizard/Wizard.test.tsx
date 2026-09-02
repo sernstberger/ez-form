@@ -8,7 +8,7 @@ import { Form } from '../Form'
 import { SubmitButton } from '../SubmitButton'
 import { TextField } from '../fields/TextField'
 import { expectNoA11yViolations } from '../test/axe'
-import { formSectionClasses } from '../FormSection'
+import { FormSection, formSectionClasses } from '../FormSection'
 import { Wizard, type WizardStepDef } from './Wizard'
 import { WizardStep } from './WizardStep'
 import { WizardStepper, wizardStepperClasses } from './WizardStepper'
@@ -919,6 +919,138 @@ describe('WizardStep renders a FormSection', () => {
     await waitFor(() =>
       expect(screen.getByRole('group', { name: 'Pick a plan' })).toBeInTheDocument(),
     )
+  })
+})
+
+describe('Wizard layout="page"', () => {
+  function PageWizard({ onSubmit = () => {} }: { onSubmit?: () => void }) {
+    return (
+      <Form schema={schema} defaultValues={filled} onSubmit={onSubmit}>
+        <Wizard steps={steps} layout="page">
+          <WizardStepper />
+          <Steps />
+          <WizardNav />
+          <SubmitButton />
+        </Wizard>
+      </Form>
+    )
+  }
+
+  it('renders every step as a named group, in step order, with no tablist/tab', () => {
+    render(<PageWizard />)
+    expect(screen.getAllByRole('group')).toHaveLength(3)
+    const account = screen.getByRole('group', { name: 'Account' })
+    const plan = screen.getByRole('group', { name: 'Plan' })
+    const review = screen.getByRole('group', { name: 'Review' })
+    expect(account.compareDocumentPosition(plan) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(plan.compareDocumentPosition(review) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument()
+  })
+
+  it('all fields are present at once (every step mounted)', () => {
+    render(<PageWizard />)
+    expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Email' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Plan' })).toBeInTheDocument()
+  })
+
+  it('exactly one heading per step', () => {
+    render(<PageWizard />)
+    expect(screen.getByRole('heading', { name: 'Account' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Plan' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Review' })).toBeInTheDocument()
+    expect(screen.getAllByRole('heading')).toHaveLength(3)
+  })
+
+  it('WizardStepper and WizardNav render nothing', () => {
+    const { container } = render(<PageWizard />)
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
+    expect(container.querySelector('.MuiStepper-root')).toBeNull()
+  })
+
+  it('Submit validates every step at once: an error on step 3 (review) shows immediately', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      <Form schema={schema} defaultValues={{ ...filled, name: '' }} onSubmit={onSubmit}>
+        <Wizard steps={steps} layout="page">
+          <Steps />
+          <SubmitButton />
+        </Wizard>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    expect(await screen.findByText('Name is required')).toBeInTheDocument()
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('useWizard reports layout="page" and current is the first step', () => {
+    render(<PageWizard />)
+    expect(screen.getByTestId('current')).toHaveTextContent('account')
+  })
+
+  it('next/prev/go are no-ops resolving false; pending is always false', async () => {
+    const user = userEvent.setup()
+    render(<PageWizard />)
+    await user.click(screen.getByRole('button', { name: 'next' }))
+    expect(screen.getByTestId('current')).toHaveTextContent('account')
+    expect(screen.getByTestId('pending')).toHaveTextContent('false')
+    await user.click(screen.getByRole('button', { name: 'go review' }))
+    expect(screen.getByTestId('current')).toHaveTextContent('account')
+  })
+
+  it('is themeable: defaultProps.layout applies EzWizard default', () => {
+    const theme = createTheme({
+      components: {
+        EzWizard: {
+          defaultProps: { layout: 'page' },
+        },
+      },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+          <Wizard steps={steps}>
+            <WizardStepper />
+            <Steps />
+          </Wizard>
+        </Form>
+      </ThemeProvider>,
+    )
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Account' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Plan' })).toBeInTheDocument()
+  })
+
+  it('has no accessibility violations (heading order clean)', async () => {
+    const { container } = render(<PageWizard />)
+    await expectNoA11yViolations(container)
+  })
+
+  it('a nested FormSection inside a step gets h4', () => {
+    render(
+      <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+        <Wizard steps={steps} layout="page">
+          <WizardStep id="account">
+            <TextField name="name" label="Name" />
+            <FormSection title="Nested">
+              <TextField name="email" label="Email" />
+            </FormSection>
+          </WizardStep>
+          <WizardStep id="plan">
+            <TextField name="plan" label="Plan" />
+          </WizardStep>
+          <WizardStep id="review">
+            <p>Review</p>
+          </WizardStep>
+        </Wizard>
+      </Form>,
+    )
+    expect(screen.getByRole('heading', { level: 3, name: 'Account' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 4, name: 'Nested' })).toBeInTheDocument()
   })
 })
 

@@ -23,6 +23,13 @@ export interface WizardContextValue {
   index: number
   visited: readonly string[]
   orientation: 'horizontal' | 'vertical'
+  /**
+   * `'steps'` (default): one step visible at a time, navigated by
+   * `next`/`prev`/`go`. `'page'`: every step renders at once, in order, as a
+   * page of `FormSection`s; `WizardStepper` and `WizardNav` render nothing,
+   * `current` is always the first step, and `next`/`prev`/`go` are no-ops.
+   */
+  layout: 'steps' | 'page'
   isFirst: boolean
   isLast: boolean
   /** True while `next()` / a forward `go()` is validating. */

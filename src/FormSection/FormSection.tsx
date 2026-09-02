@@ -1,9 +1,24 @@
-import { useId, type FieldsetHTMLAttributes, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useId,
+  type FieldsetHTMLAttributes,
+  type ReactNode,
+} from 'react'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import { styled } from '@mui/material/styles'
 import Typography from '@mui/material/Typography'
 import type { FormTextSlotProps } from '../Form'
+
+/**
+ * How many `FormSection`s deep the current one is nested (0 at the top level).
+ * Drives the legend's default heading level (`h${3 + depth}`, capped at `h6`)
+ * so nested sections — a step containing sub-sections, or plain nesting
+ * outside a wizard — produce a correct heading hierarchy without every call
+ * site specifying `slotProps.legend.component` by hand.
+ */
+export const FormSectionDepthContext = createContext(0)
 
 export interface FormSectionProps extends Omit<
   FieldsetHTMLAttributes<HTMLFieldSetElement>,
@@ -65,7 +80,17 @@ export function FormSection(inProps: FormSectionProps) {
     ...rest
   } = useDefaultProps({ props: inProps, name: 'EzFormSection' })
   const descriptionId = `${useId()}-description`
-  const legendProps = { component: 'h3', variant: 'h6', ...slotProps?.legend } as const
+  const depth = useContext(FormSectionDepthContext)
+  // h3 at the top level, one level deeper per nesting, capped at h6 — a plain
+  // legend can't outrank the page's own heading structure. `slotProps.legend`
+  // (explicit prop, or a theme default already merged in by useDefaultProps
+  // above) always wins over this default: it is spread after `component`.
+  const depthComponent = `h${Math.min(3 + depth, 6)}` as const
+  const legendProps = {
+    component: depthComponent,
+    variant: 'h6',
+    ...slotProps?.legend,
+  } as const
   const descriptionProps = { component: 'p', variant: 'body2', ...slotProps?.description } as const
   return (
     <FormSectionRoot
@@ -91,7 +116,9 @@ export function FormSection(inProps: FormSectionProps) {
         {...slotProps?.content}
         className={`${formSectionClasses.content}${slotProps?.content?.className ? ` ${slotProps.content.className}` : ''}`}
       >
-        {children}
+        <FormSectionDepthContext.Provider value={depth + 1}>
+          {children}
+        </FormSectionDepthContext.Provider>
       </FormSectionContent>
     </FormSectionRoot>
   )
