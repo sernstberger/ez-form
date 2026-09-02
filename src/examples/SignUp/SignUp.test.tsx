@@ -32,7 +32,7 @@ describe('SignUp', () => {
   })
 
   it('shows the refine message on confirm password when the two passwords do not match', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<SignUp />)
     await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
     await user.type(screen.getByLabelText(/^password(?! strength)/i), 'correct-horse-1')
@@ -45,7 +45,7 @@ describe('SignUp', () => {
   })
 
   it('blocks Next when the terms checkbox is unchecked', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<SignUp />)
     await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
     await user.type(screen.getByLabelText(/^password(?! strength)/i), 'correct-horse-1')
@@ -58,7 +58,7 @@ describe('SignUp', () => {
   })
 
   it('Next validates only step 1: an empty step 1 keeps the wizard on step 1', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<SignUp />)
     await user.click(screen.getByRole('button', { name: /next/i }))
     await screen.findAllByText(/required|invalid/i)
@@ -66,7 +66,7 @@ describe('SignUp', () => {
   })
 
   it('advances to the verification step once step 1 is valid', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<SignUp />)
     await fillStepOne(user)
     await user.click(screen.getByRole('button', { name: /next/i }))
@@ -78,7 +78,7 @@ describe('SignUp', () => {
   })
 
   it('shows a server error alert when the fake API rejects a wrong code', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<SignUp />)
     await fillStepOne(user)
     await user.click(screen.getByRole('button', { name: /next/i }))
@@ -90,7 +90,7 @@ describe('SignUp', () => {
   })
 
   it('calls the fake verify API exactly once with the good code and reports success', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const onSuccess = vi.fn()
     render(<SignUp onSuccess={onSuccess} />)
     await fillStepOne(user)
@@ -102,7 +102,7 @@ describe('SignUp', () => {
   })
 
   it('is accessible on step 1 and step 2', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const { container } = render(<SignUp />)
     await expectNoA11yViolations(container)
     await fillStepOne(user)
@@ -112,7 +112,7 @@ describe('SignUp', () => {
   })
 
   it('is accessible with a server error shown on step 2', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const { container } = render(<SignUp />)
     await fillStepOne(user)
     await user.click(screen.getByRole('button', { name: /next/i }))

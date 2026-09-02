@@ -4,9 +4,6 @@ import { Checkout } from './Checkout'
 import { DECLINED_CARD_NUMBER } from '../fakeApi'
 import { expectNoA11yViolations } from '../../test/axe'
 
-// Multi-step example flows drive many steps through userEvent; CI runners need more than the 5 s default.
-vi.setConfig({ testTimeout: 20_000 })
-
 async function fillShipping(user: ReturnType<typeof userEvent.setup>) {
   const shipping = screen.getByRole('group', { name: 'Shipping address' })
   await user.type(within(shipping).getByLabelText(/full name/i), 'Ada Lovelace')
@@ -61,7 +58,7 @@ describe('Checkout', () => {
   })
 
   it('reveals the billing address fields once "same as shipping" is unchecked', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Checkout />)
     const billing = screen.getByRole('group', { name: 'Billing address' })
     await user.click(within(billing).getByRole('checkbox', { name: /same as shipping/i }))
@@ -70,7 +67,7 @@ describe('Checkout', () => {
   })
 
   it('requires billing fields only once "same as shipping" is unchecked', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Checkout />)
     await fillCompleteForm(user)
     const billing = screen.getByRole('group', { name: 'Billing address' })
@@ -81,7 +78,7 @@ describe('Checkout', () => {
   })
 
   it('submits with the shipping address copied onto billing when "same as shipping" stays checked', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const onSuccess = vi.fn()
     render(<Checkout onSuccess={onSuccess} />)
     await fillCompleteForm(user)
@@ -99,7 +96,7 @@ describe('Checkout', () => {
   })
 
   it('shows a field error for a card number that fails the 16-digit pattern', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Checkout />)
     await fillCompleteForm(user, '123')
     await user.click(screen.getByRole('button', { name: /place order/i }))
@@ -108,7 +105,7 @@ describe('Checkout', () => {
   })
 
   it('shows a field error for a CVC that fails the 3-4 digit pattern', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Checkout />)
     await fillShipping(user)
     const payment = screen.getByRole('group', { name: 'Payment' })
@@ -121,7 +118,7 @@ describe('Checkout', () => {
   })
 
   it('asks for confirmation before placing the order and only submits on Confirm', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const onSuccess = vi.fn()
     render(<Checkout onSuccess={onSuccess} />)
     await fillCompleteForm(user)
@@ -133,7 +130,7 @@ describe('Checkout', () => {
   })
 
   it('cancelling the confirm dialog never submits', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const onSuccess = vi.fn()
     render(<Checkout onSuccess={onSuccess} />)
     await fillCompleteForm(user)
@@ -145,7 +142,7 @@ describe('Checkout', () => {
   })
 
   it('shows a server error alert when the fake API declines the card', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Checkout />)
     await fillCompleteForm(user, DECLINED_CARD_NUMBER)
     await confirmDialog(user)
@@ -154,7 +151,7 @@ describe('Checkout', () => {
   })
 
   it('updates the total in the order summary as the tip changes', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Checkout />)
     const summary = screen.getByRole('group', { name: 'Order summary' })
     expect(within(summary).getByText('Total').closest('[aria-labelledby]')).toHaveTextContent(
@@ -178,7 +175,7 @@ describe('Checkout', () => {
   })
 
   it('is accessible with the billing fields revealed', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const { container } = render(<Checkout />)
     const billing = screen.getByRole('group', { name: 'Billing address' })
     await user.click(within(billing).getByRole('checkbox', { name: /same as shipping/i }))
@@ -186,7 +183,7 @@ describe('Checkout', () => {
   })
 
   it('is accessible with a server error shown', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const { container } = render(<Checkout />)
     await fillCompleteForm(user, DECLINED_CARD_NUMBER)
     await confirmDialog(user)

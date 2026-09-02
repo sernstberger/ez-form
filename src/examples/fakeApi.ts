@@ -5,9 +5,18 @@
  * exclusion for `src/examples`).
  */
 
-/** Resolves after `ms` milliseconds. */
+/**
+ * Scales every `delay()` call below. Stories keep the realistic `scale: 1`
+ * (the default); the test setup (`src/test/setup.ts`) sets this to `0` so
+ * example tests still exercise a real pending state (a `setTimeout(fn, 0)`
+ * still needs a macrotask turn) without paying the realistic 300-600ms in
+ * real time.
+ */
+export const fakeApiTiming = { scale: 1 }
+
+/** Resolves after `ms * fakeApiTiming.scale` milliseconds. */
 export function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+  return new Promise((resolve) => setTimeout(resolve, ms * fakeApiTiming.scale))
 }
 
 export interface LoginValues {

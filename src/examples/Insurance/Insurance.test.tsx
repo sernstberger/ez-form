@@ -5,9 +5,6 @@ import { APPLICATION_DECLINED_FOR } from '../fakeApi'
 import { expectNoA11yViolations } from '../../test/axe'
 import { withPickers } from '../../test/pickers'
 
-// Multi-step example flows drive many steps through userEvent; CI runners need more than the 5 s default.
-vi.setConfig({ testTimeout: 20_000 })
-
 const STORAGE_KEY = 'ez-form:insurance-resume'
 
 /** DateField renders its own hidden text input, found by `name` (see DateField.test.tsx). */
@@ -107,7 +104,7 @@ describe('Insurance', () => {
   })
 
   it('renders exactly one named group per step, with aria-current="step" on the stepper', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(withPickers(<Insurance />))
     expect(screen.getByRole('group', { name: 'Applicant' })).toBeInTheDocument()
     const current = screen.getByRole('tab', { name: /Applicant/ })
@@ -120,7 +117,7 @@ describe('Insurance', () => {
   })
 
   it('skips the Vehicle step when "has vehicle?" is No (the default)', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(withPickers(<Insurance />))
     await fillApplicant(user)
     await fillContact(user)
@@ -134,7 +131,7 @@ describe('Insurance', () => {
   })
 
   it('shows the Vehicle step when "has vehicle?" is Yes', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(withPickers(<Insurance />))
     await fillApplicant(user)
     await fillContact(user)
@@ -146,7 +143,7 @@ describe('Insurance', () => {
   })
 
   it('lists every value on the Review step, with a working Edit link back to its step', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(withPickers(<Insurance />))
     await fillThroughReview(user, { vehicle: true })
     const review = screen.getByRole('group', { name: 'Review' })
@@ -161,7 +158,7 @@ describe('Insurance', () => {
   })
 
   it('shows the error summary listing step-owned fields on a failed final submit', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(withPickers(<Insurance />))
     // Reach Review with "has vehicle?" still No, then flip it on via the Edit link (backward
     // nav skips validation) without ever visiting/filling the newly-shown Vehicle step: the
@@ -185,7 +182,7 @@ describe('Insurance', () => {
   })
 
   it('resumes from localStorage after a remount: step and values are restored', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const { unmount } = render(withPickers(<Insurance />))
     await fillApplicant(user)
     await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
@@ -201,7 +198,7 @@ describe('Insurance', () => {
   })
 
   it('does not persist uploaded documents: resuming after an upload still submits cleanly with Documents empty', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const { unmount } = render(withPickers(<Insurance />))
     await fillApplicant(user)
     await fillContact(user)
@@ -260,7 +257,7 @@ describe('Insurance', () => {
   })
 
   it('"Start over" clears localStorage and resets to the first step with empty values', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(withPickers(<Insurance />))
     await fillApplicant(user)
     await waitFor(() => expect(localStorage.getItem(STORAGE_KEY)).toBeTruthy())
@@ -271,7 +268,7 @@ describe('Insurance', () => {
   })
 
   it('submits and reports a server error for a declined application', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(withPickers(<Insurance />))
     await fillThroughReview(user, { firstName: APPLICATION_DECLINED_FOR })
     await user.click(screen.getByRole('button', { name: /submit application/i }))
@@ -282,7 +279,7 @@ describe('Insurance', () => {
   })
 
   it('submits successfully and clears saved resume state', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const onSuccess = vi.fn()
     render(withPickers(<Insurance onSuccess={onSuccess} />))
     await fillThroughReview(user)
@@ -317,7 +314,7 @@ describe('Insurance', () => {
 
   describe('agent mode', () => {
     it('has autoComplete off, renders one page, and shows every error after one submit', async () => {
-      const user = userEvent.setup()
+      const user = userEvent.setup({ delay: null })
       render(withPickers(<Insurance agentMode />))
       const form = screen.getByRole('form', { name: 'Auto insurance application' })
       expect(form).toHaveAttribute('autocomplete', 'off')
@@ -337,7 +334,7 @@ describe('Insurance', () => {
   })
 
   it('is accessible on the Coverage step', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const { container } = render(withPickers(<Insurance />))
     await fillApplicant(user)
     await fillContact(user)
@@ -345,7 +342,7 @@ describe('Insurance', () => {
   })
 
   it('is accessible on the Review step', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const { container } = render(withPickers(<Insurance />))
     await fillThroughReview(user, { vehicle: true })
     await expectNoA11yViolations(container)
