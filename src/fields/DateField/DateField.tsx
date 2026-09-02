@@ -7,7 +7,15 @@ import { usePickerField, type PickerFieldProps } from '../pickers/usePickerField
 
 export type DateFieldProps = Omit<
   MuiDateFieldProps,
-  'name' | 'value' | 'defaultValue' | 'disabled' | 'label' | 'error' | 'required' | 'helperText'
+  | 'name'
+  | 'value'
+  | 'defaultValue'
+  | 'disabled'
+  | 'label'
+  | 'error'
+  | 'required'
+  | 'helperText'
+  | 'onBlur'
 > &
   PickerFieldProps<PickerValidDate | null, DateValidationError>
 
@@ -30,7 +38,8 @@ interface DateFieldChangeContext {
  * birthdays and other far-away dates.
  *
  * `DateField` *is* the text field: it also accepts `label`/`helperText`/
- * `error`/`required`/`onBlur` as flat top-level props. But `useSlotProps`
+ * `error`/`required` as flat top-level props (and `onBlur`, but that one is
+ * omitted from `DateFieldProps` below — see why underneath). `useSlotProps`
  * (the resolver `PickerFieldUI` uses) merges `slotProps.textField` *after*
  * those flat props (`{ ...additionalProps, ...externalForwardedProps,
  * ...externalSlotProps }`), so `slotProps.textField` always wins. That means
@@ -40,6 +49,12 @@ interface DateFieldChangeContext {
  * consumer's own `slotProps.textField` (e.g. `{ helperText: 'hint' }`) would
  * silently override the form's error text, clear `aria-invalid`, or drop the
  * required marker.
+ *
+ * `onBlur` is omitted from `DateFieldProps` entirely (not just left unbound):
+ * MUI's `DateFieldProps` accepts a flat `onBlur`, and since this component
+ * never sets it, a naive `<DateField onBlur={fn} />` would typecheck while
+ * `fn` silently fell into `...rest` and was never called — a consumer
+ * `onBlur` only takes effect through `slotProps={{ textField: { onBlur } }}`.
  */
 export function DateField({
   name,

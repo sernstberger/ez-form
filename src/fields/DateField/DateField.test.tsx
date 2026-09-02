@@ -18,6 +18,20 @@ const hiddenInput = (name: string) =>
 const typeDate = (name: string, text: string) =>
   fireEvent.change(hiddenInput(name), { target: { value: text } })
 
+/**
+ * Type-level guard, never called: `DateField` omits `onBlur` from its props
+ * (see `DateField.tsx`) so a flat `onBlur` is a compile error rather than a
+ * silently-ignored prop (it used to typecheck and fall into `...rest`,
+ * where `MuiDateField` accepts `onBlur` too but this component never wires
+ * it — a consumer's handler was never called). `tsc --noEmit` fails if this
+ * ever stops being a type error, i.e. if `DateFieldProps` regains `onBlur`.
+ */
+function typeGuardFlatOnBlurIsRejected() {
+  // @ts-expect-error onBlur is not a DateField prop — use slotProps.textField.onBlur
+  return <DateField name="birthday" label="Birthday" onBlur={() => {}} />
+}
+void typeGuardFlatOnBlurIsRejected
+
 describeFieldContract({
   componentName: 'DateField',
   label: 'Birthday',
