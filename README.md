@@ -660,7 +660,8 @@ instruction, and `dragActive` is a visual cue only.
 `accept`, `maxSize` (bytes) and `maxFiles` (under `multiple`) are validation, not just
 filtering: a picked _or dropped_ file that fails one is rejected — it never enters the
 value — and the reason surfaces as the field's error through a built-in rule, so it
-fails a submit too until the next accepted pick clears it. `accept` still goes on the
+fails a submit too. Any change to the value clears it: an accepted pick or drop, or
+removing a file with its chip (which is how you answer a `maxFiles` rejection). `accept` still goes on the
 input as the native attribute, and it is matched the way the native input matches it
 (`.ext` by suffix, `type/subtype` exactly, `type/*` by prefix).
 

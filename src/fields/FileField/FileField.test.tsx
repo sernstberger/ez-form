@@ -1,5 +1,5 @@
 import { createTheme, ThemeProvider } from '@mui/material/styles'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../../Form'
@@ -533,6 +533,75 @@ describe('FileField limits', () => {
     await user.upload(fileInput('Resume'), pdf)
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(onSubmit).toHaveBeenCalledWith({ resume: pdf }, expect.anything())
+  })
+
+  it('a chip delete back under maxFiles clears the alert and unblocks submit', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      <Form schema={multiSchema} defaultValues={{ photos: [png] }} onSubmit={onSubmit}>
+        <FileField name="photos" label="Photos" multiple dropzone maxFiles={1} />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    fireEvent.drop(dropZone(), { dataTransfer: dataTransfer([jpg]) })
+    expect(await screen.findByRole('alert')).toHaveTextContent('Choose at most 1 files')
+    // Removing a file is exactly how a user answers a maxFiles rejection: the
+    // error must go with it, not strand the field permanently unsubmittable.
+    await user.click(screen.getByRole('button', { name: 'Remove a.png' }))
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(onSubmit).toHaveBeenCalledWith({ photos: [] }, expect.anything())
+  })
+
+  it('an accepted pick after a rejection removes the alert from the DOM', async () => {
+    const user = userEvent.setup({ applyAccept: false })
+    render(
+      <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+        <FileField name="resume" label="Resume" accept=".pdf" />
+      </Form>,
+    )
+    await user.upload(fileInput('Resume'), png)
+    expect(await screen.findByRole('alert')).toHaveTextContent('File type not accepted')
+    await user.upload(fileInput('Resume'), pdf)
+    // The chip appears *and* the stale message goes — not one without the other.
+    expect(await screen.findByText('resume.pdf')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+  })
+
+  it('an accepted drop after a rejection removes the alert from the DOM', async () => {
+    render(
+      <Form schema={multiSchema} defaultValues={{ photos: [] }} onSubmit={() => {}}>
+        <FileField name="photos" label="Photos" multiple dropzone maxSize={10} />
+      </Form>,
+    )
+    const big = new File(['x'.repeat(50)], 'big.png', { type: 'image/png' })
+    fireEvent.drop(dropZone(), { dataTransfer: dataTransfer([big]) })
+    expect(await screen.findByRole('alert')).toHaveTextContent('File is larger than 10 B')
+    fireEvent.drop(dropZone(), { dataTransfer: dataTransfer([png]) })
+    expect(await screen.findByText('a.png')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+  })
+
+  it('rejected, accepted, rejected again: the alert tracks the latest pick', async () => {
+    const user = userEvent.setup({ applyAccept: false })
+    const onSubmit = vi.fn()
+    render(
+      <Form schema={multiSchema} defaultValues={{ photos: [] }} onSubmit={onSubmit}>
+        <FileField name="photos" label="Photos" multiple accept="image/*" />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.upload(fileInput('Photos'), pdf)
+    expect(await screen.findByRole('alert')).toHaveTextContent('File type not accepted')
+    await user.upload(fileInput('Photos'), png)
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+    await user.upload(fileInput('Photos'), pdf)
+    expect(await screen.findByRole('alert')).toHaveTextContent('File type not accepted')
+    // Still blocked, and the accepted file from the middle step survived.
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(screen.getByText('a.png')).toBeInTheDocument()
   })
 
   it('a consumer validate still runs alongside the built-in rule', async () => {

@@ -2,6 +2,7 @@ import {
   Fragment,
   useEffect,
   useId,
+  useRef,
   useState,
   type DragEvent,
   type ReactNode,
@@ -186,8 +187,9 @@ function matchesAccept(file: File, accept: string | undefined): boolean {
  *
  * `accept`, `maxSize` and `maxFiles` reject at pick/drop time: the offending
  * file never enters the value, and the reason surfaces as the field's error
- * through a built-in `validate` rule, so it also fails a submit until the
- * next pick clears it. That rule is only registered when one of those props is
+ * through a built-in `validate` rule, so it also fails a submit. Any change to
+ * the value clears it — an accepted pick or drop, or a chip delete, which is how
+ * a `maxFiles` rejection gets answered. That rule is only registered when one of those props is
  * set, so a field without limits registers and runs exactly what it did before.
  *
  * Under `multiple`, a pick or drop **appends** to the value (it used to
@@ -238,9 +240,10 @@ export function FileField(inProps: FileFieldProps) {
               : typeof validate === 'function'
                 ? { validate }
                 : validate),
-            // Reads the state captured in this render — the rule object is rebuilt
-            // (and re-registered by useController) on every render, so a rejection
-            // set by `add` below is visible to the next validation run.
+            // Closes over this render's state. hookform reads the rules off the
+            // field on every validation run (ezResolver's `options.fields`), and
+            // useController keeps that entry pointing at the latest render's
+            // rules, so a rejection set below is what the next run sees.
             accepted: () => rejection ?? true,
           }
         : validate,
@@ -255,17 +258,21 @@ export function FileField(inProps: FileFieldProps) {
   const isDisabled = mergeDisabled(disabled, f.field.disabled)
   const [dragActive, setDragActive] = useState(false)
 
+  // Every value change clears the rejection, not just an accepted pick: removing
+  // a chip is exactly how a user answers a `maxFiles` rejection, so leaving the
+  // message set there would strand the field in an error it can never clear.
   const store = (event: SyntheticEvent, next: File[]) => {
     const value = multiple ? next : (next[0] ?? null)
+    setRejection(undefined)
     f.field.onChange(value)
     onChange?.(event, value)
   }
 
   /**
    * The one path every pick and drop takes. Rejects on the first failing rule
-   * (a rejection is about the pick, so a second reason adds nothing), records
-   * it, and stores nothing; otherwise clears any previous rejection, stores,
-   * and tells the consumer which files were added.
+   * (a rejection is about the pick, so a second reason adds nothing) and stores
+   * nothing; otherwise stores — which clears any previous rejection — and tells
+   * the consumer which files were added.
    */
   const add = (event: SyntheticEvent, picked: File[]) => {
     if (picked.length === 0) return // cancelled dialog: keep what we have
@@ -273,23 +280,30 @@ export function FileField(inProps: FileFieldProps) {
       return setRejection(maxSizeMessage.replace('{size}', formatFileSize(maxSize)))
     }
     if (picked.some((file) => !matchesAccept(file, accept))) return setRejection(acceptMessage)
-    const total = multiple ? files.length + picked.length : picked.length
-    if (maxFiles !== undefined && total > maxFiles) {
+    // `maxFiles` counts a list, so it only means anything under `multiple` —
+    // a single-file field always holds exactly one, as its doc comment says.
+    if (multiple && maxFiles !== undefined && files.length + picked.length > maxFiles) {
       return setRejection(maxFilesMessage.replace('{count}', String(maxFiles)))
     }
-    setRejection(undefined)
     const next = multiple ? [...files, ...picked] : picked
     store(event, next)
     onFilesAdded?.(picked)
   }
 
-  // A rejection has to show now, not at the next submit: the default `mode` is
-  // `onSubmit`, so nothing would re-validate on its own. Setting the state
-  // re-registers the `accepted` rule carrying the new message; this effect then
-  // runs after that render and asks hookform to re-run it, so the same rule
-  // that fails a submit also produces the immediate error.
+  // A rejection has to appear — and disappear — now, not at the next submit: the
+  // default `mode` is `onSubmit`, so nothing re-validates on its own. Changing
+  // the state re-registers the `accepted` rule with (or without) the message,
+  // and this effect then re-runs it. It fires on *both* edges: only re-running
+  // on the setting edge would leave a cleared rejection's stale error on screen.
+  // The ref skips the mount pass, so a fresh field is never validated into an
+  // error it hasn't earned.
+  const validated = useRef(false)
   useEffect(() => {
-    if (rejection !== undefined) void trigger(name)
+    if (!validated.current) {
+      validated.current = true
+      return
+    }
+    void trigger(name)
   }, [rejection, trigger, name])
 
   // Slot default (see ConfirmDialog's `confirmProps`): `slotProps.button` is what
@@ -360,7 +374,13 @@ export function FileField(inProps: FileFieldProps) {
             event.preventDefault()
             if (!isDisabled) setDragActive(true)
           }}
-          onDragLeave={() => setDragActive(false)}
+          // Leaving for a child (the picker button inside) is not leaving the
+          // zone; without this the highlight flickers as the pointer crosses it.
+          onDragLeave={(event: DragEvent<HTMLDivElement>) => {
+            const next = event.relatedTarget
+            if (next instanceof Node && event.currentTarget.contains(next)) return
+            setDragActive(false)
+          }}
           onDrop={(event: DragEvent<HTMLDivElement>) => {
             event.preventDefault()
             setDragActive(false)
