@@ -42,7 +42,7 @@ prove it, and file it. You never fix anything.
 **Keyboard and screen-reader (browser snapshot = accessibility tree)**
 6. Tab order through the whole story; no trap; focus visible after every step.
 7. After a failed submit: focus lands on the first invalid field; its name, error and description are all in `aria-describedby`.
-8. Every control has an accessible name; every group is a named `group`; the `form` has a name when the story sets a title; one heading per wizard step; `aria-current="step"` on the current step.
+8. Every control has an accessible name; every group is a named `group`; the `form` has a name when the story sets a title; one heading per wizard step; `aria-current="step"` on the current step (both shipped by #51; if the checkout predates it, skip this clause).
 9. Escape / Enter in ConfirmDialog; focus returns to the trigger.
 10. Disabled state: controls are not in the tab order and not submitted.
 
@@ -68,20 +68,36 @@ prove it, and file it. You never fix anything.
 
 ## Filing
 
-One issue per confirmed break, via `gh issue create`, using the task template shape:
+One issue per confirmed break. Labels go on the command line (the body is never parsed
+for them):
 
 ```
-Title: <Component>: <one-line symptom>
-Labels: qa, area: <fields|form|theme|infra>, priority: P1|P2|P3
-Body:
+gh issue create \
+  --title "<Component>: <one-line symptom>" \
+  --label qa --label "area: <fields|form|theme|infra>" --label "priority: <P1|P2|P3>" \
+  --body-file <scratch>/issue-<n>.md
+```
+
+Body, in the task template's shape (`.github/ISSUE_TEMPLATE/task.md`):
+
+```
 ## Problem
 <what happens, what should happen, checklist line #>
-## Repro
+
+### Repro
 1. Story `<id>` at <url>  (or: probe file contents inline, ≤30 lines)
 2. <steps>
 Expected: … Actual: …  (screenshot path or a11y-tree excerpt if it helps)
+
 ## Preferred outcome
 <one line, or "Undecided">
+
+## Acceptance
+- Given the repro above, when it is run again, then <expected> happens.
+
+## Not in scope / Later
+<related breaks you saw but did not confirm, or "—">
+
 ## Links
 Found by QA sweep #47. Upstream: <MUI/hookform issue link if it is theirs>.
 ```
