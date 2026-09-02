@@ -143,6 +143,36 @@ describe('AddressField', () => {
     )
   })
 
+  it('under <Form assisted> emits autoComplete="off" on every part instead of the US tokens (#65)', () => {
+    render(
+      <Form schema={schema} defaultValues={defaultValues} onSubmit={vi.fn()} assisted>
+        <AddressField name="address" />
+      </Form>,
+    )
+    expect(street()).toHaveAttribute('autoComplete', 'off')
+    expect(screen.getByRole('textbox', { name: 'Apartment, suite, etc.' })).toHaveAttribute(
+      'autoComplete',
+      'off',
+    )
+    expect(city()).toHaveAttribute('autoComplete', 'off')
+    expect(zip()).toHaveAttribute('autoComplete', 'off')
+    expect(document.querySelector('input[name="address.state"]')).toHaveAttribute(
+      'autoComplete',
+      'off',
+    )
+  })
+
+  it('a consumer autoComplete on a part still wins under assisted', () => {
+    render(
+      <Form schema={schema} defaultValues={defaultValues} onSubmit={vi.fn()} assisted>
+        <AddressField name="address" slotProps={{ street: { autoComplete: 'street-address' } }} />
+      </Form>,
+    )
+    expect(street()).toHaveAttribute('autoComplete', 'street-address')
+    // The other parts are unaffected by the one override.
+    expect(city()).toHaveAttribute('autoComplete', 'off')
+  })
+
   it('required propagates to street, city, state and zip but never street2', () => {
     renderForm(vi.fn(), { required: true })
     expect(street()).toBeRequired()

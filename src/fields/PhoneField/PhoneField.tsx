@@ -3,6 +3,8 @@ import { useWatch } from 'react-hook-form'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import { mergeSlotProps } from '@mui/material/utils'
 import { TextField, type TextFieldProps } from '../TextField'
+import { resolveAutoComplete } from '../resolveAutoComplete'
+import { useAssisted } from '../../Form/AssistedContext'
 import { useEzFormContext } from '../../useEzFormContext'
 import {
   caretAtDigitIndex,
@@ -100,11 +102,13 @@ export function PhoneField(inProps: PhoneFieldProps) {
     name,
     format = DEFAULT_FORMAT,
     invalidMessage,
-    autoComplete = 'tel',
+    autoComplete: autoCompleteProp,
     validate,
     slotProps,
     ...rest
   } = props
+  const assisted = useAssisted()
+  const autoComplete = autoCompleteProp ?? resolveAutoComplete('tel', assisted)
 
   const capacity = templateDigitCount(format)
   const message = invalidMessage ?? `Enter a ${capacity}-digit phone number`

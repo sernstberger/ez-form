@@ -5,7 +5,9 @@ import { styled } from '@mui/material/styles'
 import { TextField, type TextFieldProps } from '../TextField'
 import { StateSelect, type StateSelectProps } from '../StateSelect'
 import { ZipField, type ZipFieldProps } from '../ZipField'
+import { resolveAutoComplete } from '../resolveAutoComplete'
 import { FormSection, type FormSectionProps } from '../../FormSection'
+import { useAssisted } from '../../Form/AssistedContext'
 import { useEzFormContext } from '../../useEzFormContext'
 import { cx } from '../../cx'
 
@@ -112,9 +114,14 @@ export interface AddressFieldProps extends PartRules {
   }
 }
 
-/** Prefixes an autofill token with the section name, when one was given. */
-const token = (section: string | undefined, field: string) =>
-  section ? `${section} ${field}` : field
+/**
+ * Prefixes an autofill token with the section name, when one was given, then
+ * runs it through `resolveAutoComplete` — this composite passes each part's
+ * token down as an *explicit* `autoComplete` prop, so it has to apply the
+ * assisted-mode rule itself rather than relying on the part's own default.
+ */
+const token = (section: string | undefined, field: string, assisted: boolean) =>
+  resolveAutoComplete(section ? `${section} ${field}` : field, assisted)
 
 /**
  * A US street address as five bound parts under one nested object `name`:
@@ -150,13 +157,14 @@ export function AddressField(inProps: AddressFieldProps) {
   // Guard here as well as in each part, so the "outside <Form>" error names
   // <AddressField> rather than whichever part happened to render first.
   useEzFormContext('AddressField')
+  const assisted = useAssisted()
 
   const parts = (
     <AddressFieldRoot {...rest} className={cx(addressFieldClasses.root, className)}>
       <AddressFieldStreet
         name={`${name}.street`}
         label={streetLabel}
-        autoComplete={token(autoCompleteSection, 'street-address')}
+        autoComplete={token(autoCompleteSection, 'street-address', assisted)}
         required={required}
         disabled={disabled}
         {...slotProps?.street}
@@ -166,7 +174,7 @@ export function AddressField(inProps: AddressFieldProps) {
         <AddressFieldStreet2
           name={`${name}.street2`}
           label={street2Label}
-          autoComplete={token(autoCompleteSection, 'address-line2')}
+          autoComplete={token(autoCompleteSection, 'address-line2', assisted)}
           disabled={disabled}
           {...slotProps?.street2}
           className={cx(addressFieldClasses.street2, slotProps?.street2?.className)}
@@ -175,7 +183,7 @@ export function AddressField(inProps: AddressFieldProps) {
       <AddressFieldCity
         name={`${name}.city`}
         label={cityLabel}
-        autoComplete={token(autoCompleteSection, 'address-level2')}
+        autoComplete={token(autoCompleteSection, 'address-level2', assisted)}
         required={required}
         disabled={disabled}
         {...slotProps?.city}
@@ -184,7 +192,7 @@ export function AddressField(inProps: AddressFieldProps) {
       <AddressFieldState
         name={`${name}.state`}
         label={stateLabel}
-        autoComplete={token(autoCompleteSection, 'address-level1')}
+        autoComplete={token(autoCompleteSection, 'address-level1', assisted)}
         required={required}
         disabled={disabled}
         {...slotProps?.state}
@@ -193,7 +201,7 @@ export function AddressField(inProps: AddressFieldProps) {
       <AddressFieldZip
         name={`${name}.zip`}
         label={zipLabel}
-        autoComplete={token(autoCompleteSection, 'postal-code')}
+        autoComplete={token(autoCompleteSection, 'postal-code', assisted)}
         required={required}
         disabled={disabled}
         {...slotProps?.zip}

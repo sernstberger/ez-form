@@ -10,6 +10,7 @@ import VisibilityOutlined from '@mui/icons-material/VisibilityOutlined'
 import VisibilityOffOutlined from '@mui/icons-material/VisibilityOffOutlined'
 import { TextField, type TextFieldProps } from '../TextField'
 import { mergeDisabled } from '../mergeDisabled'
+import { useAssisted } from '../../Form/AssistedContext'
 import { useEzFormContext } from '../../useEzFormContext'
 
 export const passwordFieldClasses = generateUtilityClasses('EzPasswordField', ['root', 'toggle'])
@@ -42,13 +43,21 @@ export function PasswordField(inProps: PasswordFieldProps) {
   const props = useDefaultProps({ props: inProps, name: 'EzPasswordField' })
   const {
     revealable = true,
-    autoComplete = 'current-password',
+    autoComplete: autoCompleteProp,
     disabled,
     className,
     slotProps,
     icons,
     ...rest
   } = props
+  // `resolveAutoComplete`'s `"off"` is what every other field gets under `assisted`, but
+  // Chromium (and most password managers) does not reliably honour `off` for a password
+  // input — it still offers to fill or save. `"new-password"` is the one token browsers
+  // consistently treat as "do not fill from a saved credential", which is exactly what
+  // assisted mode wants here regardless of whether this field is a sign-in or a
+  // sign-up/change field (#65 requirement 3).
+  const assisted = useAssisted()
+  const autoComplete = autoCompleteProp ?? (assisted ? 'new-password' : 'current-password')
   // Local only: never reaches the form value, and resets on unmount since it starts false again.
   const [revealed, setRevealed] = useState(false)
   const { toggle: toggleSlotProps, ...restSlotProps } = slotProps ?? {}

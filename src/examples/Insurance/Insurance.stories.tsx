@@ -64,12 +64,15 @@ export const Vertical: Story = { args: { orientation: 'vertical' } }
 export const Page: Story = { args: { layout: 'page' } }
 
 /**
- * The manual precursor of #65 (assisted mode — not built): a single-page
- * form with `autoComplete="off"` (no autofill for the person filling this
- * out, since it's on someone else's behalf), `confirm` and `guard` off, and
- * every validation error shown after one submit attempt rather than
- * per-step. This is what an internal agent's UI looks like today, by hand;
- * #65 would make it a `Form` preset.
+ * `<Form assisted>` (#65): a single-page form with `autoComplete="off"` on
+ * the `<form>` (and on every field's own default token — the address/name
+ * fields hardcode a token with no `type` to derive it from, so `ApplicantStep`
+ * / `ContactStep` resolve those against `assisted` themselves, the same
+ * pattern any consumer with hardcoded tokens needs), `confirm` and `guard`
+ * off, and every validation error shown after one submit attempt rather than
+ * per-step — what an internal agent filling this application out on someone
+ * else's behalf sees, so the browser never offers to fill it with the agent's
+ * own saved name, address, or contact details.
  */
 export const Agent: Story = {
   args: { agentMode: true },
@@ -77,7 +80,7 @@ export const Agent: Story = {
     docs: {
       description: {
         story:
-          'autoComplete="off" on the form, no confirm dialog, no unsaved-changes guard, one page, every error shown at once.',
+          'assisted: autoComplete="off" throughout, no confirm dialog, no unsaved-changes guard, one page, every error shown at once.',
       },
     },
   },

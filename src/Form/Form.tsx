@@ -30,6 +30,7 @@ import Typography, { type TypographyProps } from '@mui/material/Typography'
 import type { z } from 'zod'
 import { ezResolver } from './ezResolver'
 import { useConfirm, type ConfirmOptions } from '../ConfirmDialog'
+import { AssistedContext } from './AssistedContext'
 import { ErrorSummaryContext } from './ErrorSummaryContext'
 import { LiveRegion, type LiveRegionProps } from './LiveRegion'
 import { RequiredIndicatorContext } from './RequiredIndicatorContext'
@@ -142,6 +143,17 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
    */
   guard?: boolean
   /**
+   * For a form one person fills out on someone else's behalf (an agent
+   * entering an applicant's details, a rep taking a phone order): sets
+   * `autoComplete="off"` on the `<form>` and tells every field to emit
+   * `autoComplete="off"` in place of its own default token, so the browser
+   * or password manager never offers *this* person's own saved data for
+   * someone else's information. An explicit `autoComplete` on the `<Form>`
+   * itself or on any individual field still wins. Default `false`,
+   * theme-defaultable via `theme.components.EzForm.defaultProps.assisted`.
+   */
+  assisted?: boolean
+  /**
    * Accessible name of the form, rendered as a heading (`h2` by default,
    * `slotProps.title.component` changes the level) and wired to the `<form>`
    * through `aria-labelledby`. A consumer's own `aria-labelledby` wins.
@@ -212,6 +224,7 @@ function FormImpl<TIn extends FieldValues, TOut>(
     disabled = false,
     confirm,
     guard = false,
+    assisted = false,
     title,
     description,
     requiredIndicator = 'asterisk',
@@ -225,6 +238,10 @@ function FormImpl<TIn extends FieldValues, TOut>(
     children,
     'aria-labelledby': ariaLabelledBy,
     'aria-describedby': ariaDescribedBy,
+    // Pulled out (rather than left in `...formProps`) so a consumer's own
+    // `autoComplete` on `<Form>` still wins over the `assisted` default below —
+    // the same "explicit prop wins" shape every field's own default uses.
+    autoComplete = assisted ? 'off' : undefined,
     ...formProps
   } = useDefaultProps({ props: inProps, name: 'EzForm' }) as FormProps<TIn, TOut>
   const baseId = useId()
@@ -452,6 +469,7 @@ function FormImpl<TIn extends FieldValues, TOut>(
         <FormRoot
           noValidate
           {...formProps}
+          autoComplete={autoComplete}
           className={`${formClasses.root}${className ? ` ${className}` : ''}`}
           aria-labelledby={ariaLabelledBy ?? (title != null ? titleProps.id : undefined)}
           aria-describedby={
@@ -500,9 +518,11 @@ function FormImpl<TIn extends FieldValues, TOut>(
               {effectiveDescription}
             </FormDescription>
           )}
-          <RequiredIndicatorContext.Provider value={{ requiredIndicator, optionalText }}>
-            {children}
-          </RequiredIndicatorContext.Provider>
+          <AssistedContext.Provider value={assisted}>
+            <RequiredIndicatorContext.Provider value={{ requiredIndicator, optionalText }}>
+              {children}
+            </RequiredIndicatorContext.Provider>
+          </AssistedContext.Provider>
           {/*
             Rendered unconditionally, empty at rest: a live region has to be in
             the DOM before its text arrives, or assistive tech has no prior

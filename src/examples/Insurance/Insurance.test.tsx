@@ -376,6 +376,34 @@ describe('Insurance', () => {
       expect((await screen.findAllByText(/first name is required/i)).length).toBeGreaterThan(0)
       expect((await screen.findAllByText(/is required/i)).length).toBeGreaterThan(1)
     })
+
+    // #65: these fields' tokens (given-name, family-name, street-address, …) are hardcoded in
+    // ApplicantStep/ContactStep rather than type-derived, so they would otherwise be an
+    // "explicit autoComplete wins" loophole — a rep filling this out for someone else would
+    // still get autofill offers for their own name/address. ApplicantStep/ContactStep resolve
+    // these against the form's assisted flag themselves; this asserts that actually happens.
+    it('suppresses the hardcoded name/contact/address autoComplete tokens too', () => {
+      render(withPickers(<Insurance agentMode />))
+      // agent mode renders every step (including Review's ReadOnlyFields, which repeat these
+      // labels) as one page, so each real control is scoped to its own FormSection group
+      // rather than queried by label text alone.
+      const applicant = within(screen.getByRole('group', { name: 'Applicant' }))
+      expect(applicant.getByLabelText(/first name/i)).toHaveAttribute('autoComplete', 'off')
+      expect(applicant.getByLabelText(/last name/i)).toHaveAttribute('autoComplete', 'off')
+      const contact = within(screen.getByRole('group', { name: 'Contact' }))
+      expect(contact.getByLabelText(/^email/i)).toHaveAttribute('autoComplete', 'off')
+      expect(contact.getByLabelText(/^phone/i)).toHaveAttribute('autoComplete', 'off')
+      const address = within(screen.getByRole('group', { name: 'Address' }))
+      expect(address.getByLabelText(/street address/i)).toHaveAttribute('autoComplete', 'off')
+      expect(address.getByLabelText(/^city/i)).toHaveAttribute('autoComplete', 'off')
+      expect(address.getByLabelText(/zip code/i)).toHaveAttribute('autoComplete', 'off')
+    })
+
+    it('leaves the hardcoded tokens alone outside agent mode', () => {
+      render(withPickers(<Insurance />))
+      expect(screen.getByLabelText(/first name/i)).toHaveAttribute('autoComplete', 'given-name')
+      expect(screen.getByLabelText(/last name/i)).toHaveAttribute('autoComplete', 'family-name')
+    })
   })
 
   it('is accessible on the Applicant step', async () => {

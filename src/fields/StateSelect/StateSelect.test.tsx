@@ -77,6 +77,26 @@ describe('StateSelect', () => {
     expect(hidden).toHaveAttribute('autoComplete', 'off')
   })
 
+  it('under <Form assisted> emits autoComplete="off" instead of the address-level1 default (#65)', () => {
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}} assisted>
+        <StateSelect name="state" label="State" />
+      </Form>,
+    )
+    const hidden = document.querySelector('input[name="state"]') as HTMLInputElement
+    expect(hidden).toHaveAttribute('autoComplete', 'off')
+  })
+
+  it('a consumer autoComplete still wins under assisted', () => {
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}} assisted>
+        <StateSelect name="state" label="State" autoComplete="address-level1" />
+      </Form>,
+    )
+    const hidden = document.querySelector('input[name="state"]') as HTMLInputElement
+    expect(hidden).toHaveAttribute('autoComplete', 'address-level1')
+  })
+
   it('includes a territory option when territories is set', async () => {
     const user = userEvent.setup()
     render(

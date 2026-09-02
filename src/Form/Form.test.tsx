@@ -608,6 +608,92 @@ describe('useEzFormContext', () => {
       })
     })
   })
+
+  describe('assisted (#65)', () => {
+    it('does not set autoComplete="off" without the prop', () => {
+      const { container } = render(
+        <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+          <TextField name="email" label="Email" />
+        </Form>,
+      )
+      expect(container.querySelector('form')).not.toHaveAttribute('autocomplete', 'off')
+    })
+
+    it('sets autoComplete="off" on the <form> element', () => {
+      const { container } = render(
+        <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}} assisted>
+          <TextField name="email" label="Email" />
+        </Form>,
+      )
+      expect(container.querySelector('form')).toHaveAttribute('autoComplete', 'off')
+    })
+
+    it('an explicit autoComplete on <Form> itself still wins', () => {
+      const { container } = render(
+        <Form
+          schema={schema}
+          defaultValues={{ email: '' }}
+          onSubmit={() => {}}
+          assisted
+          autoComplete="on"
+        >
+          <TextField name="email" label="Email" />
+        </Form>,
+      )
+      expect(container.querySelector('form')).toHaveAttribute('autoComplete', 'on')
+    })
+
+    it('flows the flag to fields so their default autoComplete becomes "off"', () => {
+      render(
+        <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}} assisted>
+          <TextField name="email" label="Email" type="email" />
+        </Form>,
+      )
+      expect(screen.getByLabelText('Email')).toHaveAttribute('autoComplete', 'off')
+    })
+
+    it('toggling assisted at runtime updates every field', () => {
+      const { rerender } = render(
+        <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+          <TextField name="email" label="Email" type="email" />
+        </Form>,
+      )
+      expect(screen.getByLabelText('Email')).toHaveAttribute('autoComplete', 'email')
+      rerender(
+        <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}} assisted>
+          <TextField name="email" label="Email" type="email" />
+        </Form>,
+      )
+      expect(screen.getByLabelText('Email')).toHaveAttribute('autoComplete', 'off')
+      rerender(
+        <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+          <TextField name="email" label="Email" type="email" />
+        </Form>,
+      )
+      expect(screen.getByLabelText('Email')).toHaveAttribute('autoComplete', 'email')
+    })
+
+    it('is theme-defaultable via theme.components.EzForm.defaultProps.assisted', () => {
+      const theme = createTheme({ components: { EzForm: { defaultProps: { assisted: true } } } })
+      render(
+        <ThemeProvider theme={theme}>
+          <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+            <TextField name="email" label="Email" type="email" />
+          </Form>
+        </ThemeProvider>,
+      )
+      expect(screen.getByLabelText('Email')).toHaveAttribute('autoComplete', 'off')
+    })
+
+    it('has no axe violations while assisted', async () => {
+      const { container } = render(
+        <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}} assisted>
+          <TextField name="email" label="Email" />
+        </Form>,
+      )
+      await expectNoA11yViolations(container)
+    })
+  })
 })
 
 describe('title and description', () => {
