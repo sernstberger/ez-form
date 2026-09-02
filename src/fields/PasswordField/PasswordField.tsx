@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useFormState } from 'react-hook-form'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
@@ -25,6 +25,14 @@ const PasswordFieldToggle = styled(IconButton, { name: 'EzPasswordField', slot: 
 export type PasswordFieldProps = Omit<TextFieldProps, 'type'> & {
   /** Renders the show/hide toggle. Default `true`. */
   revealable?: boolean
+  /**
+   * Icons for the toggle's two states, defaulted through `useDefaultProps` so
+   * `theme.components.EzPasswordField.defaultProps.icons` can swap them app-wide.
+   * Replaces the built-in `Visibility`/`VisibilityOff` icons — `slotProps.toggle`
+   * still reaches the toggle `IconButton` itself, but its `children` is always
+   * overridden by this prop (or the default icons), not the other way around.
+   */
+  icons?: { show?: ReactNode; hide?: ReactNode }
   slotProps?: TextFieldProps['slotProps'] & { toggle?: IconButtonProps }
 }
 
@@ -38,6 +46,7 @@ export function PasswordField(inProps: PasswordFieldProps) {
     disabled,
     className,
     slotProps,
+    icons,
     ...rest
   } = props
   // Local only: never reaches the form value, and resets on unmount since it starts false again.
@@ -80,6 +89,9 @@ export function PasswordField(inProps: PasswordFieldProps) {
                 }}
               >
                 {revealed ? <VisibilityOffOutlined /> : <VisibilityOutlined />}
+                {revealed
+                  ? (icons?.hide ?? <VisibilityOffIcon />)
+                  : (icons?.show ?? <VisibilityIcon />)}
               </PasswordFieldToggle>
             </InputAdornment>
           ) : undefined,

@@ -16,8 +16,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `WizardStepper` marks the current step with `aria-current="step"` — #51.
 - `PasswordField`: ez-form `TextField` with `type` fixed to `password`/`text` and a
   show/hide toggle in the end adornment. `revealable` (default `true`) hides the toggle
-  entirely; `autoComplete` defaults to `'current-password'`. Themeable under
-  `EzPasswordField` (`defaultProps`, `styleOverrides` for `root` | `toggle`), exported as
+  entirely; `autoComplete` defaults to `'current-password'`. `icons?: { show?, hide? }`
+  swaps the reveal icons, defaulted through `useDefaultProps` so
+  `theme.components.EzPasswordField.defaultProps.icons` can replace them app-wide —
+  `slotProps.toggle` still reaches the toggle `IconButton` itself, but its `children` is
+  always overridden by `icons` instead — #69. Themeable under `EzPasswordField`
+  (`defaultProps`, `styleOverrides` for `root` | `toggle`), exported as
   `passwordFieldClasses` — #58.
 - `TextareaField`: `TextField` with `multiline` fixed on, a taller themeable default
   (`minRows: 4`, `maxRows: 12`), and a length meter (`n` or `n / max`) driven by the

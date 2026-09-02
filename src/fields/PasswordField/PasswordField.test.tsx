@@ -180,6 +180,50 @@ describe('PasswordField', () => {
     expect(input()).toHaveAttribute('readonly')
   })
 
+  it('renders custom icons via the icons prop, per toggle state', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{ password: '' }} onSubmit={() => {}}>
+        <PasswordField
+          name="password"
+          label="Password"
+          icons={{
+            show: <span data-testid="show-icon" />,
+            hide: <span data-testid="hide-icon" />,
+          }}
+        />
+      </Form>,
+    )
+    expect(screen.getByTestId('show-icon')).toBeInTheDocument()
+    expect(screen.queryByTestId('hide-icon')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show password' }))
+    expect(screen.getByTestId('hide-icon')).toBeInTheDocument()
+    expect(screen.queryByTestId('show-icon')).not.toBeInTheDocument()
+  })
+
+  it('is themeable: EzPasswordField defaultProps.icons swaps icons app-wide', () => {
+    const theme = createTheme({
+      components: {
+        EzPasswordField: {
+          defaultProps: {
+            icons: {
+              show: <span data-testid="theme-show-icon" />,
+              hide: <span data-testid="theme-hide-icon" />,
+            },
+          },
+        },
+      },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{ password: '' }} onSubmit={() => {}}>
+          <PasswordField name="password" label="Password" />
+        </Form>
+      </ThemeProvider>,
+    )
+    expect(screen.getByTestId('theme-show-icon')).toBeInTheDocument()
+  })
+
   it('resets the reveal state on unmount (a remount starts hidden again)', async () => {
     const user = userEvent.setup()
     const { unmount } = renderForm()
