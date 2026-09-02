@@ -11,6 +11,14 @@ export interface AddressSchemaOptions {
   /**
    * Messages for the four required parts. Each defaults to
    * `'<Part> is required'`, matching the part labels `AddressField` defaults to.
+   *
+   * Note the missing period: these are zod messages, and every hand-written zod
+   * message in this codebase (the examples, the field tests) omits it, whereas
+   * the built-in *rule* messages in `src/rules.ts` end with one
+   * (`'<Label> is required.'`). So a part left empty reads
+   * `'City is required'` from this schema but `'City is required.'` when the
+   * `required` prop is what fails it. That is the existing house split, not an
+   * oversight — pass `messages` to make the two identical if a form shows both.
    */
   messages?: {
     street?: string

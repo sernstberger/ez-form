@@ -16,6 +16,7 @@ import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import { styled } from '@mui/material/styles'
 import { useFieldArray, useFormState, type UseFieldArrayProps } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
+import { cx } from '../cx'
 import { FormSection, type FormSectionProps } from '../FormSection'
 
 // `errorText`, not `error`: MUI reserves `error` (with `active`, `checked`,
@@ -114,8 +115,6 @@ const FieldArrayMove = styled(IconButton, { name: 'EzFieldArray', slot: 'Move' }
 })
 const FieldArrayStatus = styled('span', { name: 'EzFieldArray', slot: 'Status' })({})
 const FieldArrayError = styled(FormHelperText, { name: 'EzFieldArray', slot: 'Error' })({})
-
-const cx = (base: string, extra?: string) => (extra ? `${base} ${extra}` : base)
 
 /** Where focus should land once React has rendered the new row list. */
 type PendingFocus =

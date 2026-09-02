@@ -7,6 +7,7 @@ import { StateSelect, type StateSelectProps } from '../StateSelect'
 import { ZipField, type ZipFieldProps } from '../ZipField'
 import { FormSection, type FormSectionProps } from '../../FormSection'
 import { useEzFormContext } from '../../useEzFormContext'
+import { cx } from '../../cx'
 
 /** The object an `AddressField` reads and writes at its `name`. */
 export interface AddressValue {
@@ -93,17 +94,23 @@ export interface AddressFieldProps extends PartRules {
   stateLabel?: ReactNode
   zipLabel?: ReactNode
   className?: string
+  /**
+   * Per-part props. `name` is omitted from every part: the composite derives
+   * all five paths from its own `name`, and since a slot spreads *after* the
+   * defaults, a slot `name` would silently rebind that part to another path —
+   * the value would land outside the address object while the part still
+   * looked correct. Everything else (per-part `helperText`, an extra rule, a
+   * `size`) passes through and wins over the composite's default.
+   */
   slotProps?: {
     section?: Omit<FormSectionProps, 'title' | 'description'>
-    street?: Partial<TextFieldProps>
-    street2?: Partial<TextFieldProps>
-    city?: Partial<TextFieldProps>
-    state?: Partial<StateSelectProps>
-    zip?: Partial<ZipFieldProps>
+    street?: Omit<Partial<TextFieldProps>, 'name'>
+    street2?: Omit<Partial<TextFieldProps>, 'name'>
+    city?: Omit<Partial<TextFieldProps>, 'name'>
+    state?: Omit<Partial<StateSelectProps>, 'name'>
+    zip?: Omit<Partial<ZipFieldProps>, 'name'>
   }
 }
-
-const cx = (base: string, extra?: string) => (extra ? `${base} ${extra}` : base)
 
 /** Prefixes an autofill token with the section name, when one was given. */
 const token = (section: string | undefined, field: string) =>

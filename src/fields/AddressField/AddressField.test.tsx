@@ -24,11 +24,18 @@ const zip = () => screen.getByRole('textbox', { name: 'ZIP code' })
 // `onChange` and the failing `required` reach it through `slotProps.street`,
 // leaving the other four parts valid so a single alert appears. `disabled`
 // still goes to the composite, since that case checks the form's lock reaches
-// the control the contract reads. The parts the contract cannot see (per-part
-// errors, `required` propagation to all four, `<Form disabled>` across all
-// five) are covered by the composite-specific cases below. `componentName`
-// stays `AddressField`, so the "outside <Form>" case verifies the composite's
-// own guard fires before any part's.
+// the control the contract reads. `componentName` stays `AddressField`, so the
+// "outside <Form>" case verifies the composite's own guard fires before any
+// part's.
+//
+// What the contract does NOT cover here, and where it is covered instead:
+//   - `toBeRequired()` on the control. The contract only asserts that when
+//     `errorProps` is left undefined, and it is passed explicitly above (the
+//     composite's own `required` would error all four parts and produce four
+//     alerts). Covered by the 'required propagates …' case below, which checks
+//     the announcement on all four parts plus its absence on street2.
+//   - per-part error isolation, `<Form disabled>` across all five parts, and
+//     the autofill tokens — all in the composite-specific cases below.
 // Only `street` is required here, so a failing submit produces exactly the one
 // alert the contract expects; the composite's real schema (`addressSchema`,
 // used everywhere else in this file) requires all four.
