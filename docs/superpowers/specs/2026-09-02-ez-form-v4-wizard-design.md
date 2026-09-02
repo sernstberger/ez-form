@@ -115,6 +115,14 @@ export interface WizardProps<TIn extends FieldValues> {
    * wizard does not move until the consumer feeds the new `step` back.
    */
   onStepChange?: (step: WizardStepDef<TIn>) => void
+  /**
+   * Controlled set of step ids the user has reached (drives which stepper
+   * steps are clickable and where an unreachable `step` redirects). Omit for
+   * internal state. Save it alongside draft values so a returning user
+   * lands on the step they left off at.
+   */
+  visited?: readonly string[]
+  onVisitedChange?: (ids: readonly string[]) => void
   orientation?: 'horizontal' | 'vertical'
   children: ReactNode
 }
@@ -131,8 +139,12 @@ export interface WizardProps<TIn extends FieldValues> {
   stepStatus(id): 'current' | 'completed' | 'visited' | 'upcoming' }
 ```
 
-- `visited` grows whenever a step becomes current. It is internal state in
-  both modes (the router only knows the current step).
+- `visited` grows whenever a step becomes current. Like `step`, it is
+  controlled when the `visited` prop is given (`onVisitedChange` fires with
+  the new list and the wizard waits for the prop) and internal otherwise.
+  `completed` still re-derives from live errors, so a restored step whose
+  values fail validation is `visited` (clickable, error-marked), not
+  `completed`, and the redirect lands on it.
 - `next()` = `trigger(current.fields, { shouldFocus: true })`; on success
   marks the step visited and moves to `index + 1`. Returns whether it moved.
 - `prev()` moves to `index - 1` without validating.
@@ -177,7 +189,8 @@ export interface WizardProps<TIn extends FieldValues> {
 
 `SignupStep` reads `useParams().step` and renders the matching `WizardStep`.
 The story uses `MemoryRouter`, shows the URL, and demonstrates the redirect
-by starting at `/signup/review`.
+by starting at `/signup/review`. A `Wizard/Resume` story persists values and
+`visited` to `localStorage` and reloads them on mount.
 
 ## Section 3 — ReadOnlyField
 
@@ -279,7 +292,7 @@ vitest + RTL + axe, matching the existing test style.
 
 | Area | Cases |
 |---|---|
-| Wizard | Next validates only the step's fields and focuses the first error; Prev never validates; visited steps clickable, upcoming disabled; `completed` clears when a field on a visited step becomes invalid; controlled `step` / `onStepChange` round trip; unknown or unreachable `step` triggers redirect to first incomplete; last-step Next is the SubmitButton; vertical renders `StepContent` and passes axe, horizontal passes axe; throws outside `<Form>` |
+| Wizard | Next validates only the step's fields and focuses the first error; Prev never validates; visited steps clickable, upcoming disabled; `completed` clears when a field on a visited step becomes invalid; controlled `step` / `onStepChange` round trip; controlled `visited` / `onVisitedChange` round trip and restore (mount with `visited` 1–5 lands on 5, 1–4 clickable, 8 redirects to 5); unknown or unreachable `step` triggers redirect to first incomplete; last-step Next is the SubmitButton; vertical renders `StepContent` and passes axe, horizontal passes axe; throws outside `<Form>` |
 | ReadOnlyField | raw value; options label; array join; boolean; empty; `format`; `editStep` shows Edit inside Wizard and nothing outside; label default humanization; axe |
 | ClearButton | disabled pristine; `defaults` resets to defaultValues; `empty` blanks by type; `confirm` cancel keeps values; confirm accept resets |
 | Form confirm | invalid form shows errors and no dialog; cancel never calls onSubmit; confirm calls onSubmit once; Enter in a field and `requestSubmit()` both go through the dialog; `confirm` object copy appears |
@@ -291,9 +304,3 @@ Stories: `Wizard/Horizontal`, `Wizard/Vertical`, `Wizard/ReactRouter`,
 `Buttons/ClearButton`, `Form/ConfirmSubmit`, `ReadOnlyField`,
 `Form/UnsavedChangesGuard`. Each story with interaction (`play`) for Next
 validation and confirm cancel.
-
-## Open questions parked
-
-- Whether `Wizard` should expose `visited` persistence (`initialVisited` /
-  `onVisitedChange`) for consumers who save progress server-side. Not needed
-  for the stories; add when a real flow asks.
