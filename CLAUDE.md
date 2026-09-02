@@ -9,6 +9,6 @@ Read `docs/PHILOSOPHY.md` first; it is the authority. The non-negotiables:
 - **Backlog is GitHub Issues only.** Labels `area:*`, `priority:*`, `size:*`, `needs-design`, `follow-up`; milestones per version. Post the finalized plan on each issue before building; `needs-design` means brainstorm first.
 - **Work is subagent-driven in parallel worktrees** (`.worktrees/<track>`), one review per task, one final whole-branch review, ledger under `.superpowers/sdd/<plan>/`, then a ledger doc under `docs/superpowers/reviews/`.
 - **Record every ruling** as `Ruling: <what> — <why> — <cost if wrong>` and list them all when handing back.
-- Pushing, publishing, and deleting remote branches are Steve's call; ask.
+- Push `main` when the final review is clean (standing rule); publishing and deleting remote branches are Steve's call, ask.
 
 Commands: `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm build-storybook`, `pnpm format`. Storybook's script pins port 6006; a second instance is `pnpm exec storybook dev -p <port> --ci`.
