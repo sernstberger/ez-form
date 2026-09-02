@@ -190,6 +190,47 @@ describe('DatePicker', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  // QA #73: see DateField.test.tsx for the root cause (MUI X collapses an
+  // unparsable string to `(null, { validationError: null })`, identical to a
+  // genuine clear); `usePickerField` tells them apart via the hidden input's
+  // raw text.
+  it('shows an invalid-date error and blocks submit for an unparsable date', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ start: null }} onSubmit={onSubmit}>
+          <DatePicker name="start" label="Start" />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    typeDate('start', 'March 2, 2024')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Start is invalid.')
+    expect(screen.getByRole('group', { name: 'Start' })).toHaveAttribute('aria-invalid', 'true')
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('still submits null with no error once cleared back to genuinely empty', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ start: new Date(2030, 5, 1) }} onSubmit={onSubmit}>
+          <DatePicker name="start" label="Start" />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    typeDate('start', '')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    await vi.waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith({ start: null }, expect.anything()),
+    )
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('calls consumer onChange and onError after the form', async () => {
     const onChange = vi.fn()
     const onError = vi.fn()

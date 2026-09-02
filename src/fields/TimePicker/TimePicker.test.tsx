@@ -61,4 +61,48 @@ describe('TimePicker', () => {
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('At is too early.')
   })
+
+  // QA #73 (noted "not in scope" as unconfirmed for TimePicker specifically,
+  // shares `usePickerField` with the other three): see DateField.test.tsx for
+  // the root cause (MUI X collapses an unparsable string to `(null, {
+  // validationError: null })`, identical to a genuine clear); `usePickerField`
+  // tells them apart via the hidden input's raw text.
+  it('shows an invalid-date error and blocks submit for an unparsable time', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ at: null }} onSubmit={onSubmit}>
+          <TimePicker name="at" label="At" />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    typeTime('at', 'half past nine')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('At is invalid.')
+    expect(screen.getByRole('group', { name: 'At' })).toHaveAttribute('aria-invalid', 'true')
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('still submits null with no error once cleared back to genuinely empty', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      withPickers(
+        <Form
+          schema={schema}
+          defaultValues={{ at: new Date(2030, 5, 1, 9, 30) }}
+          onSubmit={onSubmit}
+        >
+          <TimePicker name="at" label="At" />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    typeTime('at', '')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ at: null }, expect.anything()))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
 })

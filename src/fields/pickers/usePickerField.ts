@@ -1,5 +1,5 @@
-import { useRef, type FocusEvent, type ReactNode } from 'react'
-import { mergeSlotProps } from '@mui/material/utils'
+import { useEffect, useRef, type FocusEvent, type ReactNode } from 'react'
+import { mergeSlotProps, useForkRef } from '@mui/material/utils'
 import type { PickerChangeHandlerContext } from '@mui/x-date-pickers/models'
 import type { FieldValues, Validate } from 'react-hook-form'
 import { useEzField } from '../useEzField'
@@ -96,6 +96,67 @@ export function usePickerField<
   }: PickerFieldProps<TValue, TError> & PickerHandlers<TValue, TError, TSlotProps, TContext>,
 ) {
   const pickerError = useRef<TError | null>(null)
+  /**
+   * The raw text of the most recent hidden-input `change` (paste, or the
+   * `fireEvent.change` test seam) not yet claimed by `onChange` below — `null`
+   * once claimed or once its microtask has run. MUI X's field never records
+   * or exposes this text once parsing fails, and per-section typing never
+   * touches the hidden input's `change` event at all, so it is only ever set
+   * for a paste/programmatic write.
+   */
+  const pendingRawText = useRef<string | null>(null)
+  const hiddenInputRef = useRef<HTMLInputElement | null>(null)
+  /**
+   * MUI X leaves `validationError` at its default (`null`/falsy) for a string
+   * with no recognisable date shape at all: `parseDateStr` in MUI X's
+   * `useFieldState.updateValueFromValueStr` (internals/hooks/useField/
+   * useFieldState.js) returns `null` for such a string, and `validateDate` /
+   * `validateTime` / `validateDateTime` (validation/validateDate.js etc.) all
+   * short-circuit `value === null` to `null` before running any other check.
+   * `DateField` calls its own `onChange` unconditionally, so a genuine clear
+   * and an unparsable paste both reach it as `(null, { validationError: null
+   * })` — indistinguishable by that callback's own arguments alone.
+   *
+   * The popup pickers (`DatePicker`/`TimePicker`/`DateTimePicker`) go one step
+   * further and never call `onChange` *at all* for this case: `usePicker`'s
+   * `setValue` (internals/hooks/usePicker/hooks/useValueAndOpenStates.js)
+   * guards `shouldFireOnChange = !valueManager.areValuesEqual(newValue,
+   * value)`, and always takes that branch because `usePickerField` always
+   * passes an explicit `value` prop (making the picker "controlled" in
+   * MUI X's own eyes). An unparsable string parses to `null`, which for an
+   * already-empty field *is* the current value, so the call is swallowed
+   * before this hook ever sees it.
+   *
+   * Either way, the hidden `<input>`'s own native `change` event still fires
+   * with the raw text the user entered — MUI X's controlled-value swallow
+   * happens above that DOM event, not at it — so a listener attached via
+   * `inputRef` sees it regardless. This function marks that text pending and
+   * queues a microtask to claim it as `invalidDate` if nothing else claims it
+   * first: a same-tick `onChange` call is a real MUI X event, synchronous
+   * with a real DOM dispatch, so it always runs before any microtask queued
+   * from the same native event.
+   */
+  function handleHiddenInputChange(event: Event) {
+    const rawText = (event.target as HTMLInputElement).value
+    pendingRawText.current = rawText
+    queueMicrotask(() => {
+      if (pendingRawText.current !== rawText) return
+      pendingRawText.current = null
+      if (rawText && !pickerError.current) {
+        pickerError.current = 'invalidDate' as TError
+        f.field.onChange(f.field.value as TValue)
+      }
+    })
+  }
+  const attachHiddenInputListener = (node: HTMLInputElement | null) => {
+    hiddenInputRef.current?.removeEventListener('change', handleHiddenInputChange)
+    hiddenInputRef.current = node
+    node?.addEventListener('change', handleHiddenInputChange)
+  }
+  useEffect(
+    () => () => hiddenInputRef.current?.removeEventListener('change', handleHiddenInputChange),
+    [],
+  )
   const labelText = typeof label === 'string' ? label : undefined
   const f = useEzField<TValue>(name, componentName, {
     label,
@@ -116,15 +177,22 @@ export function usePickerField<
   })
   const text = f.helperText(helperText)
   const consumerTextField = slotProps?.textField as ConsumerTextFieldSlotProps | undefined
+  const inputRef = useForkRef(f.field.ref, attachHiddenInputListener)
 
   return {
     name: f.field.name,
     label,
     value: (f.field.value as TValue | undefined) ?? null,
-    inputRef: f.field.ref,
+    inputRef,
     disabled: mergeDisabled(disabled, f.field.disabled),
     onChange: (value: TValue, context: TContext) => {
-      pickerError.current = context.validationError
+      // `DateField`'s synchronous case (see `handleHiddenInputChange` above):
+      // MUI X did call back here for the same native event, so claim the
+      // pending raw text ourselves instead of leaving it for the microtask.
+      const rawText = pendingRawText.current
+      pendingRawText.current = null
+      const unparsable = value == null && !context.validationError && !!rawText
+      pickerError.current = unparsable ? ('invalidDate' as TError) : context.validationError
       f.field.onChange(value)
       onChange?.(value, context)
     },
