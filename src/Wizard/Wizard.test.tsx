@@ -1250,7 +1250,8 @@ describe('Wizard', () => {
           <Wizard
             steps={steps}
             stepAnnouncement={({ index, count, label, step }) =>
-              `${label} (${step.id}) — ${index + 1}/${count}`
+              // `label` is a ReactNode; every step in this fixture uses a string one.
+              `${typeof label === 'string' ? label : ''} (${step.id}) — ${index + 1}/${count}`
             }
           >
             <Steps />

@@ -32,6 +32,8 @@
  * has to look at.
  */
 
+import { cleanup } from '@testing-library/react'
+
 type Level = 'error' | 'warn'
 
 /** A recorded console call, kept with its level so the failure message can name it. */
@@ -134,6 +136,19 @@ export function installConsoleGuard(): void {
     expectations = []
 
     if (unexpected.length > 0) {
+      /*
+       * Unmount anything still rendered before throwing.
+       *
+       * Testing Library registers its own auto-cleanup `afterEach` when
+       * `@testing-library/react` is first imported, which `setup.ts` does on the line above
+       * `installConsoleGuard()`. Vitest runs `afterEach` hooks in reverse registration order,
+       * so this one runs *first* — and throwing here would skip the cleanup entirely, leaving
+       * the previous test's DOM mounted. The next test then fails with "Found multiple
+       * elements", blaming a file that is not at fault (this cost the whole FileField suite
+       * once already).
+       */
+      cleanup()
+
       // De-duplicated: React logs the same warning once per render pass, and StrictMode
       // doubles that, so the raw list is the same line several times over.
       const lines = [...new Set(unexpected.map((c) => `  console.${c.level}: ${c.text}`))].join(

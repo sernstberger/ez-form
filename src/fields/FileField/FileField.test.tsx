@@ -276,6 +276,8 @@ describe('FileField', () => {
 // only `files` is read here.
 const dataTransfer = (files: File[]) => ({ files, items: [], types: ['Files'] })
 
+// A widening cast (Element -> HTMLElement), not a non-null one.
+// eslint-disable-next-line @typescript-eslint/non-nullable-type-assertion-style
 const dropZone = () => document.querySelector(`.${fileFieldClasses.dropZone}`) as HTMLElement
 
 describe('FileField dropzone', () => {
@@ -664,6 +666,9 @@ describe('FileField progress hooks', () => {
     expect(onFilesAdded).toHaveBeenLastCalledWith([jpg])
     // A rejected pick adds nothing and tells no one.
     fireEvent.drop(dropZone(), { dataTransfer: dataTransfer([pdf]) })
+    // Awaited because setting the rejection re-runs the field's `accepted` rule, which
+    // updates the form asynchronously; the alert appearing is that update landing.
+    expect(await screen.findByRole('alert')).toHaveTextContent('File type not accepted')
     expect(onFilesAdded).toHaveBeenCalledTimes(2)
   })
 })

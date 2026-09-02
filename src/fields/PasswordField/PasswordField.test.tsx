@@ -1,5 +1,5 @@
 import { createTheme, ThemeProvider } from '@mui/material/styles'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../../Form'
@@ -122,8 +122,12 @@ describe('PasswordField', () => {
     await user.type(input(), 'hunter2')
     // Focus put on the button deliberately (keyboard): yanking it into the
     // input would fight the user.
-    input().blur()
-    screen.getByRole('button', { name: 'Show password' }).focus()
+    // Wrapped in `act`: blurring/focusing a MUI input flips its FormControl's focused
+    // state, and a raw call would land that update outside React's batching.
+    act(() => {
+      input().blur()
+      screen.getByRole('button', { name: 'Show password' }).focus()
+    })
     await user.keyboard('{Enter}')
     expect(screen.getByRole('button', { name: 'Hide password' })).toHaveFocus()
     expect(input()).not.toHaveFocus()

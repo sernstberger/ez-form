@@ -232,7 +232,7 @@ export function FormDialog<TIn extends FieldValues, TOut>(inProps: FormDialogPro
   const props = useDefaultProps({
     props: inProps,
     name: 'EzFormDialog',
-  }) as FormDialogProps<TIn, TOut>
+  })
   const {
     // FormDialog's own
     open,

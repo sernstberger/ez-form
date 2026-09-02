@@ -159,8 +159,20 @@ export interface WizardStepAnnouncementInfo {
   step: WizardStepDef
 }
 
-const defaultStepAnnouncement = ({ index, count, label }: WizardStepAnnouncementInfo): ReactNode =>
-  `Step ${index + 1} of ${count}${label ? `, ${label}` : ''}`
+/*
+ * The label is only appended when it is a string or number. `label` is a `ReactNode`, so a
+ * step titled with an element would otherwise interpolate as "[object Object]" — and this
+ * string is what a screen reader announces on every step change. A non-text label degrades to
+ * the position alone ("Step 2 of 5"), which is accurate rather than wrong.
+ */
+const defaultStepAnnouncement = ({
+  index,
+  count,
+  label,
+}: WizardStepAnnouncementInfo): ReactNode => {
+  const text = typeof label === 'string' || typeof label === 'number' ? String(label) : ''
+  return `Step ${index + 1} of ${count}${text ? `, ${text}` : ''}`
+}
 
 /**
  * Multi-step navigation over one `<Form>`. Values live in hookform; the
