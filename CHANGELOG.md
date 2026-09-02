@@ -195,6 +195,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (`12abc`, `1 234,56 €`) is a separate, general permissiveness in Base UI's own
   `parseNumber` (backed by `parseFloat`) and is out of scope here — documented on the issue
   and left as `it.todo` — #72.
+- **Docs**: README now documents the required-date pattern for `DateField`/`DatePicker`: use
+  `z.date().nullable()` in the schema and `required` on the field (the same pattern as any
+  other field), not a `.refine`-based schema-level check that would fight the rule's message — #78.
 
 ### Notes
 
