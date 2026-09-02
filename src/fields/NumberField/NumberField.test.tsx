@@ -1,8 +1,11 @@
+import { renderToString } from 'react-dom/server'
+import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../../Form'
 import { NumberField } from './NumberField'
+import { numberFieldClasses } from './NumberFieldControl'
 import { getSeparators } from './groupWhileTyping'
 import { describeFieldContract } from '../../test/describeFieldContract'
 
@@ -421,6 +424,58 @@ describe('NumberField', () => {
     setNativeValue.call(input(), '5678')
     fireEvent(input(), new InputEvent('input', { bubbles: true, isComposing: false, data: '5678' }))
     expect(input()).toHaveValue('5,678')
+  })
+
+  it('shrinks the label on the server render for a field that already has a value', () => {
+    // TextField's own FormControl derives `filled` from the input's `value`, so the
+    // markup is already shrunk with no effects run — this is what replaced the
+    // `SSRInitialFilled` placeholder the hand-composed FormControl needed.
+    const html = renderToString(
+      <Form schema={schema} defaultValues={{ age: 5 }} onSubmit={() => {}}>
+        <NumberField name="age" label="Age" />
+      </Form>,
+    )
+    expect(html).toContain('data-shrink="true"')
+  })
+
+  it('does not shrink the label on the server render for an empty field', () => {
+    const html = renderToString(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <NumberField name="age" label="Age" />
+      </Form>,
+    )
+    expect(html).toContain('data-shrink="false"')
+  })
+
+  it('is themeable: EzNumberField defaultProps and styleOverrides.steppers apply', () => {
+    const theme = createTheme({
+      components: {
+        EzNumberField: {
+          defaultProps: { size: 'small' },
+          styleOverrides: { steppers: { flexDirection: 'row' } },
+        },
+      },
+    })
+    const { container } = render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{ age: 5 }} onSubmit={() => {}}>
+          <NumberField name="age" label="Age" />
+        </Form>
+      </ThemeProvider>,
+    )
+    // defaultProps reached the control: `size="small"` is what makes the input dense.
+    expect(input().closest('.MuiInputBase-root')).toHaveClass('MuiInputBase-sizeSmall')
+    const steppers = container.querySelector(`.${numberFieldClasses.steppers}`)!
+    expect(steppers).toBeInTheDocument()
+    expect(getComputedStyle(steppers).flexDirection).toBe('row')
+    // The other slots carry their class hooks for CSS / styleOverrides to target.
+    expect(screen.getByRole('button', { name: 'Increase' })).toHaveClass(
+      numberFieldClasses.increment,
+    )
+    expect(screen.getByRole('button', { name: 'Decrease' })).toHaveClass(
+      numberFieldClasses.decrement,
+    )
+    expect(container.querySelector(`.${numberFieldClasses.root}`)).toBeInTheDocument()
   })
 
   it('calls a consumer onValueChange after updating the form', async () => {

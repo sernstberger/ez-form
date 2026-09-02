@@ -5,6 +5,7 @@ import type { ConfirmDialogProps } from '../ConfirmDialog'
 import type { WizardStepperProps } from '../Wizard/WizardStepper'
 import type { WizardNavProps } from '../Wizard/WizardNav'
 import type { ReadOnlyFieldProps } from '../fields/ReadOnlyField'
+import type { NumberFieldControlProps } from '../fields/NumberField/NumberFieldControl'
 
 declare module '@mui/material/styles' {
   interface ComponentsPropsList {
@@ -14,6 +15,7 @@ declare module '@mui/material/styles' {
     EzWizardStepper: Partial<WizardStepperProps>
     EzWizardNav: Partial<WizardNavProps>
     EzReadOnlyField: Partial<ReadOnlyFieldProps>
+    EzNumberField: Partial<NumberFieldControlProps>
   }
 
   interface ComponentNameToClassKey {
@@ -23,6 +25,7 @@ declare module '@mui/material/styles' {
     EzWizardStepper: 'root' | 'stepButton' | 'verticalStepButton'
     EzWizardNav: 'root' | 'prev' | 'next' | 'submit'
     EzReadOnlyField: 'root' | 'header' | 'label' | 'value' | 'edit'
+    EzNumberField: 'root' | 'steppers' | 'increment' | 'decrement'
   }
 
   interface Components<Theme = unknown> {
@@ -49,6 +52,10 @@ declare module '@mui/material/styles' {
     EzReadOnlyField?: {
       defaultProps?: ComponentsProps['EzReadOnlyField']
       styleOverrides?: ComponentsOverrides<Theme>['EzReadOnlyField']
+    }
+    EzNumberField?: {
+      defaultProps?: ComponentsProps['EzNumberField']
+      styleOverrides?: ComponentsOverrides<Theme>['EzNumberField']
     }
   }
 }
