@@ -1,5 +1,5 @@
-import { useEffect, useRef, type FocusEvent, type ReactNode } from 'react'
-import { mergeSlotProps, useForkRef } from '@mui/material/utils'
+import { useRef, type ClipboardEvent, type FocusEvent, type ReactNode } from 'react'
+import { mergeSlotProps } from '@mui/material/utils'
 import type { PickerChangeHandlerContext } from '@mui/x-date-pickers/models'
 import type { FieldValues, Validate } from 'react-hook-form'
 import { useEzField } from '../useEzField'
@@ -48,6 +48,7 @@ interface PickerHandlers<
  */
 interface ConsumerTextFieldSlotProps {
   onBlur?: (event: FocusEvent<HTMLDivElement>) => void
+  onPaste?: (event: ClipboardEvent<HTMLDivElement>) => void
   slotProps?: Record<string, unknown> & { formHelperText?: object }
 }
 
@@ -97,15 +98,15 @@ export function usePickerField<
 ) {
   const pickerError = useRef<TError | null>(null)
   /**
-   * The raw text of the most recent hidden-input `change` (paste, or the
-   * `fireEvent.change` test seam) not yet claimed by `onChange` below — `null`
-   * once claimed or once its microtask has run. MUI X's field never records
-   * or exposes this text once parsing fails, and per-section typing never
-   * touches the hidden input's `change` event at all, so it is only ever set
-   * for a paste/programmatic write.
+   * The clipboard text of the most recent paste onto the field, not yet
+   * claimed by `onChange` below — `null` once claimed or once its microtask
+   * has run with nothing to claim it. Only a paste needs this: per-section
+   * typing already clamps each section to a valid value as it's entered
+   * (MUI X's `useFieldCharacterEditing`), so it can't land on a fully
+   * unparsable final state the way pasting an arbitrary string over the
+   * whole field can.
    */
-  const pendingRawText = useRef<string | null>(null)
-  const hiddenInputRef = useRef<HTMLInputElement | null>(null)
+  const pendingPasteText = useRef<string | null>(null)
   /**
    * MUI X leaves `validationError` at its default (`null`/falsy) for a string
    * with no recognisable date shape at all: `parseDateStr` in MUI X's
@@ -124,39 +125,44 @@ export function usePickerField<
    * value)`, and always takes that branch because `usePickerField` always
    * passes an explicit `value` prop (making the picker "controlled" in
    * MUI X's own eyes). An unparsable string parses to `null`, which for an
-   * already-empty field *is* the current value, so the call is swallowed
-   * before this hook ever sees it.
+   * already-empty field *is* the current value, so the call — and even
+   * `onError` — is swallowed before this hook ever sees it (confirmed: 0
+   * calls to either, and no re-render of the consumer component at all, so
+   * there is no synchronous or render-keyed signal to hook here).
    *
-   * Either way, the hidden `<input>`'s own native `change` event still fires
-   * with the raw text the user entered — MUI X's controlled-value swallow
-   * happens above that DOM event, not at it — so a listener attached via
-   * `inputRef` sees it regardless. This function marks that text pending and
-   * queues a microtask to claim it as `invalidDate` if nothing else claims it
-   * first: a same-tick `onChange` call is a real MUI X event, synchronous
-   * with a real DOM dispatch, so it always runs before any microtask queued
-   * from the same native event.
+   * `onPaste` (`slotProps.textField.onPaste`, wired to the field root by MUI
+   * X's `useField.js`: `onPaste?.(event); rootProps.onPaste(event);` — ours
+   * runs first) is the only place the raw pasted text is ever observable:
+   * MUI X's own paste handler (`useFieldRootProps.js`'s `handlePaste`) reads
+   * `event.clipboardData.getData('text')` and, on a parse failure, resets the
+   * field's sections back to empty placeholders without recording the text
+   * anywhere else. (The field's *hidden* input, previously used here, is
+   * never touched by a real paste at all — `handlePaste` calls
+   * `updateValueFromValueStr` directly; that only reads from the hidden
+   * input's own `change` event, which paste never dispatches.)
+   *
+   * `onChange`'s synchronous case (`DateField`, and any paste that changes
+   * the value at all — even to something invalid like a `minDate` breach)
+   * claims this text directly. For the popup pickers' swallowed case, this
+   * queues a microtask: a real DOM paste dispatch (`fireEvent.paste`
+   * included) runs every synchronous listener for the event — React's
+   * `onChange` included — before yielding, so a microtask queued from
+   * `onPaste` always runs after whichever `onChange` call the same paste was
+   * going to produce, letting it tell "no onChange came for this paste"
+   * apart from "onChange already handled it."
    */
-  function handleHiddenInputChange(event: Event) {
-    const rawText = (event.target as HTMLInputElement).value
-    pendingRawText.current = rawText
+  function handlePaste(event: ClipboardEvent<HTMLDivElement>) {
+    const rawText = event.clipboardData.getData('text')
+    pendingPasteText.current = rawText
     queueMicrotask(() => {
-      if (pendingRawText.current !== rawText) return
-      pendingRawText.current = null
+      if (pendingPasteText.current !== rawText) return
+      pendingPasteText.current = null
       if (rawText && !pickerError.current) {
         pickerError.current = 'invalidDate' as TError
         f.field.onChange(f.field.value as TValue)
       }
     })
   }
-  const attachHiddenInputListener = (node: HTMLInputElement | null) => {
-    hiddenInputRef.current?.removeEventListener('change', handleHiddenInputChange)
-    hiddenInputRef.current = node
-    node?.addEventListener('change', handleHiddenInputChange)
-  }
-  useEffect(
-    () => () => hiddenInputRef.current?.removeEventListener('change', handleHiddenInputChange),
-    [],
-  )
   const labelText = typeof label === 'string' ? label : undefined
   const f = useEzField<TValue>(name, componentName, {
     label,
@@ -177,20 +183,20 @@ export function usePickerField<
   })
   const text = f.helperText(helperText)
   const consumerTextField = slotProps?.textField as ConsumerTextFieldSlotProps | undefined
-  const inputRef = useForkRef(f.field.ref, attachHiddenInputListener)
 
   return {
     name: f.field.name,
     label,
     value: (f.field.value as TValue | undefined) ?? null,
-    inputRef,
+    inputRef: f.field.ref,
     disabled: mergeDisabled(disabled, f.field.disabled),
     onChange: (value: TValue, context: TContext) => {
-      // `DateField`'s synchronous case (see `handleHiddenInputChange` above):
-      // MUI X did call back here for the same native event, so claim the
-      // pending raw text ourselves instead of leaving it for the microtask.
-      const rawText = pendingRawText.current
-      pendingRawText.current = null
+      // `DateField`'s synchronous case, and any paste that changes the value
+      // at all (see `handlePaste` above): MUI X did call back here for the
+      // same paste, so claim the pending clipboard text ourselves instead of
+      // leaving it for the microtask.
+      const rawText = pendingPasteText.current
+      pendingPasteText.current = null
       const unparsable = value == null && !context.validationError && !!rawText
       pickerError.current = unparsable ? ('invalidDate' as TError) : context.validationError
       f.field.onChange(value)
@@ -218,6 +224,14 @@ export function usePickerField<
         onBlur: (event: FocusEvent<HTMLDivElement>) => {
           f.field.onBlur()
           consumerTextField?.onBlur?.(event)
+        },
+        // Same "form's handler first" ordering as onBlur above — MUI X's own
+        // useField.js runs this before its own paste handling regardless
+        // (`onPaste?.(event); rootProps.onPaste(event)`), but a consumer
+        // onPaste here is still ours to sequence, not MUI X's.
+        onPaste: (event: ClipboardEvent<HTMLDivElement>) => {
+          handlePaste(event)
+          consumerTextField?.onPaste?.(event)
         },
         slotProps: {
           ...consumerTextField?.slotProps,
