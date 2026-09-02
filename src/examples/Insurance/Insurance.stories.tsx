@@ -9,23 +9,27 @@ import {
   useNavigate,
   useParams,
 } from 'react-router'
+import { useWatch } from 'react-hook-form'
 import { Form } from '../../Form'
 import { Wizard } from '../../Wizard'
-import { WizardStep } from '../../Wizard/WizardStep'
 import { WizardStepper } from '../../Wizard/WizardStepper'
 import { WizardNav } from '../../Wizard/WizardNav'
-import { TextField } from '../../fields/TextField'
-import { DateField } from '../../fields/DateField'
-import { RadioGroup } from '../../fields/RadioGroup'
-import { Slider } from '../../fields/Slider'
-import { MoneyField } from '../../fields/MoneyField'
-import { Switch } from '../../fields/Switch'
-import { NumberField } from '../../fields/NumberField'
-import { TextareaField } from '../../fields/TextareaField'
-import { CheckboxGroup } from '../../fields/CheckboxGroup'
-import { FileField } from '../../fields/FileField'
-import { ReadOnlyField } from '../../fields/ReadOnlyField'
-import { Insurance, schema, emptyValues, useInsuranceSteps } from './Insurance'
+import {
+  Insurance,
+  schema,
+  emptyValues,
+  useInsuranceSteps,
+  ApplicantStep,
+  ContactStep,
+  CoverageStep,
+  HasVehicleStep,
+  VehicleStep,
+  DriversStep,
+  HistoryStep,
+  DocumentsStep,
+  ReviewStep,
+  type Input,
+} from './Insurance'
 
 const meta = {
   title: 'Examples/Insurance',
@@ -38,7 +42,12 @@ type Story = StoryObj<typeof meta>
 
 /**
  * The default: a horizontal stepper, resumable from localStorage. Reload the
- * story after filling a few steps — it lands back where it left off.
+ * story after filling a few steps — it lands back where it left off. Uploaded
+ * documents do not survive a reload: a `File` serializes to `{}` through
+ * `JSON.stringify` (its properties are prototype getters, not own properties),
+ * which would otherwise fail schema validation and permanently block submit
+ * on the next load — so the Documents step is stripped before every save and
+ * always resumes empty.
  */
 export const Horizontal: Story = {}
 
@@ -74,156 +83,64 @@ export const Agent: Story = {
   },
 }
 
-const routeSteps = [
-  'applicant',
-  'contact',
-  'coverage',
-  'has-vehicle',
-  'vehicle',
-  'drivers',
-  'history',
-  'documents',
-  'review',
-] as const
-type RouteStep = (typeof routeSteps)[number]
-
-const coverageTypes = [
-  { value: 'liability', label: 'Liability only' },
-  { value: 'collision', label: 'Collision' },
-  { value: 'comprehensive', label: 'Comprehensive' },
-]
-const incidentOptions = [
-  { value: 'accident', label: 'At-fault accident' },
-  { value: 'ticket', label: 'Moving violation' },
-  { value: 'claim', label: 'Prior insurance claim' },
-]
-
-/** Layout route: owns the Form and the Wizard; the step routes render below through <Outlet>. */
+/**
+ * Layout route: owns the `Form` and the `Wizard`; the step routes render
+ * below through `<Outlet>`. `hasVehicle` is watched here (not read once at
+ * mount) so the conditional Vehicle step reacts live to the switch on the
+ * `has-vehicle` route, the same as the non-router stories.
+ */
 function InsuranceLayout() {
   const { step = '' } = useParams()
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const steps = useInsuranceSteps(false)
+  const hasVehicle = Boolean(useWatch<Input, 'hasVehicle'>({ name: 'hasVehicle' }))
+  const steps = useInsuranceSteps(hasVehicle)
   return (
-    <Form
-      schema={schema}
-      defaultValues={emptyValues}
-      title="Auto insurance application"
-      onSubmit={() => {}}
-    >
-      <Stack spacing={3} sx={{ width: 480, mx: 'auto', my: 4 }}>
-        <Typography variant="body2" color="text.secondary">
-          URL: {pathname}
-        </Typography>
-        <Wizard steps={steps} step={step} onStepChange={(s) => void navigate(`/insurance/${s.id}`)}>
-          <WizardStepper />
-          <Outlet />
-          <WizardNav submitLabel="Submit application" />
-        </Wizard>
-      </Stack>
-    </Form>
+    <Stack spacing={3} sx={{ width: 480, mx: 'auto', my: 4 }}>
+      <Typography variant="body2" color="text.secondary">
+        URL: {pathname}
+      </Typography>
+      <Wizard steps={steps} step={step} onStepChange={(s) => void navigate(`/insurance/${s.id}`)}>
+        <WizardStepper />
+        <Outlet />
+        <WizardNav submitLabel="Submit application" />
+      </Wizard>
+    </Stack>
   )
 }
 
-/** One route per step (like `Wizard/ReactRouter`): the route only renders the `WizardStep` for its own id. */
+/**
+ * One route per step (like `Wizard/ReactRouter`): the route only renders the
+ * step for its own id, reusing the exact same step components as the
+ * `Horizontal`/`Vertical`/`Page` stories (`Insurance.tsx`'s exported
+ * `*Step` functions) rather than a second copy of the field markup, so the
+ * two can't drift apart.
+ */
 function InsuranceRouteStep() {
-  const { step } = useParams<{ step: RouteStep }>()
+  const { step } = useParams()
+  // Called unconditionally (not inside the `switch`'s `'review'` case): this component is one
+  // instance across every `:step` param change, not remounted per route, so a hook called only
+  // for some cases would violate the rules of hooks the moment the route moves off `review`.
+  const hasVehicle = Boolean(useWatch<Input, 'hasVehicle'>({ name: 'hasVehicle' }))
   switch (step) {
     case 'applicant':
-      return (
-        <WizardStep id="applicant">
-          <Stack spacing={2}>
-            <TextField name="firstName" label="First name" required />
-            <TextField name="lastName" label="Last name" required />
-            <DateField name="birthday" label="Birthday" disableFuture required />
-          </Stack>
-        </WizardStep>
-      )
+      return <ApplicantStep />
     case 'contact':
-      return (
-        <WizardStep id="contact">
-          <Stack spacing={2}>
-            <TextField name="email" label="Email" required />
-            <TextField name="phone" label="Phone" required />
-          </Stack>
-        </WizardStep>
-      )
+      return <ContactStep />
     case 'coverage':
-      return (
-        <WizardStep id="coverage">
-          <Stack spacing={2}>
-            <RadioGroup
-              name="coverageType"
-              label="Coverage type"
-              options={coverageTypes}
-              required
-            />
-            <Slider name="deductible" label="Deductible" min={0} max={2000} step={250} />
-            <MoneyField name="coverageAmount" label="Coverage amount" required />
-          </Stack>
-        </WizardStep>
-      )
+      return <CoverageStep />
     case 'has-vehicle':
-      return (
-        <WizardStep id="has-vehicle">
-          <Switch name="hasVehicle" label="Do you want to insure a vehicle?" />
-        </WizardStep>
-      )
+      return <HasVehicleStep />
     case 'vehicle':
-      return (
-        <WizardStep id="vehicle">
-          <Stack spacing={2}>
-            <TextField name="vehicle.make" label="Make" required />
-            <TextField name="vehicle.model" label="Model" required />
-            <NumberField name="vehicle.year" label="Year" required />
-            <TextField name="vehicle.plate" label="Plate number" required />
-          </Stack>
-        </WizardStep>
-      )
+      return <VehicleStep />
     case 'drivers':
-      return (
-        <WizardStep id="drivers">
-          <Stack spacing={2}>
-            <TextField name="driver.name" label="Full name" required />
-            <TextField name="driver.licenseNumber" label="License number" required />
-            <DateField
-              name="driver.licenseDate"
-              label="License issue date"
-              disableFuture
-              required
-            />
-          </Stack>
-        </WizardStep>
-      )
+      return <DriversStep />
     case 'history':
-      return (
-        <WizardStep id="history">
-          <Stack spacing={2}>
-            <TextareaField name="claims" label="Claims in the last 5 years" maxLength={500} />
-            <CheckboxGroup
-              name="priorIncidents"
-              label="Prior incidents"
-              options={incidentOptions}
-            />
-          </Stack>
-        </WizardStep>
-      )
+      return <HistoryStep />
     case 'documents':
-      return (
-        <WizardStep id="documents">
-          <FileField name="documents" label="Upload documents" multiple />
-        </WizardStep>
-      )
+      return <DocumentsStep />
     case 'review':
-      return (
-        <WizardStep id="review">
-          <Stack spacing={2}>
-            <ReadOnlyField name="firstName" editStep="applicant" />
-            <ReadOnlyField name="email" editStep="contact" />
-            <ReadOnlyField name="coverageType" options={coverageTypes} editStep="coverage" />
-          </Stack>
-        </WizardStep>
-      )
+      return <ReviewStep hasVehicle={hasVehicle} />
     default:
       return null
   }
@@ -232,7 +149,16 @@ function InsuranceRouteStep() {
 const routes = [
   {
     path: '/insurance',
-    element: <InsuranceLayout />,
+    element: (
+      <Form
+        schema={schema}
+        defaultValues={emptyValues}
+        title="Auto insurance application"
+        onSubmit={() => {}}
+      >
+        <InsuranceLayout />
+      </Form>
+    ),
     children: [
       { index: true, element: null },
       { path: ':step', element: <InsuranceRouteStep /> },
@@ -243,7 +169,9 @@ const routes = [
 /**
  * One route per step, mirroring `Wizard/ReactRouter`: Next / Back / stepper
  * clicks change the URL, so the browser's own back/forward and deep links
- * work against a specific step.
+ * work against a specific step. The Vehicle step is reachable here too: flip
+ * "has vehicle?" on the `has-vehicle` route and Next reveals it, the same
+ * conditional behavior as the other stories.
  */
 export const ReactRouter: Story = {
   render: () => (

@@ -138,6 +138,21 @@ interface SavedState {
   values: Partial<Input>
 }
 
+/**
+ * `File`/`File[]` values (only `documents` today, but this walks generically rather than
+ * naming that one key) round-trip through `JSON.stringify` as `{}` — every own-enumerable
+ * property a `File` exposes (`name`, `size`, `type`, `lastModified`, …) is a getter on its
+ * prototype, not an own property `JSON.stringify` would serialize. Reloading that `{}` back
+ * in fails `z.instanceof(File)` (`expected File, received object`), which blocks the whole
+ * form from ever submitting again, and `ReadOnlyField`/`FileField` render it as an
+ * unlabelled `[object Object]` chip. Stripped to an empty array before every write, so a
+ * resumed session simply starts Documents empty — uploads never survive a reload; noted on
+ * the `Horizontal` story, the one demonstrating resume.
+ */
+function stripFiles(values: Partial<Input>): Partial<Input> {
+  return { ...values, documents: [] }
+}
+
 function loadSaved(): SavedState | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -220,12 +235,11 @@ function WatchValues({ onValues }: { onValues: (values: Partial<Input>) => void 
   const json = JSON.stringify(values)
   useEffect(() => {
     onValues(JSON.parse(json) as Partial<Input>)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [json])
   return null
 }
 
-function ApplicantStep() {
+export function ApplicantStep() {
   return (
     <WizardStep id="applicant">
       <Stack spacing={2}>
@@ -237,7 +251,7 @@ function ApplicantStep() {
   )
 }
 
-function ContactStep() {
+export function ContactStep() {
   return (
     <WizardStep id="contact">
       <Stack spacing={3}>
@@ -266,7 +280,7 @@ function ContactStep() {
   )
 }
 
-function CoverageStep() {
+export function CoverageStep() {
   return (
     <WizardStep id="coverage">
       <Stack spacing={3}>
@@ -286,7 +300,7 @@ function CoverageStep() {
   )
 }
 
-function HasVehicleStep() {
+export function HasVehicleStep() {
   return (
     <WizardStep id="has-vehicle">
       <Switch name="hasVehicle" label="Do you want to insure a vehicle?" />
@@ -294,7 +308,7 @@ function HasVehicleStep() {
   )
 }
 
-function VehicleStep() {
+export function VehicleStep() {
   return (
     <WizardStep id="vehicle">
       <Stack spacing={2}>
@@ -307,7 +321,7 @@ function VehicleStep() {
   )
 }
 
-function DriversStep() {
+export function DriversStep() {
   return (
     <WizardStep id="drivers">
       <FormSection title="Primary driver">
@@ -321,7 +335,7 @@ function DriversStep() {
   )
 }
 
-function HistoryStep() {
+export function HistoryStep() {
   return (
     <WizardStep id="history">
       <Stack spacing={3}>
@@ -336,7 +350,7 @@ function HistoryStep() {
   )
 }
 
-function DocumentsStep() {
+export function DocumentsStep() {
   return (
     <WizardStep id="documents">
       <FileField name="documents" label="Upload documents" multiple />
@@ -344,7 +358,7 @@ function DocumentsStep() {
   )
 }
 
-function ReviewStep({ hasVehicle }: { hasVehicle: boolean }) {
+export function ReviewStep({ hasVehicle }: { hasVehicle: boolean }) {
   return (
     <WizardStep id="review">
       <Stack spacing={2}>
@@ -463,7 +477,7 @@ export function Insurance({
       clearSaved()
       return
     }
-    saveState({ step, visited: [...visited], values })
+    saveState({ step, visited: [...visited], values: stripFiles(values) })
   }, [agentMode, isPristine, step, visited, values])
 
   function startOver() {

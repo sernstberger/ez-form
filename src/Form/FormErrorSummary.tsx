@@ -165,7 +165,7 @@ export function FormErrorSummary(inProps: FormErrorSummaryProps) {
   // step's own fields (a submit only fires from the last step's SubmitButton). A wizard's last
   // step can also carry `<Form confirm>` (e.g. a Review step's Submit) — that pre-submit
   // `trigger()` never reaches `handleSubmit` on a failed validation either, so it needs
-  // `failedConfirmAttempt` here too, the same as the non-wizard branch (see #72, filed
+  // `failedConfirmAttempt` here too, the same as the non-wizard branch (see #81, filed
   // alongside the Insurance example that first combined the two).
   const attempted = wizard
     ? wizard.lastFailed != null || submitCount > 0 || failedConfirmAttempt > 0

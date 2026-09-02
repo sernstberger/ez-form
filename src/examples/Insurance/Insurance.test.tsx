@@ -197,6 +197,65 @@ describe('Insurance', () => {
     expect(screen.getByLabelText(/first name/i)).toHaveValue('Ada')
   })
 
+  it('does not persist uploaded documents: resuming after an upload still submits cleanly with Documents empty', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(withPickers(<Insurance />))
+    await fillApplicant(user)
+    await fillContact(user)
+    await fillCoverage(user)
+    await skipVehicle(user)
+    await fillDrivers(user)
+    await fillHistory(user)
+    // On Documents: upload a file, then let the autosave effect run before remounting.
+    const file = new File(['%PDF'], 'policy.pdf', { type: 'application/pdf' })
+    await user.upload(screen.getByLabelText(/^upload documents/i) as HTMLInputElement, file)
+    expect(screen.getByText('policy.pdf')).toBeInTheDocument()
+    await waitFor(() => expect(localStorage.getItem(STORAGE_KEY)).toBeTruthy())
+    // A `File` has no own-enumerable properties (they're prototype getters), so
+    // `JSON.stringify` would otherwise serialize it as `{}` — confirm that never lands in
+    // storage: the saved `documents` is an empty array, not `[{}]` or similar.
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)!) as {
+      values: { documents: unknown }
+    }
+    expect(saved.values.documents).toEqual([])
+    unmount()
+
+    render(withPickers(<Insurance />))
+    // Resumes on Documents (the last-visited step); the upload did not survive, and nothing
+    // renders a stray "[object Object]" chip or an unlabelled Remove button.
+    expect(screen.getByRole('group', { name: 'Documents' })).toBeInTheDocument()
+    expect(screen.queryByText('policy.pdf')).not.toBeInTheDocument()
+    expect(screen.queryByText('[object Object]')).not.toBeInTheDocument()
+    await goNext(user) // -> Review
+    await user.click(screen.getByRole('button', { name: /submit application/i }))
+    const dialog = await screen.findByRole('alertdialog', { name: /submit application\?/i })
+    await user.click(within(dialog).getByRole('button', { name: /^confirm$/i }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+    expect(screen.queryByRole('heading', { name: /there is a problem/i })).not.toBeInTheDocument()
+  })
+
+  it('a stale "vehicle" in a saved visited list (from a session where "has vehicle?" was later turned off) resumes onto a real, visible step', async () => {
+    // Simulates a saved session where the Vehicle step was visited, then "has vehicle?"
+    // was turned back off before the tab closed: `visited` still names a step id that
+    // `useInsuranceSteps(false)` no longer includes. `Wizard` already filters ids that
+    // don't resolve to a current step index before picking the last-visited one (see
+    // `Wizard.tsx`'s `visitedIndexes` comment), so this should land on a real step rather
+    // than crash or render blank.
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        step: 'vehicle',
+        visited: ['applicant', 'contact', 'coverage', 'has-vehicle', 'vehicle'],
+        values: { hasVehicle: false },
+      }),
+    )
+    render(withPickers(<Insurance />))
+    // Falls back to the last visited step that still matches a current step id
+    // ("has-vehicle"), not the stale "vehicle" — and definitely not a crash.
+    expect(screen.getByRole('group', { name: 'Vehicle?' })).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: /^Vehicle$/ })).not.toBeInTheDocument()
+  })
+
   it('"Start over" clears localStorage and resets to the first step with empty values', async () => {
     const user = userEvent.setup()
     render(withPickers(<Insurance />))
