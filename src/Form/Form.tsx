@@ -48,6 +48,14 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
   values?: NoInfer<TIn>
   /** What a reset caused by `values` or async `defaultValues` keeps (dirty values, errors, …). */
   resetOptions?: KeepStateOptions
+  /**
+   * Called when the async `defaultValues` function rejects. The form
+   * re-enables with its fields empty (no defaults were applied), subject to
+   * `resetOptions` (hookform applies it on this reset too). If omitted, the
+   * rejection is rethrown so it surfaces as an unhandled rejection; the form
+   * still re-enables either way.
+   */
+  onDefaultValuesError?: (error: unknown) => void
   /** The form methods, for `reset` / `setValue` / `setError` from a parent. */
   ref?: Ref<FormMethods<TIn, TOut>>
   mode?: Mode
@@ -81,6 +89,7 @@ export function Form<TIn extends FieldValues, TOut>({
   defaultValues,
   values,
   resetOptions,
+  onDefaultValuesError,
   ref,
   mode = 'onSubmit',
   disabled = false,
@@ -97,9 +106,28 @@ export function Form<TIn extends FieldValues, TOut>({
   // hookform reports async defaults through formState.isLoading; it starts true
   // when defaultValues is a function, so the form is disabled from the first render.
   const [loading, setLoading] = useState(typeof defaultValues === 'function')
+  // hookform's internal _resetDefaultValues() calls defaultValues().then(...) with no
+  // .catch, so isLoading (and this form's `loading`) never clears on rejection. Wrap it
+  // so a rejection still clears `loading`, then either report it or rethrow so it
+  // surfaces as an unhandled rejection (current JS norm) — either way the form re-enables.
+  // Recreating this wrapper on every render is safe: useForm only reads the function-form
+  // defaultValues once, at mount (createFormControl runs once, guarded by !_formControl.current),
+  // so a new closure identity here each render never triggers an extra reset.
+  const wrappedDefaultValues =
+    typeof defaultValues === 'function'
+      ? () =>
+          defaultValues().catch((error: unknown) => {
+            setLoading(false)
+            if (onDefaultValuesError) {
+              onDefaultValuesError(error)
+              return {} as NoInfer<TIn>
+            }
+            throw error
+          })
+      : defaultValues
   const methods = useForm<TIn, unknown, TOut>({
     resolver: ezResolver(schema),
-    defaultValues,
+    defaultValues: wrappedDefaultValues,
     values,
     resetOptions,
     mode,
@@ -145,6 +173,10 @@ export function Form<TIn extends FieldValues, TOut>({
                 // Validate first (focusing the first error like handleSubmit does) so an
                 // invalid form never asks; handleSubmit re-validates on Confirm, which is
                 // cheap and keeps hookform's isSubmitting confined to the real submit.
+                // No try/catch: a rejecting resolver here (e.g. a throwing `validate` rule)
+                // propagates like the non-confirm path's handleSubmit does. Nothing is
+                // stranded either way — `submitting` and the dialog only ever get set after
+                // this awaits successfully (`ask` itself never rejects, see useConfirm).
                 const valid = await methods.trigger(undefined, { shouldFocus: true })
                 if (!valid) return
                 if (await ask(confirmOptions)) await submit(event)

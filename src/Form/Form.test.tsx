@@ -112,6 +112,59 @@ describe('Form', () => {
     expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled()
   })
 
+  it('re-enables the form and reports the error when async defaultValues rejects', async () => {
+    let reject!: (error: unknown) => void
+    const load = vi.fn(() => new Promise<{ email: string }>((_r, j) => (reject = j)))
+    const onDefaultValuesError = vi.fn()
+    render(
+      <Form
+        schema={schema}
+        defaultValues={load}
+        onSubmit={() => {}}
+        onDefaultValuesError={onDefaultValuesError}
+      >
+        <TextField name="email" label="Email" />
+        <SubmitButton />
+      </Form>,
+    )
+    expect(screen.getByLabelText('Email')).toBeDisabled()
+    const boom = new Error('boom')
+    reject(boom)
+    await waitFor(() => expect(screen.getByLabelText('Email')).toBeEnabled())
+    expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled()
+    expect(screen.getByLabelText('Email')).toHaveValue('')
+    expect(onDefaultValuesError).toHaveBeenCalledExactlyOnceWith(boom)
+  })
+
+  it('re-enables the form and rethrows when async defaultValues rejects without a handler', async () => {
+    // hookform's internal `_resetDefaultValues` never attaches a `.catch` to the
+    // promise our wrapped defaultValues returns, so a rejection with no
+    // `onDefaultValuesError` genuinely becomes an unhandled rejection (the current
+    // JS norm for an unobserved rejected promise). Observe it the same way a test
+    // runner does, and stop it from failing this run once captured.
+    const unhandled: unknown[] = []
+    const onUnhandledRejection = (error: unknown) => unhandled.push(error)
+    process.on('unhandledRejection', onUnhandledRejection)
+    try {
+      let reject!: (error: unknown) => void
+      const load = () => new Promise<{ email: string }>((_r, j) => (reject = j))
+      render(
+        <Form schema={schema} defaultValues={load} onSubmit={() => {}}>
+          <TextField name="email" label="Email" />
+          <SubmitButton />
+        </Form>,
+      )
+      expect(screen.getByLabelText('Email')).toBeDisabled()
+      const boom = new Error('boom')
+      reject(boom)
+      await waitFor(() => expect(screen.getByLabelText('Email')).toBeEnabled())
+      expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled()
+      await waitFor(() => expect(unhandled).toEqual([boom]))
+    } finally {
+      process.off('unhandledRejection', onUnhandledRejection)
+    }
+  })
+
   it('re-syncs the fields when values changes', async () => {
     const view = render(
       <Form schema={schema} values={{ email: 'a@b.co' }} onSubmit={() => {}}>
@@ -324,6 +377,42 @@ describe('useEzFormContext', () => {
       container.querySelector('form')!.requestSubmit()
       expect(await screen.findByRole('alertdialog')).toBeInTheDocument()
       expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('a rejecting resolver rethrows like the non-confirm path; nothing is left stranded', async () => {
+      // A field-level `validate` rule that throws makes `methods.trigger()` (the confirm
+      // path's own pre-validation, run before the dialog) reject. Like handleSubmit's own
+      // resolver call, this handler has no try/catch, so the rejection surfaces as an
+      // unhandled rejection — the same behavior as the non-confirm path. Nothing here should
+      // strand any state: `submitting` and the dialog are only set after this call succeeds.
+      const unhandled: unknown[] = []
+      const onUnhandledRejection = (error: unknown) => unhandled.push(error)
+      process.on('unhandledRejection', onUnhandledRejection)
+      try {
+        const user = userEvent.setup()
+        const onSubmit = vi.fn()
+        const boom = new Error('boom')
+        render(
+          <Form schema={schema} defaultValues={{ email: 'a@b.co' }} onSubmit={onSubmit} confirm>
+            <TextField
+              name="email"
+              label="Email"
+              validate={() => {
+                throw boom
+              }}
+            />
+            <SubmitButton />
+          </Form>,
+        )
+        await user.click(screen.getByRole('button', { name: 'Submit' }))
+        await waitFor(() => expect(unhandled).toEqual([boom]))
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+        expect(onSubmit).not.toHaveBeenCalled()
+        expect(screen.getByLabelText('Email')).toBeEnabled()
+        expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled()
+      } finally {
+        process.off('unhandledRejection', onUnhandledRejection)
+      }
     })
   })
 
