@@ -16,22 +16,11 @@ import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import IconButton from '@mui/material/IconButton'
 import InputAdornment from '@mui/material/InputAdornment'
 import MuiTextField from '@mui/material/TextField'
-import SvgIcon, { type SvgIconProps } from '@mui/material/SvgIcon'
 import { styled, type Theme } from '@mui/material/styles'
 import { useForkRef } from '@mui/material/utils'
+import KeyboardArrowUp from '@mui/icons-material/KeyboardArrowUp'
+import KeyboardArrowDown from '@mui/icons-material/KeyboardArrowDown'
 import { getSeparators, groupWhileTyping, type Separators } from './groupWhileTyping'
-
-// Inline copies of @mui/icons-material KeyboardArrowUp / KeyboardArrowDown.
-const ArrowUpIcon = (props: SvgIconProps) => (
-  <SvgIcon {...props}>
-    <path d="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
-  </SvgIcon>
-)
-const ArrowDownIcon = (props: SvgIconProps) => (
-  <SvgIcon {...props}>
-    <path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
-  </SvgIcon>
-)
 
 export interface NumberFieldInputProps {
   'aria-invalid'?: true
@@ -226,7 +215,7 @@ function NumberInput({
                   />
                 }
               >
-                <ArrowUpIcon fontSize={size} />
+                <KeyboardArrowUp fontSize={size} />
               </BaseNumberField.Increment>
               <BaseNumberField.Decrement
                 render={
@@ -237,7 +226,7 @@ function NumberInput({
                   />
                 }
               >
-                <ArrowDownIcon fontSize={size} />
+                <KeyboardArrowDown fontSize={size} />
               </BaseNumberField.Decrement>
             </NumberFieldSteppers>
           ),

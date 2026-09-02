@@ -70,7 +70,7 @@ the checklist a component must pass before it ships.
 ## Install
 
 ```bash
-pnpm add ez-form @mui/material @mui/x-date-pickers @emotion/react @emotion/styled @base-ui/react react-hook-form zod
+pnpm add ez-form @mui/material @mui/icons-material @mui/x-date-pickers @emotion/react @emotion/styled @base-ui/react react-hook-form zod
 ```
 
 `@mui/x-date-pickers` is a required peer even if you use no picker: ez-form has a single entry point, so the package is always resolved. `@base-ui/react` backs `NumberField`, `MoneyField`, and `OtpField`; `@mui/x-date-pickers` backs the three pickers. Both are tree-shakeable, and you also install one date adapter library (`date-fns`, `dayjs`, `luxon`, or `moment`) for the pickers — see "Date pickers" below.

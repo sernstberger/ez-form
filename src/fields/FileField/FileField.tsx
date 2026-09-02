@@ -6,23 +6,12 @@ import FormControl from '@mui/material/FormControl'
 import FormHelperText from '@mui/material/FormHelperText'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import Stack from '@mui/material/Stack'
-import SvgIcon, { type SvgIconProps } from '@mui/material/SvgIcon'
 import { styled } from '@mui/material/styles'
+import UploadFile from '@mui/icons-material/UploadFile'
+import Close from '@mui/icons-material/Close'
 import { useEzField } from '../useEzField'
 import { mergeDisabled } from '../mergeDisabled'
 import type { FieldRules } from '../../rules'
-
-// Inline copies of @mui/icons-material CloudUpload and Close.
-const UploadIcon = (props: SvgIconProps) => (
-  <SvgIcon {...props}>
-    <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96M14 13v4h-4v-4H7l5-5 5 5z" />
-  </SvgIcon>
-)
-const CloseIcon = (props: SvgIconProps) => (
-  <SvgIcon {...props}>
-    <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-  </SvgIcon>
-)
 
 // MUI's documented file-upload pattern: a visually hidden input inside a Button rendered as <label>.
 const VisuallyHiddenInput = styled('input')({
@@ -100,6 +89,11 @@ export function FileField(inProps: FileFieldProps) {
     onChange?.(event, value)
   }
 
+  // Slot default (see ConfirmDialog's `confirmProps`): the literal lives in a JS object,
+  // not a JSX attribute, so `theme.components.MuiButton.defaultProps` (or a consumer's
+  // own `buttonProps.variant`) still overrides it — see #62.
+  const pickerButtonProps = { variant: 'outlined' as const, ...buttonProps }
+
   return (
     <FormControl
       error={f.invalid}
@@ -108,9 +102,8 @@ export function FileField(inProps: FileFieldProps) {
       className={fileFieldClasses.root}
     >
       <Button
-        variant="outlined" // guardrail: allow #62 literal variant on the picker button, tracked
-        startIcon={<UploadIcon />}
-        {...buttonProps}
+        startIcon={<UploadFile />}
+        {...pickerButtonProps}
         component="label"
         htmlFor={id}
         disabled={isDisabled}
@@ -162,11 +155,7 @@ export function FileField(inProps: FileFieldProps) {
               // Chip clones this element with its own onClick; the default icon has no accessible
               // name, and SvgIcon defaults aria-hidden to true unless overridden here.
               deleteIcon={
-                <CloseIcon
-                  role="button"
-                  aria-label={`Remove ${file.name}`}
-                  aria-hidden={undefined}
-                />
+                <Close role="button" aria-label={`Remove ${file.name}`} aria-hidden={undefined} />
               }
             />
           ))}

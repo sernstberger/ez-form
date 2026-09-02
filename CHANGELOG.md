@@ -54,6 +54,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `NumberField` / `NumberFieldControl` `className` is now `string` only (Base UI's
   `(state) => string` form is no longer accepted, because the Base UI root no longer
   renders an element) — #26.
+- `PasswordField`, `NumberFieldControl`, and `FileField` now render icons from
+  `@mui/icons-material` (`VisibilityOutlined`/`VisibilityOffOutlined`,
+  `KeyboardArrowUp`/`KeyboardArrowDown`, `UploadFile`/`Close`) instead of hand-rolled
+  inline `SvgIcon` paths; `@mui/icons-material` is a new peer and dev dependency.
+  `check:guardrails` gained a `no-inline-svg` rule (`<path `/`createSvgIcon(`) — #67.
+
+### Fixed
+
+- `FileField`'s picker `Button` `variant="outlined"` default now goes through a
+  spread-object slot default (`{ variant: 'outlined', ...buttonProps }`), so
+  `theme.components.MuiButton.defaultProps` can override it; removed the guardrail
+  allow-comment tracking this — #62.
 
 ### Notes
 

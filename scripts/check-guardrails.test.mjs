@@ -124,6 +124,45 @@ test('catches ripple props disableRipple / focusRipple', () => {
   assert.match(result.stderr, /no-ripple-prop/)
 })
 
+test('catches a hand-rolled inline SVG path', () => {
+  const result = runGuardrails({
+    files: {
+      'src/Widget.tsx':
+        `import SvgIcon from '@mui/material/SvgIcon'\n` +
+        `export function Widget() {\n` +
+        `  return <SvgIcon><path d="M1 1h1v1z" /></SvgIcon>\n` +
+        `}\n`,
+    },
+  })
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /no-inline-svg/)
+})
+
+test('catches createSvgIcon(...)', () => {
+  const result = runGuardrails({
+    files: {
+      'src/Widget.tsx':
+        `import createSvgIcon from '@mui/material/utils/createSvgIcon'\n` +
+        `const Icon = createSvgIcon(<path d="M1 1h1v1z" />, 'Icon')\n` +
+        `export function Widget() {\n  return <Icon />\n}\n`,
+    },
+  })
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /no-inline-svg/)
+})
+
+test('allows importing icons from @mui/icons-material', () => {
+  const result = runGuardrails({
+    files: {
+      'src/Widget.tsx':
+        `import UploadFile from '@mui/icons-material/UploadFile'\n` +
+        `export function Widget() {\n  return <UploadFile />\n}\n`,
+    },
+  })
+  assert.equal(result.status, 0)
+  assert.match(result.stdout, /0 violations/)
+})
+
 test('catches an exported component missing a README Components row', () => {
   const result = runGuardrails({
     indexTs: `export { Widget } from './Widget'\nexport { Gadget } from './Gadget'\n`,

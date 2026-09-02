@@ -29,6 +29,8 @@ identical copy of something upstream ships is not.
 > Test: "why does this line exist?" must have an answer other than "it seemed
 > cleaner".
 
+Icons come from `@mui/icons-material`; no hand-rolled SVGs.
+
 ### 2. No styling judgement calls in `src/`
 
 No `sx`, no forced ripple, no hard-coded padding or colour, no literal `variant`
