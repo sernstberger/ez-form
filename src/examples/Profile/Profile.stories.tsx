@@ -45,7 +45,7 @@ export const ReloadWhileDirty: Story = {
     docs: {
       description: {
         story:
-          '"Reload from server" re-fetches and passes the result through the `values` prop while the form is dirty. With `resetOptions={{ keepDirtyValues: true }}`, the display name (edited here) keeps the local edit, while every untouched field re-syncs to whatever the reload returned.',
+          '"Reload from server" re-fetches and passes the result through the `values` prop while the form is dirty. With `resetOptions={{ keepDirtyValues: true }}`, the display name (edited here) keeps the local edit, while the untouched bio re-syncs to whatever the reload returned — each reload seeds a fresh bio, so the change is visible rather than a coincidental match.',
       },
     },
   },
@@ -55,6 +55,9 @@ export const ReloadWhileDirty: Story = {
     await userEvent.clear(displayName)
     await userEvent.type(displayName, 'My Local Edit')
     await userEvent.click(canvas.getByRole('button', { name: /reload from server/i }))
+    // Dirty field keeps the local edit...
     await canvas.findByDisplayValue('My Local Edit')
+    // ...while the pristine bio re-syncs to the reload's fresh value.
+    await canvas.findByDisplayValue('Reloaded from the server (reload #1).')
   },
 }

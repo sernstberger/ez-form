@@ -77,6 +77,10 @@ export function Profile({ onSuccess, loadSeed }: ProfileProps) {
   // `undefined` means the form's own async `defaultValues` supplies the first load,
   // and "Reload from server" is the only thing that ever sets this afterwards.
   const [reloaded, setReloaded] = useState<ProfileValues>()
+  // Bumped on every reload and folded into the seed's `bio`, so each click's fetch
+  // comes back with a value the initial load didn't have — proof the pristine field
+  // actually re-synced from `values`, not that it just happened to match already.
+  const reloadCount = useRef(0)
   // `onDefaultValuesError` only hands back the error, not the form methods, so
   // `ref` gets us `setError` — the failure then surfaces through FormError like
   // every other root-level error in this form, instead of a one-off error UI.
@@ -124,7 +128,13 @@ export function Profile({ onSuccess, loadSeed }: ProfileProps) {
               <Button
                 type="button"
                 variant="text"
-                onClick={() => loadProfileApi(loadSeed).then(setReloaded)}
+                onClick={() => {
+                  reloadCount.current += 1
+                  loadProfileApi({
+                    ...loadSeed,
+                    bio: `Reloaded from the server (reload #${reloadCount.current}).`,
+                  }).then(setReloaded)
+                }}
               >
                 Reload from server
               </Button>

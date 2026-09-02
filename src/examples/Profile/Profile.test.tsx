@@ -93,6 +93,9 @@ describe('Profile', () => {
     render(withPickers(<Profile />))
     await waitForLoaded()
 
+    const bio = screen.getByLabelText(/^bio/i)
+    const bioBeforeReload = (bio as HTMLTextAreaElement).value
+
     const displayName = screen.getByLabelText(/display name/i)
     await user.clear(displayName)
     await user.type(displayName, 'My Local Edit')
@@ -101,10 +104,12 @@ describe('Profile', () => {
 
     // Dirty field keeps the user's edit...
     await waitFor(() => expect(displayName).toHaveValue('My Local Edit'))
-    // ...while a pristine field (bio, untouched) re-syncs to whatever the reload returned.
-    expect(screen.getByLabelText(/^bio/i)).toHaveValue(
-      'Mathematician and writer, first to publish an algorithm for a computing machine.',
-    )
+    // ...while a pristine field (bio, untouched) re-syncs to whatever the reload
+    // returned. The reload seeds a fresh bio each time (see Profile.tsx's
+    // reloadCount), so this proves the re-sync actually ran rather than the
+    // field just happening to already hold the same value as the first load.
+    await waitFor(() => expect(bio).toHaveValue('Reloaded from the server (reload #1).'))
+    expect(bio).not.toHaveValue(bioBeforeReload)
   })
 
   it('is accessible once loaded', async () => {
