@@ -89,7 +89,7 @@ export function FileField({
   return (
     <FormControl error={f.invalid} disabled={isDisabled} required={f.required}>
       <Button
-        variant="outlined"
+        variant="outlined" // guardrail: allow #62 (theme-unreachable default, tracked)
         startIcon={<UploadIcon />}
         {...buttonProps}
         component="label"
@@ -128,7 +128,12 @@ export function FileField({
         />
       </Button>
       {files.length > 0 ? (
-        <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', mt: 1 }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          useFlexGap
+          sx={{ flexWrap: 'wrap', mt: 1 }} // guardrail: allow #50 (removed on feat/sx-cleanup)
+        >
           {files.map((file) => (
             <Chip
               key={`${file.name}-${file.size}-${file.lastModified}`}

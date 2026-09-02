@@ -111,7 +111,10 @@ export function OtpFieldControl({
         ))}
       </OTPField.Root>
       {helperText ? (
-        <FormHelperText {...helperTextProps} sx={{ ml: 0 }}>
+        <FormHelperText
+          {...helperTextProps}
+          sx={{ ml: 0 }} // guardrail: allow #50 (removed on feat/sx-cleanup)
+        >
           {helperText}
         </FormHelperText>
       ) : null}
