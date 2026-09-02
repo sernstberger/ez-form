@@ -63,9 +63,10 @@ ez-form is a thin binding layer, not a component library: MUI supplies the widge
 react-hook-form the state, and zod the schema, so every prop and type traces back to
 one of those three. Nothing in `src/` makes a styling judgement call — defaults live
 only where a theme can override them — and every field ships accessible and
-axe-tested by default. The form owns submission, loading, and disabling; fields just
-read from it. See [`docs/PHILOSOPHY.md`](docs/PHILOSOPHY.md) for the full rules and
-the checklist a component must pass before it ships.
+axe-tested by default. Every control ez-form renders is at least 24×24 CSS px, per
+WCAG 2.5.8 Target Size (Minimum). The form owns submission, loading, and disabling;
+fields just read from it. See [`docs/PHILOSOPHY.md`](docs/PHILOSOPHY.md) for the full
+rules and the checklist a component must pass before it ships.
 
 ## Install
 

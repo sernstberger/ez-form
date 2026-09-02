@@ -81,6 +81,7 @@ posted on the issue so the decision survives the session that made it.
 - [ ] Bound through `useEzField` / `FieldFrame` (fields) or `useEzFormContext` (form-level parts); `required`, `disabled`, `error`, `helperText` come from the form.
 - [ ] Anything with a visual default registers as `Ez<Name>`: `useDefaultProps`, `styled` slots, `<name>Classes`, and an entry in `src/theme/augmentation.ts`. A pure pass-through field keeps MUI's own `Mui*` keys and registers nothing.
 - [ ] No `sx`, ripple props, or theme-unreachable literals in `src/`.
+- [ ] Interactive targets ≥ 24×24 px (`expectTargetSize`).
 - [ ] Tests: behaviour through the DOM (Testing Library), the shared `describeFieldContract` for fields, a jest-axe pass, pristine output (no `act()` warnings, no console noise).
 - [ ] A story per meaningful state, using the `parameters.form` decorator; `excludeStories` for shared fixtures.
 - [ ] README: a row in the Components table and, if the API has a rule or a mode, a short section.

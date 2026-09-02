@@ -61,6 +61,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   slot announces "Code sent" (or the error) once per resend without spamming assistive
   tech on every countdown tick. `EzResendCodeButton` theme key (`defaultProps`,
   `styleOverrides` for `root`, `status`) and the `resendCodeButtonClasses` export — #63.
+- WCAG 2.5.8 Target Size (Minimum): `NumberField`'s steppers and `FileField`'s chip
+  delete icon now declare `minWidth`/`minHeight: 24` (the two controls whose rendered
+  box could fall under 24×24 CSS px); `src/test/targetSize.ts` exports
+  `expectTargetSize`, a shared test helper asserting a control's declared CSS
+  guarantees the floor, called from every affected component's test file — #12.
+
+> > > > > > > feat/guardrail
 
 ### Changed
 

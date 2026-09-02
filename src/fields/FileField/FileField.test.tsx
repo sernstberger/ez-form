@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { Form } from '../../Form'
 import { FileField, fileFieldClasses } from './FileField'
 import { describeFieldContract } from '../../test/describeFieldContract'
+import { expectTargetSize } from '../../test/targetSize'
 
 const schema = z.object({ resume: z.instanceof(File).nullable() })
 const multiSchema = z.object({ photos: z.array(z.instanceof(File)) })
@@ -42,6 +43,20 @@ describe('FileField', () => {
     expect(screen.getByText('resume.pdf')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(onSubmit).toHaveBeenCalledWith({ resume: pdf }, expect.anything())
+  })
+
+  it('meets 24×24 target size: the chip delete icon', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+        <FileField name="resume" label="Resume" />
+      </Form>,
+    )
+    // The picker button itself is a text Button with a startIcon — its compliance
+    // is documented by reasoning in the audit report, not asserted here (see
+    // expectTargetSize's doc comment). Only the icon-only delete icon is checked.
+    await user.upload(fileInput('Resume'), pdf)
+    expectTargetSize(screen.getByRole('button', { name: 'Remove resume.pdf' }))
   })
 
   it('keeps the previous file when the dialog is cancelled', async () => {
