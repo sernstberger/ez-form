@@ -811,6 +811,35 @@ describe('WizardStepper', () => {
     )
   })
 
+  it('marks the current step with aria-current="step" and labels each step', async () => {
+    const user = userEvent.setup()
+    render(<Inline orientation="horizontal" />)
+    await user.click(screen.getByRole('button', { name: 'next' }))
+    await waitFor(() => expect(screen.getByRole('tab', { name: /Account/ })).toBeInTheDocument())
+    expect(screen.getByRole('tab', { name: /Account/ })).not.toHaveAttribute('aria-current')
+    const current = screen.getByRole('tab', { name: /Plan/ })
+    expect(current).toHaveAttribute('aria-current', 'step')
+    const label = screen.getByText('Account', { selector: 'span' })
+    expect(label.id).toMatch(/-label-account$/)
+  })
+
+  it('vertical: marks the current step with aria-current="step" and labels each step', async () => {
+    const user = userEvent.setup()
+    render(<Inline orientation="vertical" />)
+    await user.click(screen.getByRole('button', { name: 'next' }))
+    await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+    const accountButton = screen
+      .getByText('Account', { selector: '.MuiStepLabel-label' })
+      .closest('button')!
+    expect(accountButton).not.toHaveAttribute('aria-current')
+    const planButton = screen
+      .getByText('Plan', { selector: '.MuiStepLabel-label' })
+      .closest('button')!
+    expect(planButton).toHaveAttribute('aria-current', 'step')
+    const label = screen.getByText('Account', { selector: '.MuiStepLabel-label' })
+    expect(label.id).toMatch(/-label-account$/)
+  })
+
   it('is themeable: styleOverrides.verticalStepButton applies to the vertical step button', async () => {
     const user = userEvent.setup()
     const theme = createTheme({
