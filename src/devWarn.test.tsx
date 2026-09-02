@@ -10,6 +10,9 @@ import { RadioGroup } from './fields/RadioGroup'
 import { CheckboxGroup } from './fields/CheckboxGroup'
 import { ToggleButtonGroup } from './fields/ToggleButtonGroup'
 import { Autocomplete } from './fields/Autocomplete'
+import { Checkbox } from './fields/Checkbox'
+import { Switch } from './fields/Switch'
+import { Rating } from './fields/Rating'
 import { PasswordField } from './fields/PasswordField'
 import { TextareaField } from './fields/TextareaField'
 import type { MockInstance } from 'vitest'
@@ -107,6 +110,59 @@ describe('dev warning: a field with no accessible name', () => {
     expect(hits[0]).toContain(`<${name} name="role">`)
   })
 
+  /**
+   * A `labelAs="legend"` group sets its own `aria-labelledby={labelId}` after spreading
+   * `rest`, so a consumer's `aria-labelledby` never reaches the DOM — the group really is
+   * unnamed and must still warn. (An earlier revision forwarded it to `FieldFrame` and so
+   * silently accepted a name that was never rendered.)
+   */
+  it.each([
+    [
+      'RadioGroup',
+      <RadioGroup
+        name="role"
+        label=""
+        aria-labelledby="x"
+        options={[{ value: 'a', label: 'A' }]}
+      />,
+    ],
+    [
+      'CheckboxGroup',
+      <CheckboxGroup
+        name="role"
+        label=""
+        aria-labelledby="x"
+        options={[{ value: 'a', label: 'A' }]}
+      />,
+    ],
+    [
+      'ToggleButtonGroup',
+      <ToggleButtonGroup
+        name="role"
+        label=""
+        aria-labelledby="x"
+        options={[{ value: 'a', label: 'A' }]}
+      />,
+    ],
+    ['Rating', <Rating name="role" label="" aria-labelledby="x" />],
+  ])(
+    '%s still warns when only aria-labelledby is given: the group never renders it',
+    (_name, element) => {
+      wrap(element)
+      expect(messagesMatching(/no accessible name/)).toHaveLength(1)
+    },
+  )
+
+  // Checkbox/Switch are `labelAs="control"`: `{...rest}` really does reach the input, so a
+  // consumer's aria attribute lands in the DOM and legitimately silences the warning.
+  it.each([
+    ['Checkbox', <Checkbox name="terms" label="" aria-label="Accept terms" />],
+    ['Switch', <Switch name="terms" label="" aria-label="Accept terms" />],
+  ])('%s accepts aria-label, which does reach its input', (_name, element) => {
+    wrap(element)
+    expect(messagesMatching(/no accessible name/)).toHaveLength(0)
+  })
+
   it('fires for a group field named only through its legend', () => {
     wrap(<RadioGroup name="role" label="" options={[{ value: 'a', label: 'A' }]} />)
     const hits = messagesMatching(/no accessible name/)
@@ -154,6 +210,42 @@ describe('dev warning: duplicate option values', () => {
     ['Autocomplete', (o: typeof unique) => <Autocomplete name="role" label="Role" options={o} />],
   ])('%s does not warn for unique values', (_name, renderField) => {
     wrap(renderField(unique))
+    expect(messagesMatching(/duplicate option values/)).toHaveLength(0)
+  })
+
+  /**
+   * `getOptionValue` decides what Autocomplete stores, so it decides what collides. These
+   * options have distinct `value`s and would look unique to a check reading `option.value`.
+   */
+  it('Autocomplete compares the value getOptionValue actually stores', () => {
+    wrap(
+      <Autocomplete
+        name="role"
+        label="Role"
+        options={[
+          { value: 'a', label: 'First', group: 'shared' },
+          { value: 'b', label: 'Second', group: 'shared' },
+        ]}
+        getOptionValue={(o) => o.group}
+      />,
+    )
+    const hits = messagesMatching(/duplicate option values/)
+    expect(hits).toHaveLength(1)
+    expect(hits[0]).toContain('shared')
+  })
+
+  it('Autocomplete does not warn when getOptionValue keeps them distinct', () => {
+    wrap(
+      <Autocomplete
+        name="role"
+        label="Role"
+        options={[
+          { value: 'same', label: 'First', id: 1 },
+          { value: 'same', label: 'Second', id: 2 },
+        ]}
+        getOptionValue={(o) => o.id}
+      />,
+    )
     expect(messagesMatching(/duplicate option values/)).toHaveLength(0)
   })
 
@@ -236,6 +328,61 @@ describe('dev warning: a wizard step listing a field the form does not know', ()
     ])
     await next()
     expect(messagesMatching(/does not know/)).toHaveLength(0)
+  })
+
+  /**
+   * A row-level path into a field array that has no rows yet. The array exists, so the path
+   * is well-formed and only the rows are missing — warning here would be the empty-array
+   * false positive one level deeper.
+   */
+  it('does not fire for a row path into an empty field array', async () => {
+    const arraySchema = z.object({ email: z.string(), debts: z.array(z.object({ x: z.string() })) })
+    render(
+      <Form schema={arraySchema} defaultValues={{ email: 'a@b.c', debts: [] }} onSubmit={() => {}}>
+        <Wizard
+          steps={[
+            { id: 'one', label: 'One', fields: ['debts.0.x'] },
+            { id: 'two', label: 'Two' },
+          ]}
+        >
+          <WizardStep id="one">
+            <TextField name="email" label="Email" />
+          </WizardStep>
+          <WizardStep id="two">
+            <TextField name="email" label="Email again" />
+          </WizardStep>
+          <WizardNav />
+        </Wizard>
+      </Form>,
+    )
+    await next()
+    expect(messagesMatching(/does not know/)).toHaveLength(0)
+  })
+
+  it('still fires for a typo in the array name itself', async () => {
+    const arraySchema = z.object({ email: z.string(), debts: z.array(z.object({ x: z.string() })) })
+    render(
+      <Form schema={arraySchema} defaultValues={{ email: 'a@b.c', debts: [] }} onSubmit={() => {}}>
+        <Wizard
+          steps={[
+            { id: 'one', label: 'One', fields: ['dbets.0.x' as 'debts'] },
+            { id: 'two', label: 'Two' },
+          ]}
+        >
+          <WizardStep id="one">
+            <TextField name="email" label="Email" />
+          </WizardStep>
+          <WizardStep id="two">
+            <TextField name="email" label="Email again" />
+          </WizardStep>
+          <WizardNav />
+        </Wizard>
+      </Form>,
+    )
+    await next()
+    const hits = messagesMatching(/does not know/)
+    expect(hits).toHaveLength(1)
+    expect(hits[0]).toContain('dbets.0.x')
   })
 
   it('does not fire for an empty field array named at the array level', async () => {

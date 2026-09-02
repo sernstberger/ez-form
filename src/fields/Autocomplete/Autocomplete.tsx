@@ -96,7 +96,9 @@ export function Autocomplete<
   optionalText,
   ...rest
 }: AutocompleteProps<TOption, TValue, Multiple, FreeSolo>) {
-  warnDuplicateOptions('Autocomplete', name, options)
+  // `getOptionValue` decides what this field stores, so that — not `option.value` — is the
+  // value a duplicate actually collides on (it is also what `isOptionEqualToValue` compares).
+  warnDuplicateOptions('Autocomplete', name, options, getOptionValue)
 
   type FormValue = AutocompleteFormValue<TValue, Multiple, FreeSolo>
   type MuiValue = AutocompleteValue<TOption, Multiple, false, FreeSolo>

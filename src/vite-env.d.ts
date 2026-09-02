@@ -10,13 +10,19 @@ declare module '*.md?raw' {
  * `src/devWarn.ts`'s dev-only warnings compile out of a production bundle (every bundler
  * substitutes this exact expression before dead-code elimination).
  *
- * Declared as an interface merged into the ambient `process` rather than `declare const
- * process`, which would *replace* the type vitest's globals already provide (`process.on`,
- * used in `Form.test.tsx`) instead of adding to it. Pulling in `@types/node` for this would
- * put Node's whole global surface in scope for a package that never runs there.
+ * Declared as a global `var` rather than `declare const process`: `var` declarations merge
+ * with an existing ambient `process` instead of replacing it, so this is correct both under
+ * `tsconfig.json` (where vitest's globals already declare a full `process`, used by
+ * `Form.test.tsx`) and under `tsconfig.build.json`, which sets `"types": []` and so has no
+ * `process` at all. An interface-merge into `NodeJS.ProcessEnv` only works in the first case
+ * and leaves the build emitting TS2591.
+ *
+ * Pulling in `@types/node` would fix it too, at the cost of putting Node's whole global
+ * surface in scope for a package that never runs there.
  */
-declare namespace NodeJS {
-  interface ProcessEnv {
-    NODE_ENV?: string
-  }
+declare global {
+  // eslint-disable-next-line no-var
+  var process: { env: { NODE_ENV?: string } }
 }
+
+export {}

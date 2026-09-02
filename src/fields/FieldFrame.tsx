@@ -41,10 +41,14 @@ export interface FieldFrameProps<TValue> {
    */
   labelAs: 'control' | 'legend'
   /**
-   * Not rendered here — the field still passes its own `aria-label` /
-   * `aria-labelledby` to the control it renders. Forwarded only so the dev-mode
-   * "no accessible name" warning can see that a label-less field is named some
-   * other way. See `src/devWarn.ts`.
+   * Not rendered here — reported only so the dev-mode "no accessible name" warning can
+   * see that a label-less field is named some other way (see `src/devWarn.ts`).
+   *
+   * Only a `labelAs="control"` field (Checkbox, Switch) may pass these: its `{...rest}`
+   * genuinely reaches the rendered control, so a consumer's value lands in the DOM. A
+   * `labelAs="legend"` field must **not** — it sets its own `aria-labelledby={labelId}`
+   * after spreading `rest`, so a consumer's value never reaches the DOM and forwarding it
+   * here would suppress a warning about a group that really is unnamed.
    */
   'aria-label'?: string
   'aria-labelledby'?: string

@@ -72,24 +72,33 @@ export function warnMissingLabel(
 }
 
 /**
- * Duplicate `value`s in an options list. The value is what the form stores and what every
- * field below keys its option elements on, so duplicates silently collapse the selection:
- * two radios both appear checked, a Select shows the wrong label, React logs a duplicate-key
- * warning that names neither the field nor the offending value.
+ * Duplicate stored values in an options list. The stored value is what the form keeps and
+ * what every field below keys its option elements on, so duplicates silently collapse the
+ * selection: two radios both appear checked, a Select shows the wrong label, React logs a
+ * duplicate-key warning that names neither the field nor the offending value.
  *
  * Values are compared as `String(value)` because that is what the DOM comparison in these
- * fields already reduces them to — `1` and `'1'` are the same option to a RadioGroup.
+ * fields already reduces them to — `1` and `'1'` are the same option to a RadioGroup. An
+ * object (only reachable via `Autocomplete`'s `getOptionValue`) is compared by its JSON
+ * instead, so two structurally identical objects still read as a collision — which is what
+ * `isOptionEqualToValue` will do with them at runtime.
+ *
+ * `getValue` exists for `Autocomplete`: a `getOptionValue` prop decides what that field
+ * actually stores, so it, not `option.value`, is where a collision bites. Every other field
+ * stores `option.value` and omits it.
  */
-export function warnDuplicateOptions(
+export function warnDuplicateOptions<TOption extends { value: string | number }>(
   componentName: string,
   name: string,
-  options: readonly { value: string | number }[],
+  options: readonly TOption[],
+  getValue: (option: TOption) => unknown = (option) => option.value,
 ): void {
   if (!isDev) return
   const seen = new Set<string>()
   const duplicates = new Set<string>()
   for (const option of options) {
-    const key = String(option.value)
+    const value = getValue(option)
+    const key = typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value)
     if (seen.has(key)) duplicates.add(key)
     seen.add(key)
   }
@@ -166,11 +175,17 @@ export function warnUnmountedStepFields(
  * `address.city` resolves, and treats a present-but-`undefined` key as absent — an
  * unmounted conditional field still has its `defaultValues` entry, which is the whole
  * signal this is looking for.
+ *
+ * An index into an **empty array** (`debts.0.amount` with no rows yet) counts as known: the
+ * array exists, so the path is well-formed and the rows simply have not been added. Without
+ * this, a step listing a row-level path would warn until the user adds a row — the same
+ * empty-`FieldArray` false positive the caller exists to avoid, one level deeper.
  */
 function hasPath(values: unknown, path: string): boolean {
   let node = values
   for (const key of path.split('.')) {
     if (typeof node !== 'object' || node === null) return false
+    if (Array.isArray(node) && node.length === 0 && /^\d+$/.test(key)) return true
     if (!(key in node)) return false
     node = (node as Record<string, unknown>)[key]
   }
