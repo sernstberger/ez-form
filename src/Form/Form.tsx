@@ -1,7 +1,9 @@
 import {
   useEffect,
+  useId,
   useImperativeHandle,
   useState,
+  type ElementType,
   type FormHTMLAttributes,
   type ReactNode,
   type Ref,
@@ -16,6 +18,10 @@ import {
   type Mode,
   type UseFormReturn,
 } from 'react-hook-form'
+import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
+import generateUtilityClasses from '@mui/material/generateUtilityClasses'
+import { styled } from '@mui/material/styles'
+import Typography, { type TypographyProps } from '@mui/material/Typography'
 import type { z } from 'zod'
 import { ezResolver } from './ezResolver'
 import { useConfirm, type ConfirmOptions } from '../ConfirmDialog'
@@ -28,9 +34,18 @@ import { useConfirm, type ConfirmOptions } from '../ConfirmDialog'
  */
 export type FormMethods<TIn extends FieldValues, TOut> = UseFormReturn<TIn, unknown, TOut>
 
+export const formClasses = generateUtilityClasses('EzForm', ['root', 'title', 'description'])
+
+/** Typography plus `component`, so a slot can pick its element (heading level). */
+export type FormTextSlotProps = TypographyProps & { component?: ElementType }
+
+const FormRoot = styled('form', { name: 'EzForm', slot: 'Root' })({})
+const FormTitle = styled(Typography, { name: 'EzForm', slot: 'Title' })({})
+const FormDescription = styled(Typography, { name: 'EzForm', slot: 'Description' })({})
+
 export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
   FormHTMLAttributes<HTMLFormElement>,
-  'onSubmit'
+  'onSubmit' | 'title'
 > {
   /** zod schema. Its input type types `defaultValues`; its output type types `onSubmit`. */
   schema: z.ZodType<TOut, TIn>
@@ -80,24 +95,48 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
    * (a `beforeunload` listener). For in-app navigation use `useFormGuard`.
    */
   guard?: boolean
+  /**
+   * Accessible name of the form, rendered as a heading (`h2` by default,
+   * `slotProps.title.component` changes the level) and wired to the `<form>`
+   * through `aria-labelledby`. A consumer's own `aria-labelledby` wins.
+   */
+  title?: ReactNode
+  /** Instructions under the title, wired through `aria-describedby`. */
+  description?: ReactNode
+  slotProps?: {
+    title?: FormTextSlotProps
+    description?: FormTextSlotProps
+  }
   children: ReactNode
 }
 
-export function Form<TIn extends FieldValues, TOut>({
-  schema,
-  onSubmit,
-  defaultValues,
-  values,
-  resetOptions,
-  onDefaultValuesError,
-  ref,
-  mode = 'onSubmit',
-  disabled = false,
-  confirm,
-  guard = false,
-  children,
-  ...formProps
-}: FormProps<TIn, TOut>) {
+export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut>) {
+  const {
+    schema,
+    onSubmit,
+    defaultValues,
+    values,
+    resetOptions,
+    onDefaultValuesError,
+    ref,
+    mode = 'onSubmit',
+    disabled = false,
+    confirm,
+    guard = false,
+    title,
+    description,
+    slotProps,
+    className,
+    children,
+    'aria-labelledby': ariaLabelledBy,
+    'aria-describedby': ariaDescribedBy,
+    ...formProps
+  } = useDefaultProps({ props: inProps, name: 'EzForm' }) as FormProps<TIn, TOut>
+  const baseId = useId()
+  const titleId = `${baseId}-title`
+  const descriptionId = `${baseId}-description`
+  const titleProps = { component: 'h2', variant: 'h5', ...slotProps?.title } as const
+  const descriptionProps = { component: 'p', variant: 'body2', ...slotProps?.description } as const
   // Local flags rather than formState: useForm hands this component a React-state
   // snapshot of formState, so the new value is not readable before the useForm
   // call on the render where it changes. hookform applies the `disabled` option
@@ -163,9 +202,12 @@ export function Form<TIn extends FieldValues, TOut>({
 
   return (
     <FormProvider {...methods}>
-      <form
+      <FormRoot
         noValidate
         {...formProps}
+        className={`${formClasses.root}${className ? ` ${className}` : ''}`}
+        aria-labelledby={ariaLabelledBy ?? (title != null ? titleId : undefined)}
+        aria-describedby={ariaDescribedBy ?? (description != null ? descriptionId : undefined)}
         onSubmit={
           confirmOptions
             ? async (event) => {
@@ -184,9 +226,27 @@ export function Form<TIn extends FieldValues, TOut>({
             : submit
         }
       >
+        {title != null && (
+          <FormTitle
+            {...titleProps}
+            id={titleId}
+            className={`${formClasses.title}${titleProps.className ? ` ${titleProps.className}` : ''}`}
+          >
+            {title}
+          </FormTitle>
+        )}
+        {description != null && (
+          <FormDescription
+            {...descriptionProps}
+            id={descriptionId}
+            className={`${formClasses.description}${descriptionProps.className ? ` ${descriptionProps.className}` : ''}`}
+          >
+            {description}
+          </FormDescription>
+        )}
         {children}
         {dialog}
-      </form>
+      </FormRoot>
     </FormProvider>
   )
 }

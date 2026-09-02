@@ -1,4 +1,4 @@
-export { Form, type FormProps, type FormMethods } from './Form'
+export { Form, formClasses, type FormProps, type FormMethods, type FormTextSlotProps } from './Form'
 export { SubmitButton, submitButtonClasses, type SubmitButtonProps } from './SubmitButton'
 export { TextField, type TextFieldProps } from './fields/TextField'
 export { Select, type SelectProps, type SelectOption } from './fields/Select'
@@ -57,3 +57,4 @@ export {
   readOnlyFieldClasses,
   type ReadOnlyFieldProps,
 } from './fields/ReadOnlyField'
+export { FormSection, formSectionClasses, type FormSectionProps } from './FormSection'

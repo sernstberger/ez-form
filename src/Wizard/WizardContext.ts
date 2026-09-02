@@ -16,6 +16,8 @@ export interface WizardStepDef<TIn extends FieldValues = FieldValues> {
 export type WizardStepStatus = 'current' | 'completed' | 'visited' | 'upcoming'
 
 export interface WizardContextValue {
+  /** Stable id prefix for this wizard (`useId`), used for step label ids. */
+  id: string
   steps: readonly WizardStepDef[]
   current: WizardStepDef
   index: number
@@ -38,3 +40,5 @@ export interface WizardContextValue {
 }
 
 export const WizardContext = createContext<WizardContextValue | null>(null)
+
+export const stepLabelId = (wizardId: string, stepId: string) => `${wizardId}-label-${stepId}`

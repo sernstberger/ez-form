@@ -8,7 +8,7 @@ import StepLabel from '@mui/material/StepLabel'
 import Stepper, { type StepperProps } from '@mui/material/Stepper'
 import { styled } from '@mui/material/styles'
 import type { ReactNode } from 'react'
-import type { WizardStepDef, WizardStepStatus } from './WizardContext'
+import { stepLabelId, type WizardStepDef, type WizardStepStatus } from './WizardContext'
 import { useWizard } from './useWizard'
 
 export type WizardStepperProps = Omit<
@@ -44,9 +44,13 @@ const VerticalStepButton = styled(ButtonBase, {
  * `StepButton` clones `{ icon, optional }` onto this element, so callers
  * that render it as `StepButton`'s child must still pass `optional` to
  * `StepButton` itself too — see the comment at that call site. */
-function stepLabel(step: WizardStepDef, status: WizardStepStatus) {
+function stepLabel(step: WizardStepDef, status: WizardStepStatus, labelId: string) {
   return (
-    <StepLabel optional={step.optional} error={status === 'visited'}>
+    <StepLabel
+      optional={step.optional}
+      error={status === 'visited'}
+      slotProps={{ label: { id: labelId } }}
+    >
       {step.label}
     </StepLabel>
   )
@@ -68,7 +72,7 @@ function stepLabel(step: WizardStepDef, status: WizardStepStatus) {
  */
 export function WizardStepper(inProps: WizardStepperProps) {
   const props = useDefaultProps({ props: inProps, name: 'EzWizardStepper' })
-  const { steps, index, orientation, stepStatus, go, setContentEl } = useWizard('WizardStepper')
+  const { id, steps, index, orientation, stepStatus, go, setContentEl } = useWizard('WizardStepper')
   return (
     <Stepper
       {...props}
@@ -80,16 +84,19 @@ export function WizardStepper(inProps: WizardStepperProps) {
       {steps.map((step) => {
         const status = stepStatus(step.id)
         const clickable = status !== 'upcoming'
+        const current = status === 'current'
+        const labelId = stepLabelId(id, step.id)
         let button: ReactNode
         if (!clickable) {
-          button = stepLabel(step, status)
+          button = stepLabel(step, status, labelId)
         } else if (orientation === 'vertical') {
           button = (
             <VerticalStepButton
               className={wizardStepperClasses.verticalStepButton}
               onClick={() => void go(step.id)}
+              aria-current={current ? 'step' : undefined}
             >
-              {stepLabel(step, status)}
+              {stepLabel(step, status, labelId)}
             </VerticalStepButton>
           )
         } else {
@@ -115,8 +122,9 @@ export function WizardStepper(inProps: WizardStepperProps) {
               className={wizardStepperClasses.stepButton}
               optional={step.optional}
               onClick={() => void go(step.id)}
+              aria-current={current ? 'step' : undefined}
             >
-              {stepLabel(step, status)}
+              {stepLabel(step, status, labelId)}
             </StepButton>
           )
         }

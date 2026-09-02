@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `Form` `title` / `description` props with `aria-labelledby` / `aria-describedby` wiring;
+  `EzForm` theme key (`root`, `title`, `description`) and `formClasses` — #51.
+- `FormSection`: `<fieldset>`/`<legend>` group with `EzFormSection` theme key
+  (`root`, `legend`, `description`, `content`) and `formSectionClasses` — #51.
+- `WizardStep` renders a `FormSection` (`title`, `description`, `slotProps`);
+  `WizardStepper` marks the current step with `aria-current="step"` — #51.
 - `EzNumberField` theme key (`defaultProps`, `styleOverrides` for `root`, `steppers`,
   `increment`, `decrement`) and the `numberFieldClasses` export; NumberField renders
   through MUI `TextField` — #26.
