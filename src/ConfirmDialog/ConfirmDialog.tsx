@@ -32,8 +32,8 @@ export interface ConfirmDialogProps
   onConfirm: () => void
   /** Also called for Escape and backdrop click. */
   onCancel: () => void
-  /** Props for the Confirm / Cancel buttons. */
-  slotProps?: {
+  /** Dialog's own slots (root, backdrop, container, transition, paper), plus the Confirm / Cancel buttons. */
+  slotProps?: DialogProps['slotProps'] & {
     confirm?: ButtonProps
     cancel?: ButtonProps
   }
@@ -63,8 +63,9 @@ export function ConfirmDialog(inProps: ConfirmDialogProps) {
   } = useDefaultProps({ props: inProps, name: 'EzConfirmDialog' })
   const titleId = useId()
   const messageId = useId()
-  const confirmProps = { variant: 'contained' as const, color: confirmColor, ...slotProps?.confirm }
-  const cancelProps = { ...slotProps?.cancel }
+  const { confirm: confirmSlot, cancel: cancelSlot, ...dialogSlotProps } = slotProps ?? {}
+  const confirmProps = { variant: 'contained' as const, color: confirmColor, ...confirmSlot }
+  const cancelProps = { ...cancelSlot }
   return (
     <ConfirmDialogRoot
       {...rest}
@@ -74,6 +75,7 @@ export function ConfirmDialog(inProps: ConfirmDialogProps) {
       aria-labelledby={titleId}
       aria-describedby={message ? messageId : undefined}
       className={`${confirmDialogClasses.root}${className ? ` ${className}` : ''}`}
+      slotProps={dialogSlotProps}
     >
       <DialogTitle id={titleId}>{title}</DialogTitle>
       {message && (

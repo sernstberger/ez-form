@@ -87,4 +87,21 @@ describe('ConfirmDialog', () => {
     expect(confirmBtn).toHaveClass(confirmDialogClasses.confirm)
     expect(getComputedStyle(confirmBtn).textTransform).toBe('lowercase')
   })
+
+  it('forwards a consumer slotProps.paper to Dialog while slotProps.confirm still reaches the Confirm button', () => {
+    render(
+      <ConfirmDialog
+        open
+        title="Sure?"
+        onConfirm={() => {}}
+        onCancel={() => {}}
+        slotProps={{
+          paper: { className: 'confirm-dialog-paper' },
+          confirm: { variant: 'outlined' },
+        }}
+      />,
+    )
+    expect(document.querySelector('.confirm-dialog-paper')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirm' })).toHaveClass('MuiButton-outlined')
+  })
 })
