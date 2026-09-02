@@ -72,6 +72,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `NumberField` / `NumberFieldControl` `className` is now `string` only (Base UI's
   `(state) => string` form is no longer accepted, because the Base UI root no longer
   renders an element) — #26.
+- `PasswordField`, `NumberFieldControl`, and `FileField` now render icons from
+  `@mui/icons-material` (`VisibilityOutlined`/`VisibilityOffOutlined`,
+  `KeyboardArrowUp`/`KeyboardArrowDown`, `UploadFile`/`Close`) instead of hand-rolled
+  inline `SvgIcon` paths; `@mui/icons-material` is a new peer and dev dependency.
+  `check:guardrails` gained a `no-inline-svg` rule (`<path `/`createSvgIcon(`) — #67.
+
+### Fixed
+
+- `FileField`'s picker `Button` `variant="outlined"` default is no longer a bare JSX
+  literal: it now reads from a new `slotProps.button` prop, which `useDefaultProps`
+  deep-merges key-by-key against `theme.components.EzFileField.defaultProps.slotProps.button`
+  (the same mechanism `ConfirmDialog`'s `slotProps.confirm` uses), so a theme can override
+  it globally and a per-instance override still wins over the theme default. The previous
+  flat `buttonProps` prop is a deprecated alias — it still works, but (being a flat, non-
+  slot prop) a theme can never reach into it. Removed the guardrail allow-comment
+  tracking the old literal — #62.
 
 ### Notes
 

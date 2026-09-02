@@ -136,6 +136,57 @@ describe('FileField', () => {
     expect(onChange).toHaveBeenCalledTimes(2)
   })
 
+  it('is themeable: defaultProps.slotProps.button applies to the picker Button', () => {
+    const theme = createTheme({
+      components: {
+        EzFileField: {
+          defaultProps: { slotProps: { button: { variant: 'contained' } } },
+        },
+      },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+          <FileField name="resume" label="Resume" />
+        </Form>
+      </ThemeProvider>,
+    )
+    // The picker renders as a native <label> (see FileField's `role={undefined}`
+    // comment), which testing-library gives no accessible role — query by the
+    // Button's own class instead of screen.getByRole.
+    const button = screen.getByText('Resume').closest('label') as HTMLElement
+    expect(button).toHaveClass('MuiButton-contained')
+  })
+
+  it('defaults the picker Button to outlined when no theme is provided', () => {
+    render(
+      <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+        <FileField name="resume" label="Resume" />
+      </Form>,
+    )
+    const button = screen.getByText('Resume').closest('label') as HTMLElement
+    expect(button).toHaveClass('MuiButton-outlined')
+  })
+
+  it('a per-instance slotProps.button still wins over the theme default', () => {
+    const theme = createTheme({
+      components: {
+        EzFileField: {
+          defaultProps: { slotProps: { button: { variant: 'contained' } } },
+        },
+      },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+          <FileField name="resume" label="Resume" slotProps={{ button: { variant: 'text' } }} />
+        </Form>
+      </ThemeProvider>,
+    )
+    const button = screen.getByText('Resume').closest('label') as HTMLElement
+    expect(button).toHaveClass('MuiButton-text')
+  })
+
   it('is themeable: styleOverrides.fileList applies', async () => {
     const user = userEvent.setup()
     const theme = createTheme({

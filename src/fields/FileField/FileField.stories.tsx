@@ -26,7 +26,7 @@ export const Multiple: Story = {
     },
   } satisfies FormParameters,
 }
-export const Contained: Story = { args: { buttonProps: { variant: 'contained' } } }
+export const Contained: Story = { args: { slotProps: { button: { variant: 'contained' } } } }
 export const Disabled: Story = { args: { disabled: true } }
 export const Error: Story = {
   args: { required: true },

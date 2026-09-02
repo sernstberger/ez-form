@@ -31,6 +31,9 @@ const RIPPLE_ATTR_RE = /(?<![\w-])(disableRipple|focusRipple)\b(?!-)/
 // A literal string value: `variant="contained"`. `variant={variant}` (an expression) is fine and
 // does not match this regex because it doesn't have a `="` sequence.
 const LITERAL_PROP_RE = /(?<![\w-])(variant|size|color)\s*=\s*"[^"]*"/
+// Hand-rolled SVG icons: a raw `<path ` element, or `createSvgIcon(...)` building one from path
+// data. Icons come from `@mui/icons-material` (see #67) — never inlined in src/.
+const INLINE_SVG_RE = /(<path[\s>]|createSvgIcon\()/
 
 /**
  * @param {string} dir
@@ -71,6 +74,7 @@ function checkFileLiterals(filePath, content) {
       { re: SX_ATTR_RE, rule: 'no-sx' },
       { re: RIPPLE_ATTR_RE, rule: 'no-ripple-prop' },
       { re: LITERAL_PROP_RE, rule: 'no-literal-style-prop' },
+      { re: INLINE_SVG_RE, rule: 'no-inline-svg' },
     ]
 
     for (const { re, rule } of checks) {
