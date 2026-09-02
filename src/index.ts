@@ -19,6 +19,7 @@ export {
   type TextareaFieldProps,
 } from './fields/TextareaField'
 export { MoneyField, type MoneyFieldProps } from './fields/MoneyField'
+export { ZipField, type ZipFieldProps } from './fields/ZipField'
 export {
   PasswordField,
   passwordFieldClasses,

@@ -94,6 +94,8 @@ Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >
 | `Autocomplete`                                 | MUI `Autocomplete`                            | `name`, `options`, `getOptionValue?` (default `o => o.value`; return `o` to store objects), `multiple`, `freeSolo`, `textFieldProps?`; all TextField rules. Options may carry extra fields (they reach `onChange`)                                                                                                                                                                                                                                                               |
 | `NumberField`                                  | Base UI `NumberField` through MUI `TextField` | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max` (also the stepper bounds), `validate`. Value is `number \| null`; digits group while typing (new in v2.1), and `format={{ useGrouping: false }}` turns that off                                                                                                                                                                                                                                         |
 | `MoneyField`                                   | `NumberField` pinned to USD                   | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max`, `validate`. Value is a `number` in dollars, rounded to the cent; shows `$1,234.50` on blur                                                                                                                                                                                                                                                                                                             |
+| `ZipField`                                     | `TextField`                                   | `name`; same rules as TextField, plus a built-in "5 digits" rule (`invalidMessage?`, default `'Enter a 5-digit ZIP code'`). Digits only, capped at 5 (anything else is stripped on type/paste); `inputMode="numeric"`, `autoComplete` defaults to `'postal-code'`. Value is the digit string                                                                                                                                                                                     |
+| `StateSelect`                                  | `Select`                                      | `name`; same rules as Select. Options are the 50 states + DC by default; `territories?` adds PR, GU, VI, AS, MP. `autoComplete` defaults to `'address-level1'`. Value is the USPS abbreviation; also exports `US_STATES`/`US_TERRITORIES` option arrays                                                                                                                                                                                                                          |
 | `DatePicker` / `TimePicker` / `DateTimePicker` | MUI X pickers                                 | `name`, `label?`, `helperText?`, `errorMessages?`; rules `required`, `validate`. The picker's own props (`minDate`, `disablePast`, `views`, …) pass through. Value is the adapter's date type or `null`                                                                                                                                                                                                                                                                          |
 | `OtpField`                                     | Base UI `OTPField` in MUI's outlined style    | `name`, `label?`, `helperText?`, `length?` (6), `mask?`, `validationType?`, `size?`; rules `required`, `validate`. Value is the code string; a partial code fails with `<label> must be <length> characters.`                                                                                                                                                                                                                                                                    |
 | `FileField`                                    | MUI `Button` + hidden `<input type="file">`   | `name`, `label` (button text), `accept?`, `multiple?`, `buttonProps?`, `helperText?`; rules `required`, `validate`. Value is `File \| null`, or `File[]` under `multiple`. `onChange(event, value)` fires on a pick and on a chip delete                                                                                                                                                                                                                                         |
@@ -686,6 +688,27 @@ A meter bound to a password field's live value, read with `useWatch` like `ReadO
 **Bundle size**: `PasswordStrength` lives in its own module and `PasswordField` does not import it, so a consumer using only `PasswordField` never pulls in `PasswordStrength` or `scorePassword` — a scorer like zxcvbn (~400 kB) stays opt-in. This is `sideEffects: false` plus a single ESM entry point (`package.json`) doing the work a bundler needs: unused named exports tree-shake out. `dist/index.js` itself, as a single-entry bundle, still contains every export's source (grepping it for `PasswordStrength` finds it) — the tree-shaking happens in the _consumer's_ bundler, not in this package's own build.
 
 Themeable under `EzPasswordStrength` (`defaultProps`, `styleOverrides` for `root` | `bar` | `label`), exported as `passwordStrengthClasses`.
+
+## US fields
+
+Small, US-specific conveniences on top of `TextField` and `Select` — for a non-US audience, build the equivalent with plain `TextField`/`Select`.
+
+**ZipField**: digits only, capped at 5 — anything else (letters, the ZIP+4 dash) is stripped as you type or paste. The form value is always the digit string (`'90210'`), never a formatted one. `inputMode="numeric"` brings up the numeric keypad on mobile; `autoComplete` defaults to `'postal-code'`. A non-empty value shorter than 5 digits fails a built-in rule (`invalidMessage?`, default `'Enter a 5-digit ZIP code'`), composed with any `validate` you pass the same way `required`/`pattern` are — a built-in key is never silently replaced by yours.
+
+```tsx
+<ZipField name="zip" label="ZIP code" required />
+```
+
+```ts
+const schema = z.object({ zip: z.string().min(1) })
+```
+
+**StateSelect**: `Select` pre-loaded with the 50 states + DC (`US_STATES`, exported as an `Option[]`); pass `territories` to add PR, GU, VI, AS, MP (`US_TERRITORIES`). Values are USPS abbreviations (`'CA'`), labels are full names (`'California'`). `autoComplete` defaults to `'address-level1'`.
+
+```tsx
+<StateSelect name="state" label="State" required />
+<StateSelect name="state" label="State or territory" territories />
+```
 
 ## Develop
 
