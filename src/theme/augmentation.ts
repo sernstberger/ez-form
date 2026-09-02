@@ -6,6 +6,7 @@ import type { WizardStepperProps } from '../Wizard/WizardStepper'
 import type { WizardNavProps } from '../Wizard/WizardNav'
 import type { ReadOnlyFieldProps } from '../fields/ReadOnlyField'
 import type { NumberFieldControlProps } from '../fields/NumberField/NumberFieldControl'
+import type { TextareaFieldProps } from '../fields/TextareaField/TextareaField'
 
 declare module '@mui/material/styles' {
   interface ComponentsPropsList {
@@ -16,6 +17,7 @@ declare module '@mui/material/styles' {
     EzWizardNav: Partial<WizardNavProps>
     EzReadOnlyField: Partial<ReadOnlyFieldProps>
     EzNumberField: Partial<NumberFieldControlProps>
+    EzTextareaField: Partial<TextareaFieldProps>
   }
 
   interface ComponentNameToClassKey {
@@ -26,6 +28,7 @@ declare module '@mui/material/styles' {
     EzWizardNav: 'root' | 'prev' | 'next' | 'submit'
     EzReadOnlyField: 'root' | 'header' | 'label' | 'value' | 'edit'
     EzNumberField: 'root' | 'steppers' | 'increment' | 'decrement'
+    EzTextareaField: 'root' | 'counter'
   }
 
   interface Components<Theme = unknown> {
@@ -56,6 +59,10 @@ declare module '@mui/material/styles' {
     EzNumberField?: {
       defaultProps?: ComponentsProps['EzNumberField']
       styleOverrides?: ComponentsOverrides<Theme>['EzNumberField']
+    }
+    EzTextareaField?: {
+      defaultProps?: ComponentsProps['EzTextareaField']
+      styleOverrides?: ComponentsOverrides<Theme>['EzTextareaField']
     }
   }
 }

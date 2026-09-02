@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `TextareaField`: `TextField` with `multiline` fixed on, a taller themeable default
+  (`minRows: 4`, `maxRows: 12`), and a length meter (`n` or `n / max`) driven by the
+  `maxLength` rule or an explicit `showCount` prop — over the limit, the meter is
+  replaced by the normal `maxLength` validation error. `EzTextareaField` theme key
+  (`defaultProps`, `styleOverrides` for `root`, `counter`) and the `textareaFieldClasses`
+  export — #49.
 - `EzNumberField` theme key (`defaultProps`, `styleOverrides` for `root`, `steppers`,
   `increment`, `decrement`) and the `numberFieldClasses` export; NumberField renders
   through MUI `TextField` — #26.
