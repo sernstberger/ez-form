@@ -27,6 +27,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   export — #49.
 - `.github/PULL_REQUEST_TEMPLATE.md` mirroring the "a component ships when" checklist
   from `docs/PHILOSOPHY.md` — #46.
+- `DateField`: MUI X's keyboard-only, sectioned date input, bound through the same
+  `usePickerField`-family binding as `DatePicker` (`errorMessages` mapping for
+  `invalidDate`, `minDate`, `maxDate`, `disablePast`, `disableFuture`). Recommended
+  over `DatePicker` for birthdays and other far-away dates — typing beats paging a
+  calendar back decades — #61.
 - `EzNumberField` theme key (`defaultProps`, `styleOverrides` for `root`, `steppers`,
   `increment`, `decrement`) and the `numberFieldClasses` export; NumberField renders
   through MUI `TextField` — #26.

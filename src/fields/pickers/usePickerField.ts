@@ -19,8 +19,25 @@ export interface PickerFieldProps<TValue, TError extends string | null> {
   validate?: FieldRules<TValue>['validate']
 }
 
-interface PickerHandlers<TValue, TError, TSlotProps extends { textField?: object }> {
-  onChange?: (value: TValue, context: PickerChangeHandlerContext<TError>) => void
+/**
+ * The only part of the change context this hook itself reads. `DatePicker` /
+ * `TimePicker` / `DateTimePicker` call back with `PickerChangeHandlerContext`
+ * (adds a required `source`); `DateField` calls back with the narrower
+ * `FieldChangeHandlerContext` (`validationError` only). `TContext` defaults
+ * to the wider popup-picker shape and `DateField` passes the narrower one
+ * explicitly, so each binding's consumer `onChange` keeps its real MUI X type.
+ */
+interface ChangeContext<TError> {
+  validationError: TError
+}
+
+interface PickerHandlers<
+  TValue,
+  TError,
+  TSlotProps extends { textField?: object },
+  TContext extends ChangeContext<TError>,
+> {
+  onChange?: (value: TValue, context: TContext) => void
   onError?: (error: TError, value: TValue) => void
   slotProps?: TSlotProps
 }
@@ -47,11 +64,22 @@ const toRecord = <TValue>(
  * share one channel: helper text, `aria-invalid`, `role="alert"`, and the
  * submit block. The ref (not state) keeps the rule current for the validation
  * that runs inside `field.onChange`.
+ *
+ * Works for both the popup pickers (`DatePicker`, `TimePicker`,
+ * `DateTimePicker` — the text field lives under `slotProps.textField`) and
+ * `DateField` (which *is* the text field: `label`/`helperText`/`error`/
+ * `required` are its own direct props). Either way the consumer's
+ * `slotProps.textField` is where `PickerFieldUI` reads the `formHelperText`
+ * slot from (MUI X merges `slotProps.textField` into the `PickersTextField`
+ * it renders even for `DateField`), so this always returns that nesting; a
+ * flat-prop component spreads the returned `slotProps.textField` fields onto
+ * itself too — see `DateField.tsx`.
  */
 export function usePickerField<
   TValue,
   TError extends string | null,
   TSlotProps extends { textField?: object },
+  TContext extends ChangeContext<TError> = PickerChangeHandlerContext<TError>,
 >(
   componentName: string,
   {
@@ -65,7 +93,7 @@ export function usePickerField<
     onChange,
     onError,
     slotProps,
-  }: PickerFieldProps<TValue, TError> & PickerHandlers<TValue, TError, TSlotProps>,
+  }: PickerFieldProps<TValue, TError> & PickerHandlers<TValue, TError, TSlotProps, TContext>,
 ) {
   const pickerError = useRef<TError | null>(null)
   const labelText = typeof label === 'string' ? label : undefined
@@ -95,7 +123,7 @@ export function usePickerField<
     value: (f.field.value as TValue | undefined) ?? null,
     inputRef: f.field.ref,
     disabled: mergeDisabled(disabled, f.field.disabled),
-    onChange: (value: TValue, context: PickerChangeHandlerContext<TError>) => {
+    onChange: (value: TValue, context: TContext) => {
       pickerError.current = context.validationError
       f.field.onChange(value)
       onChange?.(value, context)
