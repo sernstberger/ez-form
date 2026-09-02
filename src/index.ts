@@ -14,3 +14,4 @@ export {
   type AutocompleteProps,
   type AutocompleteFormValue,
 } from './fields/Autocomplete'
+export { Slider, type SliderProps, type SliderValue } from './fields/Slider'
