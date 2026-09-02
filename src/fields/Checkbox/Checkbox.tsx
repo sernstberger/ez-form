@@ -46,6 +46,10 @@ export function Checkbox({
       rules={{ required, validate }}
       optionalText={optionalText}
       labelAs="control"
+      // For the dev-mode "no accessible name" check only — read, not destructured, so
+      // both still reach the control through `rest`.
+      aria-label={rest['aria-label']}
+      aria-labelledby={rest['aria-labelledby']}
       renderControl={({ field, required: isRequired, inputA11y }) => (
         <MuiCheckbox
           {...rest}

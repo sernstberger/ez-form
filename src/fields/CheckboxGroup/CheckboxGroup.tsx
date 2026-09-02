@@ -5,6 +5,7 @@ import FormGroup, { type FormGroupProps } from '@mui/material/FormGroup'
 import { FieldFrame } from '../FieldFrame'
 import type { Option } from '../Option'
 import type { FieldRules } from '../../rules'
+import { warnDuplicateOptions } from '../../devWarn'
 
 type Value = Option['value']
 
@@ -45,6 +46,7 @@ export function CheckboxGroup({
   onBlur,
   ...rest
 }: CheckboxGroupProps) {
+  warnDuplicateOptions('CheckboxGroup', name, options)
   return (
     <FieldFrame<Value[]>
       componentName="CheckboxGroup"

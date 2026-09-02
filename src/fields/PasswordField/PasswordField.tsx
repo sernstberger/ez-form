@@ -22,7 +22,7 @@ const PasswordFieldToggle = styled(IconButton, { name: 'EzPasswordField', slot: 
  * Omits `type` (the binding owns it, driven by the toggle) — everything else,
  * including validation rules, comes from `TextField`.
  */
-export type PasswordFieldProps = Omit<TextFieldProps, 'type'> & {
+export type PasswordFieldProps = Omit<TextFieldProps, 'type' | 'componentName'> & {
   /** Renders the show/hide toggle. Default `true`. */
   revealable?: boolean
   /**
@@ -61,6 +61,7 @@ export function PasswordField(inProps: PasswordFieldProps) {
   return (
     <PasswordFieldRoot
       {...rest}
+      componentName="PasswordField"
       type={revealed ? 'text' : 'password'}
       autoComplete={autoComplete}
       disabled={disabled}

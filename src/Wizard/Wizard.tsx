@@ -3,6 +3,7 @@ import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import { useFormState, useWatch, type FieldValues, type Path } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
 import { useHasErrorSummary } from '../Form/ErrorSummaryContext'
+import { warnUnmountedStepFields } from '../devWarn'
 import {
   WizardContext,
   type WizardContextValue,
@@ -169,7 +170,7 @@ function WizardBody<TIn extends FieldValues>({
   layout = 'steps',
   children,
 }: WizardBodyProps<TIn>) {
-  const { trigger, control, setFocus } = useEzFormContext('Wizard')
+  const { trigger, control, setFocus, getValues } = useEzFormContext('Wizard')
   const { errors, submitCount } = useFormState({ control })
   // A mounted <FormErrorSummary> moves focus to its own heading on a failed Next; letting
   // hookform also focus the first invalid field here would fight it — same principle as
@@ -238,6 +239,10 @@ function WizardBody<TIn extends FieldValues>({
   const validateCurrent = useCallback(async () => {
     const fields = current.fields as readonly Path<TIn>[] | undefined
     if (!fields?.length) return true
+    // Dev-only. `_names` (hookform's registered-name sets) plus the current values answer
+    // "does the form know this name at all" — see `warnUnmountedStepFields` for why
+    // mount-only is the wrong question here.
+    warnUnmountedStepFields(current.id, fields as readonly string[], control._names, getValues)
     setPending(true)
     try {
       const valid = await trigger(fields as unknown as Path<FieldValues>[], {
@@ -252,7 +257,7 @@ function WizardBody<TIn extends FieldValues>({
     } finally {
       setPending(false)
     }
-  }, [current, trigger, hasErrorSummary])
+  }, [current, trigger, control, getValues, hasErrorSummary])
 
   // In `page` layout every step is already visible at once, so Next/Prev/go
   // have nothing to do — the whole schema is validated by `<SubmitButton>`
