@@ -60,24 +60,6 @@ describe('DateTimePicker', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('When must be in the past.')
   })
 
-  it('Form requiredIndicator="optional": required stays required with no label asterisk', () => {
-    const { container } = render(
-      withPickers(
-        <Form
-          schema={schema}
-          defaultValues={{ when: null }}
-          onSubmit={() => {}}
-          requiredIndicator="optional"
-        >
-          <DateTimePicker name="when" label="When" required />
-        </Form>,
-      ),
-    )
-    expect(hiddenInput('when')).toBeRequired()
-    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
-  })
-
-  it('Form requiredIndicator="optional": not-required gets the optional suffix in its label', () => {
   // QA #73: a real paste (not per-section typing) of an unparsable string is
   // what silently dropped to `null` — see DateField.test.tsx for the full
   // root cause and why `pasteAllText` (Ctrl/Cmd+A then paste, matching what a
@@ -124,15 +106,6 @@ describe('DateTimePicker', () => {
       withPickers(
         <Form
           schema={schema}
-          defaultValues={{ when: null }}
-          onSubmit={() => {}}
-          requiredIndicator="optional"
-        >
-          <DateTimePicker name="when" label="When" />
-        </Form>,
-      ),
-    )
-    expect(screen.getByRole('group', { name: 'When (optional)' })).toBeInTheDocument()
           defaultValues={{ when: new Date(2030, 5, 1, 9, 30) }}
           onSubmit={onSubmit}
         >
@@ -145,5 +118,38 @@ describe('DateTimePicker', () => {
     await user.click(screen.getByRole('button', { name: 'Go' }))
     await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ when: null }, expect.anything()))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('Form requiredIndicator="optional": required stays required with no label asterisk', () => {
+    const { container } = render(
+      withPickers(
+        <Form
+          schema={schema}
+          defaultValues={{ when: null }}
+          onSubmit={() => {}}
+          requiredIndicator="optional"
+        >
+          <DateTimePicker name="when" label="When" required />
+        </Form>,
+      ),
+    )
+    expect(hiddenInput('when')).toBeRequired()
+    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
+  })
+
+  it('Form requiredIndicator="optional": not-required gets the optional suffix in its label', () => {
+    render(
+      withPickers(
+        <Form
+          schema={schema}
+          defaultValues={{ when: null }}
+          onSubmit={() => {}}
+          requiredIndicator="optional"
+        >
+          <DateTimePicker name="when" label="When" />
+        </Form>,
+      ),
+    )
+    expect(screen.getByRole('group', { name: 'When (optional)' })).toBeInTheDocument()
   })
 })

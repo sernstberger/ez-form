@@ -58,7 +58,6 @@ interface ConsumerTextFieldSlotProps {
     inputLabel?: { required?: boolean }
   }
   onPaste?: (event: ClipboardEvent<HTMLDivElement>) => void
-  slotProps?: Record<string, unknown> & { formHelperText?: object }
 }
 
 const toRecord = <TValue>(

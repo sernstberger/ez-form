@@ -62,24 +62,6 @@ describe('TimePicker', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('At is too early.')
   })
 
-  it('Form requiredIndicator="optional": required stays required with no label asterisk', () => {
-    const { container } = render(
-      withPickers(
-        <Form
-          schema={schema}
-          defaultValues={{ at: null }}
-          onSubmit={() => {}}
-          requiredIndicator="optional"
-        >
-          <TimePicker name="at" label="At" required />
-        </Form>,
-      ),
-    )
-    expect(hiddenInput('at')).toBeRequired()
-    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
-  })
-
-  it('Form requiredIndicator="optional": not-required gets the optional suffix in its label', () => {
   // QA #73 (noted "not in scope" as unconfirmed for TimePicker specifically,
   // shares `usePickerField` with the other three): a real paste (not
   // per-section typing) of an unparsable string is what silently dropped to
@@ -130,15 +112,6 @@ describe('TimePicker', () => {
       withPickers(
         <Form
           schema={schema}
-          defaultValues={{ at: null }}
-          onSubmit={() => {}}
-          requiredIndicator="optional"
-        >
-          <TimePicker name="at" label="At" />
-        </Form>,
-      ),
-    )
-    expect(screen.getByRole('group', { name: 'At (optional)' })).toBeInTheDocument()
           defaultValues={{ at: new Date(2030, 5, 1, 9, 30) }}
           onSubmit={onSubmit}
         >
@@ -151,5 +124,38 @@ describe('TimePicker', () => {
     await user.click(screen.getByRole('button', { name: 'Go' }))
     await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ at: null }, expect.anything()))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('Form requiredIndicator="optional": required stays required with no label asterisk', () => {
+    const { container } = render(
+      withPickers(
+        <Form
+          schema={schema}
+          defaultValues={{ at: null }}
+          onSubmit={() => {}}
+          requiredIndicator="optional"
+        >
+          <TimePicker name="at" label="At" required />
+        </Form>,
+      ),
+    )
+    expect(hiddenInput('at')).toBeRequired()
+    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
+  })
+
+  it('Form requiredIndicator="optional": not-required gets the optional suffix in its label', () => {
+    render(
+      withPickers(
+        <Form
+          schema={schema}
+          defaultValues={{ at: null }}
+          onSubmit={() => {}}
+          requiredIndicator="optional"
+        >
+          <TimePicker name="at" label="At" />
+        </Form>,
+      ),
+    )
+    expect(screen.getByRole('group', { name: 'At (optional)' })).toBeInTheDocument()
   })
 })
