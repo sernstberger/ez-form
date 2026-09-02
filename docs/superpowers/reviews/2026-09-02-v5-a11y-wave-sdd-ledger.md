@@ -59,6 +59,15 @@ delete-icon a11y.
 - Docs-only or review-only ⚠️ items (jest-axe coverage via `describeFieldContract`, `useConfirm`/`ClearButton` sharing `ConfirmDialog`) resolved by controller inspection rather than a fix round.
 - Strict mode = React StrictMode + console-noise-fails-tests + stricter tsc + ESLint type-checked + builds fail on warnings; test timeouts the strict lane added were removed (standing rule), `stripInternal`/`exactOptionalPropertyTypes` rejected with evidence, `typescript` aliased to TS 6 for ESLint/docgen/dts while `tsc` runs TS 7 (documented) — cost if wrong: a rule relaxed with a comment.
 
+## Final whole-wave review
+
+Cross-task integration review on `main` (exports vs README vs augmentation, shared-helper convergence, live-region seams, StrictMode effects, story dev-warnings): one Critical (README Components table duplicated by union merges with a header mid-table) and three Important (duplicate `## US fields`/`## PasswordStrength` with the `formatTemplate` docs orphaned; a second copy of the email regex in `EmailField`; `ZipField`/`StateSelect` defaults not theme-reachable). One fix wave, one scoped re-review, clean. The guardrail script now fails on duplicate Components rows, duplicate README headings and a header row spliced mid-table, and was regression-proven against the broken README. Follow-ups from the triage: #90 (Autocomplete chips), #91 (`react-hooks/refs`), #92 (callback-form `slotProps.htmlInput` ref), #93 (FieldArray announcement closure), #94 (SignUp `LiveRegion`), #95 (Storybook chunk limit).
+
+- Ruling: keep the complete `PasswordStrength` section and delete the orphan copy — the review's line range named the wrong one — cost if wrong: none, content-checked.
+- Ruling: `EzZipField`/`EzStateSelect` register `defaultProps` only, no class key — no styled slot, same as `EzEmailField`/`EzFeinField` — cost if wrong: add a key when a slot appears.
+
+Final state: main at the merge of `fix/v5-final-review`; seven gates green (lint, typecheck, 1425 tests, scripts, guardrails, build, build-storybook with zero warn lines); pushed.
+
 ## Incidents (controller and lanes)
 
 1. **Shared git stash across worktrees**: three lanes used `git stash`; pops landed in the wrong worktree twice and one lane's WIP was dropped and recovered from a dangling commit. Nothing was lost. The implementer contract now forbids `git stash`; obsolete stashes were dropped once their branches merged.

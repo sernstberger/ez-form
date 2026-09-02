@@ -128,3 +128,5 @@ A ruling is a judgement call recorded during implementation: `Ruling: <what> —
 - Meta-level Storybook `docs.description.component` is the right home for a component-wide usage rule — cost if wrong: move two blocks.
 - Docs-only or review-only ⚠️ items (jest-axe coverage via `describeFieldContract`, `useConfirm`/`ClearButton` sharing `ConfirmDialog`) resolved by controller inspection rather than a fix round.
 - Strict mode = React StrictMode + console-noise-fails-tests + stricter tsc + ESLint type-checked + builds fail on warnings; no test timeouts; TS 6 alias for the compiler-API tools while `tsc` runs TS 7 — cost if wrong: a rule relaxed with a comment.
+- Keep the complete `PasswordStrength` README section, delete the orphan copy (final-review fix) — cost if wrong: none.
+- `EzZipField`/`EzStateSelect` register `defaultProps` only, no class key — no styled slot — cost if wrong: add a key when a slot appears.
