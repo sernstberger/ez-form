@@ -84,6 +84,57 @@ describe('ClearButton', () => {
     await waitFor(() => expect(name).toHaveValue('Ada'))
   })
 
+  it('confirm: onClick does not fire when Cancelled (#75)', async () => {
+    const user = userEvent.setup()
+    const onClick = vi.fn()
+    render(
+      <Form schema={schema} defaultValues={defaults} onSubmit={() => {}}>
+        <Fields />
+        <ClearButton confirm onClick={onClick} />
+      </Form>,
+    )
+    const name = screen.getByRole('textbox', { name: 'Name' })
+    await user.type(name, 'm')
+    await user.click(screen.getByRole('button', { name: 'Clear' }))
+    await screen.findByRole('alertdialog', { name: 'Discard changes?' })
+    expect(onClick).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+    expect(name).toHaveValue('Adam')
+    expect(onClick).not.toHaveBeenCalled()
+  })
+
+  it('confirm: onClick fires once, after reset, when Confirmed (#75)', async () => {
+    const user = userEvent.setup()
+    const onClick = vi.fn()
+    render(
+      <Form schema={schema} defaultValues={defaults} onSubmit={() => {}}>
+        <Fields />
+        <ClearButton confirm onClick={onClick} />
+      </Form>,
+    )
+    const name = screen.getByRole('textbox', { name: 'Name' })
+    await user.type(name, 'm')
+    await user.click(screen.getByRole('button', { name: 'Clear' }))
+    await user.click(await screen.findByRole('button', { name: 'Confirm' }))
+    await waitFor(() => expect(name).toHaveValue('Ada'))
+    expect(onClick).toHaveBeenCalledTimes(1)
+  })
+
+  it('without confirm, onClick still fires on click (nothing to gate on)', async () => {
+    const user = userEvent.setup()
+    const onClick = vi.fn()
+    render(
+      <Form schema={schema} defaultValues={defaults} onSubmit={() => {}}>
+        <Fields />
+        <ClearButton onClick={onClick} />
+      </Form>,
+    )
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'm')
+    await user.click(screen.getByRole('button', { name: 'Clear' }))
+    expect(onClick).toHaveBeenCalledTimes(1)
+  })
+
   it('is disabled while the form is disabled, even when dirty', async () => {
     const user = userEvent.setup()
     const { rerender } = render(

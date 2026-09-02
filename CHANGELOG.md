@@ -144,6 +144,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `Form`: `guard`'s `beforeunload` warning no longer re-arms after a successful submit.
+  `isDirty` stays `true` after a submit unless the form is explicitly `reset()`, so the
+  guard effect now also checks `isSubmitSuccessful` before arming — the same
+  `isDirty && !isSubmitting && !isSubmitSuccessful` formula `useFormGuard` already used,
+  now shared as `shouldBlockUnsavedChanges` so the two guards can't drift apart. A later
+  `reset()` (the common submit-then-reset pattern) clears `isSubmitSuccessful` again, so
+  editing after that still re-arms the guard — #74.
+- `ClearButton`: the consumer's `onClick` no longer fires when `confirm` is set and the
+  dialog is Cancelled. It now runs only after the confirm gate passes, right after
+  `reset()`, matching `Form`'s `confirm`/`onSubmit` contract (`onSubmit` never runs on a
+  cancelled confirm either); without `confirm` there is nothing to gate on, so `onClick`
+  still fires immediately on click, same as a plain `Button` — documented on the prop — #75.
 - `Form`: a `setError` called synchronously inside `onDefaultValuesError` (for example
   `ref.current?.setError('root.server', …)`) no longer gets wiped by hookform's own
   post-rejection `reset({})`. `onDefaultValuesError` now runs after that reset has

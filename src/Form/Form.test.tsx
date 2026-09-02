@@ -488,6 +488,75 @@ describe('useEzFormContext', () => {
       )
       unmount()
     })
+
+    it('disarms after a successful submit, even though isDirty stays true (#74)', async () => {
+      const user = userEvent.setup()
+      const add = addSpy()
+      const remove = removeSpy()
+      render(
+        <Form schema={schema} defaultValues={{ email: 'a@b.co' }} onSubmit={() => {}} guard>
+          <TextField name="email" label="Email" />
+          <SubmitButton />
+        </Form>,
+      )
+      await user.type(screen.getByRole('textbox', { name: 'Email' }), 'm')
+      await waitFor(() => expect(beforeunloadCalls(add)).toHaveLength(1))
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      // Net armed state: adds minus removes for 'beforeunload' should settle back to 0 —
+      // the guard must not re-arm once isSubmitSuccessful is true, even though isDirty
+      // stays true (hookform never clears isDirty except on an explicit reset()).
+      await waitFor(() => {
+        const netArmed = beforeunloadCalls(add).length - beforeunloadCalls(remove).length
+        expect(netArmed).toBe(0)
+      })
+      // A dispatched beforeunload must not be prevented while disarmed.
+      const event = new Event('beforeunload', { cancelable: true })
+      window.dispatchEvent(event)
+      expect(event.defaultPrevented).toBe(false)
+    })
+
+    it('re-arms once the form is reset and dirtied again after a successful submit (#74)', async () => {
+      // Verified directly against react-hook-form: a plain edit after a successful submit
+      // does NOT clear isSubmitSuccessful (only the next handleSubmit call or an explicit
+      // reset() does) — isDirty was already true and stays true, so typing more produces
+      // no change either guard can observe; this matches useFormGuard's own long-accepted
+      // isSubmitSuccessful semantics (see its "stops blocking after a successful submit"
+      // test), which has no re-arm-on-plain-edit case either. The real re-arm path is the
+      // common submit-then-reset pattern: onSubmit resolves, the consumer resets the form
+      // (often to fresh values, from outside handleSubmit's own microtask chain — a
+      // reset() called synchronously inside onSubmit itself is clobbered by hookform's own
+      // post-submit state patch, a hookform ordering quirk, not an ez-form one), clearing
+      // both isDirty and isSubmitSuccessful, and only then does a later edit genuinely
+      // re-dirty and re-arm the guard.
+      const user = userEvent.setup()
+      const add = addSpy()
+      const remove = removeSpy()
+      render(
+        <Form
+          schema={schema}
+          defaultValues={{ email: 'a@b.co' }}
+          onSubmit={(_values, form) => {
+            setTimeout(() => form.reset({ email: 'a@b.co' }), 0)
+          }}
+          guard
+        >
+          <TextField name="email" label="Email" />
+          <SubmitButton />
+        </Form>,
+      )
+      await user.type(screen.getByRole('textbox', { name: 'Email' }), 'm')
+      await waitFor(() => expect(beforeunloadCalls(add)).toHaveLength(1))
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      await waitFor(() => {
+        const netArmed = beforeunloadCalls(add).length - beforeunloadCalls(remove).length
+        expect(netArmed).toBe(0)
+      })
+      await user.type(screen.getByRole('textbox', { name: 'Email' }), 'z')
+      await waitFor(() => {
+        const netArmed = beforeunloadCalls(add).length - beforeunloadCalls(remove).length
+        expect(netArmed).toBe(1)
+      })
+    })
   })
 })
 

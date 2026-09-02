@@ -31,6 +31,7 @@ import { ezResolver } from './ezResolver'
 import { useConfirm, type ConfirmOptions } from '../ConfirmDialog'
 import { ErrorSummaryContext } from './ErrorSummaryContext'
 import { RequiredIndicatorContext } from './RequiredIndicatorContext'
+import { shouldBlockUnsavedChanges } from '../useFormGuard'
 
 /**
  * The hookform methods for this form. It is the same object `useFormContext()`
@@ -279,7 +280,9 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
     // first-invalid-field focus, so both it and the summary heading would compete for focus.
     shouldFocusError: errorSummaryCount === 0,
   })
-  const { isLoading, isDirty, isSubmitting } = useFormState({ control: methods.control })
+  const { isLoading, isDirty, isSubmitting, isSubmitSuccessful } = useFormState({
+    control: methods.control,
+  })
   // Ruling: read methods.formState.errors here, unused — #70. hookform only re-renders a
   // form-wide (non-per-field) error like 'root.server' if some *root* consumer has read
   // formState.errors at least once: getProxyFormState's getter marks control._proxyFormState
@@ -306,14 +309,22 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
   const confirmOptions: ConfirmOptions | undefined =
     confirm === true ? { title: 'Submit?' } : confirm
 
+  // Ruling: share shouldBlockUnsavedChanges with useFormGuard rather than repeating
+  // the isDirty/isSubmitting/isSubmitSuccessful formula inline — #74. isDirty stays
+  // true after a successful submit (hookform only clears it on an explicit reset()),
+  // so without isSubmitSuccessful this effect re-armed the listener the instant
+  // isSubmitting flipped back to false post-submit, warning on unload for changes
+  // that were, in fact, just saved. Cost if wrong: the beforeunload prompt fires
+  // after every successful submit until the next edit, and a future edit to one
+  // guard's predicate silently drifts from the other's.
   useEffect(() => {
-    if (!guard || !isDirty || isSubmitting) return
+    if (!guard || !shouldBlockUnsavedChanges({ isDirty, isSubmitting, isSubmitSuccessful })) return
     const handler = (event: BeforeUnloadEvent) => {
       event.preventDefault()
     }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
-  }, [guard, isDirty, isSubmitting])
+  }, [guard, isDirty, isSubmitting, isSubmitSuccessful])
 
   const submit = methods.handleSubmit(async (submitted) => {
     setSubmitting(true)
