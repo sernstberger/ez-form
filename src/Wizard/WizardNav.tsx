@@ -16,6 +16,11 @@ export interface WizardNavProps extends StackProps {
   nextLabel?: ReactNode
   /** Default `Submit` (SubmitButton's default). */
   submitLabel?: ReactNode
+  /**
+   * DOM order of the two buttons, not just their visual order — tab order
+   * follows. Default `'back-next'`.
+   */
+  actionsOrder?: 'back-next' | 'next-back'
   slotProps?: {
     prev?: ButtonProps
     next?: ButtonProps
@@ -51,6 +56,7 @@ export function WizardNav(inProps: WizardNavProps) {
     prevLabel = 'Back',
     nextLabel = 'Next',
     submitLabel,
+    actionsOrder = 'back-next',
     slotProps,
     direction = 'row',
     spacing = 1,
@@ -62,6 +68,39 @@ export function WizardNav(inProps: WizardNavProps) {
   if (layout === 'page') return null
   const prevProps = { variant: 'text', ...slotProps?.prev } as const
   const nextProps = { variant: 'contained', ...slotProps?.next } as const
+  const prevButton = (
+    <WizardNavPrev
+      key="prev"
+      type="button"
+      onClick={prev}
+      {...prevProps}
+      className={`${wizardNavClasses.prev}${prevProps.className ? ` ${prevProps.className}` : ''}`}
+      disabled={isFirst || mergeDisabled(prevProps.disabled, formDisabled)}
+    >
+      {prevLabel}
+    </WizardNavPrev>
+  )
+  const nextButton = isLast ? (
+    <WizardNavSubmit
+      key="next"
+      {...slotProps?.submit}
+      className={`${wizardNavClasses.submit}${slotProps?.submit?.className ? ` ${slotProps.submit.className}` : ''}`}
+    >
+      {submitLabel ?? slotProps?.submit?.children}
+    </WizardNavSubmit>
+  ) : (
+    <WizardNavNext
+      key="next"
+      type="button"
+      onClick={() => void next()}
+      loading={pending}
+      {...nextProps}
+      className={`${wizardNavClasses.next}${nextProps.className ? ` ${nextProps.className}` : ''}`}
+      disabled={mergeDisabled(nextProps.disabled, formDisabled)}
+    >
+      {nextLabel}
+    </WizardNavNext>
+  )
   return (
     <WizardNavRoot
       direction={direction}
@@ -69,34 +108,7 @@ export function WizardNav(inProps: WizardNavProps) {
       className={`${wizardNavClasses.root}${className ? ` ${className}` : ''}`}
       {...rest}
     >
-      <WizardNavPrev
-        type="button"
-        onClick={prev}
-        {...prevProps}
-        className={`${wizardNavClasses.prev}${prevProps.className ? ` ${prevProps.className}` : ''}`}
-        disabled={isFirst || mergeDisabled(prevProps.disabled, formDisabled)}
-      >
-        {prevLabel}
-      </WizardNavPrev>
-      {isLast ? (
-        <WizardNavSubmit
-          {...slotProps?.submit}
-          className={`${wizardNavClasses.submit}${slotProps?.submit?.className ? ` ${slotProps.submit.className}` : ''}`}
-        >
-          {submitLabel ?? slotProps?.submit?.children}
-        </WizardNavSubmit>
-      ) : (
-        <WizardNavNext
-          type="button"
-          onClick={() => void next()}
-          loading={pending}
-          {...nextProps}
-          className={`${wizardNavClasses.next}${nextProps.className ? ` ${nextProps.className}` : ''}`}
-          disabled={mergeDisabled(nextProps.disabled, formDisabled)}
-        >
-          {nextLabel}
-        </WizardNavNext>
-      )}
+      {actionsOrder === 'next-back' ? [nextButton, prevButton] : [prevButton, nextButton]}
     </WizardNavRoot>
   )
 }

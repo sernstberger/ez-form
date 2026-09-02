@@ -392,6 +392,27 @@ describe('useEzFormContext', () => {
       expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled()
     })
 
+    it('a theme-level EzConfirmDialog.defaultProps.actionsOrder reaches the Form confirm dialog', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      const theme = createTheme({
+        components: {
+          EzConfirmDialog: { defaultProps: { actionsOrder: 'confirm-cancel' } },
+        },
+      })
+      render(
+        <ThemeProvider theme={theme}>
+          <Form schema={schema} defaultValues={{ email: 'a@b.co' }} onSubmit={onSubmit} confirm>
+            <SubmitButton />
+          </Form>
+        </ThemeProvider>,
+      )
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      expect(await screen.findByRole('alertdialog', { name: 'Submit?' })).toBeInTheDocument()
+      const buttons = screen.getAllByRole('button', { name: /Confirm|Cancel/ })
+      expect(buttons.map((b) => b.textContent)).toEqual(['Confirm', 'Cancel'])
+    })
+
     it('Enter in a field and form.requestSubmit() both go through the dialog', async () => {
       const user = userEvent.setup()
       const onSubmit = vi.fn()

@@ -32,6 +32,12 @@ export interface ConfirmDialogProps
   onConfirm: () => void
   /** Also called for Escape and backdrop click. */
   onCancel: () => void
+  /**
+   * DOM order of the two buttons, not just their visual order — tab order
+   * follows. Default `'cancel-confirm'` (Material). Cancel keeps `autoFocus`
+   * regardless of order.
+   */
+  actionsOrder?: 'cancel-confirm' | 'confirm-cancel'
   /** Dialog's own slots (root, backdrop, container, transition, paper), plus the Confirm / Cancel buttons. */
   slotProps?: DialogProps['slotProps'] & {
     confirm?: ButtonProps
@@ -62,6 +68,7 @@ export function ConfirmDialog(inProps: ConfirmDialogProps) {
     confirmColor,
     onConfirm,
     onCancel,
+    actionsOrder = 'cancel-confirm',
     className,
     slotProps,
     ...rest
@@ -71,6 +78,27 @@ export function ConfirmDialog(inProps: ConfirmDialogProps) {
   const { confirm: confirmSlot, cancel: cancelSlot, ...dialogSlotProps } = slotProps ?? {}
   const confirmProps = { variant: 'contained' as const, color: confirmColor, ...confirmSlot }
   const cancelProps = { ...cancelSlot }
+  const cancelButton = (
+    <ConfirmDialogCancel
+      key="cancel"
+      onClick={onCancel}
+      autoFocus
+      className={confirmDialogClasses.cancel}
+      {...cancelProps}
+    >
+      {cancelLabel}
+    </ConfirmDialogCancel>
+  )
+  const confirmButton = (
+    <ConfirmDialogConfirm
+      key="confirm"
+      onClick={onConfirm}
+      className={confirmDialogClasses.confirm}
+      {...confirmProps}
+    >
+      {confirmLabel}
+    </ConfirmDialogConfirm>
+  )
   return (
     <ConfirmDialogRoot
       {...rest}
@@ -89,21 +117,9 @@ export function ConfirmDialog(inProps: ConfirmDialogProps) {
         </DialogContent>
       )}
       <DialogActions>
-        <ConfirmDialogCancel
-          onClick={onCancel}
-          autoFocus
-          className={confirmDialogClasses.cancel}
-          {...cancelProps}
-        >
-          {cancelLabel}
-        </ConfirmDialogCancel>
-        <ConfirmDialogConfirm
-          onClick={onConfirm}
-          className={confirmDialogClasses.confirm}
-          {...confirmProps}
-        >
-          {confirmLabel}
-        </ConfirmDialogConfirm>
+        {actionsOrder === 'confirm-cancel'
+          ? [confirmButton, cancelButton]
+          : [cancelButton, confirmButton]}
       </DialogActions>
     </ConfirmDialogRoot>
   )

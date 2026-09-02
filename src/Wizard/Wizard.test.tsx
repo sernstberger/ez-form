@@ -1579,4 +1579,73 @@ describe('WizardNav', () => {
     )
     expect(screen.getByRole('button', { name: 'Next' })).toHaveClass('MuiButton-outlined')
   })
+
+  it('defaults actionsOrder to back-next: Back is first in the DOM', () => {
+    render(
+      <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+        <Wizard steps={steps}>
+          <WizardNav />
+        </Wizard>
+      </Form>,
+    )
+    const buttons = screen.getAllByRole('button')
+    expect(buttons.map((b) => b.textContent)).toEqual(['Back', 'Next'])
+  })
+
+  it('actionsOrder="next-back" puts Next first in the DOM, including on the last step\'s Submit', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+        <Wizard steps={steps}>
+          <WizardStep id="account">
+            <TextField name="name" label="Name" />
+          </WizardStep>
+          <WizardStep id="plan">
+            <TextField name="plan" label="Plan" />
+          </WizardStep>
+          <WizardStep id="review">
+            <p>Review</p>
+          </WizardStep>
+          <WizardNav actionsOrder="next-back" />
+        </Wizard>
+      </Form>,
+    )
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Next', 'Back'])
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Plan' })).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => expect(screen.getByRole('group', { name: 'Review' })).toBeInTheDocument())
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Submit', 'Back'])
+  })
+
+  it('is themeable: defaultProps.actionsOrder applies globally', () => {
+    const theme = createTheme({
+      components: {
+        EzWizardNav: {
+          defaultProps: { actionsOrder: 'next-back' },
+        },
+      },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+          <Wizard steps={steps}>
+            <WizardNav />
+          </Wizard>
+        </Form>
+      </ThemeProvider>,
+    )
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Next', 'Back'])
+  })
+
+  it('has no accessibility violations with actionsOrder="next-back"', async () => {
+    const { container } = render(
+      <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+        <Wizard steps={steps}>
+          <WizardNav actionsOrder="next-back" />
+        </Wizard>
+      </Form>,
+    )
+    await expectNoA11yViolations(container)
+  })
 })
