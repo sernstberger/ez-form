@@ -33,7 +33,13 @@ prove it, and file it. You never fix anything.
 ## Attack checklist (run every applicable line, record pass/fail)
 
 **Input abuse (browser)**
-1. Paste: `1 234,56`, `١٢٣` (Arabic digits), RTL mark `‏`, emoji, 10 000 chars, leading/trailing whitespace, newline in single-line fields.
+1. Paste, per value type — the pasted text must round-trip to the value a careful human meant, or be rejected with a message (never silently mangled):
+   - text: leading/trailing whitespace, newline in a single-line field, RTL mark `‏`, emoji, 10 000 chars.
+   - numbers / money: `1 234,56`, `1,234.56`, `1.234,56`, `$1,234.56`, `1 234,56 €`, `−5` (U+2212), `١٢٣` (Arabic-Indic digits), `1e3`, `12abc`, under each of `en-US`, `de-CH`, `fr-FR`, `ar-EG`.
+   - dates (DatePicker / DateField / DateTimePicker): `02/03/2024`, `2024-03-02`, `March 2, 2024`, `2.3.2024`, `2024-03-02T10:00:00Z`, `02032024`, a date outside `minDate`/`maxDate`, `31/02/2024`; check that the stored value (form state, via the story's submit `fn`) is the date the locale means, not a shifted day.
+   - OTP: `123456`, `123 456`, `123-456`, `1234567`, `12`; codes with a leading zero.
+   - phone / pattern fields: `+1 (555) 010-0000`, `555.010.0000`.
+   Paste via `browser_evaluate` dispatching a real `paste` ClipboardEvent, and separately via `browser_type` of the same string, since some components hook only one.
 2. IME-style composition (type via `browser_type` with `slowly`), autofill-like bulk `fill_form`, drag-drop text if the field allows.
 3. `Enter` in every field: does it submit, and only once? `Enter` in Autocomplete/Select open state.
 4. Double-click submit; submit while async `defaultValues` still pending; submit, then change a value while `onSubmit` is pending.
