@@ -9,6 +9,7 @@ export { SubmitButton, submitButtonClasses, type SubmitButtonProps } from './Sub
 export { TextField, type TextFieldProps } from './fields/TextField'
 export { Select, type SelectProps, type SelectOption } from './fields/Select'
 export type { Option } from './fields/Option'
+export { StateSelect, type StateSelectProps, US_STATES, US_TERRITORIES } from './fields/StateSelect'
 export { Checkbox, type CheckboxProps } from './fields/Checkbox'
 export { Switch, type SwitchProps } from './fields/Switch'
 export { RadioGroup, type RadioGroupProps } from './fields/RadioGroup'

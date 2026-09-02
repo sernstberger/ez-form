@@ -710,6 +710,15 @@ const schema = z.object({ zip: z.string().min(1) })
 <StateSelect name="state" label="State or territory" territories />
 ```
 
+**Mobile keyboards & autofill**: each field sets sensible defaults, always overridable by your own `autoComplete` prop:
+
+| Field         | `inputMode` | `autoComplete` default |
+| ------------- | ----------- | ---------------------- |
+| `ZipField`    | `numeric`   | `postal-code`          |
+| `StateSelect` | —           | `address-level1`       |
+
+`inputMode="numeric"` on `ZipField` brings up the numeric keypad on mobile without changing the underlying `type` (still `text`, so a leading zero like `02134` is never dropped). `StateSelect`'s `autoComplete` reaches the hidden native `<input>` MUI's `Select` renders for autofill via `slotProps.htmlInput` — the same slot a plain `TextField` uses (MUI 9 has no `SelectProps`/native `inputProps` shortcut for this).
+
 ## Develop
 
 ```bash
