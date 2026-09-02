@@ -112,6 +112,59 @@ describe('Form', () => {
     expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled()
   })
 
+  it('re-enables the form and reports the error when async defaultValues rejects', async () => {
+    let reject!: (error: unknown) => void
+    const load = vi.fn(() => new Promise<{ email: string }>((_r, j) => (reject = j)))
+    const onDefaultValuesError = vi.fn()
+    render(
+      <Form
+        schema={schema}
+        defaultValues={load}
+        onSubmit={() => {}}
+        onDefaultValuesError={onDefaultValuesError}
+      >
+        <TextField name="email" label="Email" />
+        <SubmitButton />
+      </Form>,
+    )
+    expect(screen.getByLabelText('Email')).toBeDisabled()
+    const boom = new Error('boom')
+    reject(boom)
+    await waitFor(() => expect(screen.getByLabelText('Email')).toBeEnabled())
+    expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled()
+    expect(screen.getByLabelText('Email')).toHaveValue('')
+    expect(onDefaultValuesError).toHaveBeenCalledExactlyOnceWith(boom)
+  })
+
+  it('re-enables the form and rethrows when async defaultValues rejects without a handler', async () => {
+    // hookform's internal `_resetDefaultValues` never attaches a `.catch` to the
+    // promise our wrapped defaultValues returns, so a rejection with no
+    // `onDefaultValuesError` genuinely becomes an unhandled rejection (the current
+    // JS norm for an unobserved rejected promise). Observe it the same way a test
+    // runner does, and stop it from failing this run once captured.
+    const unhandled: unknown[] = []
+    const onUnhandledRejection = (error: unknown) => unhandled.push(error)
+    process.on('unhandledRejection', onUnhandledRejection)
+    try {
+      let reject!: (error: unknown) => void
+      const load = () => new Promise<{ email: string }>((_r, j) => (reject = j))
+      render(
+        <Form schema={schema} defaultValues={load} onSubmit={() => {}}>
+          <TextField name="email" label="Email" />
+          <SubmitButton />
+        </Form>,
+      )
+      expect(screen.getByLabelText('Email')).toBeDisabled()
+      const boom = new Error('boom')
+      reject(boom)
+      await waitFor(() => expect(screen.getByLabelText('Email')).toBeEnabled())
+      expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled()
+      await waitFor(() => expect(unhandled).toEqual([boom]))
+    } finally {
+      process.off('unhandledRejection', onUnhandledRejection)
+    }
+  })
+
   it('re-syncs the fields when values changes', async () => {
     const view = render(
       <Form schema={schema} values={{ email: 'a@b.co' }} onSubmit={() => {}}>

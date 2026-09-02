@@ -48,6 +48,13 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
   values?: NoInfer<TIn>
   /** What a reset caused by `values` or async `defaultValues` keeps (dirty values, errors, …). */
   resetOptions?: KeepStateOptions
+  /**
+   * Called when the async `defaultValues` function rejects. The form
+   * re-enables with its fields empty (no defaults were applied). If omitted,
+   * the rejection is rethrown so it surfaces as an unhandled rejection; the
+   * form still re-enables either way.
+   */
+  onDefaultValuesError?: (error: unknown) => void
   /** The form methods, for `reset` / `setValue` / `setError` from a parent. */
   ref?: Ref<FormMethods<TIn, TOut>>
   mode?: Mode
@@ -81,6 +88,7 @@ export function Form<TIn extends FieldValues, TOut>({
   defaultValues,
   values,
   resetOptions,
+  onDefaultValuesError,
   ref,
   mode = 'onSubmit',
   disabled = false,
@@ -97,9 +105,25 @@ export function Form<TIn extends FieldValues, TOut>({
   // hookform reports async defaults through formState.isLoading; it starts true
   // when defaultValues is a function, so the form is disabled from the first render.
   const [loading, setLoading] = useState(typeof defaultValues === 'function')
+  // hookform's internal _resetDefaultValues() calls defaultValues().then(...) with no
+  // .catch, so isLoading (and this form's `loading`) never clears on rejection. Wrap it
+  // so a rejection still clears `loading`, then either report it or rethrow so it
+  // surfaces as an unhandled rejection (current JS norm) — either way the form re-enables.
+  const wrappedDefaultValues =
+    typeof defaultValues === 'function'
+      ? () =>
+          defaultValues().catch((error: unknown) => {
+            setLoading(false)
+            if (onDefaultValuesError) {
+              onDefaultValuesError(error)
+              return {} as NoInfer<TIn>
+            }
+            throw error
+          })
+      : defaultValues
   const methods = useForm<TIn, unknown, TOut>({
     resolver: ezResolver(schema),
-    defaultValues,
+    defaultValues: wrappedDefaultValues,
     values,
     resetOptions,
     mode,
