@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { Form, type FormMethods } from '../../Form'
 import { DatePicker } from './DatePicker'
 import { describeFieldContract } from '../../test/describeFieldContract'
-import { withPickers, pasteAllText } from '../../test/pickers'
+import { withPickers, pasteAllText, clearButton } from '../../test/pickers'
 
 const schema = z.object({ start: z.date().nullable() })
 
@@ -303,5 +303,60 @@ describe('DatePicker', () => {
       ),
     )
     expect(screen.getByRole('group', { name: 'Start (optional)' })).toBeInTheDocument()
+  })
+
+  // #83 — see DateField.test.tsx for the full root cause. On a popup picker
+  // `clearable`/`onClear` are typed onto `slotProps.field` (MUI X's
+  // `BaseSingleInputPickersTextFieldProps` explicitly `Omit`s both from
+  // `slotProps.textField`), and MUI X funnels that slot's props through
+  // `useFieldTextFieldProps`, which merges `slotProps.textField` in — so the `onClear`
+  // `usePickerField` puts under `textField` reaches `useField` on this path too.
+  it('clearable: clearing after an unparsable paste drops the invalid-date error', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ start: null }} onSubmit={onSubmit}>
+          <DatePicker name="start" label="Start" slotProps={{ field: { clearable: true } }} />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    const root = screen.getByRole('group', { name: 'Start' })
+    await pasteAllText(root, 'March 2, 2024')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Start is invalid.')
+    expect(onSubmit).not.toHaveBeenCalled()
+
+    await user.click(root)
+    await user.keyboard('05')
+    await user.click(clearButton(root))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(root).toHaveAttribute('aria-invalid', 'false')
+
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    await vi.waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith({ start: null }, expect.anything()),
+    )
+  })
+
+  it("clearable: a consumer's own onClear still runs", async () => {
+    const user = userEvent.setup()
+    const onClear = vi.fn()
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ start: new Date(2030, 5, 1) }} onSubmit={() => {}}>
+          <DatePicker
+            name="start"
+            label="Start"
+            slotProps={{ field: { clearable: true, onClear } }}
+          />
+        </Form>,
+      ),
+    )
+    const root = screen.getByRole('group', { name: 'Start' })
+    await user.click(clearButton(root))
+    expect(onClear).toHaveBeenCalledTimes(1)
+    expect(hiddenInput('start')).toHaveValue('')
   })
 })

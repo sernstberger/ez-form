@@ -78,6 +78,8 @@ pnpm add ez-form @mui/material @mui/icons-material @mui/x-date-pickers @emotion/
 
 Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >= 5.4 (the types use `NoInfer`).
 
+React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form methods) and `<FormSection ref>` (the `<fieldset>`) are populated the same way on either major.
+
 ## Components
 
 | Component                                      | Wraps                                         | Extra props                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -94,13 +96,15 @@ Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >
 | `Autocomplete`                                 | MUI `Autocomplete`                            | `name`, `options`, `getOptionValue?` (default `o => o.value`; return `o` to store objects), `multiple`, `freeSolo`, `textFieldProps?`; all TextField rules. Options may carry extra fields (they reach `onChange`)                                                                                                                                                                                                                                                               |
 | `NumberField`                                  | Base UI `NumberField` through MUI `TextField` | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max` (also the stepper bounds), `validate`. Value is `number \| null`; digits group while typing (new in v2.1), and `format={{ useGrouping: false }}` turns that off                                                                                                                                                                                                                                         |
 | `MoneyField`                                   | `NumberField` pinned to USD                   | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max`, `validate`. Value is a `number` in dollars, rounded to the cent; shows `$1,234.50` on blur                                                                                                                                                                                                                                                                                                             |
+| `ZipField`                                     | `TextField`                                   | `name`; same rules as TextField, plus a built-in "5 digits" rule (`invalidMessage?`, default `'Enter a 5-digit ZIP code'`). Digits only, capped at 5 (anything else is stripped on type/paste); `inputMode="numeric"`, `autoComplete` defaults to `'postal-code'`. Value is the digit string                                                                                                                                                                                     |
+| `StateSelect`                                  | `Select`                                      | `name`; same rules as Select. Options are the 50 states + DC by default; `territories?` adds PR, GU, VI, AS, MP. `autoComplete` defaults to `'address-level1'`. Value is the USPS abbreviation; also exports `US_STATES`/`US_TERRITORIES` option arrays                                                                                                                                                                                                                          |
 | `DatePicker` / `TimePicker` / `DateTimePicker` | MUI X pickers                                 | `name`, `label?`, `helperText?`, `errorMessages?`; rules `required`, `validate`. The picker's own props (`minDate`, `disablePast`, `views`, …) pass through. Value is the adapter's date type or `null`                                                                                                                                                                                                                                                                          |
 | `OtpField`                                     | Base UI `OTPField` in MUI's outlined style    | `name`, `label?`, `helperText?`, `length?` (6), `mask?`, `validationType?`, `size?`; rules `required`, `validate`. Value is the code string; a partial code fails with `<label> must be <length> characters.`                                                                                                                                                                                                                                                                    |
 | `FileField`                                    | MUI `Button` + hidden `<input type="file">`   | `name`, `label` (button text), `accept?`, `multiple?`, `buttonProps?`, `helperText?`; rules `required`, `validate`. Value is `File \| null`, or `File[]` under `multiple`. `onChange(event, value)` fires on a pick and on a chip delete                                                                                                                                                                                                                                         |
 | `Checkbox`                                     | MUI `Checkbox`                                | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `Switch`                                       | MUI `Switch`                                  | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `SubmitButton`                                 | MUI `Button`                                  | `loading` while submitting, disabled while the form is                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `Form` (v4 additions)                          | —                                             | `confirm?: true \| ConfirmOptions` asks after validation on every submit path; `guard?: boolean` warns on tab close while dirty                                                                                                                                                                                                                                                                                                                                                  |
+| `Form` (v4 additions)                          | —                                             | `confirm?: true \| ConfirmOptions` asks after validation on every submit path; `guard?: boolean` warns on tab close while dirty; `submitPendingText?`/`submitSuccessText?`/`submitErrorText?` are the submit announcements (`false` suppresses one)                                                                                                                                                                                                                              |
 | `ClearButton`                                  | MUI `Button`                                  | `to?: 'defaults' \| 'empty'`, `confirm?`; disabled while pristine                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `ConfirmDialog`                                | MUI `Dialog`                                  | `open`, `title`, `message?`, `confirmLabel?`, `cancelLabel?`, `confirmColor?`, `onConfirm`, `onCancel`, `actionsOrder?: 'cancel-confirm' \| 'confirm-cancel'` (default `'cancel-confirm'`; Cancel keeps `autoFocus` either way); `useConfirm()` gives a promise API                                                                                                                                                                                                              |
 | `FormDialog`                                   | MUI `Dialog` + `Form`                         | `open`, `onClose(event, reason)`, `title`, `actions?`/`cancelLabel?`/`submitLabel?`, `exitConfirm?: ConfirmOptions \| false`, `closeOnSubmit?`; every `Form` prop (`schema`, `onSubmit`, `confirm`, …) and every `Dialog` prop (`maxWidth`, `fullScreen`, …). Closing while dirty asks first                                                                                                                                                                                     |
@@ -113,11 +117,12 @@ Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >
 | `ResendCodeButton`                             | MUI `Button`                                  | `onResend` (awaited if a promise; disabled while pending), `cooldown?` (seconds, default 30) shown in the label (`Resend code (27s)`); a rejected `onResend` shows `errorText?` (default "Code could not be sent") in the status slot instead, starts no cooldown, and calls `onResendError?(error)`. `slotProps.status` for the `role="status"` region that announces "Code sent" (or the error) once per resend. Disabled while the form is disabled (which covers submitting) |
 | `FormError`                                    | MUI `Alert`                                   | Renders `formState.errors.root` (set via `form.setError('root.<key>', { message })`, e.g. a rejected async `onSubmit`); renders nothing when there is no root error                                                                                                                                                                                                                                                                                                              |
 | `FormErrorSummary`                             | —                                             | `title?` (default "There is a problem"), `slotProps?` (`heading`, `list`, `item`, `link`); lists the last failed validation's errors as focusable links, GOV.UK-style — see "Error summary" below                                                                                                                                                                                                                                                                                |
+| `LiveRegion`                                   | —                                             | `message`, `announcementKey?` (bump to re-announce identical text), `politeness?` (`polite`/`assertive`), `visuallyHidden?` (default `true`), `component?`; the shared announcement region. `<Form>` renders one for submit status — see "Announcements" below                                                                                                                                                                                                                   |
 | `FieldArray`                                   | hookform `useFieldArray`                      | `name`, `label` (array legend), `emptyRow`, `singular?`/`rowLabel?`, `minRows?`/`maxRows?`, `addLabel?`/`removeLabel?`, `reorder?`, `slotProps?`; children is a render prop `(row) => ...` given `row.name('field')` for the array path. Rows are keyed by hookform's `field.id`; Add/Remove/Move move focus and announce in a `role="status"` region                                                                                                                            |
 
 `Form`'s `title` / `description` give the form its accessible name and instructions (wired to the `<form>` via `aria-labelledby` / `aria-describedby`); `slotProps.title.component` sets the heading level (default `h2`). `FormSection` groups fields in a `<fieldset>` named by its `title` (`<legend>`, heading level configurable via `slotProps.legend.component`, default `h3`); `description` is helper text wired via `aria-describedby`.
 
-**Required vs optional.** `Form`'s `requiredIndicator` picks how a field's `required` rule is shown: `'asterisk'` (default) is today's behavior — a required field gets MUI's usual `*`. `'optional'` flips the convention: a required field still gets `required` / `aria-required` on its input, but renders no asterisk; a field that is not required gets `optionalText` appended to its label (default `'(optional)'`, override per-field with the field's own `optionalText` prop, or `false` to hide it on that one field). In `'optional'` mode, `Form` also states the convention once via `requiredIndicatorText` (default "All fields are required unless marked optional."), rendered in the same `description` slot — appended as a second sentence when `description` is also set, or alone when it is not; pass `requiredIndicatorText={false}` to suppress it. All three props are theme-defaultable through `theme.components.EzForm.defaultProps`.
+**Required vs optional.** `Form`'s `requiredIndicator` picks how a field's `required` rule is shown: `'asterisk'` (default) is today's behavior — a required field gets MUI's usual `*`. `'optional'` flips the convention: a required field still gets `required` / `aria-required` on its input, but renders no asterisk; a field that is not required gets `optionalText` appended to its label (default `'(optional)'`, override per-field with the field's own `optionalText` prop, or `false` to hide it on that one field). `Form` also states whichever convention is active once via `requiredIndicatorText`, rendered in the same `description` slot — appended as a second sentence when `description` is also set, or alone when it is not. The default text is mode-dependent: `'Required fields are marked with an asterisk (*).'` in `'asterisk'` mode (the `*` is spelled out as a word so it reads sensibly to assistive tech, the way MUI's own `FormLabel` asterisk is `aria-hidden`), `'All fields are required unless marked optional.'` in `'optional'` mode. Pass a string to use it verbatim in either mode, or `requiredIndicatorText={false}` to suppress it. Per field, nothing extra is added beyond `required`/`aria-required` — the input's own required state is what assistive tech announces; an additional hidden "required" string would double-announce it. All three props are theme-defaultable through `theme.components.EzForm.defaultProps`.
 
 Every field shows its zod message as helper text (linked to the input with `aria-describedby`; the first invalid field is focused on submit). The error text is a live region (`role="alert"`), so it is announced in `onChange`/`onBlur` modes as well. Fields must be rendered inside `<Form>`. Consumer `onChange`/`onBlur` handlers run after the form's own.
 
@@ -138,6 +143,18 @@ Need `reset`, `setError`, `watch`? `onSubmit` receives the form methods as its s
 Inside child components use `useFormContext()` from `react-hook-form`.
 
 Numbers: NumberField stores `number | null`, so use `z.number()` (add `.nullable()` if empty is allowed). TextField hands zod the string from the input, so a numeric TextField needs `z.coerce.number()`.
+
+### Checkbox vs Switch
+
+| Use case                                                                                                                                                      | Prefer     | Why                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------- |
+| A yes/no answer or opt-in recorded on submit ("I accept the terms", "Same as shipping", "Insure a vehicle")                                                   | `Checkbox` | Reviewed and only takes effect once the form is submitted |
+| One of several independent options                                                                                                                            | `Checkbox` | `CheckboxGroup` — each option is its own recorded opt-in  |
+| A setting that takes effect immediately, no submit step (dark mode, notifications on an autosaving settings page, a UI toggle whose `onChange` does the work) | `Switch`   | Nothing to submit — flipping it is the action             |
+
+If the page has a Submit button, it is almost always a `Checkbox`. Both: phrase the label as the state when on ("Marketing emails"), never as a question ("Receive marketing emails?").
+
+This follows [Material Design's selection-controls guidance](https://m3.material.io/components/switch/guidelines) and WCAG: MUI's `Switch` sets `role="switch"`, and assistive tech announces "on/off" for it — correct for a setting that takes effect immediately, wrong for an answer that is only recorded when the surrounding form is submitted.
 
 ## Error summary
 
@@ -166,6 +183,64 @@ field" behavior so the two don't fight over focus.
 
 Inside a `Wizard`, place one `<FormErrorSummary />` per `WizardStep`: each shows only that step's
 own `fields` from its last failed `Next`, not the whole form's errors.
+
+## Announcements
+
+Screen reader users get no feedback from a button that quietly starts an async submit, so
+`<Form>` announces the submit lifecycle in a live region it renders itself — no wiring, and
+nothing visible changes:
+
+```tsx
+<Form schema={schema} onSubmit={save}>   {/* announces "Submitting…", then "Submitted." or "Submit failed." */}
+```
+
+Each string is a prop, so it can be localised or turned off individually
+(`false` suppresses just that one):
+
+```tsx
+<Form
+  schema={schema}
+  onSubmit={save}
+  submitPendingText="Saving your answers…"
+  submitSuccessText="Saved."
+  submitErrorText={false}          // the page shows its own error banner instead
+>
+```
+
+A _validation_ failure is deliberately not announced here: `onSubmit` never ran, and
+`<FormErrorSummary />` already announces and lists what needs fixing. "Submit failed." is
+reserved for a submit that started and then rejected.
+
+The region itself is `<LiveRegion />`, exported for your own announcements:
+
+```tsx
+<LiveRegion message={saved ? 'Draft saved' : ''} />
+```
+
+It is visually hidden by default, `polite` by default (`politeness="assertive"` renders an
+`alert` instead of a `status`), and takes `component` to render as something else — MUI's
+`Typography`, say, when the text is also visible UI (`visuallyHidden={false}`).
+
+Assistive tech only announces a live region when its _content changes_, so setting the same
+text twice is silent. Pass a counter as `announcementKey` to force a re-announcement — it keys
+the node, so an identical message mounts a fresh region and is heard again:
+
+```tsx
+<LiveRegion message="Could not save" announcementKey={attempt} />
+```
+
+Render a `LiveRegion` unconditionally with an empty `message` at rest, rather than mounting it
+alongside its text: a region that appears in the same commit as its content has nothing to
+change _from_, and that first announcement is unreliable. `Form`, `FieldArray`,
+`ResendCodeButton` and `PasswordStrength` all use this same component internally.
+
+Because several of them can be on screen at once, one form may hold more than one
+`role="status"` region — so in a test, query the one you mean by its slot class rather than by
+role. The form's own submit-status region is `formClasses.status`:
+
+```tsx
+document.querySelector(`.${formClasses.status}`) // the form's, not a field's
+```
 
 ## Field arrays
 
@@ -653,6 +728,24 @@ Use `z.date().nullable()` in the schema and `required` on the field — the same
 
 `disableFuture`, `minDate`, and other picker validations compose with `required` — compose them freely.
 
+One ordering to know: paste something unparsable (`March 2, 2024`, say) into a **required** picker that is still empty and the message is `Birthday is required.`, not `Birthday is invalid.` MUI X parses an unrecognisable string to `null`, so the field really is empty, and `ezResolver` runs `required` before the picker's own code. Submit is blocked either way, and the message becomes `Birthday is invalid.` as soon as the field is not required or already holds a date. Nothing to configure — just don't be surprised by which of the two you see.
+
+### Clearing a picker
+
+MUI X's own `clearable` works as it does outside a form. Pass it — and any `onClear` of your own — where MUI X types it for the component you are using, which is not the same slot for both:
+
+```tsx
+// Popup pickers (DatePicker, TimePicker, DateTimePicker): the field slot.
+<DatePicker name="start" label="Start" slotProps={{ field: { clearable: true, onClear } }} />
+
+// DateField *is* the text field, so both are flat props.
+<DateField name="birthday" label="Birthday" clearable onClear={onClear} />
+```
+
+(MUI X omits `clearable`/`onClear` from the popup pickers' `slotProps.textField` type, which is why they go on `slotProps.field` there.)
+
+Clearing resets the picker's validation state along with the value, so an `invalidDate` left over from an unparsable paste goes away with it, and your `onChange` is called with `null` either way. Note that MUI X only renders the clear button while the field shows something — after an unparsable paste it blanks every section, so the button stays hidden until the user types into one.
+
 ## Autocomplete
 
 Address lookup (Places-style): the options list is fed by an async lookup, and the free-typed text is kept even if it doesn't match a suggestion.
@@ -763,6 +856,71 @@ A meter bound to a password field's live value, read with `useWatch` like `ReadO
 **Bundle size**: `PasswordStrength` lives in its own module and `PasswordField` does not import it, so a consumer using only `PasswordField` never pulls in `PasswordStrength` or `scorePassword` — a scorer like zxcvbn (~400 kB) stays opt-in. This is `sideEffects: false` plus a single ESM entry point (`package.json`) doing the work a bundler needs: unused named exports tree-shake out. `dist/index.js` itself, as a single-entry bundle, still contains every export's source (grepping it for `PasswordStrength` finds it) — the tree-shaking happens in the _consumer's_ bundler, not in this package's own build.
 
 Themeable under `EzPasswordStrength` (`defaultProps`, `styleOverrides` for `root` | `bar` | `label`), exported as `passwordStrengthClasses`.
+
+## US fields
+
+Small, US-specific conveniences on top of `TextField` and `Select` — for a non-US audience, build the equivalent with plain `TextField`/`Select`.
+
+**ZipField**: digits only, capped at 5 — anything else (letters, the ZIP+4 dash) is stripped as you type or paste. The form value is always the digit string (`'90210'`), never a formatted one. `inputMode="numeric"` brings up the numeric keypad on mobile; `autoComplete` defaults to `'postal-code'`. A non-empty value shorter than 5 digits fails a built-in rule (`invalidMessage?`, default `'Enter a 5-digit ZIP code'`), composed with any `validate` you pass the same way `required`/`pattern` are — a built-in key is never silently replaced by yours.
+
+```tsx
+<ZipField name="zip" label="ZIP code" required />
+```
+
+```ts
+const schema = z.object({ zip: z.string().min(1) })
+```
+
+**StateSelect**: `Select` pre-loaded with the 50 states + DC (`US_STATES`, exported as an `Option[]`); pass `territories` to add PR, GU, VI, AS, MP (`US_TERRITORIES`). Values are USPS abbreviations (`'CA'`), labels are full names (`'California'`). `autoComplete` defaults to `'address-level1'`.
+
+```tsx
+<StateSelect name="state" label="State" required />
+<StateSelect name="state" label="State or territory" territories />
+```
+
+**Mobile keyboards & autofill**: each field sets sensible defaults, always overridable by your own `autoComplete` prop:
+
+| Field         | `inputMode` | `autoComplete` default |
+| ------------- | ----------- | ---------------------- |
+| `ZipField`    | `numeric`   | `postal-code`          |
+| `StateSelect` | —           | `address-level1`       |
+
+`inputMode="numeric"` on `ZipField` brings up the numeric keypad on mobile without changing the underlying `type` (still `text`, so a leading zero like `02134` is never dropped). `StateSelect`'s `autoComplete` reaches the hidden native `<input>` MUI's `Select` renders for autofill via `slotProps.htmlInput` — the same slot a plain `TextField` uses (MUI 9 has no `SelectProps`/native `inputProps` shortcut for this).
+## Developer warnings
+
+Three mistakes leave a form that renders and submits perfectly while quietly failing the
+people using it. There is nothing to throw on and nothing a type can catch, so ez-form
+writes them to the console in development:
+
+| Warning                                                          | Fires when                                                                                                            | Why it matters                                                                                        |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `<Field name="…"> has no accessible name`                        | a field mounts with no `label`, `aria-label` or `aria-labelledby`                                                     | a screen-reader user hears an unlabelled edit box; axe reports it, but only if you run axe            |
+| `<Field name="…"> has duplicate option values`                   | `Select`, `RadioGroup`, `Autocomplete`, `ToggleButtonGroup` or `CheckboxGroup` gets two options with the same `value` | the duplicates collapse: two radios look checked at once, and a `Select` shows the wrong label        |
+| `<Wizard> step "…" lists field(s) … that the form does not know` | a step's `fields` names something absent from the schema and the values                                               | `trigger` on an unknown name returns valid, so **Next** advances past the field you meant to validate |
+
+Each fires **once per mistake** (keyed on the component and field name), so a field
+re-rendering on every keystroke reports once, while two different fields with the same
+problem both get reported.
+
+The last one is deliberately narrow: it asks whether the form _knows_ the name, not whether
+the field is mounted right now. Listing an unmounted field is normal and correct — that is
+exactly how [conditional fields](#conditional-fields) validate, and how a step naming an
+empty `FieldArray` validates the array-level schema. Only a name the form has never heard of
+— a typo, or a field renamed on one side only — warns.
+
+### Silencing them
+
+Fix the cause; there is no mute. A field genuinely named somewhere ez-form cannot see (a
+label rendered by a wrapper, say) should say so with `aria-labelledby`, which is both the fix
+and the thing that makes the warning stop.
+
+### They cost nothing in production
+
+Every warning sits behind a module-level `const isDev = process.env.NODE_ENV !== 'production'`.
+Bundlers substitute that expression before dead-code elimination, so a production build drops
+the call sites _and_ the message strings — no runtime check, no bytes. This is the same
+mechanism React uses for its own development warnings, and it requires nothing of you beyond
+building for production the way you already do.
 
 ## Develop
 

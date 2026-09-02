@@ -5,3 +5,4 @@ export {
   type FormErrorSummaryProps,
   type FormErrorSummaryHeadingProps,
 } from './FormErrorSummary'
+export { LiveRegion, liveRegionClasses, type LiveRegionProps } from './LiveRegion'

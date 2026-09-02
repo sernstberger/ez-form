@@ -14,7 +14,7 @@ export const textareaFieldClasses = generateUtilityClasses('EzTextareaField', ['
 // not `Typography`: it sits inside `FormHelperText`, which supplies its own typography.
 const TextareaFieldCounter = styled('span', { name: 'EzTextareaField', slot: 'Counter' })({})
 
-export type TextareaFieldProps = Omit<TextFieldProps, 'multiline' | 'rows'> & {
+export type TextareaFieldProps = Omit<TextFieldProps, 'multiline' | 'rows' | 'componentName'> & {
   /**
    * Shows the length meter (`n` or `n / max`) even with no `maxLength` rule.
    * A `maxLength` rule always shows the meter; this only adds it when there
@@ -68,6 +68,7 @@ export function TextareaField(inProps: TextareaFieldProps) {
   return (
     <TextField
       name={name}
+      componentName="TextareaField"
       helperText={composedHelperText}
       maxLength={maxLength}
       minRows={minRows}

@@ -1,5 +1,6 @@
 import {
   useCallback,
+  forwardRef,
   Fragment,
   useEffect,
   useId,
@@ -30,6 +31,7 @@ import type { z } from 'zod'
 import { ezResolver } from './ezResolver'
 import { useConfirm, type ConfirmOptions } from '../ConfirmDialog'
 import { ErrorSummaryContext } from './ErrorSummaryContext'
+import { LiveRegion, type LiveRegionProps } from './LiveRegion'
 import { RequiredIndicatorContext } from './RequiredIndicatorContext'
 import { shouldBlockUnsavedChanges } from '../useFormGuard'
 
@@ -41,7 +43,12 @@ import { shouldBlockUnsavedChanges } from '../useFormGuard'
  */
 export type FormMethods<TIn extends FieldValues, TOut> = UseFormReturn<TIn, unknown, TOut>
 
-export const formClasses = generateUtilityClasses('EzForm', ['root', 'title', 'description'])
+export const formClasses = generateUtilityClasses('EzForm', [
+  'root',
+  'title',
+  'description',
+  'status',
+])
 
 /** Typography plus `component`, so a slot can pick its element (heading level). */
 export type FormTextSlotProps = TypographyProps & { component?: ElementType }
@@ -49,6 +56,12 @@ export type FormTextSlotProps = TypographyProps & { component?: ElementType }
 const FormRoot = styled('form', { name: 'EzForm', slot: 'Root' })({})
 const FormTitle = styled(Typography, { name: 'EzForm', slot: 'Title' })({})
 const FormDescription = styled(Typography, { name: 'EzForm', slot: 'Description' })({})
+// The submit-status region gets its own EzForm slot rather than rendering a bare
+// LiveRegion: every migrated call site now carries `EzLiveRegion-root` too, so
+// that class alone no longer identifies *this* region — a form containing a
+// FieldArray or ResendCodeButton has several, and this one renders last.
+// `formClasses.status` is what names it, for a theme and for a test query.
+const FormStatus = styled(LiveRegion, { name: 'EzForm', slot: 'Status' })({})
 
 export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
   FormHTMLAttributes<HTMLFormElement>,
@@ -126,19 +139,42 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
   /** Appended to a not-required field's label when `requiredIndicator="optional"`. */
   optionalText?: ReactNode
   /**
-   * States the `requiredIndicator="optional"` convention once, in the form's
+   * States the `requiredIndicator` convention once, in the form's
    * `description` (appended as a second sentence when `description` is also
-   * set). `false` suppresses it. Ignored in `'asterisk'` mode.
+   * set). Defaults to `'Required fields are marked with an asterisk (*).'`
+   * in `'asterisk'` mode and `'All fields are required unless marked
+   * optional.'` in `'optional'` mode; an explicit string is used verbatim in
+   * either mode. `false` suppresses it in either mode.
    */
   requiredIndicatorText?: ReactNode | false
+  /**
+   * Announced when a submit starts. `false` suppresses just this one.
+   * Default "Submitting…".
+   */
+  submitPendingText?: ReactNode | false
+  /** Announced when `onSubmit` resolves. `false` suppresses. Default "Submitted." */
+  submitSuccessText?: ReactNode | false
+  /**
+   * Announced when `onSubmit` rejects. `false` suppresses. Default "Submit failed."
+   *
+   * A *validation* failure is not this: the schema rejected, `onSubmit` never
+   * ran, and `<FormErrorSummary>` already announces and lists what is wrong.
+   * Announcing "Submit failed." there would talk over it.
+   */
+  submitErrorText?: ReactNode | false
   slotProps?: {
     title?: FormTextSlotProps
     description?: FormTextSlotProps
+    /** The form's submit-status live region. `message`/`announcementKey` are owned by the form. */
+    liveRegion?: Omit<LiveRegionProps, 'message' | 'announcementKey'>
   }
   children: ReactNode
 }
 
-export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut>) {
+function FormImpl<TIn extends FieldValues, TOut>(
+  inProps: FormProps<TIn, TOut>,
+  forwardedRef: Ref<FormMethods<TIn, TOut>>,
+) {
   const {
     schema,
     onSubmit,
@@ -146,7 +182,11 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
     values,
     resetOptions,
     onDefaultValuesError,
-    ref,
+    // `ref` stays in `FormProps` because that is the consumer-facing type, but it is never
+    // read from props here: React removes it before props reach a `forwardRef` render
+    // function and hands it over as the second argument instead, on both majors. Pulled
+    // out of the rest anyway so a stray one could never land on the DOM `<form>`.
+    ref: _ref,
     mode = 'onSubmit',
     disabled = false,
     confirm,
@@ -155,7 +195,10 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
     description,
     requiredIndicator = 'asterisk',
     optionalText = '(optional)',
-    requiredIndicatorText = 'All fields are required unless marked optional.',
+    requiredIndicatorText,
+    submitPendingText = 'Submitting…',
+    submitSuccessText = 'Submitted.',
+    submitErrorText = 'Submit failed.',
     slotProps,
     className,
     children,
@@ -166,11 +209,11 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
   const baseId = useId()
   const titleId = `${baseId}-title`
   const descriptionId = `${baseId}-description`
-  // `id` is spread-overridable (`slotProps.title.id`) so a wrapper that owns the
-  // dialog/section around this form — `FormDialog`, say — can point its own
-  // `aria-labelledby`/`aria-describedby` at these elements. The wrapper is
-  // expected to pass the matching `aria-*` prop too; the fallbacks below keep
-  // the `<form>` itself wired either way.
+  // `id` is spread-overridable (`slotProps.title.id` / `slotProps.description.id`)
+  // so a wrapper that owns the dialog or section around this form — `FormDialog`,
+  // say — can point its own `aria-labelledby` / `aria-describedby` at these
+  // elements. The wrapper is expected to pass the matching `aria-*` prop too; the
+  // fallbacks below keep the `<form>` itself wired either way.
   const titleProps = { component: 'h2', variant: 'h5', id: titleId, ...slotProps?.title } as const
   const descriptionProps = {
     component: 'p',
@@ -178,19 +221,27 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
     id: descriptionId,
     ...slotProps?.description,
   } as const
-  // The "required unless marked optional" convention is stated once, in the same
-  // slot as `description`: appended as a second sentence when both are set, or
-  // rendered alone when `description` is unset. Only relevant in `optional` mode;
-  // `requiredIndicatorText={false}` (or `asterisk` mode) suppresses it.
-  const showRequiredIndicatorText =
-    requiredIndicator === 'optional' && requiredIndicatorText !== false
+  // The requiredIndicator convention is stated once, in the same slot as
+  // `description`: appended as a second sentence when both are set, or rendered
+  // alone when `description` is unset. The default text is mode-dependent; an
+  // explicit `requiredIndicatorText` (including `false` to suppress it) is used
+  // verbatim in either mode. The `*` in the asterisk-mode default is spelled out
+  // ("asterisk (*)") rather than rendered as a bare glyph, so it reads sensibly
+  // to assistive tech without needing an `aria-hidden` span — mirroring how
+  // MUI's `FormLabel` asterisk is itself `aria-hidden`.
+  const defaultRequiredIndicatorText =
+    requiredIndicator === 'optional'
+      ? 'All fields are required unless marked optional.'
+      : 'Required fields are marked with an asterisk (*).'
+  const resolvedRequiredIndicatorText = requiredIndicatorText ?? defaultRequiredIndicatorText
+  const showRequiredIndicatorText = resolvedRequiredIndicatorText !== false
   const effectiveDescription = showRequiredIndicatorText ? (
     description != null ? (
       <Fragment>
-        {description} {requiredIndicatorText}
+        {description} {resolvedRequiredIndicatorText}
       </Fragment>
     ) : (
-      requiredIndicatorText
+      resolvedRequiredIndicatorText
     )
   ) : (
     description
@@ -313,7 +364,7 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
     }
     setLoading(isLoading)
   }, [isLoading, onDefaultValuesError])
-  useImperativeHandle(ref, () => methods, [methods])
+  useImperativeHandle(forwardedRef, () => methods, [methods])
 
   const { confirm: ask, dialog } = useConfirm()
   const confirmOptions: ConfirmOptions | undefined =
@@ -336,10 +387,39 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
     return () => window.removeEventListener('beforeunload', handler)
   }, [guard, isDirty, isSubmitting, isSubmitSuccessful])
 
+  // Ruling: announce from inside this handler rather than from an effect on
+  // formState — the existing submit path is already the one place that knows all
+  // three outcomes, and hookform's own flags cannot tell them apart on their own.
+  // `isSubmitSuccessful` is false both when the schema rejected and when
+  // `onSubmit` threw (handleSubmit sets it to `isEmptyObject(errors) &&
+  // !onValidError`), so an effect would have to re-derive "did onValid actually
+  // run" from the errors object to avoid announcing "Submit failed." at a
+  // validation failure — which requirement 2 forbids, since FormErrorSummary
+  // owns that case. Here the distinction is free: this callback only runs when
+  // validation passed, so its catch is unambiguously a submit failure. Cost if
+  // wrong: a validation failure would announce over the error summary, and the
+  // pending/settled pair could drift out of step with the real submit.
+  const [announcement, setAnnouncement] = useState<{ text: ReactNode; seq: number }>({
+    text: null,
+    seq: 0,
+  })
+  // `seq` (not the text) is what makes a repeat audible: a second failed submit
+  // sets the identical string, which is not a content change on its own. See
+  // LiveRegion's `announcementKey`.
+  const announce = useCallback((text: ReactNode | false) => {
+    if (text === false) return
+    setAnnouncement((prev) => ({ text, seq: prev.seq + 1 }))
+  }, [])
+
   const submit = methods.handleSubmit(async (submitted) => {
     setSubmitting(true)
+    announce(submitPendingText)
     try {
       await onSubmit(submitted, methods)
+      announce(submitSuccessText)
+    } catch (error) {
+      announce(submitErrorText)
+      throw error
     } finally {
       setSubmitting(false)
     }
@@ -402,9 +482,39 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
           <RequiredIndicatorContext.Provider value={{ requiredIndicator, optionalText }}>
             {children}
           </RequiredIndicatorContext.Provider>
+          {/*
+            Rendered unconditionally, empty at rest: a live region has to be in
+            the DOM before its text arrives, or assistive tech has no prior
+            content to observe changing and the first announcement is missed.
+          */}
+          <FormStatus
+            {...slotProps?.liveRegion}
+            message={announcement.text}
+            announcementKey={announcement.seq}
+            className={`${formClasses.status}${slotProps?.liveRegion?.className ? ` ${slotProps.liveRegion.className}` : ''}`}
+          />
           {dialog}
         </FormRoot>
       </ErrorSummaryContext.Provider>
     </FormProvider>
   )
 }
+
+/**
+ * The form. See `FormProps` for the API.
+ *
+ * Wrapped in `forwardRef` so `ref` reaches the imperative handle on React 18 as well as
+ * 19 (#71): on 19 a function component receives `ref` as an ordinary prop, but on 18 it
+ * does not — a plain `Form` would silently never populate the consumer's ref there, while
+ * the peer range advertises `^18 || ^19`. `forwardRef` delivers it on both.
+ *
+ * `forwardRef` erases the generics (it returns a non-generic exotic component), so the
+ * result is cast back to a callable generic signature — the same thing MUI does for its
+ * own generic components (see `@mui/material/Autocomplete`, whose `forwardRef` result is
+ * cast to a generic call signature). The cast is the only way to keep `Form<TIn, TOut>`
+ * inferring from `schema`/`defaultValues`; it changes no runtime behaviour, and
+ * `FormProps` (including its `ref` field) is unchanged for consumers.
+ */
+export const Form = forwardRef(FormImpl) as <TIn extends FieldValues, TOut>(
+  props: FormProps<TIn, TOut>,
+) => ReactNode

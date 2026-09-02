@@ -7,6 +7,7 @@ import { FieldFrame } from '../FieldFrame'
 import { mergeDisabled } from '../mergeDisabled'
 import type { Option } from '../Option'
 import type { FieldRules } from '../../rules'
+import { warnDuplicateOptions } from '../../devWarn'
 
 type Value = Option['value']
 
@@ -46,6 +47,7 @@ export function ToggleButtonGroup({
   onBlur,
   ...rest
 }: ToggleButtonGroupProps) {
+  warnDuplicateOptions('ToggleButtonGroup', name, options)
   return (
     <FieldFrame<Value | null | Value[]>
       componentName="ToggleButtonGroup"

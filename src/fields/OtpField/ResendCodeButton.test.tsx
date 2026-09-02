@@ -8,6 +8,11 @@ import { expectNoA11yViolations } from '../../test/axe'
 
 const schema = z.object({ code: z.string() })
 
+// This button's own status region, not the <Form>'s submit-status live region —
+// both are `role="status"`, so the role alone is ambiguous inside a form.
+const statusRegion = () =>
+  document.querySelector<HTMLElement>(`.${resendCodeButtonClasses.status}`)!
+
 describe('ResendCodeButton', () => {
   it('renders a type=button with default label and enabled status region', () => {
     render(
@@ -18,8 +23,8 @@ describe('ResendCodeButton', () => {
     const btn = screen.getByRole('button', { name: 'Resend code' })
     expect(btn).toHaveAttribute('type', 'button')
     expect(btn).toBeEnabled()
-    expect(screen.getByRole('status')).toBeInTheDocument()
-    expect(screen.getByRole('status')).toBeEmptyDOMElement()
+    expect(statusRegion()).toBeInTheDocument()
+    expect(statusRegion()).toBeEmptyDOMElement()
   })
 
   it('calls onResend once on click, disables immediately, and shows a countdown label', async () => {
@@ -85,24 +90,27 @@ describe('ResendCodeButton', () => {
       </Form>,
     )
     const btn = screen.getByRole('button', { name: 'Resend code' })
-    const status = screen.getByRole('status')
-    expect(status).toBeEmptyDOMElement()
+    // Re-queried each time: each announcement mounts a fresh region node, so a
+    // held reference goes stale (that remount is what makes a repeat audible).
+    expect(statusRegion()).toBeEmptyDOMElement()
 
     await act(async () => {
       fireEvent.click(btn)
     })
-    expect(status).toHaveTextContent('Code sent')
+    expect(statusRegion()).toHaveTextContent('Code sent')
+    const first = statusRegion()
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000)
     })
     expect(btn).toBeEnabled()
 
-    // Re-click triggers a fresh announcement (cleared then re-set).
+    // Re-click triggers a fresh announcement in a replaced node.
     await act(async () => {
       fireEvent.click(btn)
     })
-    expect(status).toHaveTextContent('Code sent')
+    expect(statusRegion()).toHaveTextContent('Code sent')
+    expect(statusRegion()).not.toBe(first)
     vi.useRealTimers()
   })
 
@@ -206,7 +214,7 @@ describe('ResendCodeButton', () => {
     expect(btn).toHaveClass('MuiButton-outlined')
     expect(btn).toHaveClass(resendCodeButtonClasses.root)
     expect(getComputedStyle(btn).textTransform).toBe('lowercase')
-    const status = screen.getByRole('status')
+    const status = statusRegion()
     expect(status).toHaveClass(resendCodeButtonClasses.status)
     expect(getComputedStyle(status).fontStyle).toBe('italic')
   })
@@ -217,7 +225,7 @@ describe('ResendCodeButton', () => {
         <ResendCodeButton onResend={() => {}} slotProps={{ status: { id: 'resend-status' } }} />
       </Form>,
     )
-    expect(document.getElementById('resend-status')).toBe(screen.getByRole('status'))
+    expect(document.getElementById('resend-status')).toBe(statusRegion())
   })
 
   it('shows the error text and re-enables immediately (no cooldown) when onResend rejects', async () => {
@@ -229,9 +237,8 @@ describe('ResendCodeButton', () => {
       </Form>,
     )
     const btn = screen.getByRole('button', { name: 'Resend code' })
-    const status = screen.getByRole('status')
     await user.click(btn)
-    await waitFor(() => expect(status).toHaveTextContent('Code could not be sent'))
+    await waitFor(() => expect(statusRegion()).toHaveTextContent('Code could not be sent'))
     expect(btn).toBeEnabled()
     expect(btn).toHaveTextContent('Resend code')
     expect(btn).not.toHaveTextContent(/\(\d+s\)/)
@@ -246,7 +253,7 @@ describe('ResendCodeButton', () => {
       </Form>,
     )
     await user.click(screen.getByRole('button', { name: 'Resend code' }))
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Try again later'))
+    await waitFor(() => expect(statusRegion()).toHaveTextContent('Try again later'))
   })
 
   it('calls onResendError with the rejection and does not leave an unhandled rejection', async () => {
@@ -272,9 +279,7 @@ describe('ResendCodeButton', () => {
       </Form>,
     )
     await user.click(screen.getByRole('button', { name: 'Resend code' }))
-    await waitFor(() =>
-      expect(screen.getByRole('status')).toHaveTextContent('Code could not be sent'),
-    )
+    await waitFor(() => expect(statusRegion()).toHaveTextContent('Code could not be sent'))
     // No unhandled rejection: vitest fails the run on one, so reaching this
     // point (and the file finishing green) is the assertion.
   })

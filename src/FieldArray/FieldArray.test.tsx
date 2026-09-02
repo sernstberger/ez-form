@@ -46,6 +46,10 @@ function Applicants({
 
 const rows = () => screen.getAllByRole('group', { name: /^Applicant \d+$/ })
 
+// This array's own status region, not the <Form>'s submit-status live region —
+// both are `role="status"`, so the role alone is ambiguous inside a form.
+const statusRegion = () => document.querySelector<HTMLElement>(`.${fieldArrayClasses.status}`)!
+
 describe('FieldArray', () => {
   it('renders the array as a named group with one named group per row', () => {
     render(<Applicants />)
@@ -178,7 +182,7 @@ describe('FieldArray', () => {
     render(<Applicants reorder />)
     // Re-queried each time on purpose: each announcement mounts a fresh status
     // node (see the repeat test below), so a held reference would go stale.
-    const status = () => screen.getByRole('status')
+    const status = statusRegion
     expect(status()).toBeEmptyDOMElement()
     await user.click(screen.getByRole('button', { name: 'Add' }))
     await waitFor(() => expect(status()).toHaveTextContent('Row 2 added'))
@@ -209,7 +213,7 @@ describe('FieldArray', () => {
     const observer = new MutationObserver((records) => {
       for (const record of records) {
         for (const node of record.addedNodes) {
-          if (node instanceof HTMLElement && node.getAttribute('role') === 'status') {
+          if (node instanceof HTMLElement && node.classList.contains(fieldArrayClasses.status)) {
             announcements.push(node.textContent ?? '')
           }
         }
@@ -218,11 +222,11 @@ describe('FieldArray', () => {
     observer.observe(document.body, { childList: true, subtree: true })
 
     await user.click(screen.getByRole('button', { name: 'Remove Applicant 2' }))
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Row 2 removed'))
-    const first = screen.getByRole('status')
+    await waitFor(() => expect(statusRegion()).toHaveTextContent('Row 2 removed'))
+    const first = statusRegion()
     await user.click(screen.getByRole('button', { name: 'Remove Applicant 2' }))
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Row 2 removed'))
-    const second = screen.getByRole('status')
+    await waitFor(() => expect(statusRegion()).toHaveTextContent('Row 2 removed'))
+    const second = statusRegion()
     observer.disconnect()
 
     expect(second).not.toBe(first)
@@ -234,12 +238,12 @@ describe('FieldArray', () => {
     render(<Applicants defaultValues={{ applicants: [] }} />)
     const add = screen.getByRole('button', { name: 'Add' })
     await user.click(add)
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Row 1 added'))
-    const first = screen.getByRole('status')
+    await waitFor(() => expect(statusRegion()).toHaveTextContent('Row 1 added'))
+    const first = statusRegion()
     // A different message, but the node must still be a new one each time.
     await user.click(add)
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Row 2 added'))
-    expect(screen.getByRole('status')).not.toBe(first)
+    await waitFor(() => expect(statusRegion()).toHaveTextContent('Row 2 added'))
+    expect(statusRegion()).not.toBe(first)
   })
 
   it('minRows disables Remove at the floor; maxRows disables Add at the ceiling', async () => {

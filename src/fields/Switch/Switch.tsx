@@ -15,7 +15,16 @@ export type SwitchProps = Omit<MuiSwitchProps, 'name' | 'checked' | 'required'> 
   optionalText?: ReactNode | false
 } & BooleanFieldRules
 
-// MUI 9's Switch sets role="switch" on the input itself; nothing to add here.
+/**
+ * @remarks When to use
+ * Use `Switch` only for a setting that takes effect immediately, with no
+ * submit step — dark mode, notifications on a settings page that autosaves,
+ * a UI mode toggle whose `onChange` does the work. MUI 9's `Switch` sets
+ * `role="switch"` on the input, and assistive tech announces "on/off" —
+ * correct for an immediate setting, wrong for an answer that is only
+ * recorded on submit. If the page has a Submit button, use `Checkbox`
+ * instead.
+ */
 export function Switch({
   name,
   label,
@@ -39,6 +48,10 @@ export function Switch({
       rules={{ required, validate }}
       optionalText={optionalText}
       labelAs="control"
+      // For the dev-mode "no accessible name" check only — read, not destructured, so
+      // both still reach the control through `rest`.
+      aria-label={rest['aria-label']}
+      aria-labelledby={rest['aria-labelledby']}
       renderControl={({ field, required: isRequired, inputA11y }) => (
         <MuiSwitch
           {...rest}

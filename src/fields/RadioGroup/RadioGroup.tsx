@@ -5,6 +5,7 @@ import MuiRadioGroup, { type RadioGroupProps as MuiRadioGroupProps } from '@mui/
 import { FieldFrame } from '../FieldFrame'
 import type { Option } from '../Option'
 import type { FieldRules } from '../../rules'
+import { warnDuplicateOptions } from '../../devWarn'
 
 export type RadioGroupProps = Omit<
   MuiRadioGroupProps,
@@ -41,6 +42,7 @@ export function RadioGroup({
   onBlur,
   ...rest
 }: RadioGroupProps) {
+  warnDuplicateOptions('RadioGroup', name, options)
   return (
     <FieldFrame<Option['value']>
       componentName="RadioGroup"

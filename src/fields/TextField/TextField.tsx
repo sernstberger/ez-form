@@ -21,6 +21,16 @@ export type TextFieldProps = Omit<
    * `requiredIndicator` is `"optional"`; `false` hides it on this field.
    */
   optionalText?: ReactNode | false
+  /**
+   * Internal. The name a dev-mode warning should call this field: `Select`,
+   * `PasswordField` and `TextareaField` all render *through* `TextField`, and a
+   * warning that named `TextField` would point the consumer at a component they
+   * never wrote. Every such wrapper `Omit`s this from its own public props, so it
+   * is not part of any component's API.
+   *
+   * @internal
+   */
+  componentName?: string
 } & FieldRules<string>
 
 // `type` → mobile keyboard (`inputMode`) and autofill (`autoComplete`) token. Only types
@@ -55,12 +65,17 @@ export function TextField({
   optionalText,
   type,
   autoComplete = type ? AUTO_COMPLETE_BY_TYPE[type] : undefined,
+  componentName = 'TextField',
   ...rest
 }: TextFieldProps) {
-  const f = useEzField<string>(name, 'TextField', {
+  const f = useEzField<string>(name, componentName, {
     label,
     rules: { required, min, max, minLength, maxLength, pattern, validate },
     optionalText,
+    // Read, not destructured: both still reach MUI through `rest`. The hook only
+    // needs to know a label-less field is named some other way before it warns.
+    'aria-label': rest['aria-label'],
+    'aria-labelledby': rest['aria-labelledby'],
   })
   const {
     ref,
