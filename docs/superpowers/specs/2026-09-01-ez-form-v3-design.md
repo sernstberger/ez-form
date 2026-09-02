@@ -160,7 +160,7 @@ Default messages, label-derived like `rules.ts`:
 
 | Code | Message |
 |---|---|
-| `invalidDate` | `<label> is not a valid date.` |
+| `invalidDate` | `<label> is invalid.` |
 | `minDate`, `minTime`, `minutesStep`, `minDateTime` | `<label> is too early.` |
 | `maxDate`, `maxTime`, `maxDateTime` | `<label> is too late.` |
 | `disablePast` | `<label> must be in the future.` |

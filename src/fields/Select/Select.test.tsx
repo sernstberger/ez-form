@@ -136,6 +136,9 @@ describe('Select', () => {
       </Form>,
     )
     await user.click(screen.getByRole('combobox', { name: 'Role' }))
-    expect(await screen.findByRole('option', { name: 'Admin' })).toHaveAttribute('aria-disabled', 'true')
+    expect(await screen.findByRole('option', { name: 'Admin' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    )
   })
 })

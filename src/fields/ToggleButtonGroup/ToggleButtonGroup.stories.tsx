@@ -37,7 +37,10 @@ export const Multiple: Story = {
     ],
   },
   parameters: {
-    form: { schema: z.object({ format: z.array(z.string()) }), defaultValues: { format: ['bold'] } },
+    form: {
+      schema: z.object({ format: z.array(z.string()) }),
+      defaultValues: { format: ['bold'] },
+    },
   } satisfies FormParameters,
 }
 export const Required: Story = { args: { required: true, helperText: 'Pick an alignment' } }

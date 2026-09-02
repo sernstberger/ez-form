@@ -4,7 +4,10 @@ export interface Separators {
 }
 
 /** Locale/format-derived separators, from `Intl.NumberFormat(...).formatToParts(1234567.891)`. */
-export function getSeparators(locale?: Intl.LocalesArgument, format?: Intl.NumberFormatOptions): Separators {
+export function getSeparators(
+  locale?: Intl.LocalesArgument,
+  format?: Intl.NumberFormatOptions,
+): Separators {
   const parts = new Intl.NumberFormat(locale, format).formatToParts(1234567.891)
   const group = parts.find((part) => part.type === 'group')?.value ?? ','
   const decimal = parts.find((part) => part.type === 'decimal')?.value ?? '.'
@@ -28,7 +31,8 @@ export function groupWhileTyping(text: string, caret: number, separators: Separa
 
   const { group, decimal } = separators
 
-  const isAllowedChar = (char: string) => /\d/.test(char) || char === '-' || char === decimal || char === group || /\s/.test(char)
+  const isAllowedChar = (char: string) =>
+    /\d/.test(char) || char === '-' || char === decimal || char === group || /\s/.test(char)
   if (![...text].every(isAllowedChar)) {
     return { text, caret }
   }

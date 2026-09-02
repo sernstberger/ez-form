@@ -29,6 +29,10 @@ export interface FieldFrameProps<TValue> {
   /**
    * `control`: label beside the control (FormControlLabel) — Checkbox, Switch.
    * `legend`: label above a group of controls (fieldset + legend) — RadioGroup.
+   * A `legend` frame renders a fieldset whose implicit role is `group` named by the
+   * legend; when the inner control is itself `role="group"` (ToggleButtonGroup,
+   * CheckboxGroup), it shares that same accessible name, so tests must disambiguate
+   * by picking the inner element rather than querying by the shared name alone.
    */
   labelAs: 'control' | 'legend'
   renderControl: (bound: BoundField) => ReactElement

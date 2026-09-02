@@ -48,7 +48,7 @@ export type FileFieldProps = {
   /** Store `File[]` instead of `File | null`. */
   multiple?: boolean
   /** Props for the MUI Button (`variant`, `color`, `size`, `startIcon`, …). */
-  buttonProps?: Omit<ButtonProps<'label'>, 'component' | 'htmlFor' | 'children'>
+  buttonProps?: Omit<ButtonProps<'label'>, 'component' | 'htmlFor' | 'children' | 'role'>
   /** Runs after the form's handler, only when the user picked at least one file. */
   onChange?: (event: ChangeEvent<HTMLInputElement>, value: FileFieldValue) => void
 } & Pick<FieldRules<FileFieldValue>, 'required' | 'validate'>
@@ -131,7 +131,11 @@ export function FileField({
               // Chip clones this element with its own onClick; the default icon has no accessible
               // name, and SvgIcon defaults aria-hidden to true unless overridden here.
               deleteIcon={
-                <CloseIcon role="button" aria-label={`Remove ${file.name}`} aria-hidden={undefined} />
+                <CloseIcon
+                  role="button"
+                  aria-label={`Remove ${file.name}`}
+                  aria-hidden={undefined}
+                />
               }
             />
           ))}

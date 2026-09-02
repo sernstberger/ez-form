@@ -24,7 +24,13 @@ describe('groupWhileTyping', () => {
     ['12345', 2, '12,345', 2],
     ['$1000', 5, '$1000', 5],
     ['', 0, '', 0],
-  ])('groupWhileTyping(%j, %j) -> { text: %j, caret: %j }', (text, caret, expectedText, expectedCaret) => {
-    expect(groupWhileTyping(text, caret, separators)).toEqual({ text: expectedText, caret: expectedCaret })
-  })
+  ])(
+    'groupWhileTyping(%j, %j) -> { text: %j, caret: %j }',
+    (text, caret, expectedText, expectedCaret) => {
+      expect(groupWhileTyping(text, caret, separators)).toEqual({
+        text: expectedText,
+        caret: expectedCaret,
+      })
+    },
+  )
 })

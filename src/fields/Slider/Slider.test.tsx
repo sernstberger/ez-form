@@ -50,7 +50,10 @@ describe('Slider', () => {
         <button type="submit">Go</button>
       </Form>,
     )
-    const [start, end] = screen.getAllByRole('slider', { name: 'Hours' }) as [HTMLElement, HTMLElement]
+    const [start, end] = screen.getAllByRole('slider', { name: 'Hours' }) as [
+      HTMLElement,
+      HTMLElement,
+    ]
     expect(start).toHaveValue('9')
     expect(end).toHaveValue('17')
     setSlider(end, 18)

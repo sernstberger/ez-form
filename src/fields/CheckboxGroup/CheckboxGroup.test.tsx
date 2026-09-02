@@ -17,11 +17,14 @@ describeFieldContract({
   label: 'Toppings',
   schema,
   defaultValues: { toppings: [] },
-  render: (props) => <CheckboxGroup name="toppings" label="Toppings" options={toppings} {...props} />,
+  render: (props) => (
+    <CheckboxGroup name="toppings" label="Toppings" options={toppings} {...props} />
+  ),
   // The enclosing <fieldset> also matches role "group" named "Toppings" (native
   // legend association), so disambiguate to the inner MUI FormGroup, the element
   // that actually carries aria-describedby/aria-invalid.
-  getControl: () => screen.getAllByRole('group', { name: 'Toppings' }).find((el) => el.tagName !== 'FIELDSET')!,
+  getControl: () =>
+    screen.getAllByRole('group', { name: 'Toppings' }).find((el) => el.tagName !== 'FIELDSET')!,
   expectDisabled: () => expect(screen.getByRole('checkbox', { name: 'Cheese' })).toBeDisabled(),
   interact: (user) => user.click(screen.getByRole('checkbox', { name: 'Ham' })),
 })

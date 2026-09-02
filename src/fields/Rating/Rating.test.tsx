@@ -73,7 +73,10 @@ describe('Rating', () => {
     // `user.click` never triggers the clear here. `user.pointer` with
     // explicit `coords` is the same click, with real coordinates attached.
     const star2 = screen.getByRole('radio', { name: '2 Stars' })
-    await user.pointer([{ target: star2, coords: { clientX: 1, clientY: 1 } }, { keys: '[MouseLeft]', target: star2, coords: { clientX: 1, clientY: 1 } }])
+    await user.pointer([
+      { target: star2, coords: { clientX: 1, clientY: 1 } },
+      { keys: '[MouseLeft]', target: star2, coords: { clientX: 1, clientY: 1 } },
+    ])
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(onSubmit).toHaveBeenCalledWith({ stars: null }, expect.anything())
   })
@@ -88,7 +91,9 @@ describe('Rating', () => {
     )
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(await screen.findByText('Stars is required.')).toBeInTheDocument()
-    expect(screen.getByRole('radiogroup', { name: 'Stars' })).toContainElement(document.activeElement as HTMLElement)
+    expect(screen.getByRole('radiogroup', { name: 'Stars' })).toContainElement(
+      document.activeElement as HTMLElement,
+    )
   })
 
   it('calls a consumer onChange with the number after updating the form', async () => {

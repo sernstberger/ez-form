@@ -13,7 +13,11 @@ import dts from 'vite-plugin-dts'
 // package's folder instead of letting it default to the project's TS 7.
 const require = createRequire(import.meta.url)
 const apiExtractorTypescriptFolder = dirname(
-  dirname(require.resolve('typescript', { paths: [require.resolve('@microsoft/api-extractor/package.json')] })),
+  dirname(
+    require.resolve('typescript', {
+      paths: [require.resolve('@microsoft/api-extractor/package.json')],
+    }),
+  ),
 )
 
 // Never bundle a dependency: anything that is not a relative or absolute

@@ -20,7 +20,10 @@ export const Required: Story = { args: { required: true, helperText: 'PDF only' 
 export const Multiple: Story = {
   args: { name: 'photos', label: 'Add photos', accept: 'image/*', multiple: true },
   parameters: {
-    form: { schema: z.object({ photos: z.array(z.instanceof(File)) }), defaultValues: { photos: [] } },
+    form: {
+      schema: z.object({ photos: z.array(z.instanceof(File)) }),
+      defaultValues: { photos: [] },
+    },
   } satisfies FormParameters,
 }
 export const Contained: Story = { args: { buttonProps: { variant: 'contained' } } }

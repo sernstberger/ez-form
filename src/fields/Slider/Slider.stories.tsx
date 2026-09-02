@@ -27,7 +27,11 @@ export const Range: Story = {
   } satisfies FormParameters,
 }
 export const Bounded: Story = {
-  args: { min: 0, max: { value: 50, message: 'Keep it under 50' }, helperText: 'Default is out of range' },
+  args: {
+    min: 0,
+    max: { value: 50, message: 'Keep it under 50' },
+    helperText: 'Default is out of range',
+  },
   parameters: { form: { schema, defaultValues: { volume: 80 } } } satisfies FormParameters,
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole('button', { name: 'Submit' }))

@@ -23,11 +23,14 @@ describeFieldContract({
   label: 'Align',
   schema,
   defaultValues: { align: null },
-  render: (props) => <ToggleButtonGroup name="align" label="Align" options={aligns} exclusive {...props} />,
+  render: (props) => (
+    <ToggleButtonGroup name="align" label="Align" options={aligns} exclusive {...props} />
+  ),
   // The enclosing <fieldset> also matches role "group" named "Align" (native
   // legend association), so disambiguate to the inner MUI group, the element
   // that actually carries aria-describedby/aria-invalid.
-  getControl: () => screen.getAllByRole('group', { name: 'Align' }).find((el) => el.tagName !== 'FIELDSET')!,
+  getControl: () =>
+    screen.getAllByRole('group', { name: 'Align' }).find((el) => el.tagName !== 'FIELDSET')!,
   expectDisabled: () => expect(screen.getByRole('button', { name: 'Left' })).toBeDisabled(),
   interact: (user) => user.click(screen.getByRole('button', { name: 'Center' })),
 })
@@ -94,7 +97,13 @@ describe('ToggleButtonGroup', () => {
     const onChange = vi.fn()
     render(
       <Form schema={schema} defaultValues={{ align: null }} onSubmit={() => {}}>
-        <ToggleButtonGroup name="align" label="Align" options={aligns} exclusive onChange={onChange} />
+        <ToggleButtonGroup
+          name="align"
+          label="Align"
+          options={aligns}
+          exclusive
+          onChange={onChange}
+        />
       </Form>,
     )
     await user.click(screen.getByRole('button', { name: 'Left' }))
