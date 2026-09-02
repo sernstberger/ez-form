@@ -13,6 +13,7 @@ import type { PasswordStrengthProps } from '../fields/PasswordStrength'
 import type { OtpFieldControlProps } from '../fields/OtpField/OtpFieldControl'
 import type { FileFieldProps } from '../fields/FileField'
 import type { TextareaFieldProps } from '../fields/TextareaField/TextareaField'
+import type { ResendCodeButtonProps } from '../fields/OtpField/ResendCodeButton'
 
 declare module '@mui/material/styles' {
   interface ComponentsPropsList {
@@ -31,6 +32,7 @@ declare module '@mui/material/styles' {
     EzOtpField: Partial<OtpFieldControlProps>
     EzFileField: Partial<FileFieldProps>
     EzTextareaField: Partial<TextareaFieldProps>
+    EzResendCodeButton: Partial<ResendCodeButtonProps>
   }
 
   interface ComponentNameToClassKey {
@@ -48,6 +50,7 @@ declare module '@mui/material/styles' {
     EzOtpField: 'root' | 'helperText'
     EzFileField: 'root' | 'fileList'
     EzTextareaField: 'root' | 'counter'
+    EzResendCodeButton: 'root' | 'status'
   }
 
   interface Components<Theme = unknown> {
@@ -106,6 +109,10 @@ declare module '@mui/material/styles' {
     EzTextareaField?: {
       defaultProps?: ComponentsProps['EzTextareaField']
       styleOverrides?: ComponentsOverrides<Theme>['EzTextareaField']
+    }
+    EzResendCodeButton?: {
+      defaultProps?: ComponentsProps['EzResendCodeButton']
+      styleOverrides?: ComponentsOverrides<Theme>['EzResendCodeButton']
     }
   }
 }
