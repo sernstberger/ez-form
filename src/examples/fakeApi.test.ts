@@ -1,4 +1,14 @@
-import { delay, loginApi, LOGIN_BAD_PASSWORD, verifyCodeApi, SIGNUP_GOOD_CODE } from './fakeApi'
+import {
+  delay,
+  loginApi,
+  LOGIN_BAD_PASSWORD,
+  verifyCodeApi,
+  SIGNUP_GOOD_CODE,
+  loadProfileApi,
+  saveProfileApi,
+  PROFILE_LOAD_FAILS_FOR,
+  type ProfileValues,
+} from './fakeApi'
 
 describe('fakeApi', () => {
   it('delay resolves after roughly the given ms', async () => {
@@ -50,6 +60,52 @@ describe('fakeApi', () => {
     const assertion = expect(promise).rejects.toThrow('That code is incorrect')
     await vi.runAllTimersAsync()
     await assertion
+    vi.useRealTimers()
+  })
+
+  it('loadProfileApi resolves with a saved profile by default', async () => {
+    vi.useFakeTimers()
+    const promise = loadProfileApi()
+    await vi.runAllTimersAsync()
+    const profile = await promise
+    expect(profile.displayName).toBe('Ada Lovelace')
+    expect(profile.birthday).toBeInstanceOf(Date)
+    vi.useRealTimers()
+  })
+
+  it('loadProfileApi merges a seed over the defaults', async () => {
+    vi.useFakeTimers()
+    const promise = loadProfileApi({ displayName: 'Grace Hopper' })
+    await vi.runAllTimersAsync()
+    const profile = await promise
+    expect(profile.displayName).toBe('Grace Hopper')
+    expect(profile.country).toBe('gb') // untouched default
+    vi.useRealTimers()
+  })
+
+  it('loadProfileApi rejects when the seed requests the failure path', async () => {
+    vi.useFakeTimers()
+    const promise = loadProfileApi({ displayName: PROFILE_LOAD_FAILS_FOR })
+    const assertion = expect(promise).rejects.toThrow('Could not load your profile')
+    await vi.runAllTimersAsync()
+    await assertion
+    vi.useRealTimers()
+  })
+
+  it('saveProfileApi resolves with the values it was given', async () => {
+    vi.useFakeTimers()
+    const values: ProfileValues = {
+      displayName: 'Ada Lovelace',
+      bio: '',
+      birthday: null,
+      country: 'us',
+      marketingEmails: true,
+      language: 'en',
+      avatar: null,
+    }
+    const promise = saveProfileApi(values)
+    await vi.runAllTimersAsync()
+    await expect(promise).resolves.toEqual(values)
     vi.useRealTimers()
   })
 })
