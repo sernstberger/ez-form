@@ -212,3 +212,100 @@ test('does not flag type-only or *Classes exports as components needing a README
   })
   assert.equal(result.status, 0)
 })
+
+// --- README structural checks (the union-merge damage class) ------------------------------------
+
+const CLEAN_SRC = {
+  'src/Widget.tsx': `export function Widget() {\n  return <button>ok</button>\n}\n`,
+}
+
+test('catches a component listed in two Components-table rows', () => {
+  const result = runGuardrails({
+    readme:
+      '## Components\n\n| Component | Wraps |\n| --- | --- |\n' +
+      '| `Widget` | MUI Button |\n| `Widget` | MUI Button (again) |\n',
+    files: CLEAN_SRC,
+  })
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /duplicate-readme-row/)
+  assert.match(result.stderr, /`Widget` appears in 2 Components rows \(lines 5, 6\)/)
+})
+
+test('allows distinct Components rows that share a component name in prose', () => {
+  const result = runGuardrails({
+    readme:
+      '## Components\n\n| Component | Wraps |\n| --- | --- |\n' +
+      '| `Widget` | MUI Button |\n| `Widget` (v4 additions) | see `Widget` above |\n',
+    files: CLEAN_SRC,
+  })
+  assert.equal(result.status, 0)
+})
+
+test('catches a duplicated ## heading', () => {
+  const result = runGuardrails({
+    readme:
+      '## Components\n\n| Component | Wraps |\n| --- | --- |\n| `Widget` | MUI Button |\n\n' +
+      '## Theming\n\nfirst copy\n\n## Theming\n\nsecond copy\n',
+    files: CLEAN_SRC,
+  })
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /duplicate-readme-heading/)
+  assert.match(result.stderr, /"## Theming" appears 2 times/)
+})
+
+test('catches a duplicated ### heading', () => {
+  const result = runGuardrails({
+    readme:
+      '## Components\n\n| Component | Wraps |\n| --- | --- |\n| `Widget` | MUI Button |\n\n' +
+      '## Theming\n\n### Slots\n\nfirst\n\n### Slots\n\nsecond\n',
+    files: CLEAN_SRC,
+  })
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /duplicate-readme-heading/)
+  assert.match(result.stderr, /"### Slots" appears 2 times/)
+})
+
+test('does not confuse a ### heading with a same-named ## heading', () => {
+  const result = runGuardrails({
+    readme:
+      '## Components\n\n| Component | Wraps |\n| --- | --- |\n| `Widget` | MUI Button |\n\n' +
+      '## Slots\n\ntop level\n\n### Slots\n\nsub level\n',
+    files: CLEAN_SRC,
+  })
+  assert.equal(result.status, 0)
+})
+
+test('ignores headings inside fenced code blocks', () => {
+  const result = runGuardrails({
+    readme:
+      '## Components\n\n| Component | Wraps |\n| --- | --- |\n| `Widget` | MUI Button |\n\n' +
+      '## Theming\n\n```md\n## Theming\n## Theming\n```\n',
+    files: CLEAN_SRC,
+  })
+  assert.equal(result.status, 0)
+})
+
+test('catches a header row spliced into the middle of a table', () => {
+  const result = runGuardrails({
+    readme:
+      '## Components\n\n| Component | Wraps |\n| --- | --- |\n| `Widget` | MUI Button |\n' +
+      '| Component | Wraps |\n| --- | --- |\n| `Gadget` | MUI Chip |\n',
+    indexTs: `export { Widget } from './Widget'\nexport { Gadget } from './Gadget'\n`,
+    files: {
+      ...CLEAN_SRC,
+      'src/Gadget.tsx': `export function Gadget() {\n  return <button>ok</button>\n}\n`,
+    },
+  })
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /mid-table-header-row/)
+})
+
+test('allows two separate tables each with their own header', () => {
+  const result = runGuardrails({
+    readme:
+      '## Components\n\n| Component | Wraps |\n| --- | --- |\n| `Widget` | MUI Button |\n\n' +
+      '## Theming\n\n| Key | Slots |\n| --- | --- |\n| `EzWidget` | root |\n',
+    files: CLEAN_SRC,
+  })
+  assert.equal(result.status, 0)
+})

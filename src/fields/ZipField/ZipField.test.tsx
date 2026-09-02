@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import { ThemeProvider, createTheme } from '@mui/material/styles'
 import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../../Form'
@@ -146,5 +147,49 @@ describe('ZipField', () => {
     await user.type(input(), '99999')
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(await screen.findByText('Not that one')).toBeInTheDocument()
+  })
+})
+
+describe('ZipField theme defaultProps (EzZipField)', () => {
+  it('takes invalidMessage from theme defaultProps', async () => {
+    const user = userEvent.setup()
+    const theme = createTheme({
+      components: {
+        EzZipField: {
+          defaultProps: { invalidMessage: 'Introduzca un código postal de 5 dígitos' },
+        },
+      },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{ zip: '' }} onSubmit={() => {}}>
+          <ZipField name="zip" label="Zip" />
+          <button type="submit">Go</button>
+        </Form>
+      </ThemeProvider>,
+    )
+    await user.type(input(), '902')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Introduzca un código postal de 5 dígitos',
+    )
+  })
+
+  it("a prop on the element still wins over the theme's default", async () => {
+    const user = userEvent.setup()
+    const theme = createTheme({
+      components: { EzZipField: { defaultProps: { invalidMessage: 'From the theme' } } },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{ zip: '' }} onSubmit={() => {}}>
+          <ZipField name="zip" label="Zip" invalidMessage="From the prop" />
+          <button type="submit">Go</button>
+        </Form>
+      </ThemeProvider>,
+    )
+    await user.type(input(), '902')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('From the prop')
   })
 })

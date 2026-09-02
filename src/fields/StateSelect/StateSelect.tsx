@@ -1,3 +1,4 @@
+import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import { mergeSlotProps } from '@mui/material/utils'
 import { Select, type SelectProps } from '../Select'
 import type { Option } from '../Option'
@@ -82,14 +83,11 @@ export const US_TERRITORIES: readonly Option[] = [
  * via `slotProps.htmlInput` — the same path a plain `TextField` uses, verified because
  * `Select`'s own `SelectProps`/`inputProps` legacy APIs don't exist in MUI 9.
  */
-export function StateSelect({
-  territories = false,
-  autoComplete: autoCompleteProp,
-  slotProps,
-  ...rest
-}: StateSelectProps) {
+export function StateSelect(inProps: StateSelectProps) {
   // Ahead of Select's own guard, so the "outside <Form>" error names <StateSelect>.
   useEzFormContext('StateSelect')
+  const props = useDefaultProps({ props: inProps, name: 'EzStateSelect' })
+  const { territories = false, autoComplete: autoCompleteProp, slotProps, ...rest } = props
   const assisted = useAssisted()
   const autoComplete = autoCompleteProp ?? resolveAutoComplete('address-level1', assisted)
   const options = territories ? [...US_STATES, ...US_TERRITORIES] : US_STATES

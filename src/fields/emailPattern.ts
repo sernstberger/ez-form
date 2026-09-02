@@ -18,8 +18,3 @@ export const EMAIL_PATTERN =
  * one's, and every caller checks for it separately before asking.
  */
 export const isEmail = (value: string): boolean => EMAIL_PATTERN.test(value)
-
-// TODO(#86): `EmailField` is being built in parallel and will want the same
-// regex. When both have landed, whichever merges second should import from here
-// rather than keeping a second copy — there must be exactly one definition of
-// "a valid email address" in this library.
