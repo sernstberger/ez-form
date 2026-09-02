@@ -131,6 +131,7 @@ const FORM_PROP_KEYS = {
   disabled: true,
   confirm: true,
   guard: true,
+  assisted: true,
   description: true,
   requiredIndicator: true,
   optionalText: true,

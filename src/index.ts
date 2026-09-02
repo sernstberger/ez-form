@@ -35,6 +35,7 @@ export {
   type PasswordFieldProps,
 } from './fields/PasswordField'
 export { PhoneField, type PhoneFieldProps } from './fields/PhoneField'
+export { SsnField, ssnFieldClasses, type SsnFieldProps } from './fields/SsnField'
 export type { FieldRules, BooleanFieldRules } from './rules'
 export {
   Autocomplete,

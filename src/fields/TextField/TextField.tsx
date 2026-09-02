@@ -3,6 +3,8 @@ import { mergeSlotProps } from '@mui/material/utils'
 import type { ReactNode } from 'react'
 import { useEzField } from '../useEzField'
 import { mergeDisabled } from '../mergeDisabled'
+import { resolveAutoComplete } from '../resolveAutoComplete'
+import { useAssisted } from '../../Form/AssistedContext'
 import type { FieldRules } from '../../rules'
 
 /**
@@ -77,10 +79,14 @@ export function TextField({
   optionalText,
   displayValue,
   type,
-  autoComplete = type ? AUTO_COMPLETE_BY_TYPE[type] : undefined,
+  autoComplete: autoCompleteProp,
   componentName = 'TextField',
   ...rest
 }: TextFieldProps) {
+  const assisted = useAssisted()
+  const autoComplete =
+    autoCompleteProp ??
+    resolveAutoComplete(type ? AUTO_COMPLETE_BY_TYPE[type] : undefined, assisted)
   const f = useEzField<string>(name, componentName, {
     label,
     rules: { required, min, max, minLength, maxLength, pattern, validate },

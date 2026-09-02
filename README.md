@@ -113,8 +113,9 @@ React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form
 | `Wizard`                                       | MUI `Stepper`                                 | `steps`, `step?`/`onStepChange?`, `visited?`/`onVisitedChange?`, `orientation?`, `layout?: 'steps' \| 'page'`; with `WizardStepper`, `WizardStep`, `WizardNav` (`actionsOrder?: 'back-next' \| 'next-back'`, default `'back-next'`), `useWizard`                                                                                                                                                                                                                                 |
 | `Wizard`                                       | MUI `Stepper`                                 | `steps`, `step?`/`onStepChange?`, `visited?`/`onVisitedChange?`, `orientation?`, `layout?: 'steps' \| 'page'`, `stepAnnouncement?`; with `WizardStepper`, `WizardStep`, `WizardNav` (`actionsOrder?: 'back-next' \| 'next-back'`, default `'back-next'`), `useWizard`                                                                                                                                                                                                            |
 | `ReadOnlyField`                                | MUI `Typography`                              | `name`, `label?`, `options?`, `format?`, `empty?`, `editStep?` — or `value` (a caller-computed value, e.g. from its own `useWatch`) with `label` required and no `name`; never calls `useWatch` in that mode                                                                                                                                                                                                                                                                     |
-| `PasswordField`                                | ez-form `TextField`                           | `name`; same rules as TextField. `revealable?` (default `true`) shows a show/hide toggle in the end adornment; `autoComplete` defaults to `'current-password'`; `slotProps.toggle?` reaches the toggle `IconButton`                                                                                                                                                                                                                                                              |
+| `PasswordField`                                | ez-form `TextField`                           | `name`; same rules as TextField. `revealable?` (default `true`) shows a show/hide toggle in the end adornment; `autoComplete` defaults to `'current-password'`; `slotProps.toggle?` reaches the toggle `IconButton`; `showLabel?`/`hideLabel?` set its accessible name                                                                                                                                                                                                           |
 | `PhoneField`                                   | ez-form `TextField`                           | `name`; same rules as TextField, plus `format?` (a `#` template, default `'###-###-####'`) and `invalidMessage?`. The form value is digits only (`'5551234567'`); `type="tel"`, `inputMode="tel"`, `autoComplete` defaults to `'tel'`. A non-empty value shorter than the template's digit count fails with `invalidMessage`                                                                                                                                                     |
+| `SsnField`                                     | ez-form `TextField`                           | `name`; same rules as TextField, plus a built-in "9 digits" rule (`invalidMessage?`, default `'Enter a 9-digit Social Security number'`). The form value is digits only (`'123456789'`), displayed as `123-45-6789`; `inputMode="numeric"`, `autoComplete="off"`. `reveal?` (default `true`) shows a show/hide toggle; hidden renders `type="password"`                                                                                                                          |
 | `PasswordStrength`                             | MUI `LinearProgress`                          | `name`; `score?: (password) => 0\|1\|2\|3\|4` (default a small built-in heuristic); `labels?` (5 strings). Renders as an ARIA `meter`, never registers or validates                                                                                                                                                                                                                                                                                                              |
 | `TextareaField`                                | `TextField` with `multiline` fixed on         | `name`, `showCount?`; the same rules as TextField. Taller default (`minRows: 4`, `maxRows: 12`, both themeable); shows a `n / max` length meter when `maxLength` is set (or `showCount`), which turns into the validation error past the limit                                                                                                                                                                                                                                   |
 | `DateField`                                    | MUI X `DateField`                             | Same shape as `DatePicker`, but no popup — a keyboard-only, sectioned date input. Better for birthdays and other far-away dates: typing beats paging a calendar back decades                                                                                                                                                                                                                                                                                                     |
@@ -967,8 +968,54 @@ Themeable under `EzFileField` (`root`, `fileList`, `deleteIcon`, `dropZone`, `dr
 | `MoneyField`  | always (currency has cents)                                           | —               | `decimal`       |
 | `OtpField`    | first slot only, from Base UI itself, not duplicated here             | `one-time-code` | `numeric`       |
 | `PhoneField`  | always — set by the field itself, not the `type="tel"` fallback       | `tel`           | `tel`           |
+| `SsnField`    | always — an SSN has no autofill token, so `off` is deliberate         | `off`           | `numeric`       |
 
-`TextField` never guesses a token from `name` — a wrong guess is worse than none, so only these unambiguous `type`s get a default. `PasswordField` covers `autoComplete="current-password"` / `"new-password"` on its own, above. `PhoneField` sets `type="tel"`, `inputMode="tel"` and its `autoComplete` default itself rather than relying on the `type`-derived fallback — the two agree, but the field owns them — and its `autoComplete` takes a sectioned token (`"shipping tel"`, `"work tel"`) for forms with more than one number. The remaining v8 date/time/address fields (#17–#19) will extend this table.
+`TextField` never guesses a token from `name` — a wrong guess is worse than none, so only these unambiguous `type`s get a default. `PasswordField` covers `autoComplete="current-password"` / `"new-password"` on its own, above. `PhoneField` sets `type="tel"`, `inputMode="tel"` and its `autoComplete` default itself rather than relying on the `type`-derived fallback — the two agree, but the field owns them — and its `autoComplete` takes a sectioned token (`"shipping tel"`, `"work tel"`) for forms with more than one number. `SsnField` pins `autoComplete="off"` rather than offering it as a prop: there is no autofill token for a Social Security number, and inviting a browser to store one is the wrong default. The remaining v8 date/time/address fields (#18–#19) will extend this table.
+
+## Assisted mode
+
+`<Form assisted>` is for a form filled out by someone other than the person it's about — an
+internal rep taking a phone order, an agent entering an applicant's details. You don't
+necessarily know who's actually typing, so the browser's own autofill (their saved name,
+address, card) should never be offered:
+
+```tsx
+<Form assisted schema={schema} defaultValues={values} onSubmit={onSubmit}>
+  <TextField name="firstName" label="First name" />
+  <PhoneField name="phone" label="Phone" />
+</Form>
+```
+
+It does two things:
+
+- Sets `autoComplete="off"` on the `<form>` element itself.
+- Tells every field to emit `autoComplete="off"` in place of its own default token — `TextField`'s
+  `type`-derived guess, `PhoneField`'s `'tel'`, `ZipField`'s `'postal-code'`, `StateSelect`'s
+  `'address-level1'`, and each part of `AddressField`. `PasswordField` is the one exception: it
+  emits `'new-password'` instead of `'off'` (below).
+
+An **explicit `autoComplete` always wins**, on the `<Form>` itself or on any individual field —
+`assisted` only replaces a field's own _default_. This matters for a field whose token has no
+`type` to derive it from — `<TextField name="firstName" autoComplete="given-name" />`, say: since
+there's no default to override, passing `assisted` on `<Form>` alone does nothing for it, and a
+plain `TextField` has no built-in way to resolve it either. The `Insurance` example's Agent story
+(`agentMode`) hits exactly this: its `given-name`/`family-name`/`street-address` fields are
+hardcoded (no `type` derives them), so its `ApplicantStep`/`ContactStep` read the form's assisted
+state and clear their own token when it's on — the pattern to follow for any field where you've
+hardcoded a token that should also disappear under `assisted`.
+
+**What browsers actually honour.** `autoComplete="off"` works for most fields, but Chromium
+ignores it for address-shaped fields (street, city, state, ZIP) and offers to fill them anyway —
+a documented, long-standing browser quirk, not a bug here. No test in this codebase has shown
+`"off"` fail for ez-form's own address fields, so that's what they emit; a future field where it
+provably doesn't work should fall back to a non-matching token (e.g. `one-time-code`) instead,
+with the reasoning recorded next to the change. Password managers also don't reliably honour
+`"off"` on a password input specifically, which is why `PasswordField` uses `autoComplete="new-password"`
+under `assisted` regardless of whether it's a sign-in or sign-up field — the one token browsers
+consistently treat as "don't fill from a saved credential".
+
+`assisted` is theme-defaultable like any other `Form` prop:
+`theme.components.EzForm.defaultProps.assisted`.
 
 ## NumberField
 
@@ -1003,9 +1050,13 @@ const schema = z.object({ price: z.number().min(0) })
 
 The toggle is a themeable `IconButton` under `EzPasswordField` (`root`, `toggle`, exported as `passwordFieldClasses`); `slotProps.toggle` reaches it directly, but its `children` is always overridden — swap the reveal icons with `icons?: { show?: ReactNode; hide?: ReactNode }` instead, defaulted through `useDefaultProps` so `theme.components.EzPasswordField.defaultProps.icons` can replace them app-wide.
 
+`showLabel?` / `hideLabel?` set the toggle's accessible name (defaults `'Show password'` / `'Hide password'`); like `icons`, both are settable app-wide through `theme.components.EzPasswordField.defaultProps`, which is what makes the toggle localisable.
+
+Revealing keeps your place: flipping an `<input>` between `type="password"` and `type="text"` makes the browser re-create the editing context, which drops the selection, and the click that flipped it has already moved focus to the button. Both fields with a toggle capture the selection before the swap and restore focus and caret after it — unless focus was not in the input to begin with (a toggle reached by Tab), in which case focus stays on the button where you put it.
+
 ## US fields
 
-`PhoneField` is the first of the US-shaped fields. They share one rule: **the form value is the bare digits, and the template only decides how they are displayed.** So a zod schema stays a plain `z.string()` with no regex — the field itself owns completeness — and the value you submit, store and compare is always canonical, whatever the user typed or pasted.
+`PhoneField` and `SsnField` are the template-driven US fields. They share one rule: **the form value is the bare digits, and the template only decides how they are displayed.** So a zod schema stays a plain `z.string()` with no regex — the field itself owns completeness — and the value you submit, store and compare is always canonical, whatever the user typed or pasted.
 
 ```tsx
 const schema = z.object({ phone: z.string() })
@@ -1038,6 +1089,30 @@ A value that is non-empty but incomplete fails on submit with `invalidMessage`, 
 ```
 
 `format`, `invalidMessage` and `autoComplete` are all settable app-wide through `theme.components.EzPhoneField.defaultProps`; a prop on the element always wins. `PhoneField` adds no styled slot of its own — it renders a `TextField`, so MUI's own `MuiTextField` / `MuiOutlinedInput` style keys reach it unchanged.
+
+### SsnField
+
+The same template machinery, with the template fixed at `###-##-####` — an SSN has one canonical rendering, so there is no `format` prop to get it wrong with. The form value is the bare nine digits; `123-45-6789`, `123 45 6789` and `123456789` all paste to `'123456789'`.
+
+```tsx
+const schema = z.object({ ssn: z.string() })
+
+<SsnField name="ssn" label="Social Security number" required />
+```
+
+**It is hidden by default.** While hidden the input is `type="password"`, so the browser masks the formatted text and the number survives a shoulder-surf; the toggle switches to `type="text"` to check an entry, and the reveal state is local to the field — it never reaches the form value and resets on unmount. `reveal={false}` removes the toggle entirely. Toggling keeps your place in the field: focus returns to the input and the caret goes back where it was (see PasswordField above, which shares the behaviour).
+
+```tsx
+<SsnField name="ssn" label="Social Security number" reveal={false} />
+```
+
+Masking hides the digits, not the shape: nine dots plus two separators is what `type="password"` renders. That is the same trade every masked field makes, and it is what lets the field be a plain `<input>` with real caret, paste and screen-reader behaviour rather than a custom widget.
+
+A value that is non-empty but shorter than nine digits fails on submit with `invalidMessage`, default `Enter a 9-digit Social Security number`. An empty value is left to `required`, and the value is `''` rather than `undefined` when empty, so `required` still applies. The field validates _length_, not issuance — it does not reject the ranges the SSA never assigned (`000`/`666`/`9xx` area numbers, and so on); add a `validate` of your own if you need that.
+
+`autoComplete` is pinned to `'off'` and is not a prop: there is no autofill token for an SSN, and inviting a browser to store one is the wrong default.
+
+The toggle is a themeable `IconButton` under `EzSsnField` (`root`, `toggle`, exported as `ssnFieldClasses`); `slotProps.toggle` reaches it, `icons?: { show?, hide? }` swaps its icons, and `showLabel`/`hideLabel` set its accessible name (defaults `'Show Social Security number'` / `'Hide Social Security number'`). `invalidMessage`, `reveal`, `icons` and the labels are all settable app-wide through `theme.components.EzSsnField.defaultProps`; a prop on the element always wins.
 
 ## PasswordStrength
 
