@@ -101,7 +101,7 @@ React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form
 | `AddressField`                                 | `TextField` + `StateSelect` + `ZipField`      | `name` (nested object), `legend?`/`description?` (renders a `FormSection`), `autoCompleteSection?` (`'shipping'`/`'billing'`/any section token, prefixes every autofill token), `street2?` (default `true`), `streetLabel?`/`street2Label?`/`cityLabel?`/`stateLabel?`/`zipLabel?`, `required`/`disabled`, `slotProps?`. `required` reaches street/city/state/zip, never street2; `addressSchema()` is the matching zod object                                                   |
 | `DatePicker` / `TimePicker` / `DateTimePicker` | MUI X pickers                                 | `name`, `label?`, `helperText?`, `errorMessages?`; rules `required`, `validate`. The picker's own props (`minDate`, `disablePast`, `views`, …) pass through. Value is the adapter's date type or `null`                                                                                                                                                                                                                                                                          |
 | `OtpField`                                     | Base UI `OTPField` in MUI's outlined style    | `name`, `label?`, `helperText?`, `length?` (6), `mask?`, `validationType?`, `size?`; rules `required`, `validate`. Value is the code string; a partial code fails with `<label> must be <length> characters.`                                                                                                                                                                                                                                                                    |
-| `FileField`                                    | MUI `Button` + hidden `<input type="file">`   | `name`, `label` (button text), `accept?`, `multiple?`, `buttonProps?`, `helperText?`; rules `required`, `validate`. Value is `File \| null`, or `File[]` under `multiple`. `onChange(event, value)` fires on a pick and on a chip delete                                                                                                                                                                                                                                         |
+| `FileField`                                    | MUI `Button` + hidden `<input type="file">`   | `name`, `label` (button text), `accept?`, `multiple?`, `dropzone?`, `dropText?`, `maxSize?`, `maxFiles?`, `renderFile?`, `onFilesAdded?`, `buttonProps?`, `helperText?`; rules `required`, `validate`. Value is `File \| null`, or `File[]` under `multiple`. `onChange(event, value)` fires on a pick and on a chip delete                                                                                                                                                      |
 | `Checkbox`                                     | MUI `Checkbox`                                | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `Switch`                                       | MUI `Switch`                                  | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `SubmitButton`                                 | MUI `Button`                                  | `loading` while submitting, disabled while the form is                                                                                                                                                                                                                                                                                                                                                                                                                           |
@@ -626,7 +626,7 @@ const theme = createTheme({
       styleOverrides: { helperText: { marginLeft: 8 } },
     },
     EzFileField: {
-      styleOverrides: { fileList: { marginTop: 16 } },
+      styleOverrides: { fileList: { marginTop: 16 }, dropZone: { borderStyle: 'solid' } },
     },
   },
 })
@@ -792,6 +792,58 @@ const schema = z.object({ bio: z.string().max(500) })
 ```
 
 Themeable under `EzTextareaField` (`root`, `counter`, exported as `textareaFieldClasses`).
+
+## FileField
+
+The default is a picker button over a hidden `<input type="file">`. `dropzone` wraps
+it in a drop area; the button inside stays the keyboard and screen-reader path, so the
+zone is deliberately not focusable and carries no role — drag-and-drop adds no second
+tab stop. `dropText` (default `'Drag files here, or'`) is the zone's visible
+instruction, and `dragActive` is a visual cue only.
+
+```tsx
+<FileField name="photos" label="Choose photos" multiple dropzone accept="image/*" />
+```
+
+`accept`, `maxSize` (bytes) and `maxFiles` (under `multiple`) are validation, not just
+filtering: a picked _or dropped_ file that fails one is rejected — it never enters the
+value — and the reason surfaces as the field's error through a built-in rule, so it
+fails a submit too. Any change to the value clears it: an accepted pick or drop, or
+removing a file with its chip (which is how you answer a `maxFiles` rejection). `accept` still goes on the
+input as the native attribute, and it is matched the way the native input matches it
+(`.ext` by suffix, `type/subtype` exactly, `type/*` by prefix).
+
+| Prop       | Rejection message prop | Default                          |
+| ---------- | ---------------------- | -------------------------------- |
+| `maxSize`  | `maxSizeMessage`       | `'File is larger than {size}'`   |
+| `accept`   | `acceptMessage`        | `'File type not accepted'`       |
+| `maxFiles` | `maxFilesMessage`      | `'Choose at most {count} files'` |
+
+`{size}` is replaced with the limit humanized (`1500000` → `1.5 MB`) and `{count}` with
+the limit; both messages are props, so they translate.
+
+Under `multiple`, a pick or drop **appends** to the value rather than replacing it, so a
+drop zone used twice accumulates and `maxFiles` means "at most n in total"; files come
+off with their chips. A single-file field still replaces.
+
+The library uploads nothing. `onFilesAdded(files)` fires once per pick or drop with the
+files that passed — start your upload there — and `renderFile(file, index)` replaces the
+default chip so you can render your own progress:
+
+```tsx
+<FileField
+  name="photos"
+  label="Choose photos"
+  multiple
+  dropzone
+  maxSize={2_000_000}
+  onFilesAdded={(files) => files.forEach(upload)}
+  renderFile={(file) => <LinearProgress variant="determinate" value={percent(file)} />}
+/>
+```
+
+Themeable under `EzFileField` (`root`, `fileList`, `deleteIcon`, `dropZone`, `dragActive`,
+`dropText`, exported as `fileFieldClasses`).
 
 ## Mobile keyboards & autofill
 
