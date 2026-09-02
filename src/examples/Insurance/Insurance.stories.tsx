@@ -18,7 +18,7 @@ import {
   Insurance,
   schema,
   emptyValues,
-  useInsuranceSteps,
+  INSURANCE_STEPS,
   ApplicantStep,
   ContactStep,
   CoverageStep,
@@ -93,8 +93,7 @@ function InsuranceLayout() {
   const { step = '' } = useParams()
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const hasVehicle = Boolean(useWatch<Input, 'hasVehicle'>({ name: 'hasVehicle' }))
-  const steps = useInsuranceSteps(hasVehicle)
+  const steps = INSURANCE_STEPS
   return (
     <Stack spacing={3} sx={{ width: 480, mx: 'auto', my: 4 }}>
       <Typography variant="body2" color="text.secondary">

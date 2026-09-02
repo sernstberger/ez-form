@@ -195,39 +195,28 @@ const HISTORY_FIELDS = ['claims', 'priorIncidents'] as const
 const DOCUMENTS_FIELDS = ['documents'] as const
 
 /**
- * All 9 steps, always present in `steps` (`Wizard.steps` must be a stable
- * reference — see `WizardProps.steps`'s own doc — so the vehicle step can't
- * be spliced in/out on every render). `useInsuranceSteps` below derives the
- * *effective* list with `useMemo` keyed on `hasVehicle`, memoized so the
- * reference only changes when the boolean itself changes; the vehicle step
- * is filtered out of that derived list when `hasVehicle` is false, which
- * only ever removes it from *navigation and validation*, not from the
- * `WizardStep` elements below (`WizardStep` no-ops when its `id` isn't the
- * current step). Ruling: no library primitive removes a step from `steps`
- * short of building this filtered array ourselves — `onStepChange`/`go`
- * alone can't stop the stepper from listing/allowing a step, so this is the
- * least-hacky option; tracked as a request in #80 for a first-class
- * `WizardStepDef.when` predicate. Cost if wrong: for now every multi-step
- * conditional-step form must repeat this `useMemo` pattern by hand.
+ * All 9 steps. The vehicle step carries a `when` predicate (#80), so the
+ * Wizard itself hides it from navigation, the stepper and page layout while
+ * `hasVehicle` is false; its fields are gated in the schema with `superRefine`.
+ * `steps` stays a module-level constant — `Wizard.steps` must be a stable
+ * reference.
  */
-const ALL_STEPS = [
+export const INSURANCE_STEPS = [
   { id: 'applicant', label: 'Applicant', fields: APPLICANT_FIELDS },
   { id: 'contact', label: 'Contact', fields: CONTACT_FIELDS },
   { id: 'coverage', label: 'Coverage', fields: COVERAGE_FIELDS },
   { id: 'has-vehicle', label: 'Vehicle?', fields: HAS_VEHICLE_FIELDS },
-  { id: 'vehicle', label: 'Vehicle', fields: VEHICLE_FIELDS },
+  {
+    id: 'vehicle',
+    label: 'Vehicle',
+    fields: VEHICLE_FIELDS,
+    when: (values: Input) => Boolean(values.hasVehicle),
+  },
   { id: 'drivers', label: 'Drivers', fields: DRIVERS_FIELDS },
   { id: 'history', label: 'History', fields: HISTORY_FIELDS },
   { id: 'documents', label: 'Documents', fields: DOCUMENTS_FIELDS },
   { id: 'review', label: 'Review' },
-] as const satisfies WizardStepDef<Input>[]
-
-export function useInsuranceSteps(hasVehicle: boolean): readonly WizardStepDef<Input>[] {
-  return useMemo(
-    () => (hasVehicle ? ALL_STEPS : ALL_STEPS.filter((s) => s.id !== 'vehicle')),
-    [hasVehicle],
-  )
-}
+] as const satisfies readonly WizardStepDef<Input>[]
 
 /** Watches the whole form so the parent can persist it (localStorage resume). */
 function WatchValues({ onValues }: { onValues: (values: Partial<Input>) => void }) {
@@ -410,7 +399,7 @@ export function InsuranceSteps({ hasVehicle }: { hasVehicle: boolean }) {
       <ContactStep />
       <CoverageStep />
       <HasVehicleStep />
-      {hasVehicle && <VehicleStep />}
+      <VehicleStep />
       <DriversStep />
       <HistoryStep />
       <DocumentsStep />
@@ -454,7 +443,7 @@ export function Insurance({
   const [visited, setVisited] = useState<readonly string[]>(saved?.visited ?? ['applicant'])
   const [values, setValues] = useState<Partial<Input>>(saved?.values ?? emptyValues)
   const hasVehicle = Boolean(values.hasVehicle)
-  const steps = useInsuranceSteps(hasVehicle)
+  const steps = INSURANCE_STEPS
   // `defaultValues` only seeds hookform once, at mount; "Start over" needs the already-mounted
   // form to actually reset, so it goes through the form methods (see Profile's own `form` ref
   // for the same reasoning) rather than relying on this state change alone.
