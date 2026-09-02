@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useFormContext } from 'react-hook-form'
 import { z } from 'zod'
@@ -8,6 +8,7 @@ import { Form } from '../Form'
 import { SubmitButton } from '../SubmitButton'
 import { TextField } from '../fields/TextField'
 import { expectNoA11yViolations } from '../test/axe'
+import { formSectionClasses } from '../FormSection'
 import { Wizard, type WizardStepDef } from './Wizard'
 import { WizardStep } from './WizardStep'
 import { WizardStepper, wizardStepperClasses } from './WizardStepper'
@@ -707,7 +708,7 @@ describe('WizardStepper', () => {
   it('shows every step; visited steps are buttons, upcoming steps are not', async () => {
     const user = userEvent.setup()
     render(<Inline />)
-    expect(screen.getByText('Account')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /Account/ })).toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: /Plan/ })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'next' }))
     await waitFor(() => expect(screen.getByRole('tab', { name: /Account/ })).toBeInTheDocument())
@@ -864,6 +865,63 @@ describe('WizardStepper', () => {
   })
 })
 
+describe('WizardStep renders a FormSection', () => {
+  function renderWizard({ orientation }: { orientation?: 'horizontal' | 'vertical' } = {}) {
+    return render(
+      <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+        <Wizard steps={steps} orientation={orientation}>
+          <WizardStepper />
+          <Steps />
+        </Wizard>
+      </Form>,
+    )
+  }
+
+  it('horizontal: a step is a group named by its label with one heading', () => {
+    renderWizard()
+    const group = screen.getByRole('group', { name: 'Account' })
+    expect(within(group).getByRole('textbox', { name: 'Name' })).toBeInTheDocument()
+    expect(screen.getAllByRole('heading')).toHaveLength(1)
+    expect(screen.getByRole('heading', { name: 'Account' })).toBeInTheDocument()
+  })
+
+  it('vertical: the step group is named by the stepper label and renders no legend', () => {
+    renderWizard({ orientation: 'vertical' })
+    const group = screen.getByRole('group', { name: 'Account' })
+    expect(within(group).getByRole('textbox', { name: 'Name' })).toBeInTheDocument()
+    // MUI's outlined TextField renders its own <legend> (NotchedOutline); target
+    // FormSection's own legend class rather than the bare selector.
+    expect(group.querySelector(`.${formSectionClasses.legend}`)).toBeNull()
+  })
+
+  it('title={null} keeps the fieldset but drops the legend; title overrides the label', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+        <Wizard steps={steps}>
+          <WizardStep id="account" title={null}>
+            <TextField name="name" label="Name" />
+          </WizardStep>
+          <WizardStep id="plan" title="Pick a plan">
+            <TextField name="plan" label="Plan" />
+          </WizardStep>
+          <WizardStep id="review">
+            <p>Review</p>
+          </WizardStep>
+          <Controls />
+        </Wizard>
+      </Form>,
+    )
+    const accountGroup = screen.getByRole('group')
+    expect(within(accountGroup).getByRole('textbox', { name: 'Name' })).toBeInTheDocument()
+    expect(accountGroup.querySelector(`.${formSectionClasses.legend}`)).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'next' }))
+    await waitFor(() =>
+      expect(screen.getByRole('group', { name: 'Pick a plan' })).toBeInTheDocument(),
+    )
+  })
+})
+
 describe('WizardNav', () => {
   function Inline({ onSubmit = () => {} }: { onSubmit?: () => void }) {
     return (
@@ -894,7 +952,7 @@ describe('WizardNav', () => {
     await waitFor(() => expect(screen.getByRole('textbox', { name: 'Plan' })).toBeInTheDocument())
     expect(screen.getByRole('button', { name: 'Back' })).toBeEnabled()
     await user.click(screen.getByRole('button', { name: 'Next' }))
-    await waitFor(() => expect(screen.getByText('Review')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('group', { name: 'Review' })).toBeInTheDocument())
     expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Submit' }))
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(filled, expect.anything()))
