@@ -113,6 +113,31 @@ export const Horizontal: Story = {}
 export const Vertical: Story = { args: { orientation: 'vertical' } }
 
 /**
+ * `WizardNav actionsOrder="next-back"` renders Next (or Submit, on the last step) before Back
+ * in the DOM — tab order follows, not just the visual order. Also settable globally via
+ * `theme.components.EzWizardNav.defaultProps.actionsOrder`.
+ */
+export const NextBackOrder: Story = {
+  render: (args) => (
+    <Form
+      schema={schema}
+      defaultValues={emptyValues}
+      onSubmit={onSubmit}
+      title="Create your account"
+      confirm={{ title: 'Create account?' }}
+    >
+      <Stack spacing={3} sx={{ width: 480 }}>
+        <Wizard {...args}>
+          <WizardStepper />
+          <StepsContent />
+          <WizardNav submitLabel="Create account" actionsOrder="next-back" />
+        </Wizard>
+      </Stack>
+    </Form>
+  ),
+}
+
+/**
  * The same `steps` array and `StepsContent` as `Horizontal` / `Vertical`, rendered as one
  * page instead: `WizardStepper` and `WizardNav` render nothing in `layout="page"`, so this
  * story swaps in a plain `SubmitButton` that validates the whole schema at once.

@@ -32,6 +32,15 @@ export const Destructive: Story = {
   },
 }
 
+/**
+ * `actionsOrder="confirm-cancel"` renders Confirm before Cancel in the DOM — tab order
+ * follows, not just the visual order. Cancel still gets `autoFocus`. Also settable globally
+ * via `theme.components.EzConfirmDialog.defaultProps.actionsOrder`.
+ */
+export const ReversedOrder: Story = {
+  args: { actionsOrder: 'confirm-cancel' },
+}
+
 export const WithUseConfirm: Story = {
   render: () => {
     const { confirm, dialog } = useConfirm()
