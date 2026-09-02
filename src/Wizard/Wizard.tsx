@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useFormState, type FieldValues, type Path } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
 import {
@@ -85,6 +85,7 @@ export function Wizard<TIn extends FieldValues>({
 }: WizardProps<TIn>) {
   const { trigger, control, setFocus } = useEzFormContext('Wizard')
   const { errors, submitCount } = useFormState({ control })
+  const id = useId()
   // `steps` is required and a wizard with no steps has nothing to render;
   // every index below is derived from it and clamped to its range, so the
   // non-null assertions here are the shape of the data, not a guess.
@@ -242,6 +243,7 @@ export function Wizard<TIn extends FieldValues>({
 
   const value = useMemo<WizardContextValue>(
     () => ({
+      id,
       // The context is deliberately untyped in `TIn`: WizardStepper / WizardNav / useWizard
       // consume it without knowing the form's field type, so these casts erase `TIn` on purpose.
       steps: steps as readonly WizardStepDef[],
@@ -259,7 +261,20 @@ export function Wizard<TIn extends FieldValues>({
       contentEl,
       setContentEl,
     }),
-    [steps, current, index, visited, orientation, pending, next, prev, go, stepStatus, contentEl],
+    [
+      id,
+      steps,
+      current,
+      index,
+      visited,
+      orientation,
+      pending,
+      next,
+      prev,
+      go,
+      stepStatus,
+      contentEl,
+    ],
   )
 
   return <WizardContext.Provider value={value}>{children}</WizardContext.Provider>

@@ -4,3 +4,4 @@ export { WizardStepper, type WizardStepperProps, wizardStepperClasses } from './
 export { WizardNav, type WizardNavProps, wizardNavClasses } from './WizardNav'
 export { useWizard, useOptionalWizard } from './useWizard'
 export type { WizardContextValue } from './WizardContext'
+export { stepLabelId } from './WizardContext'
