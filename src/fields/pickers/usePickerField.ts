@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react'
+import { useRef, type FocusEvent, type ReactNode } from 'react'
 import { mergeSlotProps } from '@mui/material/utils'
 import type { PickerChangeHandlerContext } from '@mui/x-date-pickers/models'
 import type { FieldValues, Validate } from 'react-hook-form'
@@ -23,6 +23,15 @@ interface PickerHandlers<TValue, TError, TSlotProps extends { textField?: object
   onChange?: (value: TValue, context: PickerChangeHandlerContext<TError>) => void
   onError?: (error: TError, value: TValue) => void
   slotProps?: TSlotProps
+}
+
+/**
+ * The parts of the consumer's `slotProps.textField` this hook merges by hand.
+ * `TSlotProps` only guarantees `textField?: object`, so read them through this.
+ */
+interface ConsumerTextFieldSlotProps {
+  onBlur?: (event: FocusEvent<HTMLDivElement>) => void
+  slotProps?: Record<string, unknown> & { formHelperText?: object }
 }
 
 const toRecord = <TValue>(
@@ -78,6 +87,7 @@ export function usePickerField<
     },
   })
   const text = f.helperText(helperText)
+  const consumerTextField = slotProps?.textField as ConsumerTextFieldSlotProps | undefined
 
   return {
     name: f.field.name,
@@ -96,13 +106,30 @@ export function usePickerField<
     },
     slotProps: {
       ...slotProps,
-      textField: mergeSlotProps(slotProps?.textField, {
+      // Merged by hand, one level deeper than `mergeSlotProps` goes: that is a
+      // shallow merge with the consumer's props spread last, so a consumer
+      // `textField.slotProps` would replace `{ formHelperText: { role } }`
+      // wholesale and silently drop the error announcement. The form owns
+      // `required`/`error`/`helperText`, so those are spread after the
+      // consumer's — the same precedence TextField uses.
+      textField: {
+        ...consumerTextField,
         required: f.required,
         error: f.invalid,
         helperText: text,
-        onBlur: () => f.field.onBlur(),
-        slotProps: { formHelperText: { role: f.helperTextA11y.role } },
-      }),
+        // Not merged through `mergeSlotProps`: its handler composition would run
+        // the consumer's onBlur first, inverting the "form's handler first" rule.
+        onBlur: (event: FocusEvent<HTMLDivElement>) => {
+          f.field.onBlur()
+          consumerTextField?.onBlur?.(event)
+        },
+        slotProps: {
+          ...consumerTextField?.slotProps,
+          formHelperText: mergeSlotProps(consumerTextField?.slotProps?.formHelperText, {
+            role: f.helperTextA11y.role,
+          }),
+        },
+      },
     } as TSlotProps,
   }
 }
