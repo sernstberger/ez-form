@@ -289,6 +289,38 @@ calls the consumer's `useBlocker(shouldBlock)` (react-router's hook has that
 signature) and adapts the result for a `ConfirmDialog`. Story: react-router
 `MemoryRouter` with a second route, dirty form, nav link → dialog.
 
+## Section 5 — Theming: no styling in components, everything overridable
+
+Steve's rule (Sept 2, mid-implementation): ez-form components carry **no
+styling judgement calls** — no `sx`, no hard-coded paddings, no ripple
+toggles, no colors. Sane defaults exist, but only in the two places MUI's own
+components keep them, so a consumer theme can override every one:
+
+| Layer | Mechanism | Theme override |
+|---|---|---|
+| Default props (`variant`, `size`, `slotProps`, `direction`, …) | `useDefaultProps({ props, name: 'Ez<Component>' })` from `@mui/material/DefaultPropsProvider` | `theme.components.Ez<Component>.defaultProps` |
+| Default styles (the few a component needs to work, e.g. the vertical step button's padding) | `styled(Base, { name: 'Ez<Component>', slot: '<Slot>' })({ … })` | `theme.components.Ez<Component>.styleOverrides.<slot>` |
+| Class hooks | `generateUtilityClasses('Ez<Component>', ['root', 'label', …])` exported as `<component>Classes` | CSS / `styleOverrides` keys |
+| Types | one module augmentation file adds every `Ez*` name to `ComponentsPropsList`, `ComponentNameToClassKey`, and `Components` | typed `createTheme({ components: { EzReadOnlyField: … } })` |
+
+Names: `EzForm` prefix is not used; the prefix is `Ez` followed by the
+component name (`EzReadOnlyField`, `EzWizardStepper`, `EzWizardNav`,
+`EzClearButton`, `EzConfirmDialog`, `EzSubmitButton`). Slot names are
+`Root` plus one per meaningful part, lower-camel in class keys and
+`styleOverrides` (`root`, `label`, `value`, `edit`, `verticalStepButton`).
+
+What this means per component:
+
+- `ReadOnlyField`: `slotProps.label` defaults to `{ variant: 'caption', color: 'text.secondary' }`, `slotProps.value` to `{ variant: 'body1' }` — as `useDefaultProps` defaults, so a theme can swap them. Root / label / value / edit are `styled` slots with classes.
+- `WizardStepper`: orientation stays a prop; the vertical clickable step is `styled(ButtonBase, { slot: 'VerticalStepButton' })` carrying StepButton's own layout styles as its default style block (overridable). No `focusRipple`.
+- `WizardNav`: `direction`, `spacing`, `justifyContent` and the Back/Next `variant`s are `useDefaultProps` defaults (`row`, `1`, `space-between`, `text`, `contained`), not literals in JSX.
+- `ClearButton` / `SubmitButton`: `variant` defaults (`text` / `contained`) move to `useDefaultProps`.
+- `ConfirmDialog`: Confirm button `variant="contained"` default moves to `useDefaultProps`; `confirmColor` stays a prop.
+- Stories may style freely; `src/` may not.
+
+An optional `ezFormTheme` (a `createTheme` preset that sets these keys the way
+Steve likes) is a later version; this section only guarantees the hooks.
+
 ## Testing
 
 vitest + RTL + axe, matching the existing test style.
