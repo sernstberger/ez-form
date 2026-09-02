@@ -106,6 +106,58 @@ describe('ConfirmDialog', () => {
     expect(screen.getByRole('button', { name: 'Confirm' })).toHaveClass('MuiButton-contained')
   })
 
+  it('defaults actionsOrder to cancel-confirm: Cancel is first in the DOM', () => {
+    render(<ConfirmDialog open title="Sure?" onConfirm={() => {}} onCancel={() => {}} />)
+    const buttons = screen.getAllByRole('button')
+    expect(buttons.map((b) => b.textContent)).toEqual(['Cancel', 'Confirm'])
+  })
+
+  it('actionsOrder="confirm-cancel" puts Confirm first in the DOM; Cancel keeps autoFocus', () => {
+    render(
+      <ConfirmDialog
+        open
+        title="Sure?"
+        onConfirm={() => {}}
+        onCancel={() => {}}
+        actionsOrder="confirm-cancel"
+      />,
+    )
+    const buttons = screen.getAllByRole('button')
+    expect(buttons.map((b) => b.textContent)).toEqual(['Confirm', 'Cancel'])
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus()
+  })
+
+  it('is themeable: defaultProps.actionsOrder applies globally', () => {
+    const theme = createTheme({
+      components: {
+        EzConfirmDialog: {
+          defaultProps: { actionsOrder: 'confirm-cancel' },
+        },
+      },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <ConfirmDialog open title="Sure?" onConfirm={() => {}} onCancel={() => {}} />
+      </ThemeProvider>,
+    )
+    const buttons = screen.getAllByRole('button')
+    expect(buttons.map((b) => b.textContent)).toEqual(['Confirm', 'Cancel'])
+  })
+
+  it('has no accessibility violations with actionsOrder="confirm-cancel"', async () => {
+    const { baseElement } = render(
+      <ConfirmDialog
+        open
+        title="Sure?"
+        message="Really."
+        onConfirm={() => {}}
+        onCancel={() => {}}
+        actionsOrder="confirm-cancel"
+      />,
+    )
+    await expectNoA11yViolations(baseElement)
+  })
+
   it('forwards a consumer slotProps.paper to Dialog while slotProps.confirm still reaches the Confirm button', () => {
     render(
       <ConfirmDialog

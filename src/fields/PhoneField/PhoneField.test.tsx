@@ -229,6 +229,20 @@ describe('PhoneField input attributes', () => {
     renderPhone({ autoComplete: 'shipping tel' })
     expect(input()).toHaveAttribute('autocomplete', 'shipping tel')
   })
+
+  it('keeps inputMode=tel when a consumer sets an unrelated slotProps.htmlInput key', () => {
+    // PhoneField sets `inputMode` itself through `mergeSlotProps`, rather than
+    // leaning on TextField's `type="tel"` fallback (which agrees, but is a
+    // different code path). Merging a sibling key must not drop it.
+    renderPhone({ slotProps: { htmlInput: { 'data-testid': 'phone-input' } } })
+    expect(input()).toHaveAttribute('inputmode', 'tel')
+    expect(input()).toHaveAttribute('data-testid', 'phone-input')
+  })
+
+  it("a consumer's own slotProps.htmlInput.inputMode still wins", () => {
+    renderPhone({ slotProps: { htmlInput: { inputMode: 'numeric' } } })
+    expect(input()).toHaveAttribute('inputmode', 'numeric')
+  })
 })
 
 describe('PhoneField a11y', () => {

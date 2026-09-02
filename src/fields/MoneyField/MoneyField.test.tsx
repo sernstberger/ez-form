@@ -122,3 +122,23 @@ describe('MoneyField', () => {
     )
   })
 })
+
+describe('MoneyField inputMode default (#6, #7)', () => {
+  it('defaults to "decimal" (currency always allows fraction digits)', () => {
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <MoneyField name="price" label="Price" />
+      </Form>,
+    )
+    expect(input()).toHaveAttribute('inputMode', 'decimal')
+  })
+
+  it('a consumer inputMode wins over the default', () => {
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <MoneyField name="price" label="Price" inputMode="text" />
+      </Form>,
+    )
+    expect(input()).toHaveAttribute('inputMode', 'text')
+  })
+})

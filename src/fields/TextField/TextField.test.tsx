@@ -184,6 +184,100 @@ describe('TextField', () => {
   })
 })
 
+describe('TextField autoComplete/inputMode defaults (#6, #7)', () => {
+  const cases = [
+    { type: 'email', autoComplete: 'email', inputMode: 'email' },
+    { type: 'tel', autoComplete: 'tel', inputMode: 'tel' },
+    { type: 'url', autoComplete: 'url', inputMode: 'url' },
+  ] as const
+
+  it.each(cases)(
+    'type="$type" defaults autoComplete="$autoComplete" and inputMode="$inputMode"',
+    ({ type, autoComplete, inputMode }) => {
+      render(
+        <Form schema={schema} defaultValues={{ email: '' }} onSubmit={vi.fn()}>
+          <TextField name="email" label="Email" type={type} />
+        </Form>,
+      )
+      const input = screen.getByLabelText('Email')
+      expect(input).toHaveAttribute('autoComplete', autoComplete)
+      expect(input).toHaveAttribute('inputMode', inputMode)
+    },
+  )
+
+  it('type="search" defaults inputMode="search" with no autoComplete guess', () => {
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={vi.fn()}>
+        <TextField name="email" label="Email" type="search" />
+      </Form>,
+    )
+    const input = screen.getByLabelText('Email')
+    expect(input).toHaveAttribute('inputMode', 'search')
+    expect(input).not.toHaveAttribute('autocomplete')
+  })
+
+  it('plain type="text" gets no autoComplete or inputMode default', () => {
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={vi.fn()}>
+        <TextField name="email" label="Email" type="text" />
+      </Form>,
+    )
+    const input = screen.getByLabelText('Email')
+    expect(input).not.toHaveAttribute('autocomplete')
+    expect(input).not.toHaveAttribute('inputmode')
+  })
+
+  it('no type at all gets no autoComplete or inputMode default', () => {
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={vi.fn()}>
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    const input = screen.getByLabelText('Email')
+    expect(input).not.toHaveAttribute('autocomplete')
+    expect(input).not.toHaveAttribute('inputmode')
+  })
+
+  it('a consumer top-level autoComplete wins over the type-derived default', () => {
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={vi.fn()}>
+        <TextField name="email" label="Email" type="email" autoComplete="username" />
+      </Form>,
+    )
+    expect(screen.getByLabelText('Email')).toHaveAttribute('autoComplete', 'username')
+  })
+
+  it('a consumer slotProps.htmlInput.inputMode wins over the type-derived default', () => {
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={vi.fn()}>
+        <TextField
+          name="email"
+          label="Email"
+          type="email"
+          slotProps={{ htmlInput: { inputMode: 'text' } }}
+        />
+      </Form>,
+    )
+    expect(screen.getByLabelText('Email')).toHaveAttribute('inputMode', 'text')
+  })
+
+  it('a consumer inputMode set via slotProps.htmlInput on type="tel" is not clobbered by undefined', () => {
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={vi.fn()}>
+        <TextField
+          name="email"
+          label="Email"
+          type="tel"
+          slotProps={{ htmlInput: { 'aria-label': 'Phone' } }}
+        />
+      </Form>,
+    )
+    const input = screen.getByLabelText('Email')
+    expect(input).toHaveAttribute('inputMode', 'tel')
+    expect(input).toHaveAttribute('aria-label', 'Phone')
+  })
+})
+
 describe('TextField displayValue', () => {
   it('renders the bound value when displayValue is not set', async () => {
     const user = userEvent.setup()

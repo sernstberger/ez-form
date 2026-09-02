@@ -618,3 +618,59 @@ describe('NumberField', () => {
     expect(screen.getByLabelText('Age (optional)')).toBeInTheDocument()
   })
 })
+
+describe('NumberField inputMode default (#6, #7)', () => {
+  it('defaults to "numeric" with no step or format (integer-only)', () => {
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <NumberField name="age" label="Age" />
+      </Form>,
+    )
+    expect(input()).toHaveAttribute('inputMode', 'numeric')
+  })
+
+  it('defaults to "numeric" with an integer step', () => {
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <NumberField name="age" label="Age" step={1} />
+      </Form>,
+    )
+    expect(input()).toHaveAttribute('inputMode', 'numeric')
+  })
+
+  it('defaults to "decimal" with a fractional step', () => {
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <NumberField name="age" label="Age" step={0.1} />
+      </Form>,
+    )
+    expect(input()).toHaveAttribute('inputMode', 'decimal')
+  })
+
+  it('defaults to "decimal" with a format that allows fraction digits', () => {
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <NumberField name="age" label="Age" format={{ maximumFractionDigits: 2 }} />
+      </Form>,
+    )
+    expect(input()).toHaveAttribute('inputMode', 'decimal')
+  })
+
+  it('defaults to "numeric" with a format fixed to 0 fraction digits', () => {
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <NumberField name="age" label="Age" format={{ maximumFractionDigits: 0 }} />
+      </Form>,
+    )
+    expect(input()).toHaveAttribute('inputMode', 'numeric')
+  })
+
+  it('a consumer inputMode wins over the derived default', () => {
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <NumberField name="age" label="Age" inputMode="text" />
+      </Form>,
+    )
+    expect(input()).toHaveAttribute('inputMode', 'text')
+  })
+})
