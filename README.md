@@ -887,6 +887,7 @@ Themeable under `EzAddressField` (`defaultProps`, `styleOverrides` for `root` | 
 | `AddressField` | per part    | per part, `autoCompleteSection`-prefixed |
 
 `inputMode="numeric"` on `ZipField` brings up the numeric keypad on mobile without changing the underlying `type` (still `text`, so a leading zero like `02134` is never dropped). `StateSelect`'s `autoComplete` reaches the hidden native `<input>` MUI's `Select` renders for autofill via `slotProps.htmlInput` — the same slot a plain `TextField` uses (MUI 9 has no `SelectProps`/native `inputProps` shortcut for this).
+
 ## Developer warnings
 
 Three mistakes leave a form that renders and submits perfectly while quietly failing the

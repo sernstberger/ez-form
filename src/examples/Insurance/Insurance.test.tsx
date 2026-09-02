@@ -24,13 +24,44 @@ async function fillApplicant(user: ReturnType<typeof userEvent.setup>, firstName
   await goNext(user)
 }
 
+/**
+ * Picks a state from `StateSelect`'s menu the way a person does. Kept separate from
+ * `fillContact` because it is by far the most expensive interaction in this file:
+ * the menu renders all 51 options, so a click-through costs roughly as much as a
+ * whole other step. `fillContact` uses `selectState` below instead, and the one test
+ * that cares about the menu itself calls this.
+ */
+async function pickStateFromMenu(
+  user: ReturnType<typeof userEvent.setup>,
+  label: string,
+  within_: HTMLElement,
+) {
+  await user.click(within(within_).getByRole('combobox', { name: /^state/i }))
+  await user.click(await screen.findByRole('option', { name: label }))
+}
+
+/**
+ * Sets `StateSelect`'s value through the hidden native `<input>` MUI's `Select`
+ * renders (the same element `StateSelect.test.tsx` reads for its autofill assertions)
+ * rather than opening the 51-option menu. `fireEvent.change` on it is what MUI's own
+ * `Select` dispatches when an option is chosen, so react-hook-form sees exactly the
+ * same change — this skips the menu rendering, not the binding under test, which
+ * `selects a state from the full 50-state menu` below still covers for real.
+ */
+function selectState(abbreviation: string) {
+  fireEvent.change(hiddenInput('address.state'), { target: { value: abbreviation } })
+}
+
 async function fillContact(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
-  await user.type(screen.getByLabelText(/^phone/i), '555-555-5555')
+  // Typed as a person would; `PhoneField` formats to "555-555-5555" on screen and
+  // stores the bare digits.
+  await user.type(screen.getByLabelText(/^phone/i), '5555555555')
   const address = screen.getByRole('group', { name: 'Address' })
   await user.type(within(address).getByLabelText(/street address/i), '1 Analytical Way')
-  await user.type(within(address).getByLabelText(/^city/i), 'London')
-  await user.type(within(address).getByLabelText(/zip code/i), 'SW1A1AA')
+  await user.type(within(address).getByLabelText(/^city/i), 'Cambridge')
+  selectState('MA')
+  await user.type(within(address).getByLabelText(/zip code/i), '02139')
   await goNext(user)
 }
 
@@ -99,8 +130,9 @@ const COMPLETE_VALUES = {
   lastName: 'Lovelace',
   birthday: new Date(1985, 0, 1),
   email: 'ada@example.com',
-  phone: '555-555-5555',
-  address: { street: '1 Analytical Way', city: 'London', zip: 'SW1A1AA' },
+  // Digits only — what `PhoneField` stores and what `saveState` would have written.
+  phone: '5555555555',
+  address: { street: '1 Analytical Way', city: 'Cambridge', state: 'MA', zip: '02139' },
   coverageType: 'liability',
   deductible: 500,
   coverageAmount: 10000,
@@ -192,6 +224,44 @@ describe('Insurance', () => {
     expect(screen.getByRole('tab', { name: /^Vehicle$/ })).toBeInTheDocument()
   })
 
+  it('Contact step: selects a state from the full 50-state menu', async () => {
+    // The one place the `StateSelect` menu is driven for real; `fillContact`'s
+    // `selectState` shortcut stands on this.
+    seedReview(
+      { ...COMPLETE_VALUES, address: { ...COMPLETE_VALUES.address, state: '' } },
+      'contact',
+    )
+    const user = userEvent.setup({ delay: null })
+    render(withPickers(<Insurance />))
+    const address = screen.getByRole('group', { name: 'Address' })
+    await pickStateFromMenu(user, 'Massachusetts', address)
+    expect(within(address).getByRole('combobox', { name: /^state/i })).toHaveTextContent(
+      'Massachusetts',
+    )
+    expect(hiddenInput('address.state')).toHaveValue('MA')
+  })
+
+  it('Contact step: phone formats as you type and blocks Next on a partial number, with no pattern rule', async () => {
+    // The point of the US fields: the format lives in `PhoneField`, so the example
+    // carries no `pattern={{ value: /^\d{3}-\d{3}-\d{4}$/ }}` and the schema no regex.
+    seedReview(COMPLETE_VALUES, 'contact')
+    const user = userEvent.setup({ delay: null })
+    render(withPickers(<Insurance />))
+    const phone = screen.getByLabelText(/^phone/i)
+    await user.clear(phone)
+    await user.type(phone, '5551234')
+    // Separators are inserted by the field, not typed by the user.
+    expect(phone).toHaveValue('555-123-4')
+    await goNext(user)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Enter a 10-digit phone number')
+    expect(screen.getByRole('group', { name: 'Contact' })).toBeInTheDocument()
+
+    await user.type(phone, '567')
+    expect(phone).toHaveValue('555-123-4567')
+    await goNext(user)
+    expect(await screen.findByRole('group', { name: 'Coverage' })).toBeInTheDocument()
+  })
+
   it('lists every value on the Review step, with a working Edit link back to its step', async () => {
     const user = userEvent.setup({ delay: null })
     seedReview()
@@ -201,6 +271,12 @@ describe('Insurance', () => {
     expect(within(review).getByText('Lovelace')).toBeInTheDocument()
     expect(within(review).getByText('ada@example.com')).toBeInTheDocument()
     expect(within(review).getByText('Toyota')).toBeInTheDocument()
+    // The address's state row resolves 'MA' to its full name through `US_STATES`.
+    expect(within(review).getByText('Massachusetts')).toBeInTheDocument()
+    expect(within(review).getByText('02139')).toBeInTheDocument()
+    // Phone is stored as bare digits but reviews formatted, not as '5555555555'.
+    expect(within(review).getByText('555-555-5555')).toBeInTheDocument()
+    expect(within(review).queryByText('5555555555')).not.toBeInTheDocument()
 
     await user.click(within(review).getByRole('button', { name: /edit first name/i }))
     expect(screen.getByRole('group', { name: 'Applicant' })).toBeInTheDocument()
