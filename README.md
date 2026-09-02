@@ -98,16 +98,19 @@ React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form
 | `MoneyField`                                   | `NumberField` pinned to USD                   | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max`, `validate`. Value is a `number` in dollars, rounded to the cent; shows `$1,234.50` on blur                                                                                                                                                                                                                                                                                                             |
 | `ZipField`                                     | `TextField`                                   | `name`; same rules as TextField, plus a built-in "5 digits" rule (`invalidMessage?`, default `'Enter a 5-digit ZIP code'`). Digits only, capped at 5 (anything else is stripped on type/paste); `inputMode="numeric"`, `autoComplete` defaults to `'postal-code'`. Value is the digit string                                                                                                                                                                                     |
 | `StateSelect`                                  | `Select`                                      | `name`; same rules as Select. Options are the 50 states + DC by default; `territories?` adds PR, GU, VI, AS, MP. `autoComplete` defaults to `'address-level1'`. Value is the USPS abbreviation; also exports `US_STATES`/`US_TERRITORIES` option arrays                                                                                                                                                                                                                          |
+| `AddressField`                                 | `TextField` + `StateSelect` + `ZipField`      | `name` (nested object), `legend?`/`description?` (renders a `FormSection`), `autoCompleteSection?` (`'shipping'`/`'billing'`/any section token, prefixes every autofill token), `street2?` (default `true`), `streetLabel?`/`street2Label?`/`cityLabel?`/`stateLabel?`/`zipLabel?`, `required`/`disabled`, `slotProps?`. `required` reaches street/city/state/zip, never street2; `addressSchema()` is the matching zod object                                                   |
 | `DatePicker` / `TimePicker` / `DateTimePicker` | MUI X pickers                                 | `name`, `label?`, `helperText?`, `errorMessages?`; rules `required`, `validate`. The picker's own props (`minDate`, `disablePast`, `views`, …) pass through. Value is the adapter's date type or `null`                                                                                                                                                                                                                                                                          |
 | `OtpField`                                     | Base UI `OTPField` in MUI's outlined style    | `name`, `label?`, `helperText?`, `length?` (6), `mask?`, `validationType?`, `size?`; rules `required`, `validate`. Value is the code string; a partial code fails with `<label> must be <length> characters.`                                                                                                                                                                                                                                                                    |
-| `FileField`                                    | MUI `Button` + hidden `<input type="file">`   | `name`, `label` (button text), `accept?`, `multiple?`, `buttonProps?`, `helperText?`; rules `required`, `validate`. Value is `File \| null`, or `File[]` under `multiple`. `onChange(event, value)` fires on a pick and on a chip delete                                                                                                                                                                                                                                         |
+| `FileField`                                    | MUI `Button` + hidden `<input type="file">`   | `name`, `label` (button text), `accept?`, `multiple?`, `dropzone?`, `dropText?`, `maxSize?`, `maxFiles?`, `renderFile?`, `onFilesAdded?`, `buttonProps?`, `helperText?`; rules `required`, `validate`. Value is `File \| null`, or `File[]` under `multiple`. `onChange(event, value)` fires on a pick and on a chip delete                                                                                                                                                      |
 | `Checkbox`                                     | MUI `Checkbox`                                | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `Switch`                                       | MUI `Switch`                                  | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `SubmitButton`                                 | MUI `Button`                                  | `loading` while submitting, disabled while the form is                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `Form` (v4 additions)                          | —                                             | `confirm?: true \| ConfirmOptions` asks after validation on every submit path; `guard?: boolean` warns on tab close while dirty; `submitPendingText?`/`submitSuccessText?`/`submitErrorText?` are the submit announcements (`false` suppresses one)                                                                                                                                                                                                                              |
 | `ClearButton`                                  | MUI `Button`                                  | `to?: 'defaults' \| 'empty'`, `confirm?`; disabled while pristine                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `ConfirmDialog`                                | MUI `Dialog`                                  | `open`, `title`, `message?`, `confirmLabel?`, `cancelLabel?`, `confirmColor?`, `onConfirm`, `onCancel`, `actionsOrder?: 'cancel-confirm' \| 'confirm-cancel'` (default `'cancel-confirm'`; Cancel keeps `autoFocus` either way); `useConfirm()` gives a promise API                                                                                                                                                                                                              |
+| `FormDialog`                                   | MUI `Dialog` + `Form`                         | `open`, `onClose(event, reason)`, `title`, `actions?`/`cancelLabel?`/`submitLabel?`, `exitConfirm?: ConfirmOptions \| false`, `closeOnSubmit?`; every `Form` prop (`schema`, `onSubmit`, `confirm`, …) and every `Dialog` prop (`maxWidth`, `fullScreen`, …). Closing while dirty asks first                                                                                                                                                                                     |
 | `Wizard`                                       | MUI `Stepper`                                 | `steps`, `step?`/`onStepChange?`, `visited?`/`onVisitedChange?`, `orientation?`, `layout?: 'steps' \| 'page'`; with `WizardStepper`, `WizardStep`, `WizardNav` (`actionsOrder?: 'back-next' \| 'next-back'`, default `'back-next'`), `useWizard`                                                                                                                                                                                                                                 |
+| `Wizard`                                       | MUI `Stepper`                                 | `steps`, `step?`/`onStepChange?`, `visited?`/`onVisitedChange?`, `orientation?`, `layout?: 'steps' \| 'page'`, `stepAnnouncement?`; with `WizardStepper`, `WizardStep`, `WizardNav` (`actionsOrder?: 'back-next' \| 'next-back'`, default `'back-next'`), `useWizard`                                                                                                                                                                                                            |
 | `ReadOnlyField`                                | MUI `Typography`                              | `name`, `label?`, `options?`, `format?`, `empty?`, `editStep?` — or `value` (a caller-computed value, e.g. from its own `useWatch`) with `label` required and no `name`; never calls `useWatch` in that mode                                                                                                                                                                                                                                                                     |
 | `PasswordField`                                | ez-form `TextField`                           | `name`; same rules as TextField. `revealable?` (default `true`) shows a show/hide toggle in the end adornment; `autoComplete` defaults to `'current-password'`; `slotProps.toggle?` reaches the toggle `IconButton`                                                                                                                                                                                                                                                              |
 | `PhoneField`                                   | ez-form `TextField`                           | `name`; same rules as TextField, plus `format?` (a `#` template, default `'###-###-####'`) and `invalidMessage?`. The form value is digits only (`'5551234567'`); `type="tel"`, `inputMode="tel"`, `autoComplete` defaults to `'tel'`. A non-empty value shorter than the template's digit count fails with `invalidMessage`                                                                                                                                                     |
@@ -232,7 +235,7 @@ the node, so an identical message mounts a fresh region and is heard again:
 
 Render a `LiveRegion` unconditionally with an empty `message` at rest, rather than mounting it
 alongside its text: a region that appears in the same commit as its content has nothing to
-change _from_, and that first announcement is unreliable. `Form`, `FieldArray`,
+change _from_, and that first announcement is unreliable. `Form`, `Wizard`, `FieldArray`,
 `ResendCodeButton` and `PasswordStrength` all use this same component internally.
 
 Because several of them can be on screen at once, one form may hold more than one
@@ -335,6 +338,39 @@ const steps = [
 Every field in the schema should appear in exactly one step's `fields`. When Submit fails validation, the wizard moves to the first step (in `steps` order) owning an errored field and focuses that field once it mounts, so an error on a step you have navigated away from is never silent. A field listed in no step is validated only on final submit and its error belongs to the last step: that step is marked in the stepper, and a failed submit lands there.
 
 Each `WizardStep` is a `FormSection` (a fieldset). Horizontally, the step's `title` defaults to its `label` from `steps` and renders as a heading in the legend; pass `title={null}` to render no legend. Vertically, the legend is suppressed and the section is named by the stepper's label via `aria-labelledby`, so the step has no visible legend but is still named for assistive technology; `description` works in both modes.
+
+### Step changes are announced and focused
+
+Changing step swaps the page's content without moving the caret, so a screen reader user is left reading the old step. On every `Next` / `Back` / stepper click, the wizard moves focus to the new step's **heading** and announces the move in a live region it renders itself — no wiring:
+
+```tsx
+<Wizard steps={steps}>   {/* announces "Step 2 of 3, Plan" and focuses that step's heading */}
+```
+
+Focus goes to the step's container, not its first field: focusing an input announces the input and skips the step's name and position, so the user would hear "Email, edit" with no idea they had moved. It lands on the legend heading horizontally, on the stepper label the step is named by vertically (there is no legend there), and on the `<fieldset>` itself for a `title={null}` step, which has no naming element to reach.
+
+The announcement is a function prop, so it can be localised or turned off:
+
+```tsx
+<Wizard
+  steps={steps}
+  stepAnnouncement={({ index, count, label }) => `Paso ${index + 1} de ${count}: ${label}`}
+>
+
+<Wizard steps={steps} stepAnnouncement={false} />   {/* silent; focus still moves */}
+```
+
+`index` and `count` are positions in the **effective** step list — a step hidden by `when` is not counted, so what the user hears matches what the stepper shows. `stepAnnouncement={false}` suppresses only the announcement; focus management is not optional.
+
+Four cases deliberately stay quiet: initial mount (nothing changed, and stealing focus on load is hostile), a failed `Next` (the step did not change — `<FormErrorSummary />` announces and focuses instead), the failed-submit jump to the first errored step, which is `<FormErrorSummary />`'s arrival to own, and a controlled wizard's declined move. `layout="page"` never navigates, so it never announces.
+
+That last case matters when `step`/`onStepChange` are wired to a router: both the announcement and the focus move wait until the wizard has actually _arrived_ on the requested step, so a transition your own code vetoes — or one that resolves a tick later through `navigate()` — never announces a step the user is not looking at.
+
+Because a form can hold several `role="status"` regions at once, query this one by its slot class in a test:
+
+```tsx
+document.querySelector(`.${wizardClasses.status}`) // the wizard's, not the form's
+```
 
 ### Same steps, one page
 
@@ -446,6 +482,68 @@ Either way, the message shown to the user comes from the schema, not from a rule
 - `<ClearButton confirm>`: dialog before reset.
 - `<Form guard>`: browser prompt on tab close / reload while dirty.
 - `useFormGuard(useBlocker)`: in-app navigation; pass react-router's `useBlocker` and render a `ConfirmDialog` with the result.
+- `<FormDialog>`: a form in a dialog, which asks before closing with unsaved changes — see below.
+
+## Form in a dialog
+
+`FormDialog` is a `<Form>` inside a MUI `Dialog`, with the heading, the scrolling
+content area and the action buttons already wired. It takes every `Form` prop and
+every `Dialog` prop; you own `open` and `onClose`.
+
+```tsx
+const [open, setOpen] = useState(false)
+
+<FormDialog
+  open={open}
+  onClose={() => setOpen(false)}
+  title="Edit contact"
+  schema={contactSchema}
+  defaultValues={contact}
+  onSubmit={async (values) => save(values)}
+>
+  <Stack spacing={2}>
+    <TextField name="name" label="Name" />
+    <TextField name="email" label="Email" />
+  </Stack>
+</FormDialog>
+```
+
+**Closing asks first.** Escape, a backdrop click, and the Cancel button all go
+through the same gate: if the form is dirty, a `ConfirmDialog` appears
+(`Discard changes?` / `Discard` / `Keep editing`) and `onClose` is called only if
+it is confirmed — so `onClose` always means "it really is closing". A pristine
+form closes with no prompt, and neither does one that has just been submitted
+successfully (the same `isDirty && !isSubmitting && !isSubmitSuccessful` rule the
+other guards use). Pass `exitConfirm` to change the copy, or `exitConfirm={false}`
+to drop the prompt.
+
+**Submitting closes it.** A successful submit calls `onClose(event, 'submit')`
+after your `onSubmit` settles — so a save that rejects, or one that calls
+`form.setError`, leaves the dialog open with its values intact.
+`closeOnSubmit={false}` keeps it open for an "add another" flow.
+
+`onClose`'s `reason` is MUI's own (`'escapeKeyDown'`, `'backdropClick'`) plus
+`'cancelClick'` and `'submit'`.
+
+**Actions.** The default footer is a Cancel `Button` and a `SubmitButton`, in that
+DOM order; `cancelLabel` / `submitLabel` rename them and `slotProps.cancel` /
+`slotProps.submit` reach them. Pass `actions` to replace both with your own — a
+`type="submit"` button inside still submits the form. Cancel is disabled while a
+submit is pending, since cancelling then would abandon a save already in flight.
+A `slotProps.cancel.onClick` runs _before_ the close gate and does not replace it;
+call `event.preventDefault()` in it to veto the close and keep the dialog open.
+
+**Layout.** ARIA does not allow `role="dialog"` on a `<form>`, so the dialog's
+paper stays a `div` and the `<form>` sits just inside it, carrying the paper's
+flex layout through — long content still scrolls inside `DialogContent` while the
+title and actions stay put. `title` names the dialog (`aria-labelledby`) and
+whatever `Form` renders in its description slot describes it (`aria-describedby`) —
+that includes the required-fields convention `Form` states by default, so the
+dialog is described even when you pass no `description` of your own.
+
+Theme it through `theme.components.EzFormDialog` (`defaultProps`, and
+`styleOverrides` for the `root`, `form`, `title`, `content`, `actions`, `cancel`
+and `submit` slots).
 
 ## Timeouts (OTP codes, sessions)
 
@@ -563,7 +661,7 @@ const theme = createTheme({
       styleOverrides: { helperText: { marginLeft: 8 } },
     },
     EzFileField: {
-      styleOverrides: { fileList: { marginTop: 16 } },
+      styleOverrides: { fileList: { marginTop: 16 }, dropZone: { borderStyle: 'solid' } },
     },
   },
 })
@@ -730,6 +828,58 @@ const schema = z.object({ bio: z.string().max(500) })
 
 Themeable under `EzTextareaField` (`root`, `counter`, exported as `textareaFieldClasses`).
 
+## FileField
+
+The default is a picker button over a hidden `<input type="file">`. `dropzone` wraps
+it in a drop area; the button inside stays the keyboard and screen-reader path, so the
+zone is deliberately not focusable and carries no role — drag-and-drop adds no second
+tab stop. `dropText` (default `'Drag files here, or'`) is the zone's visible
+instruction, and `dragActive` is a visual cue only.
+
+```tsx
+<FileField name="photos" label="Choose photos" multiple dropzone accept="image/*" />
+```
+
+`accept`, `maxSize` (bytes) and `maxFiles` (under `multiple`) are validation, not just
+filtering: a picked _or dropped_ file that fails one is rejected — it never enters the
+value — and the reason surfaces as the field's error through a built-in rule, so it
+fails a submit too. Any change to the value clears it: an accepted pick or drop, or
+removing a file with its chip (which is how you answer a `maxFiles` rejection). `accept` still goes on the
+input as the native attribute, and it is matched the way the native input matches it
+(`.ext` by suffix, `type/subtype` exactly, `type/*` by prefix).
+
+| Prop       | Rejection message prop | Default                          |
+| ---------- | ---------------------- | -------------------------------- |
+| `maxSize`  | `maxSizeMessage`       | `'File is larger than {size}'`   |
+| `accept`   | `acceptMessage`        | `'File type not accepted'`       |
+| `maxFiles` | `maxFilesMessage`      | `'Choose at most {count} files'` |
+
+`{size}` is replaced with the limit humanized (`1500000` → `1.5 MB`) and `{count}` with
+the limit; both messages are props, so they translate.
+
+Under `multiple`, a pick or drop **appends** to the value rather than replacing it, so a
+drop zone used twice accumulates and `maxFiles` means "at most n in total"; files come
+off with their chips. A single-file field still replaces.
+
+The library uploads nothing. `onFilesAdded(files)` fires once per pick or drop with the
+files that passed — start your upload there — and `renderFile(file, index)` replaces the
+default chip so you can render your own progress:
+
+```tsx
+<FileField
+  name="photos"
+  label="Choose photos"
+  multiple
+  dropzone
+  maxSize={2_000_000}
+  onFilesAdded={(files) => files.forEach(upload)}
+  renderFile={(file) => <LinearProgress variant="determinate" value={percent(file)} />}
+/>
+```
+
+Themeable under `EzFileField` (`root`, `fileList`, `deleteIcon`, `dropZone`, `dragActive`,
+`dropText`, exported as `fileFieldClasses`).
+
 ## Mobile keyboards & autofill
 
 `TextField`, `NumberField`, `MoneyField`, and `OtpField` set `autoComplete` / `inputMode` defaults so mobile keyboards and password managers do the right thing without per-field wiring. A default only applies when the consumer sets neither the prop nor its `slotProps.htmlInput` equivalent — an explicit value always wins.
@@ -885,12 +1035,31 @@ const schema = z.object({ zip: z.string().min(1) })
 <StateSelect name="state" label="State or territory" territories />
 ```
 
+**AddressField**: the five US address parts as one bound composite under a nested object `name` — `street`, an optional `street2`, `city`, `state` (a `StateSelect`) and `zip` (a `ZipField`). Each part is the real field component, so a per-part error, `required`, `disabled` and focus-on-error behave exactly as they do when you write the five fields out by hand; the composite supplies the names, the autofill tokens, the labels and the layout.
+
+```tsx
+<AddressField name="shipping" legend="Shipping address" autoCompleteSection="shipping" required />
+```
+
+```ts
+const schema = z.object({ shipping: addressSchema() })
+```
+
+`required` applies to street, city, state and ZIP — never `street2`, which is optional by definition. `autoCompleteSection` prefixes every token at once (`shipping street-address`, `shipping address-level2`, …), which is what lets a browser fill a shipping and a billing address on the same page separately. `legend` (with optional `description`) wraps the group in a `FormSection` fieldset; without one the parts sit in a plain container named by their own labels. `street2={false}` hides the second line — pair it with `addressSchema({ street2: false })` so the schema does not declare a key nothing writes.
+
+Every label is a prop with a default (`streetLabel` `'Street address'`, `street2Label` `'Apartment, suite, etc.'`, `cityLabel` `'City'`, `stateLabel` `'State'`, `zipLabel` `'ZIP code'`), and `slotProps.street` / `.street2` / `.city` / `.state` / `.zip` reach the individual field components for anything else (per-part `helperText`, an extra rule, a `size`).
+
+`addressSchema({ street2?, messages? })` returns the matching `z.object` so a form does not restate the five keys: all four required parts are non-empty strings with `'<Part> is required'` messages (override via `messages`), and `street2` is `z.string().optional()`. ZIP is only checked for presence — `ZipField`'s own 5-digit rule already covers the format, and duplicating it in zod would show two messages for one mistake. The messages have no trailing period, matching every other zod message in this codebase; the built-in `required` _rule_ messages do end with one (`'City is required.'`), so pass `messages` if a form surfaces both and you want them identical.
+
+Themeable under `EzAddressField` (`defaultProps`, `styleOverrides` for `root` | `street` | `street2` | `city` | `state` | `zip`), exported as `addressFieldClasses`. The root is a CSS grid with named areas (`street` / `street2` / `city state zip`, one column below `sm`); re-order or re-span any part by overriding `gridTemplateAreas` on `root`.
+
 **Mobile keyboards & autofill**: each field sets sensible defaults, always overridable by your own `autoComplete` prop:
 
-| Field         | `inputMode` | `autoComplete` default |
-| ------------- | ----------- | ---------------------- |
-| `ZipField`    | `numeric`   | `postal-code`          |
-| `StateSelect` | —           | `address-level1`       |
+| Field          | `inputMode` | `autoComplete` default                   |
+| -------------- | ----------- | ---------------------------------------- |
+| `ZipField`     | `numeric`   | `postal-code`                            |
+| `StateSelect`  | —           | `address-level1`                         |
+| `AddressField` | per part    | per part, `autoCompleteSection`-prefixed |
 
 `inputMode="numeric"` on `ZipField` brings up the numeric keypad on mobile without changing the underlying `type` (still `text`, so a leading zero like `02134` is never dropped). `StateSelect`'s `autoComplete` reaches the hidden native `<input>` MUI's `Select` renders for autofill via `slotProps.htmlInput` — the same slot a plain `TextField` uses (MUI 9 has no `SelectProps`/native `inputProps` shortcut for this).
 

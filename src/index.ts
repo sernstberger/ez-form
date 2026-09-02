@@ -22,6 +22,14 @@ export {
 export { MoneyField, type MoneyFieldProps } from './fields/MoneyField'
 export { ZipField, type ZipFieldProps } from './fields/ZipField'
 export {
+  AddressField,
+  addressFieldClasses,
+  addressSchema,
+  type AddressFieldProps,
+  type AddressValue,
+  type AddressSchemaOptions,
+} from './fields/AddressField'
+export {
   PasswordField,
   passwordFieldClasses,
   type PasswordFieldProps,
@@ -63,12 +71,20 @@ export {
   useConfirm,
   type UseConfirmReturn,
 } from './ConfirmDialog'
+export {
+  FormDialog,
+  formDialogClasses,
+  type FormDialogProps,
+  type FormDialogCloseReason,
+} from './FormDialog'
 export { ClearButton, clearButtonClasses, type ClearButtonProps } from './ClearButton'
 export type {} from './theme/augmentation'
 export { useFormGuard, type FormGuardBlocker, type UseFormGuardReturn } from './useFormGuard'
 export {
   Wizard,
+  wizardClasses,
   type WizardProps,
+  type WizardStepAnnouncementInfo,
   type WizardStepDef,
   type WizardStepStatus,
   type WizardContextValue,
