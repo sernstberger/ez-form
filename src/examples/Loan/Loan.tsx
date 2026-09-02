@@ -19,7 +19,7 @@ import { Slider } from '../../fields/Slider'
 import { DateField } from '../../fields/DateField'
 import { FileField } from '../../fields/FileField'
 import { ReadOnlyField } from '../../fields/ReadOnlyField'
-import { FieldArray } from '../../FieldArray'
+import { FieldArray, type FieldArrayRow } from '../../FieldArray'
 import { Wizard, type WizardStepDef } from '../../Wizard'
 import { WizardStepper } from '../../Wizard/WizardStepper'
 import { WizardStep } from '../../Wizard/WizardStep'
@@ -43,8 +43,17 @@ const RELATIONSHIP_OPTIONS: readonly Option[] = [
   { value: 'other', label: 'Other' },
 ]
 
+const EMPLOYMENT_TYPE_OPTIONS: readonly Option[] = [
+  { value: 'full-time', label: 'Full-time' },
+  { value: 'part-time', label: 'Part-time' },
+  { value: 'self-employed', label: 'Self-employed' },
+  { value: 'other', label: 'Other' },
+]
+
 const MIN_TERM_MONTHS = 12
 const MAX_TERM_MONTHS = 360
+// Pattern 4 (#82): applicant income below this reveals a required co-signer note.
+const LOW_INCOME_THRESHOLD = 3000
 
 const coApplicantSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -58,6 +67,15 @@ const coApplicantSchema = z.object({
 
 const employmentSchema = z.object({
   employer: z.string().min(1, 'Employer is required'),
+  status: z.enum(
+    EMPLOYMENT_TYPE_OPTIONS.map((o) => o.value as string) as [string, ...string[]],
+    'Choose an employment type',
+  ),
+  // "Other" reveals a free-text field on this row (pattern 2, #82); optional at the
+  // zod level, required only when `status === 'other'` via the top-level schema's
+  // `superRefine` below (a per-row array index is needed for the issue `path`, which
+  // a nested object schema's own `superRefine` doesn't have access to).
+  statusOther: z.string(),
   // Nullable at the zod level (a date field starts empty and can't be typed as
   // non-null); `required` on the <DateField> itself (a hookform rule prop, which
   // wins over zod's message for that field per FieldRules's contract) is what
@@ -74,29 +92,66 @@ const debtSchema = z.object({
   monthlyPayment: z.number().min(0, 'Monthly payment cannot be negative'),
 })
 
-const schema = z.object({
-  amount: z.number().min(1000, 'Enter an amount of at least $1,000'),
-  purpose: z.enum(
-    PURPOSE_OPTIONS.map((o) => o.value as string) as [string, ...string[]],
-    'Choose a purpose',
-  ),
-  termMonths: z.number().min(MIN_TERM_MONTHS).max(MAX_TERM_MONTHS),
-  applicantName: z.string().min(1, 'Name is required'),
-  applicantEmail: z.email('Invalid email address'),
-  // See employmentSchema's `from` comment: `required` on <DateField> enforces this.
-  applicantBirthday: z.date().nullable(),
-  applicantIncome: z.number().min(0, 'Monthly income cannot be negative'),
-  applicantDocuments: z.array(z.instanceof(File)),
-  coApplicants: z.array(coApplicantSchema).max(3, 'Add at most 3 co-applicants'),
-  employment: z.array(employmentSchema).min(1, 'Add at least one employer'),
-  debts: z.array(debtSchema),
-})
+const schema = z
+  .object({
+    amount: z.number().min(1000, 'Enter an amount of at least $1,000'),
+    purpose: z.enum(
+      PURPOSE_OPTIONS.map((o) => o.value as string) as [string, ...string[]],
+      'Choose a purpose',
+    ),
+    termMonths: z.number().min(MIN_TERM_MONTHS).max(MAX_TERM_MONTHS),
+    applicantName: z.string().min(1, 'Name is required'),
+    applicantEmail: z.email('Invalid email address'),
+    // See employmentSchema's `from` comment: `required` on <DateField> enforces this.
+    applicantBirthday: z.date().nullable(),
+    applicantIncome: z.number().min(0, 'Monthly income cannot be negative'),
+    // Pattern 4 (#82): required only when `applicantIncome` is below the threshold,
+    // enforced below rather than with a rule prop on the field (see the README's
+    // Validation rules section on rule-prop-vs-zod precedence).
+    coSignerNote: z.string(),
+    applicantDocuments: z.array(z.instanceof(File)),
+    coApplicants: z.array(coApplicantSchema).max(3, 'Add at most 3 co-applicants'),
+    employment: z.array(employmentSchema).min(1, 'Add at least one employer'),
+    debts: z.array(debtSchema),
+  })
+  .superRefine(
+    (data, ctx) => {
+      if (data.applicantIncome < LOW_INCOME_THRESHOLD && !data.coSignerNote) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'A co-signer note is required for income below the threshold',
+          path: ['coSignerNote'],
+        })
+      }
+      data.employment.forEach((row, index) => {
+        if (row.status === 'other' && !row.statusOther) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Please specify',
+            path: ['employment', index, 'statusOther'],
+          })
+        }
+      })
+    },
+    // Zod skips a `superRefine` once any other issue in the object is "non-continuable"
+    // (an enum's `invalid_value`, among others) — an empty `purpose`/`status` elsewhere
+    // in this form would otherwise silently swallow the two checks above. `when: () =>
+    // true` forces this refinement to run regardless of what else in the object failed.
+    { when: () => true },
+  )
 
 type Input = z.input<typeof schema>
 type Output = z.infer<typeof schema>
 
 const emptyCoApplicant = () => ({ name: '', relationship: '', monthlyIncome: 0, documents: [] })
-const emptyEmployment = () => ({ employer: '', from: null, to: null, monthlyIncome: 0 })
+const emptyEmployment = () => ({
+  employer: '',
+  status: '',
+  statusOther: '',
+  from: null,
+  to: null,
+  monthlyIncome: 0,
+})
 const emptyDebt = () => ({ creditor: '', balance: 0, monthlyPayment: 0 })
 
 const defaultValues: Input = {
@@ -107,6 +162,7 @@ const defaultValues: Input = {
   applicantEmail: '',
   applicantBirthday: null,
   applicantIncome: 0,
+  coSignerNote: '',
   applicantDocuments: [],
   coApplicants: [],
   employment: [emptyEmployment()],
@@ -118,7 +174,13 @@ const steps = [
   {
     id: 'applicant',
     label: 'Applicant',
-    fields: ['applicantName', 'applicantEmail', 'applicantBirthday', 'applicantIncome'],
+    fields: [
+      'applicantName',
+      'applicantEmail',
+      'applicantBirthday',
+      'applicantIncome',
+      'coSignerNote',
+    ],
   },
   { id: 'coApplicants', label: 'Co-applicants', fields: ['coApplicants'] },
   { id: 'employment', label: 'Employment', fields: ['employment'] },
@@ -178,6 +240,31 @@ function Totals() {
         <Typography {...dtiProps}>Debt-to-income ratio: {(dti * 100).toFixed(1)}%</Typography>
       </Stack>
     </FormSection>
+  )
+}
+
+/**
+ * Pattern 2 (#82) inside a `FieldArray` row: the row's own employment-type `Select`
+ * controls whether this row's "Please specify" field shows, so the watch is on the
+ * row's own path (`employment.<index>.status`) rather than the whole array.
+ */
+function EmploymentOtherField({ row }: { row: FieldArrayRow }) {
+  const status = useWatch({ name: row.name('status') }) as string | undefined
+  if (status !== 'other') return null
+  return <TextField name={row.name('statusOther')} label="Please specify" />
+}
+
+/** Pattern 4 (#82): income below the threshold reveals a note + a required field. */
+function LowIncomeCoSignerNote() {
+  const applicantIncome = useWatch<Input, 'applicantIncome'>({ name: 'applicantIncome' })
+  if (typeof applicantIncome !== 'number' || applicantIncome >= LOW_INCOME_THRESHOLD) return null
+  return (
+    <>
+      <Typography variant="body2" color="text.secondary" role="note">
+        A co-signer is required for income below the threshold.
+      </Typography>
+      <TextField name="coSignerNote" label="Co-signer note" />
+    </>
   )
 }
 
@@ -271,6 +358,7 @@ export function Loan({ onSuccess }: LoanProps) {
                       required
                     />
                     <MoneyField name="applicantIncome" label="Monthly income" min={0} required />
+                    <LowIncomeCoSignerNote />
                   </Stack>
                 </WizardStep>
 
@@ -314,6 +402,13 @@ export function Loan({ onSuccess }: LoanProps) {
                     {(row) => (
                       <Stack spacing={2}>
                         <TextField name={row.name('employer')} label="Employer" required />
+                        <Select
+                          name={row.name('status')}
+                          label="Employment type"
+                          options={EMPLOYMENT_TYPE_OPTIONS}
+                          required
+                        />
+                        <EmploymentOtherField row={row} />
                         <DateField name={row.name('from')} label="From" disableFuture required />
                         <DateField name={row.name('to')} label="To" disableFuture />
                         <MoneyField

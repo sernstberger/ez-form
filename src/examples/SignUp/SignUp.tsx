@@ -4,11 +4,13 @@ import Paper from '@mui/material/Paper'
 import Button from '@mui/material/Button'
 import Stack from '@mui/material/Stack'
 import { z } from 'zod'
+import { useWatch } from 'react-hook-form'
 import { Form } from '../../Form'
 import { FormError } from '../../FormError'
 import { FormSection } from '../../FormSection'
 import { SubmitButton } from '../../SubmitButton'
 import { TextField } from '../../fields/TextField'
+import { Select } from '../../fields/Select'
 import { PasswordField } from '../../fields/PasswordField'
 import { Checkbox } from '../../fields/Checkbox'
 import { OtpField } from '../../fields/OtpField'
@@ -16,7 +18,15 @@ import { PasswordStrength } from '../../fields/PasswordStrength'
 import { Wizard, type WizardStepDef } from '../../Wizard'
 import { WizardStep } from '../../Wizard/WizardStep'
 import { WizardNav } from '../../Wizard/WizardNav'
+import type { Option } from '../../fields/Option'
 import { verifyCodeApi } from '../fakeApi'
+
+const REFERRAL_OPTIONS: readonly Option[] = [
+  { value: 'search', label: 'Search engine' },
+  { value: 'friend', label: 'Friend or colleague' },
+  { value: 'social', label: 'Social media' },
+  { value: 'other', label: 'Other' },
+]
 
 const schema = z
   .object({
@@ -25,12 +35,31 @@ const schema = z
     confirmPassword: z.string().min(1, 'Please confirm your password'),
     displayName: z.string().min(1, 'Display name is required'),
     terms: z.literal(true, { error: 'You must accept the terms to continue' }),
+    // "Other" reveals a free-text field on the form (pattern 2, #82); `referralOther`
+    // stays optional at the zod level and `superRefine` below requires it only when
+    // `referralSource` is `'other'` — a hookform `required` prop on the field itself
+    // would win over that message even while the field is hidden (see the README's
+    // Validation rules section).
+    referralSource: z.string(),
+    referralOther: z.string(),
     code: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     error: 'Passwords do not match',
     path: ['confirmPassword'],
   })
+  .superRefine(
+    (data, ctx) => {
+      if (data.referralSource === 'other' && !data.referralOther) {
+        ctx.addIssue({ code: 'custom', message: 'Please specify', path: ['referralOther'] })
+      }
+    },
+    // Zod skips a `superRefine` once any other issue in the object is "non-continuable"
+    // (e.g. `z.literal`'s mismatch, among others) — an unfinished email/password/terms
+    // elsewhere on this same step would otherwise silently swallow this check. `when:
+    // () => true` forces this refinement to always run regardless of what else failed.
+    { when: () => true },
+  )
 
 type Input = z.input<typeof schema>
 
@@ -44,6 +73,8 @@ const defaultValues: Input = {
   // runtime default while satisfying the input type would require `as true` — this
   // cast documents that mismatch rather than hiding it.
   terms: false as unknown as true,
+  referralSource: '',
+  referralOther: '',
   code: '',
 }
 
@@ -51,10 +82,28 @@ const steps = [
   {
     id: 'details',
     label: 'Details',
-    fields: ['email', 'password', 'confirmPassword', 'displayName', 'terms'],
+    fields: [
+      'email',
+      'password',
+      'confirmPassword',
+      'displayName',
+      'terms',
+      'referralSource',
+      'referralOther',
+    ],
   },
   { id: 'verification', label: 'Verification', fields: ['code'] },
 ] as const satisfies WizardStepDef<Input>[]
+
+function ReferralFields() {
+  const referralSource = useWatch<Input, 'referralSource'>({ name: 'referralSource' })
+  return (
+    <>
+      <Select name="referralSource" label="How did you hear about us?" options={REFERRAL_OPTIONS} />
+      {referralSource === 'other' && <TextField name="referralOther" label="Please specify" />}
+    </>
+  )
+}
 
 export interface SignUpProps {
   /** Called once the verification code is accepted by the fake API. */
@@ -127,6 +176,7 @@ export function SignUp({ onSuccess }: SignUpProps) {
                         label="I accept the terms of service"
                         required="You must accept the terms to continue"
                       />
+                      <ReferralFields />
                     </Stack>
                   </FormSection>
                 </Stack>

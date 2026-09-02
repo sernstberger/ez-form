@@ -21,6 +21,9 @@ async function fillLoanStep(user: ReturnType<typeof userEvent.setup>, amount = '
   await user.click(await screen.findByRole('option', { name: 'Home purchase' }))
 }
 
+/** Below Loan's LOW_INCOME_THRESHOLD (see Loan.tsx): the co-signer note becomes required. */
+const LOW_INCOME_THRESHOLD = 3000
+
 async function fillApplicantStep(user: ReturnType<typeof userEvent.setup>, income = '8000') {
   await user.type(screen.getByLabelText(/full name/i), 'Ada Lovelace')
   await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
@@ -28,11 +31,16 @@ async function fillApplicantStep(user: ReturnType<typeof userEvent.setup>, incom
   const incomeInput = screen.getByLabelText(/monthly income/i)
   await user.clear(incomeInput)
   await user.type(incomeInput, income)
+  if (Number(income.replace(/,/g, '')) < LOW_INCOME_THRESHOLD) {
+    await user.type(screen.getByLabelText(/co-signer note/i), 'Applying with a co-signer')
+  }
 }
 
 async function fillEmploymentStep(user: ReturnType<typeof userEvent.setup>, income = '8000') {
   const group = screen.getByRole('group', { name: 'Employer 1' })
   await user.type(within(group).getByLabelText(/^employer/i), 'Acme Corp')
+  await user.click(within(group).getByRole('combobox', { name: /employment type/i }))
+  await user.click(await screen.findByRole('option', { name: 'Full-time' }))
   typeDate('employment.0.from', '01/01/2018')
   const incomeInput = within(group).getByLabelText(/monthly income/i)
   await user.clear(incomeInput)
@@ -145,6 +153,94 @@ describe('Loan', () => {
     const rows = screen.getAllByRole('group', { name: /^Employer \d+$/ })
     expect(within(rows[0]!).getByLabelText(/^employer/i)).toHaveValue('Beta LLC')
     expect(within(rows[1]!).getByLabelText(/^employer/i)).toHaveValue('Acme Corp')
+  })
+
+  it('hides "Please specify" on an employment row until its type is "Other"', async () => {
+    const user = userEvent.setup()
+    render(<Loan />)
+    await fillLoanStep(user)
+    await next(user)
+    await fillApplicantStep(user)
+    await next(user)
+    await next(user) // co-applicants
+    const row = screen.getByRole('group', { name: 'Employer 1' })
+    expect(within(row).queryByLabelText(/please specify/i)).not.toBeInTheDocument()
+
+    await user.click(within(row).getByRole('combobox', { name: /employment type/i }))
+    await user.click(await screen.findByRole('option', { name: 'Other' }))
+    expect(within(row).getByLabelText(/please specify/i)).toBeInTheDocument()
+  })
+
+  it('requires "Please specify" on an employment row only when its type is "Other"', async () => {
+    const user = userEvent.setup()
+    render(<Loan />)
+    await fillLoanStep(user)
+    await next(user)
+    await fillApplicantStep(user)
+    await next(user)
+    await next(user) // co-applicants
+    const row = screen.getByRole('group', { name: 'Employer 1' })
+    await user.type(within(row).getByLabelText(/^employer/i), 'Acme Corp')
+    await user.click(within(row).getByRole('combobox', { name: /employment type/i }))
+    await user.click(await screen.findByRole('option', { name: 'Other' }))
+    typeDate('employment.0.from', '01/01/2018')
+    const incomeInput = within(row).getByLabelText(/monthly income/i)
+    await user.clear(incomeInput)
+    await user.type(incomeInput, '8000')
+
+    await next(user)
+    await within(row).findByRole('alert')
+    // Still on the employment step: Next was blocked by the empty "Other" specify field.
+    expect(screen.queryByRole('group', { name: 'Debt 1' })).not.toBeInTheDocument()
+  })
+
+  it('reveals a co-signer note once monthly income drops below the threshold, required only then', async () => {
+    const user = userEvent.setup()
+    render(<Loan />)
+    await fillLoanStep(user)
+    await next(user)
+    // Default applicantIncome (0) is already below the threshold, so the note starts revealed.
+    expect(screen.getByLabelText(/co-signer note/i)).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText(/full name/i), 'Ada Lovelace')
+    await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
+    typeDate('applicantBirthday', '12/10/1985')
+    const incomeInput = screen.getByLabelText(/monthly income/i)
+    await user.clear(incomeInput)
+    await user.type(incomeInput, '1000')
+    await user.tab()
+    expect(screen.getByLabelText(/co-signer note/i)).toBeInTheDocument()
+
+    await next(user)
+    await screen.findByRole('alert')
+    // Still on the applicant step: Next was blocked by the empty co-signer note.
+    expect(screen.queryByRole('group', { name: /^Co-applicant 1$/ })).not.toBeInTheDocument()
+  })
+
+  it('hides the co-signer note once income is raised to or above the threshold', async () => {
+    const user = userEvent.setup()
+    render(<Loan />)
+    await fillLoanStep(user)
+    await next(user)
+    expect(screen.getByLabelText(/co-signer note/i)).toBeInTheDocument()
+    const incomeInput = screen.getByLabelText(/monthly income/i)
+    await user.clear(incomeInput)
+    await user.type(incomeInput, '8000')
+    await user.tab()
+    expect(screen.queryByLabelText(/co-signer note/i)).not.toBeInTheDocument()
+  })
+
+  it('does not require a co-signer note when income is at or above the threshold', async () => {
+    const user = userEvent.setup()
+    render(<Loan />)
+    await fillLoanStep(user)
+    await next(user)
+    await fillApplicantStep(user, '8000')
+    expect(screen.queryByLabelText(/co-signer note/i)).not.toBeInTheDocument()
+    await next(user)
+    await waitFor(() =>
+      expect(screen.getByRole('group', { name: 'Co-applicants' })).toBeInTheDocument(),
+    )
   })
 
   it('computes the DTI ratio on the review step from watched totals', async () => {

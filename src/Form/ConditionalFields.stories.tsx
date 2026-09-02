@@ -128,70 +128,81 @@ const schema = z
     address: addressSchema,
     contactBy: contactByLooseSchema,
   })
-  .superRefine((data, ctx) => {
-    // Pattern 1
-    if (data.contact.differentContact) {
-      if (!data.contact.contactName) {
+  .superRefine(
+    (data, ctx) => {
+      // Pattern 1
+      if (data.contact.differentContact) {
+        if (!data.contact.contactName) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Name is required',
+            path: ['contact', 'contactName'],
+          })
+        }
+        if (!data.contact.contactPhone) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Phone is required',
+            path: ['contact', 'contactPhone'],
+          })
+        }
+      }
+      // Pattern 2
+      if (data.referral.referralSource === 'other' && !data.referral.referralOther) {
         ctx.addIssue({
           code: 'custom',
-          message: 'Name is required',
-          path: ['contact', 'contactName'],
+          message: 'Please specify',
+          path: ['referral', 'referralOther'],
         })
       }
-      if (!data.contact.contactPhone) {
+      // Pattern 3
+      if (data.coSigner.addCoSigner) {
+        if (!data.coSigner.coSignerName) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Co-signer name is required',
+            path: ['coSigner', 'coSignerName'],
+          })
+        }
+        if (!data.coSigner.coSignerEmail) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Co-signer email is required',
+            path: ['coSigner', 'coSignerEmail'],
+          })
+        }
+      }
+      // Pattern 4
+      if (data.income.monthlyIncome < INCOME_THRESHOLD && !data.income.coSignerNote) {
         ctx.addIssue({
           code: 'custom',
-          message: 'Phone is required',
-          path: ['contact', 'contactPhone'],
+          message: 'A co-signer note is required for income below the threshold',
+          path: ['income', 'coSignerNote'],
         })
       }
-    }
-    // Pattern 2
-    if (data.referral.referralSource === 'other' && !data.referral.referralOther) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Please specify',
-        path: ['referral', 'referralOther'],
-      })
-    }
-    // Pattern 3
-    if (data.coSigner.addCoSigner) {
-      if (!data.coSigner.coSignerName) {
+      // Pattern 5
+      if (!data.address.region) {
         ctx.addIssue({
           code: 'custom',
-          message: 'Co-signer name is required',
-          path: ['coSigner', 'coSignerName'],
+          message: 'Region is required',
+          path: ['address', 'region'],
         })
       }
-      if (!data.coSigner.coSignerEmail) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Co-signer email is required',
-          path: ['coSigner', 'coSignerEmail'],
-        })
+      // Pattern 6: re-validate the discriminated union so the phone/email branch reports
+      // through this shared schema's own error paths (`contactBy.phone` / `contactBy.email`).
+      const result = contactByBaseSchema.safeParse(data.contactBy)
+      if (!result.success) {
+        for (const issue of result.error.issues) {
+          ctx.addIssue({ ...issue, path: ['contactBy', ...issue.path] })
+        }
       }
-    }
-    // Pattern 4
-    if (data.income.monthlyIncome < INCOME_THRESHOLD && !data.income.coSignerNote) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'A co-signer note is required for income below the threshold',
-        path: ['income', 'coSignerNote'],
-      })
-    }
-    // Pattern 5
-    if (!data.address.region) {
-      ctx.addIssue({ code: 'custom', message: 'Region is required', path: ['address', 'region'] })
-    }
-    // Pattern 6: re-validate the discriminated union so the phone/email branch reports
-    // through this shared schema's own error paths (`contactBy.phone` / `contactBy.email`).
-    const result = contactByBaseSchema.safeParse(data.contactBy)
-    if (!result.success) {
-      for (const issue of result.error.issues) {
-        ctx.addIssue({ ...issue, path: ['contactBy', ...issue.path] })
-      }
-    }
-  })
+    },
+    // Zod skips a `superRefine` once any other issue in the object is "non-continuable"
+    // (an enum's `invalid_value`, among others) — `contactBy.contactBy` is itself a
+    // `z.enum`, so an invalid value there would otherwise silently swallow every check
+    // above. `when: () => true` forces this refinement to always run regardless.
+    { when: () => true },
+  )
 
 type Input = z.input<typeof schema>
 

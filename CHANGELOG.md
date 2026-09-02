@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `Form/ConditionalFields` story and a README "Conditional fields" section: six
+  patterns (checkbox reveal, select-value reveal, switch-toggled section, threshold,
+  cascading selects with `resetField` on change, and a discriminated union for
+  mutually-exclusive fields) driven by `useWatch` + `superRefine`/`discriminatedUnion`,
+  plus the same patterns applied in `SignUp` (referral source → "Other"), `Loan`
+  (employment "Other" → specify, income-below-threshold co-signer note), and
+  `Checkout` (country → region, resetting on change) — #82.
 - `FieldArray`: a repeating group of fields over hookform `useFieldArray`, rendered as
   a `FormSection` per array and a nested `FormSection` per row. `name`, `label`,
   `emptyRow` (a value or a per-Add factory), `singular?` / `rowLabel?`, `minRows?` /

@@ -63,26 +63,33 @@ const schema = z
     cvc: z.string().min(1, 'CVC is required'),
     tip: z.number().min(0, 'Tip cannot be negative'),
   })
-  .superRefine((data, ctx) => {
-    if (data.sameAsShipping) return
-    const required: (keyof z.infer<typeof optionalAddressSchema>)[] = [
-      'name',
-      'street',
-      'city',
-      'country',
-      'state',
-      'postalCode',
-    ]
-    for (const key of required) {
-      if (!data.billing[key]) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `Billing ${key === 'postalCode' ? 'postal code' : key} is required`,
-          path: ['billing', key] as const,
-        })
+  .superRefine(
+    (data, ctx) => {
+      if (data.sameAsShipping) return
+      const required: (keyof z.infer<typeof optionalAddressSchema>)[] = [
+        'name',
+        'street',
+        'city',
+        'country',
+        'state',
+        'postalCode',
+      ]
+      for (const key of required) {
+        if (!data.billing[key]) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `Billing ${key === 'postalCode' ? 'postal code' : key} is required`,
+            path: ['billing', key] as const,
+          })
+        }
       }
-    }
-  })
+    },
+    // Zod skips a `superRefine` once any other issue in the object is "non-continuable"
+    // (an enum's `invalid_value`, among others) — an empty `shipping.country` (also a
+    // `z.enum`) would otherwise silently swallow every issue above before the user has
+    // touched shipping at all. `when: () => true` forces this refinement to always run.
+    { when: () => true },
+  )
 
 type Input = z.input<typeof schema>
 
