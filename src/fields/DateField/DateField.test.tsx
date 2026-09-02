@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { Form, type FormMethods } from '../../Form'
 import { DateField } from './DateField'
 import { describeFieldContract } from '../../test/describeFieldContract'
-import { withPickers, pasteAllText } from '../../test/pickers'
+import { withPickers, pasteAllText, clearButton } from '../../test/pickers'
 
 const schema = z.object({ birthday: z.date().nullable() })
 
@@ -436,5 +436,115 @@ describe('DateField', () => {
       ),
     )
     expect(screen.getByRole('group', { name: 'Birthday (optional)' })).toBeInTheDocument()
+  })
+
+  // #83. MUI X's `useField.js` `handleClear` runs `onClear?.(event)` and *then*
+  // `clearValue()`, which only fires `onChange` when the value actually changes. After
+  // an unparsable paste the stored value is already `null` (the string never parsed)
+  // while `usePickerField`'s `pickerError` ref is holding `invalidDate` — so clearing
+  // produces no `onChange`, nothing resets the ref, and the field stayed stuck on
+  // "Birthday is invalid." with no way back.
+  //
+  // The clear button is only rendered while a section holds a value (`clearable:
+  // Boolean(clearable && !areAllSectionsEmpty && …)` in `useField.js`), and an
+  // unparsable paste blanks every section — so reaching the button in this state means
+  // typing a section afterwards, which is exactly how a stuck user would try to recover.
+  //
+  // `DateField` *is* the text field, so MUI X types `clearable`/`onClear` as flat props
+  // here (the popup pickers take them on `slotProps.field` instead — see
+  // DatePicker.test.tsx).
+  it('clearable: clearing after an unparsable paste drops the invalid-date error', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ birthday: null }} onSubmit={onSubmit}>
+          <DateField name="birthday" label="Birthday" clearable />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    const root = screen.getByRole('group', { name: 'Birthday' })
+    await pasteAllText(root, 'March 2, 2024')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Birthday is invalid.')
+    expect(onSubmit).not.toHaveBeenCalled()
+
+    await user.click(root)
+    await user.keyboard('05')
+    await user.click(clearButton(root))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(root).toHaveAttribute('aria-invalid', 'false')
+
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    await vi.waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith({ birthday: null }, expect.anything()),
+    )
+  })
+
+  // The consumer's `onChange` must fire on a clear whether or not MUI X publishes the
+  // change itself: it does when the field held a real value, and skips it when the value
+  // was already `null` (the unparsable-paste case), so `usePickerField` fills that one in.
+  // Both are asserted here — an emptying clear should look the same to a consumer either way.
+  it('clearable: clearing notifies a consumer onChange, including after an unparsable paste', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    const { rerender } = render(
+      withPickers(
+        <Form
+          schema={schema}
+          defaultValues={{ birthday: new Date(1990, 5, 1) }}
+          onSubmit={() => {}}
+        >
+          <DateField name="birthday" label="Birthday" clearable onChange={onChange} />
+        </Form>,
+      ),
+    )
+    await user.click(clearButton(screen.getByRole('group', { name: 'Birthday' })))
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange).toHaveBeenCalledWith(null, expect.objectContaining({ validationError: null }))
+
+    // Same again, but from the stuck state: value already `null`, `pickerError` holding
+    // `invalidDate`, so MUI X's own `clearValue` publishes nothing.
+    onChange.mockClear()
+    rerender(
+      withPickers(
+        <Form schema={schema} defaultValues={{ birthday: null }} onSubmit={() => {}}>
+          <DateField name="birthday" label="Birthday" clearable onChange={onChange} />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    const root = screen.getByRole('group', { name: 'Birthday' })
+    await pasteAllText(root, 'March 2, 2024')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Birthday is invalid.')
+    await user.click(root)
+    await user.keyboard('05')
+    onChange.mockClear()
+    await user.click(clearButton(root))
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange).toHaveBeenCalledWith(null, expect.objectContaining({ validationError: null }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it("clearable: a consumer's own onClear still runs", async () => {
+    const user = userEvent.setup()
+    const onClear = vi.fn()
+    render(
+      withPickers(
+        <Form
+          schema={schema}
+          defaultValues={{ birthday: new Date(1990, 5, 1) }}
+          onSubmit={() => {}}
+        >
+          <DateField name="birthday" label="Birthday" clearable onClear={onClear} />
+        </Form>,
+      ),
+    )
+    const root = screen.getByRole('group', { name: 'Birthday' })
+    await user.click(clearButton(root))
+    expect(onClear).toHaveBeenCalledTimes(1)
+    expect(hiddenInput('birthday')).toHaveValue('')
   })
 })

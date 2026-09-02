@@ -57,6 +57,12 @@ interface DateFieldChangeContext {
  * />` would typecheck while `fn` silently fell into `...rest` and was never
  * called — a consumer `onBlur`/`onPaste` only takes effect through
  * `slotProps={{ textField: { onBlur, onPaste } }}`.
+ *
+ * `onClear` is the third prop in that position but is *bound* rather than
+ * omitted (#83): unlike `onBlur`/`onPaste`, `clearable` is the documented way
+ * to let a user empty this field, so the flat `onClear` MUI X types alongside
+ * it should keep working. It is handed to `usePickerField`, which composes it
+ * after the form's own clear handling.
  */
 export function DateField({
   name,
@@ -69,6 +75,7 @@ export function DateField({
   optionalText,
   onChange,
   onError,
+  onClear,
   slotProps,
   ...rest
 }: DateFieldProps) {
@@ -88,6 +95,7 @@ export function DateField({
     optionalText,
     onChange,
     onError,
+    onClear,
     slotProps,
   })
   return <MuiDateField {...rest} {...bound} />

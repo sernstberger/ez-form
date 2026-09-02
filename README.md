@@ -78,6 +78,8 @@ pnpm add ez-form @mui/material @mui/icons-material @mui/x-date-pickers @emotion/
 
 Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >= 5.4 (the types use `NoInfer`).
 
+React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form methods) and `<FormSection ref>` (the `<fieldset>`) are populated the same way on either major.
+
 ## Components
 
 | Component                                      | Wraps                                         | Extra props                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -607,6 +609,24 @@ Use `z.date().nullable()` in the schema and `required` on the field — the same
 ```
 
 `disableFuture`, `minDate`, and other picker validations compose with `required` — compose them freely.
+
+One ordering to know: paste something unparsable (`March 2, 2024`, say) into a **required** picker that is still empty and the message is `Birthday is required.`, not `Birthday is invalid.` MUI X parses an unrecognisable string to `null`, so the field really is empty, and `ezResolver` runs `required` before the picker's own code. Submit is blocked either way, and the message becomes `Birthday is invalid.` as soon as the field is not required or already holds a date. Nothing to configure — just don't be surprised by which of the two you see.
+
+### Clearing a picker
+
+MUI X's own `clearable` works as it does outside a form. Pass it — and any `onClear` of your own — where MUI X types it for the component you are using, which is not the same slot for both:
+
+```tsx
+// Popup pickers (DatePicker, TimePicker, DateTimePicker): the field slot.
+<DatePicker name="start" label="Start" slotProps={{ field: { clearable: true, onClear } }} />
+
+// DateField *is* the text field, so both are flat props.
+<DateField name="birthday" label="Birthday" clearable onClear={onClear} />
+```
+
+(MUI X omits `clearable`/`onClear` from the popup pickers' `slotProps.textField` type, which is why they go on `slotProps.field` there.)
+
+Clearing resets the picker's validation state along with the value, so an `invalidDate` left over from an unparsable paste goes away with it, and your `onChange` is called with `null` either way. Note that MUI X only renders the clear button while the field shows something — after an unparsable paste it blanks every section, so the button stays hidden until the user types into one.
 
 ## Autocomplete
 
