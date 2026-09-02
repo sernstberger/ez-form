@@ -1,1 +1,1 @@
-export { ClearButton, type ClearButtonProps } from './ClearButton'
+export { ClearButton, clearButtonClasses, type ClearButtonProps } from './ClearButton'

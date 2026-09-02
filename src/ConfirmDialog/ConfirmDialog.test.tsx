@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { ConfirmDialog } from './ConfirmDialog'
+import { createTheme, ThemeProvider } from '@mui/material/styles'
+import { ConfirmDialog, confirmDialogClasses } from './ConfirmDialog'
 import { expectNoA11yViolations } from '../test/axe'
 
 describe('ConfirmDialog', () => {
@@ -65,5 +66,25 @@ describe('ConfirmDialog', () => {
       />,
     )
     await expectNoA11yViolations(baseElement)
+  })
+
+  it('is themeable: defaultProps and styleOverrides apply', () => {
+    const theme = createTheme({
+      components: {
+        EzConfirmDialog: {
+          defaultProps: { slotProps: { confirm: { variant: 'outlined' } } },
+          styleOverrides: { confirm: { textTransform: 'lowercase' } },
+        },
+      },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <ConfirmDialog open title="Sure?" onConfirm={() => {}} onCancel={() => {}} />
+      </ThemeProvider>,
+    )
+    const confirmBtn = screen.getByRole('button', { name: 'Confirm' })
+    expect(confirmBtn).toHaveClass('MuiButton-outlined')
+    expect(confirmBtn).toHaveClass(confirmDialogClasses.confirm)
+    expect(getComputedStyle(confirmBtn).textTransform).toBe('lowercase')
   })
 })

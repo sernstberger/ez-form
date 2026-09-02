@@ -1,10 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { z } from 'zod'
 import { Form } from '../Form'
 import { TextField } from '../fields/TextField'
 import { NumberField } from '../fields/NumberField'
-import { ClearButton } from './ClearButton'
+import { ClearButton, clearButtonClasses } from './ClearButton'
 import { expectNoA11yViolations } from '../test/axe'
 
 const schema = z.object({ name: z.string(), seats: z.number().nullable() })
@@ -116,5 +117,28 @@ describe('ClearButton', () => {
     expect(() => render(<ClearButton />)).toThrow(
       'ez-form: <ClearButton> must be rendered inside <Form>',
     )
+  })
+
+  it('is themeable: defaultProps and styleOverrides apply', () => {
+    const theme = createTheme({
+      components: {
+        EzClearButton: {
+          defaultProps: { variant: 'outlined' },
+          styleOverrides: { root: { textTransform: 'lowercase' } },
+        },
+      },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={defaults} onSubmit={() => {}}>
+          <Fields />
+          <ClearButton />
+        </Form>
+      </ThemeProvider>,
+    )
+    const btn = screen.getByRole('button', { name: 'Clear' })
+    expect(btn).toHaveClass('MuiButton-outlined')
+    expect(btn).toHaveClass(clearButtonClasses.root)
+    expect(getComputedStyle(btn).textTransform).toBe('lowercase')
   })
 })
