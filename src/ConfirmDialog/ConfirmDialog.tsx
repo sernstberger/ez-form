@@ -35,6 +35,11 @@ export interface ConfirmDialogProps
   /** Dialog's own slots (root, backdrop, container, transition, paper), plus the Confirm / Cancel buttons. */
   slotProps?: DialogProps['slotProps'] & {
     confirm?: ButtonProps
+    /**
+     * Cancel receives `autoFocus` by default so Enter never confirms by
+     * accident. Pass `{ autoFocus: false }` here to opt out — it's applied
+     * after the default, so it wins.
+     */
     cancel?: ButtonProps
   }
 }

@@ -16,6 +16,8 @@ const schema = z.object({
   tos: z.boolean(),
   when: z.date().nullable(),
   cardNumber: z.string(),
+  letters: z.array(z.string()),
+  lettersUnknown: z.array(z.string()),
 })
 const values = {
   email: 'ada@x.io',
@@ -24,10 +26,16 @@ const values = {
   tos: true,
   when: null,
   cardNumber: '',
+  letters: ['a', 'b'],
+  lettersUnknown: ['a', 'zzz'],
 }
 const roles = [
   { value: 'admin', label: 'Administrator' },
   { value: 'user', label: 'User' },
+]
+const letterOptions = [
+  { value: 'a', label: 'Alpha' },
+  { value: 'b', label: 'Beta' },
 ]
 
 const wrap = (ui: React.ReactNode) =>
@@ -74,6 +82,16 @@ describe('ReadOnlyField', () => {
     expect(screen.getByText('Yes')).toBeInTheDocument()
     expect(screen.getByText('—')).toBeInTheDocument()
     expect(screen.getByText('none')).toBeInTheDocument()
+  })
+
+  it('array + options: joins the matching option labels', () => {
+    wrap(<ReadOnlyField name="letters" options={letterOptions} />)
+    expect(screen.getByText('Alpha, Beta')).toBeInTheDocument()
+  })
+
+  it('array + options: an unmatched value falls back to its raw string', () => {
+    wrap(<ReadOnlyField name="lettersUnknown" options={letterOptions} />)
+    expect(screen.getByText('Alpha, zzz')).toBeInTheDocument()
   })
 
   it('format wins over every default', () => {

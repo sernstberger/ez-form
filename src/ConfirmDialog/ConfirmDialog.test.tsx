@@ -31,6 +31,19 @@ describe('ConfirmDialog', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1)
   })
 
+  it('slotProps={{ cancel: { autoFocus: false } }} opts out of the default Cancel focus', () => {
+    render(
+      <ConfirmDialog
+        open
+        title="Sure?"
+        onConfirm={() => {}}
+        onCancel={() => {}}
+        slotProps={{ cancel: { autoFocus: false } }}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Cancel' })).not.toHaveFocus()
+  })
+
   it('treats Escape as cancel', async () => {
     const user = userEvent.setup()
     const onCancel = vi.fn()
