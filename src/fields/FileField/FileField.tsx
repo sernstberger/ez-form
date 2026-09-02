@@ -13,25 +13,13 @@ import { useEzField } from '../useEzField'
 import { mergeDisabled } from '../mergeDisabled'
 import type { FieldRules } from '../../rules'
 
-// Inline copies of @mui/icons-material CloudUpload and Close.
-const UploadIcon = (props: SvgIconProps) => (
-  <SvgIcon {...props}>
-    <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96M14 13v4h-4v-4H7l5-5 5 5z" />
-  </SvgIcon>
-)
-const CloseIcon = (props: SvgIconProps) => (
-  <SvgIcon {...props}>
-    <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-  </SvgIcon>
-)
-
 // MUI's Chip.deleteIcon renders at `fontSize: 22` with no hit-area padding —
 // under the 24×24 CSS px target (WCAG 2.5.8). `minWidth`/`minHeight: 24` here
 // is the functional minimum, still overridable via
 // `theme.components.EzFileField.styleOverrides.deleteIcon`; `boxSizing:
 // 'content-box'` keeps the 22px glyph itself unchanged; centering it in the
 // larger box needs no extra rule since Chip already centers the icon.
-const FileFieldDeleteIcon = styled(CloseIcon, { name: 'EzFileField', slot: 'DeleteIcon' })({
+const FileFieldDeleteIcon = styled(Close, { name: 'EzFileField', slot: 'DeleteIcon' })({
   minWidth: 24,
   minHeight: 24,
   boxSizing: 'content-box',
@@ -206,7 +194,6 @@ export function FileField(inProps: FileFieldProps) {
                   aria-hidden={undefined}
                   className={fileFieldClasses.deleteIcon}
                 />
-                <Close role="button" aria-label={`Remove ${file.name}`} aria-hidden={undefined} />
               }
             />
           ))}
