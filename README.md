@@ -138,7 +138,7 @@ const steps = [
 </Form>
 ```
 
-Every field in the schema should appear in exactly one step's `fields`; a field listed in no step is validated only on final submit, and since it is not mounted its error cannot be shown or focused.
+Every field in the schema should appear in exactly one step's `fields`. When Submit fails validation, the wizard moves to the first step (in `steps` order) owning an errored field and focuses that field once it mounts, so an error on a step you have navigated away from is never silent. A field listed in no step is validated only on final submit and its error belongs to the last step: that step is marked in the stepper, and a failed submit lands there.
 
 ### One route per step
 

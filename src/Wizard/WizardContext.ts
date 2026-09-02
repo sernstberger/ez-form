@@ -5,9 +5,9 @@ export interface WizardStepDef<TIn extends FieldValues = FieldValues> {
   id: string
   label: ReactNode
   /** Field paths validated by Next. Omit for steps with nothing to validate (a review step).
-   * Every field in the schema should appear in exactly one step's `fields`; a field listed
-   * in no step is validated only on final submit, and since it is not mounted its error
-   * cannot be shown or focused. */
+   * Every field in the schema should appear in exactly one step's `fields`. A field listed
+   * in no step is validated only on final submit, and its error belongs to the last step:
+   * that step is marked in the stepper and is where a failed submit navigates. */
   fields?: readonly Path<TIn>[]
   /** Secondary text under the label (`StepLabel optional`). */
   optional?: ReactNode
