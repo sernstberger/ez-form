@@ -4,8 +4,8 @@ import {
   useId,
   type FieldsetHTMLAttributes,
   type ReactNode,
+  type Ref,
 } from 'react'
-import { useId, type FieldsetHTMLAttributes, type ReactNode, type Ref } from 'react'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import { styled } from '@mui/material/styles'

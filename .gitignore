@@ -6,3 +6,6 @@ storybook-static
 .claude/worktrees/
 .worktrees/
 .playwright-mcp/
+
+# QA breaker scratch probes (never committed)
+src/__qa__/

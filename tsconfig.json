@@ -13,5 +13,6 @@
     "noEmit": true,
     "types": ["vitest/globals"]
   },
-  "include": ["src", ".storybook", "vite.config.ts"]
+  "include": ["src", ".storybook", "vite.config.ts"],
+  "exclude": ["src/__qa__"]
 }
