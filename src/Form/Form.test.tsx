@@ -1,8 +1,9 @@
 import { createRef } from 'react'
 import { render, renderHook, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { z } from 'zod'
-import { Form, type FormMethods } from './Form'
+import { Form, formClasses, type FormMethods } from './Form'
 import { SubmitButton } from '../SubmitButton'
 import { TextField } from '../fields/TextField'
 import { Select } from '../fields/Select'
@@ -456,5 +457,84 @@ describe('useEzFormContext', () => {
       )
       unmount()
     })
+  })
+})
+
+describe('title and description', () => {
+  it('names the form from title and links description', () => {
+    render(
+      <Form schema={schema} onSubmit={() => {}} title="Sign up" description="All fields required">
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    const form = screen.getByRole('form', { name: 'Sign up' })
+    expect(form).toHaveAccessibleDescription('All fields required')
+    expect(screen.getByRole('heading', { level: 2, name: 'Sign up' })).toBeInTheDocument()
+  })
+
+  it('renders no heading and no aria attributes without a title', () => {
+    render(
+      <Form schema={schema} onSubmit={() => {}} data-testid="f">
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    expect(screen.queryByRole('heading')).toBeNull()
+    expect(screen.getByTestId('f')).not.toHaveAttribute('aria-labelledby')
+    expect(screen.getByTestId('f')).not.toHaveAttribute('aria-describedby')
+  })
+
+  it("keeps the consumer's aria-labelledby", () => {
+    render(
+      <>
+        <h1 id="mine">Mine</h1>
+        <Form schema={schema} onSubmit={() => {}} title="Ignored" aria-labelledby="mine">
+          <TextField name="email" label="Email" />
+        </Form>
+      </>,
+    )
+    expect(screen.getByRole('form', { name: 'Mine' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Ignored' })).toBeInTheDocument()
+  })
+
+  it('heading level comes from slotProps, and from the theme', () => {
+    const { unmount } = render(
+      <Form
+        schema={schema}
+        onSubmit={() => {}}
+        title="T"
+        slotProps={{ title: { component: 'h1' } }}
+      >
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    expect(screen.getByRole('heading', { level: 1, name: 'T' })).toBeInTheDocument()
+    unmount()
+    const theme = createTheme({
+      components: {
+        EzForm: {
+          defaultProps: { slotProps: { title: { component: 'h3' } } },
+          styleOverrides: { title: { letterSpacing: '9px' } },
+        },
+      },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} onSubmit={() => {}} title="T">
+          <TextField name="email" label="Email" />
+        </Form>
+      </ThemeProvider>,
+    )
+    const h = screen.getByRole('heading', { level: 3, name: 'T' })
+    expect(h).toHaveClass(formClasses.title)
+    expect(getComputedStyle(h).letterSpacing).toBe('9px')
+  })
+
+  it('has no a11y violations', async () => {
+    const { container } = render(
+      <Form schema={schema} onSubmit={() => {}} title="Sign up" description="Hint">
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    await expectNoA11yViolations(container)
   })
 })

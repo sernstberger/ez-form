@@ -224,6 +224,20 @@ export const ConfirmSubmit: Story = {
   args: { confirm: { title: 'Create account?', message: 'We will email a verification link.' } },
 }
 
+export const Titled: Story = {
+  render: () => (
+    <Form
+      schema={schema}
+      defaultValues={emptyValues}
+      onSubmit={onSubmit}
+      title="Create your account"
+      description="All fields are required unless marked optional."
+    >
+      <SignupFields />
+    </Form>
+  ),
+}
+
 export const UnsavedChangesGuard: Story = {
   args: { guard: true },
   parameters: {
