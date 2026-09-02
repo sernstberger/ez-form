@@ -81,6 +81,74 @@ function Steps() {
 const empty = { name: '', email: '', plan: '' }
 const filled = { name: 'Ada', email: 'ada@x.io', plan: 'pro' }
 
+/**
+ * A gate field plus a step whose `when` reads it — the shape the Insurance example's
+ * `hasVehicle`/`vehicle` step used a hand-rolled `useMemo` filter for (see #80).
+ */
+const conditionalSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  hasExtra: z.boolean(),
+  extra: z.string(),
+  plan: z.string().min(1, 'Plan is required'),
+})
+type ConditionalInput = z.input<typeof conditionalSchema>
+const conditionalSteps = [
+  { id: 'account', label: 'Account', fields: ['name', 'hasExtra'] },
+  {
+    id: 'extra',
+    label: 'Extra',
+    fields: ['extra'],
+    when: (v: ConditionalInput) => Boolean(v.hasExtra),
+  },
+  { id: 'plan', label: 'Plan', fields: ['plan'] },
+  { id: 'review', label: 'Review' },
+] as const satisfies WizardStepDef<ConditionalInput>[]
+const conditionalFilled: ConditionalInput = {
+  name: 'Ada',
+  hasExtra: false,
+  extra: '',
+  plan: 'pro',
+}
+
+function ConditionalControls() {
+  const { setValue } = useFormContext<ConditionalInput>()
+  return (
+    <>
+      <button type="button" onClick={() => setValue('hasExtra', true)}>
+        show extra
+      </button>
+      <button type="button" onClick={() => setValue('hasExtra', false)}>
+        hide extra
+      </button>
+    </>
+  )
+}
+
+function ConditionalSteps() {
+  const w = useWizard('ConditionalSteps')
+  return (
+    <>
+      <WizardStep id="account">
+        <TextField name="name" label="Name" />
+      </WizardStep>
+      <WizardStep id="extra">
+        <TextField name="extra" label="Extra" />
+      </WizardStep>
+      <WizardStep id="plan">
+        <TextField name="plan" label="Plan" />
+      </WizardStep>
+      <WizardStep id="review">
+        <p>Review</p>
+      </WizardStep>
+      <Controls />
+      <ConditionalControls />
+      <button type="button" onClick={() => void w.go('extra')}>
+        go extra
+      </button>
+    </>
+  )
+}
+
 /** `nickname` appears in no step's `fields`: only final submit ever validates it. */
 const unlistedSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -666,6 +734,208 @@ describe('Wizard', () => {
     })
   })
 
+  describe('conditional steps (when)', () => {
+    it('a step whose `when` is false is absent from the effective steps and stepper', () => {
+      render(
+        <Form schema={conditionalSchema} defaultValues={conditionalFilled} onSubmit={() => {}}>
+          <Wizard steps={conditionalSteps}>
+            <ConditionalSteps />
+          </Wizard>
+        </Form>,
+      )
+      expect(screen.getByTestId('status')).toHaveTextContent(
+        'account:current plan:upcoming review:upcoming',
+      )
+      expect(screen.getByTestId('status')).not.toHaveTextContent('extra:')
+    })
+
+    it('toggling the predicate true adds the step to the effective list', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={conditionalSchema} defaultValues={conditionalFilled} onSubmit={() => {}}>
+          <Wizard steps={conditionalSteps}>
+            <ConditionalSteps />
+          </Wizard>
+        </Form>,
+      )
+      expect(screen.getByTestId('status')).not.toHaveTextContent('extra:')
+      await user.click(screen.getByRole('button', { name: 'show extra' }))
+      await waitFor(() =>
+        expect(screen.getByTestId('status')).toHaveTextContent(
+          'account:current extra:upcoming plan:upcoming review:upcoming',
+        ),
+      )
+    })
+
+    it('next skips a hidden step: from account it lands on plan, not the hidden extra step', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={conditionalSchema} defaultValues={conditionalFilled} onSubmit={() => {}}>
+          <Wizard steps={conditionalSteps}>
+            <ConditionalSteps />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+    })
+
+    it("next validates only the visible step's fields: a hidden step's fields are not validated", async () => {
+      const user = userEvent.setup()
+      render(
+        <Form
+          schema={conditionalSchema}
+          defaultValues={{ ...conditionalFilled, extra: '' }}
+          onSubmit={() => {}}
+        >
+          <Wizard steps={conditionalSteps}>
+            <ConditionalSteps />
+          </Wizard>
+        </Form>,
+      )
+      // `extra` has no validation rule of its own (plain z.string()), so this only proves
+      // the hidden step is skipped entirely rather than validated-and-passing.
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+    })
+
+    it('current step becoming hidden moves the wizard back to the nearest visible earlier step', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form
+          schema={conditionalSchema}
+          defaultValues={{ ...conditionalFilled, hasExtra: true }}
+          onSubmit={() => {}}
+        >
+          <Wizard steps={conditionalSteps}>
+            <ConditionalSteps />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('extra'))
+      // Hiding the current step (no longer wants the extra step) must move the wizard off
+      // it — the nearest visible step before it, i.e. account.
+      await user.click(screen.getByRole('button', { name: 'hide extra' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('account'))
+    })
+
+    it('go(hiddenId) resolves false and does not move', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={conditionalSchema} defaultValues={conditionalFilled} onSubmit={() => {}}>
+          <Wizard steps={conditionalSteps}>
+            <ConditionalSteps />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'go extra' }))
+      expect(screen.getByTestId('current')).toHaveTextContent('account')
+    })
+
+    it("visited keeps a hidden step's id, which reappears as completed once shown again", async () => {
+      const user = userEvent.setup()
+      render(
+        <Form
+          schema={conditionalSchema}
+          defaultValues={{ ...conditionalFilled, hasExtra: true }}
+          onSubmit={() => {}}
+        >
+          <Wizard steps={conditionalSteps}>
+            <ConditionalSteps />
+          </Wizard>
+        </Form>,
+      )
+      // Visit extra, then move on to plan — a real committed move (not just the transient
+      // "current step became hidden" fallback), so the wizard's own step state points at
+      // plan by the time extra is hidden.
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('extra'))
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+      expect(screen.getByTestId('visited')).toHaveTextContent('account,extra,plan')
+      await user.click(screen.getByRole('button', { name: 'hide extra' }))
+      expect(screen.getByTestId('current')).toHaveTextContent('plan')
+      expect(screen.getByTestId('visited')).toHaveTextContent('account,extra,plan')
+      // Shown again: still visited, so it comes back as completed rather than upcoming.
+      await user.click(screen.getByRole('button', { name: 'show extra' }))
+      await waitFor(() =>
+        expect(screen.getByTestId('status')).toHaveTextContent(
+          'account:completed extra:completed plan:current review:upcoming',
+        ),
+      )
+    })
+
+    it('renders the effective steps in WizardStepper and in page layout', () => {
+      render(
+        <Form schema={conditionalSchema} defaultValues={conditionalFilled} onSubmit={() => {}}>
+          <Wizard steps={conditionalSteps}>
+            <WizardStepper />
+            <ConditionalSteps />
+          </Wizard>
+        </Form>,
+      )
+      expect(screen.queryByText('Extra')).not.toBeInTheDocument()
+      expect(screen.getAllByText('Account').length).toBeGreaterThan(0)
+      expect(screen.getByText('Plan')).toBeInTheDocument()
+    })
+
+    it('page layout omits a hidden step entirely (no group, no fields)', () => {
+      render(
+        <Form schema={conditionalSchema} defaultValues={conditionalFilled} onSubmit={() => {}}>
+          <Wizard steps={conditionalSteps} layout="page">
+            <ConditionalSteps />
+          </Wizard>
+        </Form>,
+      )
+      expect(screen.queryByRole('group', { name: 'Extra' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: 'Extra' })).not.toBeInTheDocument()
+      expect(screen.getByRole('group', { name: 'Account' })).toBeInTheDocument()
+    })
+
+    it('resuming with a hidden step id (controlled step) lands on the nearest visible step', async () => {
+      function Resume() {
+        const [step, setStep] = useState('extra')
+        return (
+          <Form schema={conditionalSchema} defaultValues={conditionalFilled} onSubmit={() => {}}>
+            <output data-testid="param">{step}</output>
+            <Wizard
+              steps={conditionalSteps}
+              step={step}
+              onStepChange={(s) => setStep(s.id)}
+              visited={['account', 'extra']}
+            >
+              <ConditionalSteps />
+            </Wizard>
+          </Form>
+        )
+      }
+      render(<Resume />)
+      // `extra` was visited (persisted from a session where hasVehicle was true) but the
+      // default values here have hasExtra: false, so it is hidden now — resume must land
+      // on the nearest visible step rather than a step that renders nothing.
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('account'))
+      expect(screen.getByTestId('param')).toHaveTextContent('account')
+    })
+
+    it('has no accessibility violations with a conditional step present', async () => {
+      const { container } = render(
+        <Form
+          schema={conditionalSchema}
+          defaultValues={{ ...conditionalFilled, hasExtra: true }}
+          onSubmit={() => {}}
+        >
+          <Wizard steps={conditionalSteps}>
+            <WizardStepper />
+            <ConditionalSteps />
+            <WizardNav />
+          </Wizard>
+        </Form>,
+      )
+      await expectNoA11yViolations(container)
+    })
+  })
+
   it('throws outside <Form> and useWizard throws outside <Wizard>', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(() =>
@@ -1074,6 +1344,20 @@ describe('Wizard layout="page"', () => {
     expect(screen.queryByText('orphaned')).not.toBeInTheDocument()
     expect(screen.getAllByRole('group')).toHaveLength(1)
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('not-a-real-step'))
+    warn.mockRestore()
+  })
+
+  it('page layout: a WizardStep hidden by `when` renders nothing and does not warn', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    render(
+      <Form schema={conditionalSchema} defaultValues={conditionalFilled} onSubmit={() => {}}>
+        <Wizard steps={conditionalSteps} layout="page">
+          <ConditionalSteps />
+        </Wizard>
+      </Form>,
+    )
+    expect(screen.queryByRole('group', { name: 'Extra' })).not.toBeInTheDocument()
+    expect(warn).not.toHaveBeenCalled()
     warn.mockRestore()
   })
 })

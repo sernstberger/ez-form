@@ -11,6 +11,18 @@ export interface WizardStepDef<TIn extends FieldValues = FieldValues> {
   fields?: readonly Path<TIn>[]
   /** Secondary text under the label (`StepLabel optional`). */
   optional?: ReactNode
+  /**
+   * Whether this step is currently part of the wizard. Omit for a step that's always
+   * shown. Read live off the form's values (`Wizard` subscribes with `useWatch()` only
+   * when at least one step defines `when`, so there is no subscription cost otherwise).
+   * A hidden step is absent from the stepper and from `next`/`prev`/`go` navigation and
+   * page layout, and its `fields` are skipped by `next`; final submit still validates
+   * the whole schema, so gate a hidden step's fields in the schema itself (`superRefine`
+   * or a discriminated union) the way a step that's always shown does not need to.
+   * `visited` keeps a hidden step's id — it still counts as reached if the predicate
+   * turns true again later.
+   */
+  when?: (values: TIn) => boolean
 }
 
 export type WizardStepStatus = 'current' | 'completed' | 'visited' | 'upcoming'
@@ -18,7 +30,10 @@ export type WizardStepStatus = 'current' | 'completed' | 'visited' | 'upcoming'
 export interface WizardContextValue {
   /** Stable id prefix for this wizard (`useId`), used for step label ids. */
   id: string
+  /** The effective steps: every entry in `steps` whose `when` is absent or true. */
   steps: readonly WizardStepDef[]
+  /** Every step passed to `Wizard`, including ones currently hidden by `when`. */
+  allSteps: readonly WizardStepDef[]
   current: WizardStepDef
   index: number
   visited: readonly string[]

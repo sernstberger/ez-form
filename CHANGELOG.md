@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `Wizard`: `WizardStepDef.when?: (values) => boolean` — a first-class conditional-step
+  predicate, so a form no longer needs to hand-roll a `useMemo` filter over its `steps`
+  array to show/hide a step. `Wizard` subscribes to live form values with `useWatch()`
+  only when at least one step defines `when` (no subscription, and no re-render cost,
+  otherwise) and derives the effective step list itself; every consumer — the stepper,
+  `page` layout, `next`/`prev`/`go`, and failed-submit step ownership — uses that
+  effective list. Hiding the current step moves the wizard to the nearest visible step
+  before it (or the first); `go()` on a hidden step resolves `false`; `visited` keeps a
+  hidden step's id so it returns as completed rather than upcoming; a saved `visited`/
+  `step` naming a currently-hidden step resumes on the nearest visible one. `steps` in
+  `useWizard()`'s context is the effective (visible) list; `allSteps` exposes every step
+  passed to `Wizard`, hidden ones included — #80.
 - `FieldArray`: a repeating group of fields over hookform `useFieldArray`, rendered as
   a `FormSection` per array and a nested `FormSection` per row. `name`, `label`,
   `emptyRow` (a value or a per-Add factory), `singular?` / `rowLabel?`, `minRows?` /

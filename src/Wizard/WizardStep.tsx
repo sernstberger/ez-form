@@ -17,20 +17,28 @@ export interface WizardStepProps {
  * One step's content, always a `FormSection` (a step is a group). Horizontal:
  * the legend is the step label (a heading). Vertical: the label is already
  * visible in the stepper, so the section is named by it via `aria-labelledby`
- * and renders no legend. `page` layout: every step renders unconditionally,
- * in document order (by convention, the order `WizardStep`s appear as
- * children — the same order given to `steps`), each as its own named
- * section — the same markup as a horizontal step. An `id` matching no
- * `steps` entry renders nothing there too (mirrors `steps` layout's "no
- * current step matches this id" case) rather than a `FormSection` with no
- * accessible name, and warns in dev so a stale/misspelled id is noticed.
+ * and renders no legend. `page` layout: every *visible* step renders
+ * unconditionally, in document order (by convention, the order `WizardStep`s
+ * appear as children — the same order given to `steps`), each as its own
+ * named section — the same markup as a horizontal step. A step hidden by
+ * `when` renders nothing here too (silently — it's expected, not a mistake);
+ * an `id` matching no step at all in `allSteps` also renders nothing but
+ * warns in dev, so a stale/misspelled id is still noticed.
  */
 export function WizardStep({ id, title, description, slotProps, children }: WizardStepProps) {
-  const { steps, current, orientation, layout, contentEl, id: wizardId } = useWizard('WizardStep')
+  const {
+    steps,
+    allSteps,
+    current,
+    orientation,
+    layout,
+    contentEl,
+    id: wizardId,
+  } = useWizard('WizardStep')
   if (layout === 'page') {
     const step = steps.find((s) => s.id === id)
     if (!step) {
-      if (import.meta.env.DEV) {
+      if (import.meta.env.DEV && !allSteps.some((s) => s.id === id)) {
         console.warn(`ez-form: <WizardStep id="${id}"> does not match any step in \`steps\`.`)
       }
       return null
