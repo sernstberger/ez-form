@@ -65,6 +65,7 @@ Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >
 | `Checkbox`     | MUI `Checkbox`         | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                        |
 | `Switch`       | MUI `Switch`           | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                        |
 | `ToggleButtonGroup` | MUI `ToggleButtonGroup` | `name`, `label` (legend), `options: readonly Option[]`, `exclusive?`, `helperText?`; rules `required`, `validate`. Value is `Option['value'] \| null` when exclusive, else `Option['value'][]` |
+| `Rating`       | MUI `Rating`           | `name`, `label` (legend), `helperText?`; rules `required`, `validate`. Value is `number \| null`                                                     |
 | `SubmitButton` | MUI `Button`           | `loading` while submitting, disabled while the form is                                                                                              |
 
 Every field shows its zod message as helper text (linked to the input with `aria-describedby`; the first invalid field is focused on submit). The error text is a live region (`role="alert"`), so it is announced in `onChange`/`onBlur` modes as well. Fields must be rendered inside `<Form>`. Consumer `onChange`/`onBlur` handlers run after the form's own.
