@@ -80,4 +80,48 @@ export async function placeOrderApi(values: PlaceOrderValues): Promise<PlaceOrde
     throw new Error('Your card was declined. Try a different payment method.')
   }
   return { orderId: `ORD-${Math.random().toString(36).slice(2, 10).toUpperCase()}` }
+export interface ProfileValues {
+  displayName: string
+  bio: string
+  birthday: Date | null
+  country: string
+  marketingEmails: boolean
+  language: string
+  avatar: File | null
+}
+
+/** The one display name `loadProfileApi` treats as a server failure, so stories/tests can trigger the error path on demand. */
+export const PROFILE_LOAD_FAILS_FOR = 'network-error'
+
+/**
+ * Fake "load the signed-in user's profile" endpoint for the Profile example
+ * (#54): a short delay (simulates a real fetch), then resolves with a saved
+ * profile. `seed` lets a story/test control what comes back (for the
+ * `values`-re-sync story); pass `seed.displayName === PROFILE_LOAD_FAILS_FOR`
+ * to make it reject instead, exercising `onDefaultValuesError`.
+ */
+export async function loadProfileApi(seed?: Partial<ProfileValues>): Promise<ProfileValues> {
+  await delay(300)
+  if (seed?.displayName === PROFILE_LOAD_FAILS_FOR) {
+    throw new Error('Could not load your profile. Check your connection and try again.')
+  }
+  return {
+    displayName: 'Ada Lovelace',
+    bio: 'Mathematician and writer, first to publish an algorithm for a computing machine.',
+    birthday: new Date(1985, 11, 10),
+    country: 'gb',
+    marketingEmails: false,
+    language: 'en',
+    avatar: null,
+    ...seed,
+  }
+}
+
+/**
+ * Fake "save the profile" endpoint: a short delay, then resolves with the
+ * values it was given (a real backend would echo the persisted record).
+ */
+export async function saveProfileApi(values: ProfileValues): Promise<ProfileValues> {
+  await delay(300)
+  return values
 }
