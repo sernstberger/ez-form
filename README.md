@@ -357,7 +357,9 @@ The announcement is a function prop, so it can be localised or turned off:
 
 `index` and `count` are positions in the **effective** step list — a step hidden by `when` is not counted, so what the user hears matches what the stepper shows. `stepAnnouncement={false}` suppresses only the announcement; focus management is not optional.
 
-Three cases deliberately stay quiet: initial mount (nothing changed, and stealing focus on load is hostile), a failed `Next` (the step did not change — `<FormErrorSummary />` announces and focuses instead), and the failed-submit jump to the first errored step, which is `<FormErrorSummary />`'s arrival to own. `layout="page"` never changes step, so it never announces.
+Four cases deliberately stay quiet: initial mount (nothing changed, and stealing focus on load is hostile), a failed `Next` (the step did not change — `<FormErrorSummary />` announces and focuses instead), the failed-submit jump to the first errored step, which is `<FormErrorSummary />`'s arrival to own, and a controlled wizard's declined move. `layout="page"` never navigates, so it never announces.
+
+That last case matters when `step`/`onStepChange` are wired to a router: both the announcement and the focus move wait until the wizard has actually _arrived_ on the requested step, so a transition your own code vetoes — or one that resolves a tick later through `navigate()` — never announces a step the user is not looking at.
 
 Because a form can hold several `role="status"` regions at once, query this one by its slot class in a test:
 

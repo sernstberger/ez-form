@@ -5,7 +5,7 @@ import { styled } from '@mui/material/styles'
 import { useFormState, useWatch, type FieldValues, type Path } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
 import { useHasErrorSummary } from '../Form/ErrorSummaryContext'
-import { LiveRegion, type LiveRegionProps } from '../Form/LiveRegion'
+import { LiveRegion } from '../Form/LiveRegion'
 import {
   WizardContext,
   type WizardContextValue,
@@ -143,10 +143,6 @@ export interface WizardProps<TIn extends FieldValues> {
    * either way.
    */
   stepAnnouncement?: ((info: WizardStepAnnouncementInfo) => ReactNode) | false
-  slotProps?: {
-    /** The step-change live region. `message`/`announcementKey` are owned by the wizard. */
-    liveRegion?: Omit<LiveRegionProps, 'message' | 'announcementKey'>
-  }
   children: ReactNode
 }
 
@@ -212,7 +208,6 @@ function WizardBody<TIn extends FieldValues>({
   orientation = 'horizontal',
   layout = 'steps',
   stepAnnouncement = defaultStepAnnouncement,
-  slotProps,
   children,
 }: WizardBodyProps<TIn>) {
   const { trigger, control, setFocus } = useEzFormContext('Wizard')
@@ -284,28 +279,35 @@ function WizardBody<TIn extends FieldValues>({
       // so focus would land a render *after* the new step's content — visible to a consumer
       // only as flakiness (a test that finds the new step's field still has to await another
       // tick before focus arrives) and to a screen reader as a gap. Batching it here makes the
-      // step change and its focus one commit. `stepId` is what keeps a *controlled* wizard
-      // honest: `onStepChange` may decline the move, and only the `WizardStep` whose id
-      // matches acts on the request — see `WizardStepProps`. Cost if wrong: a declined
-      // controlled move announces a step the user never reached.
+      // step change and its focus one commit.
+      //
+      // `stepId` is the *requested* step, not necessarily the one that ends up current: a
+      // controlled wizard's `onStepChange` may decline the move. Both halves of the request
+      // are therefore gated on arrival — `WizardStep` focuses only when its own id matches,
+      // and the live region's `message` is read through `announcement` below, which resolves
+      // to nothing until the effective `current.id` is the requested step.
       //
       // `userInitiated: false` is the failed-submit jump: `<FormErrorSummary>` focuses its own
       // heading on the step it lands on, and both an announcement and a competing heading
       // focus would fight it.
       if (userInitiated) {
-        setStepChange((prev) => ({
-          stepId: target.id,
-          text:
-            layout === 'page' || !stepAnnouncement
-              ? null
-              : stepAnnouncement({
-                  index: to,
-                  count: steps.length,
-                  label: target.label,
-                  step: target as WizardStepDef,
-                }),
-          seq: prev.seq + 1,
-        }))
+        // Computed here rather than inside the updater: a `setState` updater must be pure and
+        // may be re-invoked (StrictMode, a replayed render), and `stepAnnouncement` is a
+        // consumer's function — calling it once per navigation, outside the updater, is the
+        // only way to promise that.
+        //
+        // No `layout === 'page'` guard: `next`/`prev`/`go` all return before reaching `move()`
+        // in that layout, and so does the failed-submit effect, so a page wizard never
+        // navigates and this is unreachable there.
+        const text = stepAnnouncement
+          ? stepAnnouncement({
+              index: to,
+              count: steps.length,
+              label: target.label,
+              step: target as WizardStepDef,
+            })
+          : null
+        setStepChange((prev) => ({ stepId: target.id, text, seq: prev.seq + 1 }))
       }
       // `lastFailed` scopes a step's own last failed validation; leaving the step (forward
       // after a pass — already null from validateCurrent — or backward without validating)
@@ -314,7 +316,7 @@ function WizardBody<TIn extends FieldValues>({
       if (step === undefined) setStepState(target.id)
       onStepChange?.(target)
     },
-    [steps, markVisited, step, onStepChange, layout, stepAnnouncement],
+    [steps, markVisited, step, onStepChange, stepAnnouncement],
   )
 
   useEffect(() => {
@@ -449,13 +451,18 @@ function WizardBody<TIn extends FieldValues>({
     setFocus(focusTarget.path)
   }, [focusTarget, current.id, setFocus])
 
-  // Memoized on its own so the context object below doesn't get a new identity on a render
-  // where nothing about the focus request changed (the `text` half of `stepChange` is only
-  // read by the live region, not by any context consumer).
+  // Memoized separately from `stepChange` so the context object below keeps its identity on a
+  // render where only the announcement `text` changed.
   const focusRequest = useMemo(
     () => ({ stepId: stepChange.stepId, seq: stepChange.seq }),
     [stepChange.stepId, stepChange.seq],
   )
+
+  // The announcement is held back until the wizard has actually arrived: a controlled wizard
+  // can decline the move `move()` requested (its `onStepChange` need not feed the new `step`
+  // back), and announcing "Step 2 of 3, Plan" while the user is still on step 1 is worse than
+  // saying nothing. Same gate as `WizardStep`'s focus check, so the two never disagree.
+  const announcement = stepChange.stepId === current.id ? stepChange.text : null
 
   const value = useMemo<WizardContextValue>(
     () => ({
@@ -511,10 +518,9 @@ function WizardBody<TIn extends FieldValues>({
         is visually hidden, so document order is all that is at stake.
       */}
       <WizardStatus
-        {...slotProps?.liveRegion}
-        message={stepChange.text}
+        message={announcement}
         announcementKey={stepChange.seq}
-        className={`${wizardClasses.status}${slotProps?.liveRegion?.className ? ` ${slotProps.liveRegion.className}` : ''}`}
+        className={wizardClasses.status}
       />
     </WizardContext.Provider>
   )

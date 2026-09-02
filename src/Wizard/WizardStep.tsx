@@ -75,9 +75,22 @@ export function WizardStep({ id, title, description, slotProps, children }: Wiza
     // A heading, a stepper label and a fieldset are all non-focusable elements. `tabIndex` is
     // set here, at the moment of focusing, rather than standing in the markup: a permanent
     // `tabIndex={-1}` puts these nodes in a screen reader's "clickable" set on every render,
-    // and nothing about this component wants them reachable at any other time.
-    if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1')
+    // and nothing about this component wants them reachable at any other time. It is taken
+    // off again on blur — once the user has tabbed away into the step's fields, the heading
+    // has served its purpose and should go back to being ordinary text. A target that already
+    // carried a `tabindex` (a consumer's own) is focused as-is and left untouched.
+    if (target.hasAttribute('tabindex')) {
+      target.focus()
+      return
+    }
+    target.setAttribute('tabindex', '-1')
+    const drop = () => target.removeAttribute('tabindex')
+    target.addEventListener('blur', drop, { once: true })
     target.focus()
+    return () => {
+      target.removeEventListener('blur', drop)
+      drop()
+    }
   }, [focusMe, seq, labelledById])
 
   if (layout === 'page') {

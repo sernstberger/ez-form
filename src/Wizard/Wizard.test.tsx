@@ -1201,6 +1201,25 @@ describe('Wizard', () => {
       expect(fieldset).toHaveAttribute('tabindex', '-1')
     })
 
+    it('the heading gives its tabindex back once focus leaves it', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+          <Wizard steps={steps}>
+            <Steps />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      const heading = screen.getByRole('heading', { name: 'Plan' })
+      await waitFor(() => expect(heading).toHaveFocus())
+      // Focusable only while it holds focus: a standing tabindex would leave the heading in a
+      // screen reader's "clickable" set for the rest of the step's life.
+      expect(heading).toHaveAttribute('tabindex', '-1')
+      await user.click(screen.getByRole('textbox', { name: 'Plan' }))
+      await waitFor(() => expect(heading).not.toHaveAttribute('tabindex'))
+    })
+
     it('counts only visible steps: a hidden `when` step is out of both index and count', async () => {
       const user = userEvent.setup()
       render(
@@ -1272,7 +1291,7 @@ describe('Wizard', () => {
       expect(statusRegion()).toBeEmptyDOMElement()
     })
 
-    it('layout="page" never announces: there is no step to change to', async () => {
+    it('layout="page" never announces: navigation is a no-op there', async () => {
       const user = userEvent.setup()
       render(
         <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
@@ -1281,8 +1300,54 @@ describe('Wizard', () => {
           </Wizard>
         </Form>,
       )
+      // Every step is on screen at once, so next/prev/go resolve false without moving —
+      // `move()` is never reached and there is nothing to announce or focus.
       await user.click(screen.getByRole('button', { name: 'next' }))
+      await user.click(screen.getByRole('button', { name: 'go review' }))
+      await user.click(screen.getByRole('button', { name: 'prev' }))
+      expect(screen.getByTestId('current')).toHaveTextContent('account')
       expect(statusRegion()).toBeEmptyDOMElement()
+      // Focus stayed where the click left it; no step heading pulled it away.
+      expect(screen.getByRole('button', { name: 'prev' })).toHaveFocus()
+    })
+
+    // The announcement is raised by `move()` with the *requested* step, which a controlled
+    // wizard's `onStepChange` may then decline by not feeding the new `step` back. Both the
+    // focus request and the message are gated on arrival, so a declined move says nothing.
+    it('a controlled wizard that declines a move neither announces nor moves focus', async () => {
+      const user = userEvent.setup()
+      function DeclinesNext() {
+        const [step, setStep] = useState('account')
+        return (
+          <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+            <Wizard
+              steps={steps}
+              step={step}
+              // Vetoes every transition, the way a consumer's own routing guard might.
+              onStepChange={() => {}}
+              visited={['account', 'plan']}
+            >
+              <Steps />
+              <button type="button" onClick={() => setStep('plan')}>
+                jump to plan
+              </button>
+            </Wizard>
+          </Form>
+        )
+      }
+      render(<DeclinesNext />)
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      // The wizard asked to go to "plan" and was refused: it is still on "account", so it
+      // must not claim "Step 2 of 3, Plan" nor pull focus to a heading that is not showing.
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('account'))
+      expect(statusRegion()).toBeEmptyDOMElement()
+      expect(screen.getByRole('heading', { name: 'Account' })).not.toHaveFocus()
+
+      // Once the consumer does move the wizard on its own, the (still-pending) request now
+      // matches the step that is actually current, and that arrival is announced and focused.
+      await user.click(screen.getByRole('button', { name: 'jump to plan' }))
+      await waitFor(() => expect(statusRegion()).toHaveTextContent('Step 2 of 3, Plan'))
+      expect(screen.getByRole('heading', { name: 'Plan' })).toHaveFocus()
     })
 
     it('the failed-submit jump leaves focus to FormErrorSummary, not the step heading', async () => {
@@ -1312,10 +1377,7 @@ describe('Wizard', () => {
       await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
       await user.click(screen.getByRole('button', { name: 'next' }))
       await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('review'))
-      // The region still holds whatever the last real navigation said; capture the node so
-      // the jump can be shown to leave it alone rather than re-announce over the summary.
-      const beforeJump = statusRegion()
-      expect(beforeJump).toHaveTextContent('Step 3 of 3, Review')
+      expect(statusRegion()).toHaveTextContent('Step 3 of 3, Review')
       await user.click(screen.getByRole('button', { name: 'clear email' }))
       await user.click(screen.getByRole('button', { name: 'Submit' }))
       await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('account'))
@@ -1325,10 +1387,10 @@ describe('Wizard', () => {
         expect(screen.getByRole('heading', { name: 'There is a problem' })).toHaveFocus(),
       )
       expect(screen.getByRole('heading', { name: 'Account' })).not.toHaveFocus()
-      // Same node, same text: no new `announcementKey`, so nothing was re-announced. (Had
-      // the jump announced, the region would read "Step 1 of 3, Account" on a fresh node.)
-      expect(statusRegion()).toBe(beforeJump)
-      expect(statusRegion()).toHaveTextContent('Step 3 of 3, Review')
+      // The jump raised no request of its own, and the arrival gate drops the stale "Step 3
+      // of 3, Review" now that the wizard is on `account` — so the region is silent rather
+      // than either re-announcing over the summary or leaving a message that is now a lie.
+      expect(statusRegion()).toBeEmptyDOMElement()
       expect(onSubmit).not.toHaveBeenCalled()
     })
 
