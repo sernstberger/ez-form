@@ -3,6 +3,8 @@ import { fn } from 'storybook/test'
 import CssBaseline from '@mui/material/CssBaseline'
 import Stack from '@mui/material/Stack'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
 import type { z } from 'zod'
 import { Form } from '../src/Form'
 import { SubmitButton } from '../src/SubmitButton'
@@ -43,7 +45,9 @@ const preview: Preview = {
     (Story) => (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <Story />
+        <LocalizationProvider dateAdapter={AdapterDateFns}>
+          <Story />
+        </LocalizationProvider>
       </ThemeProvider>
     ),
   ],

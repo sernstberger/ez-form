@@ -40,10 +40,10 @@ export function Signup() {
 ## Install
 
 ```bash
-pnpm add ez-form @mui/material @emotion/react @emotion/styled @base-ui/react react-hook-form zod
+pnpm add ez-form @mui/material @mui/x-date-pickers @emotion/react @emotion/styled @base-ui/react react-hook-form zod
 ```
 
-`@base-ui/react` is used by `NumberField` only and is tree-shakeable.
+`@base-ui/react` backs `NumberField`, `MoneyField`, and `OtpField`; `@mui/x-date-pickers` backs the three pickers. Both are tree-shakeable, and you also install one date adapter library (`date-fns`, `dayjs`, `luxon`, or `moment`) for the pickers — see "Date pickers" below.
 
 Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >= 5.4 (the types use `NoInfer`).
 
