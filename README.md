@@ -105,6 +105,85 @@ Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >
 | `ConfirmDialog`                                | MUI `Dialog`                                  | `open`, `title`, `message?`, `confirmLabel?`, `cancelLabel?`, `confirmColor?`, `onConfirm`, `onCancel`; `useConfirm()` gives a promise API                                                                                                   |
 | `Wizard`                                       | MUI `Stepper`                                 | `steps`, `step?`/`onStepChange?`, `visited?`/`onVisitedChange?`, `orientation?`; with `WizardStepper`, `WizardStep`, `WizardNav`, `useWizard`                                                                                                |
 | `ReadOnlyField`                                | MUI `Typography`                              | `name`, `label?`, `options?`, `format?`, `empty?`, `editStep?`                                                                                                                                                                               |
+| Component                                      | Wraps                                         | Extra props                                                                                                                                                                                                                                                                          |
+| ---------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Form`                                         | `useForm` + `<form>`                          | `schema`, `onSubmit(values, form)`, `defaultValues?` (object or async function), `values?`, `resetOptions?`, `onDefaultValuesError?`, `ref?`, `mode?`, `disabled?`, `title?`, `description?`, `slotProps?`; fields disable while `onSubmit` is pending or async defaults are loading |
+| `FormSection`                                  | `<fieldset>` + `<legend>`                     | `title?`, `description?`, `slotProps?` (`legend`, `description`, `content`); group name is the legend, disabled disables every field in the group                                                                                                                                    |
+| `TextField`                                    | MUI `TextField`                               | `name`; rules `required`, `min`, `max`, `minLength`, `maxLength`, `pattern`, `validate`                                                                                                                                                                                              |
+| `Select`                                       | MUI `TextField select`                        | `name`, `options: readonly SelectOption[]` (`{ value: string \| number; label: string }`); the same rules as TextField, typed over the option value                                                                                                                                  |
+| `RadioGroup`                                   | MUI `RadioGroup`                              | `name`, `label` (legend), `options: readonly Option[]`, `helperText?`; rules `required`, `validate`. The form value keeps the option's type                                                                                                                                          |
+| `CheckboxGroup`                                | MUI `FormGroup` + `Checkbox`                  | `name`, `label` (legend), `options: readonly Option[]`, `row?`, `helperText?`; rules `required` (at least one), `validate`. Value is `Option['value'][]` in `options` order                                                                                                          |
+| `ToggleButtonGroup`                            | MUI `ToggleButtonGroup`                       | `name`, `label` (legend), `options: readonly Option[]`, `exclusive?`, `helperText?`; rules `required`, `validate`. Value is `Option['value'] \| null` when exclusive, else `Option['value'][]`                                                                                       |
+| `Slider`                                       | MUI `Slider`                                  | `name`, `label` (legend), `helperText?`; rules `min`, `max` (also the slider bounds), `validate` — no `required`, since a slider always reports a value. Value is a `number`, or `[number, number]` for a range                                                                      |
+| `Rating`                                       | MUI `Rating`                                  | `name`, `label` (legend), `helperText?`; rules `required`, `validate`. Value is `number \| null`                                                                                                                                                                                     |
+| `Autocomplete`                                 | MUI `Autocomplete`                            | `name`, `options`, `getOptionValue?` (default `o => o.value`; return `o` to store objects), `multiple`, `freeSolo`, `textFieldProps?`; all TextField rules. Options may carry extra fields (they reach `onChange`)                                                                   |
+| `NumberField`                                  | Base UI `NumberField` through MUI `TextField` | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max` (also the stepper bounds), `validate`. Value is `number \| null`; digits group while typing (new in v2.1), and `format={{ useGrouping: false }}` turns that off                                             |
+| `MoneyField`                                   | `NumberField` pinned to USD                   | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max`, `validate`. Value is a `number` in dollars, rounded to the cent; shows `$1,234.50` on blur                                                                                                                 |
+| `DatePicker` / `TimePicker` / `DateTimePicker` | MUI X pickers                                 | `name`, `label?`, `helperText?`, `errorMessages?`; rules `required`, `validate`. The picker's own props (`minDate`, `disablePast`, `views`, …) pass through. Value is the adapter's date type or `null`                                                                              |
+| `OtpField`                                     | Base UI `OTPField` in MUI's outlined style    | `name`, `label?`, `helperText?`, `length?` (6), `mask?`, `validationType?`, `size?`; rules `required`, `validate`. Value is the code string; a partial code fails with `<label> must be <length> characters.`                                                                        |
+| `FileField`                                    | MUI `Button` + hidden `<input type="file">`   | `name`, `label` (button text), `accept?`, `multiple?`, `buttonProps?`, `helperText?`; rules `required`, `validate`. Value is `File \| null`, or `File[]` under `multiple`. `onChange(event, value)` fires on a pick and on a chip delete                                             |
+| `Checkbox`                                     | MUI `Checkbox`                                | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                                                                                                                                                         |
+| `Switch`                                       | MUI `Switch`                                  | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                                                                                                                                                         |
+| `SubmitButton`                                 | MUI `Button`                                  | `loading` while submitting, disabled while the form is                                                                                                                                                                                                                               |
+| `Form` (v4 additions)                          | —                                             | `confirm?: true \| ConfirmOptions` asks after validation on every submit path; `guard?: boolean` warns on tab close while dirty                                                                                                                                                      |
+| `ClearButton`                                  | MUI `Button`                                  | `to?: 'defaults' \| 'empty'`, `confirm?`; disabled while pristine                                                                                                                                                                                                                    |
+| `ConfirmDialog`                                | MUI `Dialog`                                  | `open`, `title`, `message?`, `confirmLabel?`, `cancelLabel?`, `confirmColor?`, `onConfirm`, `onCancel`; `useConfirm()` gives a promise API                                                                                                                                           |
+| `Wizard`                                       | MUI `Stepper`                                 | `steps`, `step?`/`onStepChange?`, `visited?`/`onVisitedChange?`, `orientation?`; with `WizardStepper`, `WizardStep`, `WizardNav`, `useWizard`                                                                                                                                        |
+| `ReadOnlyField`                                | MUI `Typography`                              | `name`, `label?`, `options?`, `format?`, `empty?`, `editStep?`                                                                                                                                                                                                                       |
+
+`Form`'s `title` / `description` give the form its accessible name and instructions (wired to the `<form>` via `aria-labelledby` / `aria-describedby`); `slotProps.title.component` sets the heading level (default `h2`). `FormSection` groups fields in a `<fieldset>` named by its `title` (`<legend>`, heading level configurable via `slotProps.legend.component`, default `h3`); `description` is helper text wired via `aria-describedby`.
+
+| Component                                      | Wraps                                         | Extra props                                                                                                                                                                                                                                    |
+| ---------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Form`                                         | `useForm` + `<form>`                          | `schema`, `onSubmit(values, form)`, `defaultValues?` (object or async function), `values?`, `resetOptions?`, `onDefaultValuesError?`, `ref?`, `mode?`, `disabled?`; fields disable while `onSubmit` is pending or async defaults are loading   |
+| `TextField`                                    | MUI `TextField`                               | `name`; rules `required`, `min`, `max`, `minLength`, `maxLength`, `pattern`, `validate`                                                                                                                                                        |
+| `Select`                                       | MUI `TextField select`                        | `name`, `options: readonly SelectOption[]` (`{ value: string \| number; label: string }`); the same rules as TextField, typed over the option value                                                                                            |
+| `RadioGroup`                                   | MUI `RadioGroup`                              | `name`, `label` (legend), `options: readonly Option[]`, `helperText?`; rules `required`, `validate`. The form value keeps the option's type                                                                                                    |
+| `CheckboxGroup`                                | MUI `FormGroup` + `Checkbox`                  | `name`, `label` (legend), `options: readonly Option[]`, `row?`, `helperText?`; rules `required` (at least one), `validate`. Value is `Option['value'][]` in `options` order                                                                    |
+| `ToggleButtonGroup`                            | MUI `ToggleButtonGroup`                       | `name`, `label` (legend), `options: readonly Option[]`, `exclusive?`, `helperText?`; rules `required`, `validate`. Value is `Option['value'] \| null` when exclusive, else `Option['value'][]`                                                 |
+| `Slider`                                       | MUI `Slider`                                  | `name`, `label` (legend), `helperText?`; rules `min`, `max` (also the slider bounds), `validate` — no `required`, since a slider always reports a value. Value is a `number`, or `[number, number]` for a range                                |
+| `Rating`                                       | MUI `Rating`                                  | `name`, `label` (legend), `helperText?`; rules `required`, `validate`. Value is `number \| null`                                                                                                                                               |
+| `Autocomplete`                                 | MUI `Autocomplete`                            | `name`, `options`, `getOptionValue?` (default `o => o.value`; return `o` to store objects), `multiple`, `freeSolo`, `textFieldProps?`; all TextField rules. Options may carry extra fields (they reach `onChange`)                             |
+| `NumberField`                                  | Base UI `NumberField` through MUI `TextField` | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max` (also the stepper bounds), `validate`. Value is `number \| null`; digits group while typing (new in v2.1), and `format={{ useGrouping: false }}` turns that off       |
+| `MoneyField`                                   | `NumberField` pinned to USD                   | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max`, `validate`. Value is a `number` in dollars, rounded to the cent; shows `$1,234.50` on blur                                                                           |
+| `PasswordField`                                | ez-form `TextField`                           | `name`; same rules as TextField. `revealable?` (default `true`) shows a show/hide toggle in the end adornment; `autoComplete` defaults to `'current-password'`; `slotProps.toggle?` reaches the toggle `IconButton`                            |
+| `DatePicker` / `TimePicker` / `DateTimePicker` | MUI X pickers                                 | `name`, `label?`, `helperText?`, `errorMessages?`; rules `required`, `validate`. The picker's own props (`minDate`, `disablePast`, `views`, …) pass through. Value is the adapter's date type or `null`                                        |
+| `OtpField`                                     | Base UI `OTPField` in MUI's outlined style    | `name`, `label?`, `helperText?`, `length?` (6), `mask?`, `validationType?`, `size?`; rules `required`, `validate`. Value is the code string; a partial code fails with `<label> must be <length> characters.`                                  |
+| `FileField`                                    | MUI `Button` + hidden `<input type="file">`   | `name`, `label` (button text), `accept?`, `multiple?`, `buttonProps?`, `helperText?`; rules `required`, `validate`. Value is `File \| null`, or `File[]` under `multiple`. `onChange(event, value)` fires on a pick and on a chip delete       |
+| `Checkbox`                                     | MUI `Checkbox`                                | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                                                                                                                   |
+| `Switch`                                       | MUI `Switch`                                  | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                                                                                                                   |
+| `SubmitButton`                                 | MUI `Button`                                  | `loading` while submitting, disabled while the form is                                                                                                                                                                                         |
+| `Form` (v4 additions)                          | —                                             | `confirm?: true \| ConfirmOptions` asks after validation on every submit path; `guard?: boolean` warns on tab close while dirty                                                                                                                |
+| `ClearButton`                                  | MUI `Button`                                  | `to?: 'defaults' \| 'empty'`, `confirm?`; disabled while pristine                                                                                                                                                                              |
+| `ConfirmDialog`                                | MUI `Dialog`                                  | `open`, `title`, `message?`, `confirmLabel?`, `cancelLabel?`, `confirmColor?`, `onConfirm`, `onCancel`; `useConfirm()` gives a promise API                                                                                                     |
+| `Wizard`                                       | MUI `Stepper`                                 | `steps`, `step?`/`onStepChange?`, `visited?`/`onVisitedChange?`, `orientation?`; with `WizardStepper`, `WizardStep`, `WizardNav`, `useWizard`                                                                                                  |
+| `ReadOnlyField`                                | MUI `Typography`                              | `name`, `label?`, `options?`, `format?`, `empty?`, `editStep?`                                                                                                                                                                                 |
+| `PasswordStrength`                             | MUI `LinearProgress`                          | `name`; `score?: (password) => 0\|1\|2\|3\|4` (default a small built-in heuristic); `labels?` (5 strings). Renders as an ARIA `meter`, never registers or validates                                                                            |
+| Component                                      | Wraps                                         | Extra props                                                                                                                                                                                                                                    |
+| ---------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Form`                                         | `useForm` + `<form>`                          | `schema`, `onSubmit(values, form)`, `defaultValues?` (object or async function), `values?`, `resetOptions?`, `onDefaultValuesError?`, `ref?`, `mode?`, `disabled?`; fields disable while `onSubmit` is pending or async defaults are loading   |
+| `TextField`                                    | MUI `TextField`                               | `name`; rules `required`, `min`, `max`, `minLength`, `maxLength`, `pattern`, `validate`                                                                                                                                                        |
+| `TextareaField`                                | `TextField` with `multiline` fixed on         | `name`, `showCount?`; the same rules as TextField. Taller default (`minRows: 4`, `maxRows: 12`, both themeable); shows a `n / max` length meter when `maxLength` is set (or `showCount`), which turns into the validation error past the limit |
+| `Select`                                       | MUI `TextField select`                        | `name`, `options: readonly SelectOption[]` (`{ value: string \| number; label: string }`); the same rules as TextField, typed over the option value                                                                                            |
+| `RadioGroup`                                   | MUI `RadioGroup`                              | `name`, `label` (legend), `options: readonly Option[]`, `helperText?`; rules `required`, `validate`. The form value keeps the option's type                                                                                                    |
+| `CheckboxGroup`                                | MUI `FormGroup` + `Checkbox`                  | `name`, `label` (legend), `options: readonly Option[]`, `row?`, `helperText?`; rules `required` (at least one), `validate`. Value is `Option['value'][]` in `options` order                                                                    |
+| `ToggleButtonGroup`                            | MUI `ToggleButtonGroup`                       | `name`, `label` (legend), `options: readonly Option[]`, `exclusive?`, `helperText?`; rules `required`, `validate`. Value is `Option['value'] \| null` when exclusive, else `Option['value'][]`                                                 |
+| `Slider`                                       | MUI `Slider`                                  | `name`, `label` (legend), `helperText?`; rules `min`, `max` (also the slider bounds), `validate` — no `required`, since a slider always reports a value. Value is a `number`, or `[number, number]` for a range                                |
+| `Rating`                                       | MUI `Rating`                                  | `name`, `label` (legend), `helperText?`; rules `required`, `validate`. Value is `number \| null`                                                                                                                                               |
+| `Autocomplete`                                 | MUI `Autocomplete`                            | `name`, `options`, `getOptionValue?` (default `o => o.value`; return `o` to store objects), `multiple`, `freeSolo`, `textFieldProps?`; all TextField rules. Options may carry extra fields (they reach `onChange`)                             |
+| `NumberField`                                  | Base UI `NumberField` through MUI `TextField` | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max` (also the stepper bounds), `validate`. Value is `number \| null`; digits group while typing (new in v2.1), and `format={{ useGrouping: false }}` turns that off       |
+| `MoneyField`                                   | `NumberField` pinned to USD                   | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max`, `validate`. Value is a `number` in dollars, rounded to the cent; shows `$1,234.50` on blur                                                                           |
+| `DatePicker` / `TimePicker` / `DateTimePicker` | MUI X pickers                                 | `name`, `label?`, `helperText?`, `errorMessages?`; rules `required`, `validate`. The picker's own props (`minDate`, `disablePast`, `views`, …) pass through. Value is the adapter's date type or `null`                                        |
+| `OtpField`                                     | Base UI `OTPField` in MUI's outlined style    | `name`, `label?`, `helperText?`, `length?` (6), `mask?`, `validationType?`, `size?`; rules `required`, `validate`. Value is the code string; a partial code fails with `<label> must be <length> characters.`                                  |
+| `FileField`                                    | MUI `Button` + hidden `<input type="file">`   | `name`, `label` (button text), `accept?`, `multiple?`, `buttonProps?`, `helperText?`; rules `required`, `validate`. Value is `File \| null`, or `File[]` under `multiple`. `onChange(event, value)` fires on a pick and on a chip delete       |
+| `Checkbox`                                     | MUI `Checkbox`                                | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                                                                                                                   |
+| `Switch`                                       | MUI `Switch`                                  | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                                                                                                                   |
+| `SubmitButton`                                 | MUI `Button`                                  | `loading` while submitting, disabled while the form is                                                                                                                                                                                         |
+| `Form` (v4 additions)                          | —                                             | `confirm?: true \| ConfirmOptions` asks after validation on every submit path; `guard?: boolean` warns on tab close while dirty                                                                                                                |
+| `ClearButton`                                  | MUI `Button`                                  | `to?: 'defaults' \| 'empty'`, `confirm?`; disabled while pristine                                                                                                                                                                              |
+| `ConfirmDialog`                                | MUI `Dialog`                                  | `open`, `title`, `message?`, `confirmLabel?`, `cancelLabel?`, `confirmColor?`, `onConfirm`, `onCancel`; `useConfirm()` gives a promise API                                                                                                     |
+| `Wizard`                                       | MUI `Stepper`                                 | `steps`, `step?`/`onStepChange?`, `visited?`/`onVisitedChange?`, `orientation?`; with `WizardStepper`, `WizardStep`, `WizardNav`, `useWizard`                                                                                                  |
+| `ReadOnlyField`                                | MUI `Typography`                              | `name`, `label?`, `options?`, `format?`, `empty?`, `editStep?`                                                                                                                                                                                 |
 
 Every field shows its zod message as helper text (linked to the input with `aria-describedby`; the first invalid field is focused on submit). The error text is a live region (`role="alert"`), so it is announced in `onChange`/`onBlur` modes as well. Fields must be rendered inside `<Form>`. Consumer `onChange`/`onBlur` handlers run after the form's own.
 
@@ -152,6 +231,8 @@ const steps = [
 
 Every field in the schema should appear in exactly one step's `fields`. When Submit fails validation, the wizard moves to the first step (in `steps` order) owning an errored field and focuses that field once it mounts, so an error on a step you have navigated away from is never silent. A field listed in no step is validated only on final submit and its error belongs to the last step: that step is marked in the stepper, and a failed submit lands there.
 
+Each `WizardStep` is a `FormSection` (a fieldset). Horizontally, the step's `title` defaults to its `label` from `steps` and renders as a heading in the legend; pass `title={null}` to render no legend. Vertically, the legend is suppressed and the section is named by the stepper's label via `aria-labelledby`, so the step has no visible legend but is still named for assistive technology; `description` works in both modes.
+
 ### One route per step
 
 `Wizard` is controlled through `step` / `onStepChange`; wire those to your router. With react-router, put `<Form>` + `<Wizard>` in a layout route and render the step routes through `<Outlet>`:
@@ -189,6 +270,8 @@ Every ez-form component registers with MUI's theme under `Ez<Name>` (`defaultPro
 ```tsx
 const theme = createTheme({
   components: {
+    EzForm: { defaultProps: { slotProps: { title: { component: 'h1', variant: 'h4' } } } },
+    EzFormSection: { styleOverrides: { legend: { marginBottom: 8 } } },
     EzWizardNav: {
       defaultProps: { slotProps: { next: { variant: 'outlined' } } },
     },
@@ -201,6 +284,14 @@ const theme = createTheme({
     EzPasswordField: {
       defaultProps: { slotProps: { toggle: { size: 'small' } } },
       styleOverrides: { toggle: { color: 'primary' } },
+    },
+    EzPasswordStrength: {
+      styleOverrides: { bar: { height: 6 } },
+    EzOtpField: {
+      styleOverrides: { helperText: { marginLeft: 8 } },
+    },
+    EzFileField: {
+      styleOverrides: { fileList: { marginTop: 16 } },
     },
   },
 })
@@ -238,13 +329,13 @@ Every field also takes hookform-style rules as props. A bare value gets a messag
 <Checkbox name="tos" label="I accept the terms" required />                          // must be checked
 ```
 
-| rule                      | fields                                                                                               | default message                                                                       |
-| ------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `required`                | all except Slider                                                                                    | `<label> is required.` (also renders the asterisk)                                    |
-| `min` / `max`             | TextField, Select, Autocomplete, NumberField, MoneyField, Slider (a number, or both ends of a range) | `<label> must be at least/most <value>.` Numbers, or date strings (compared as dates) |
-| `minLength` / `maxLength` | TextField, Select, Autocomplete                                                                      | `<label> must be at least/most <value> characters.`                                   |
-| `pattern`                 | TextField, Select, Autocomplete                                                                      | `<label> is invalid.`                                                                 |
-| `validate`                | all                                                                                                  | a returned string; `false` gives `<label> is invalid.`                                |
+| rule                      | fields                                                                                                              | default message                                                                                            |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `required`                | all except Slider                                                                                                   | `<label> is required.` (also renders the asterisk)                                                         |
+| `min` / `max`             | TextField, TextareaField, Select, Autocomplete, NumberField, MoneyField, Slider (a number, or both ends of a range) | `<label> must be at least/most <value>.` Numbers, or date strings (compared as dates)                      |
+| `minLength` / `maxLength` | TextField, TextareaField, Select, Autocomplete                                                                      | `<label> must be at least/most <value> characters.` (`maxLength` also drives TextareaField's length meter) |
+| `pattern`                 | TextField, TextareaField, Select, Autocomplete                                                                      | `<label> is invalid.`                                                                                      |
+| `validate`                | all                                                                                                                 | a returned string; `false` gives `<label> is invalid.`                                                     |
 
 `required` fails on empty or `false`; `min`/`max`/length/`pattern` rules are skipped while the value is empty; `validate` always runs (so `validate={(v) => v || 'You must opt in'}` works on an unchecked checkbox). Rules run in hookform's order, first failure wins.
 
@@ -291,6 +382,25 @@ Address lookup (Places-style): the options list is fed by an async lookup, and t
 
 The form stores the address string (`z.string()`); `placeId` reaches `onChange` but isn't stored. For objects in form state use `getOptionValue={(o) => o}` and a `z.object` schema.
 
+## TextareaField
+
+`TextField` with `multiline` fixed on: a taller default (`minRows: 4`, `maxRows: 12`, both
+themeable under `EzTextareaField.defaultProps`) that autogrows in between. Setting the
+`maxLength` rule (or passing `showCount`) shows a length meter — `n` alone with no bound,
+`n / max` with one — as a trailing element inside the helper text, associated via the same
+`aria-describedby` id as the rest of the helper text. Past the limit the meter is replaced
+by the normal `maxLength` validation error, never flagged by colour alone.
+
+```tsx
+<TextareaField name="bio" label="Bio" maxLength={500} />
+```
+
+```ts
+const schema = z.object({ bio: z.string().max(500) })
+```
+
+Themeable under `EzTextareaField` (`root`, `counter`, exported as `textareaFieldClasses`).
+
 ## NumberField
 
 Digits group as you type for every consumer (new in v2.1): typing `1234` shows `1,234` before any blur. Pass `format={{ useGrouping: false }}` to turn grouping off. Pasted numbers group on blur rather than on paste, because Base UI handles the paste itself.
@@ -324,6 +434,27 @@ const schema = z.object({ price: z.number().min(0) })
 
 The toggle is a themeable `IconButton` under `EzPasswordField` (`root`, `toggle`, exported as `passwordFieldClasses`); `slotProps.toggle` reaches it directly.
 
+## PasswordStrength
+
+A meter bound to a password field's live value, read with `useWatch` like `ReadOnlyField` — it never registers a field and never validates. Renders MUI `LinearProgress` as an ARIA `meter` (`role="meter"`, `aria-valuemin={0}`, `aria-valuemax={4}`, `aria-valuenow`, `aria-valuetext`) with a visible label in an `aria-live="polite"` region, so the tier is announced as it changes. An empty password renders the track at 0 with no label.
+
+```tsx
+<PasswordField name="password" label="Password" autoComplete="new-password" />
+<PasswordStrength name="password" />
+```
+
+`score?: (password: string) => 0 | 1 | 2 | 3 | 4` defaults to a small built-in heuristic (length thresholds, character-class variety, a penalty for repeats/sequences) exported as `scorePassword`. Pass your own — `zxcvbn` / `@zxcvbn-ts`, for instance — to score by whatever rules you want:
+
+```tsx
+<PasswordStrength name="password" score={(pw) => toEzScore(zxcvbn(pw).score)} />
+```
+
+`labels?: readonly [string, string, string, string, string]` defaults to `['Very weak', 'Weak', 'Fair', 'Strong', 'Very strong']`.
+
+**Bundle size**: `PasswordStrength` lives in its own module and `PasswordField` does not import it, so a consumer using only `PasswordField` never pulls in `PasswordStrength` or `scorePassword` — a scorer like zxcvbn (~400 kB) stays opt-in. This is `sideEffects: false` plus a single ESM entry point (`package.json`) doing the work a bundler needs: unused named exports tree-shake out. `dist/index.js` itself, as a single-entry bundle, still contains every export's source (grepping it for `PasswordStrength` finds it) — the tree-shaking happens in the _consumer's_ bundler, not in this package's own build.
+
+Themeable under `EzPasswordStrength` (`defaultProps`, `styleOverrides` for `root` | `bar` | `label`), exported as `passwordStrengthClasses`.
+
 ## Develop
 
 ```bash
@@ -332,5 +463,15 @@ pnpm storybook   # http://localhost:6006 (with the a11y addon panel)
 pnpm test        # vitest + Testing Library, plus jest-axe accessibility checks per component
 pnpm build
 ```
+
+`pnpm check:guardrails` enforces rule 2 of `docs/PHILOSOPHY.md`: it scans `src/**/*.tsx`
+(excluding stories, tests, `src/examples/**`, `src/test/**`) for `sx=`, `disableRipple`/
+`focusRipple`, and literal `variant=`/`size=`/`color=` JSX attributes (a prop-driven value
+like `variant={variant}` is fine; a string literal like `variant="contained"` is not), and
+checks that every component exported from `src/index.ts` has a row in this README's
+Components table. A line that's a deliberate, tracked exception can end with
+`// guardrail: allow <reason, ideally an issue number>` to skip it; the script reports how
+many lines were allow-listed so they stay visible. It runs in CI (`pnpm test:scripts` runs
+its own `node --test` suite first).
 
 MIT

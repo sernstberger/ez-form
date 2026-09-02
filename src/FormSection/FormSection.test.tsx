@@ -101,4 +101,18 @@ describe('FormSection', () => {
     )
     await expectNoA11yViolations(container)
   })
+
+  it('a slotProps.description id cannot clobber the generated id aria-describedby points at', () => {
+    wrap(
+      <FormSection
+        title="Address"
+        description="Where we ship"
+        slotProps={{ description: { id: 'custom' } }}
+      >
+        <TextField name="street" label="Street" />
+      </FormSection>,
+    )
+    const group = screen.getByRole('group', { name: 'Address' })
+    expect(group).toHaveAccessibleDescription('Where we ship')
+  })
 })

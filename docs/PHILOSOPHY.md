@@ -87,6 +87,8 @@ posted on the issue so the decision survives the session that made it.
 - [ ] Exported from `src/index.ts`, including its props type and `<name>Classes`.
 - [ ] `pnpm typecheck && pnpm test && pnpm build && pnpm build-storybook` green (CI runs all four).
 
+This list is mirrored in `.github/PULL_REQUEST_TEMPLATE.md`; change both together.
+
 ## Where things live
 
 | Path | What |

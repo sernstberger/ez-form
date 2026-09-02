@@ -7,6 +7,11 @@ export { Checkbox, type CheckboxProps } from './fields/Checkbox'
 export { Switch, type SwitchProps } from './fields/Switch'
 export { RadioGroup, type RadioGroupProps } from './fields/RadioGroup'
 export { NumberField, numberFieldClasses, type NumberFieldProps } from './fields/NumberField'
+export {
+  TextareaField,
+  textareaFieldClasses,
+  type TextareaFieldProps,
+} from './fields/TextareaField'
 export { MoneyField, type MoneyFieldProps } from './fields/MoneyField'
 export {
   PasswordField,
@@ -27,8 +32,13 @@ export { DatePicker, type DatePickerProps } from './fields/DatePicker'
 export { TimePicker, type TimePickerProps } from './fields/TimePicker'
 export { DateTimePicker, type DateTimePickerProps } from './fields/DateTimePicker'
 export type { PickerErrorMessages } from './fields/pickers/pickerMessages'
-export { OtpField, type OtpFieldProps } from './fields/OtpField'
-export { FileField, type FileFieldProps, type FileFieldValue } from './fields/FileField'
+export { OtpField, otpFieldClasses, type OtpFieldProps } from './fields/OtpField'
+export {
+  FileField,
+  fileFieldClasses,
+  type FileFieldProps,
+  type FileFieldValue,
+} from './fields/FileField'
 export {
   ConfirmDialog,
   confirmDialogClasses,
@@ -64,3 +74,10 @@ export {
 } from './fields/ReadOnlyField'
 export { FormError, formErrorClasses, type FormErrorProps } from './FormError'
 export { FormSection, formSectionClasses, type FormSectionProps } from './FormSection'
+export {
+  PasswordStrength,
+  passwordStrengthClasses,
+  scorePassword,
+  type PasswordStrengthProps,
+  type PasswordStrengthScore,
+} from './fields/PasswordStrength'

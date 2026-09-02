@@ -18,6 +18,11 @@ export interface FormSectionProps extends Omit<
   /** Text after the legend, wired to the fieldset through `aria-describedby`. */
   description?: ReactNode
   slotProps?: {
+    /**
+     * Props (including `className`) for the heading rendered inside the
+     * `<legend>`, not the `<legend>` element itself — target the `<legend>`
+     * through `EzFormSection.styleOverrides.legend` / `formSectionClasses.legend`.
+     */
     legend?: FormTextSlotProps
     description?: FormTextSlotProps
     content?: React.ComponentProps<'div'>
@@ -75,8 +80,8 @@ export function FormSection(inProps: FormSectionProps) {
       )}
       {description != null && (
         <FormSectionDescription
-          id={descriptionId}
           {...descriptionProps}
+          id={descriptionId}
           className={`${formSectionClasses.description}${descriptionProps.className ? ` ${descriptionProps.className}` : ''}`}
         >
           {description}

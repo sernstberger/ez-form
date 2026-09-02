@@ -12,11 +12,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 { message })`, e.g. a rejected async `onSubmit`) as an MUI `Alert`; renders nothing
   when there is no root error. `EzFormError` theme key (`defaultProps`,
   `styleOverrides.root`) and the `formErrorClasses` export — #60.
+- `Form` `title` / `description` props with `aria-labelledby` / `aria-describedby` wiring;
+  `EzForm` theme key (`root`, `title`, `description`) and `formClasses` — #51.
+- `FormSection`: `<fieldset>`/`<legend>` group with `EzFormSection` theme key
+  (`root`, `legend`, `description`, `content`) and `formSectionClasses` — #51.
+- `WizardStep` renders a `FormSection` (`title`, `description`, `slotProps`);
+  `WizardStepper` marks the current step with `aria-current="step"` — #51.
 - `PasswordField`: ez-form `TextField` with `type` fixed to `password`/`text` and a
   show/hide toggle in the end adornment. `revealable` (default `true`) hides the toggle
   entirely; `autoComplete` defaults to `'current-password'`. Themeable under
   `EzPasswordField` (`defaultProps`, `styleOverrides` for `root` | `toggle`), exported as
   `passwordFieldClasses` — #58.
+- `TextareaField`: `TextField` with `multiline` fixed on, a taller themeable default
+  (`minRows: 4`, `maxRows: 12`), and a length meter (`n` or `n / max`) driven by the
+  `maxLength` rule or an explicit `showCount` prop — over the limit, the meter is
+  replaced by the normal `maxLength` validation error. `EzTextareaField` theme key
+  (`defaultProps`, `styleOverrides` for `root`, `counter`) and the `textareaFieldClasses`
+  export — #49.
+- `.github/PULL_REQUEST_TEMPLATE.md` mirroring the "a component ships when" checklist
+  from `docs/PHILOSOPHY.md` — #46.
 - `EzNumberField` theme key (`defaultProps`, `styleOverrides` for `root`, `steppers`,
   `increment`, `decrement`) and the `numberFieldClasses` export; NumberField renders
   through MUI `TextField` — #26.
@@ -26,6 +40,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `FormSection`: fieldset/legend grouping for related fields, with an optional
   `description`. `EzFormSection` theme key (`defaultProps`, `styleOverrides` for `root`,
   `legend`, `description`, `content`) and the `formSectionClasses` export — #51.
+- `PasswordStrength`: a meter bound to a password field's live value via `useWatch`
+  (never registers, never validates), with a pluggable `score` (default a small
+  built-in heuristic, exported as `scorePassword`) and `labels`. Renders MUI
+  `LinearProgress` as an ARIA `meter` with a live-region label. Lives in its own
+  module — `PasswordField` does not import it — so consumers of `PasswordField` alone
+  never pull it or a scorer like zxcvbn into their bundle. Themeable under
+  `EzPasswordStrength` (`defaultProps`, `styleOverrides` for `root` | `bar` | `label`),
+  exported as `passwordStrengthClasses` — #59.
+- `EzOtpField` theme key (`defaultProps`, `styleOverrides` for `root`, `helperText`) and
+  the `otpFieldClasses` export; `EzFileField` theme key (`defaultProps`, `styleOverrides`
+  for `root`, `fileList`) and the `fileFieldClasses` export — the last `sx` usages in
+  `src/` (`OtpFieldControl`, `FileField`) now go through styled slots — #50.
+- `pnpm check:guardrails`: a dependency-free CI script that fails on `sx=`, ripple props,
+  and literal `variant`/`size`/`color` JSX attributes in `src/`, and on exported components
+  missing a README Components row; allow-listed via a trailing `// guardrail: allow <reason>`
+  comment. Wired into CI alongside its own `pnpm test:scripts` suite — #44.
+
+> > > > > > > feat/guardrail
 
 ### Changed
 

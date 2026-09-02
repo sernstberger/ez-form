@@ -228,8 +228,8 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
       >
         {title != null && (
           <FormTitle
-            id={titleId}
             {...titleProps}
+            id={titleId}
             className={`${formClasses.title}${titleProps.className ? ` ${titleProps.className}` : ''}`}
           >
             {title}
@@ -237,8 +237,8 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
         )}
         {description != null && (
           <FormDescription
-            id={descriptionId}
             {...descriptionProps}
+            id={descriptionId}
             className={`${formClasses.description}${descriptionProps.className ? ` ${descriptionProps.className}` : ''}`}
           >
             {description}

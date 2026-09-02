@@ -1,8 +1,9 @@
+import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../../Form'
-import { FileField } from './FileField'
+import { FileField, fileFieldClasses } from './FileField'
 import { describeFieldContract } from '../../test/describeFieldContract'
 
 const schema = z.object({ resume: z.instanceof(File).nullable() })
@@ -118,5 +119,30 @@ describe('FileField', () => {
     await user.upload(fileInput('Resume'), pdf)
     await user.upload(fileInput('Resume'), pdf)
     expect(onChange).toHaveBeenCalledTimes(2)
+  })
+
+  it('is themeable: styleOverrides.fileList applies', async () => {
+    const user = userEvent.setup()
+    const theme = createTheme({
+      components: {
+        EzFileField: {
+          styleOverrides: {
+            fileList: { marginTop: '9px' },
+          },
+        },
+      },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+          <FileField name="resume" label="Resume" />
+        </Form>
+      </ThemeProvider>,
+    )
+    await user.upload(fileInput('Resume'), pdf)
+    const chip = screen.getByText('resume.pdf')
+    const fileList = chip.closest(`.${fileFieldClasses.fileList}`)
+    expect(fileList).not.toBeNull()
+    expect(getComputedStyle(fileList as Element).marginTop).toBe('9px')
   })
 })

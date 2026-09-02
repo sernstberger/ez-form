@@ -10,6 +10,10 @@ import type { FormProps } from '../Form'
 import type { FormErrorProps } from '../FormError'
 import type { FormSectionProps } from '../FormSection'
 import type { PasswordFieldProps } from '../fields/PasswordField'
+import type { PasswordStrengthProps } from '../fields/PasswordStrength'
+import type { OtpFieldControlProps } from '../fields/OtpField/OtpFieldControl'
+import type { FileFieldProps } from '../fields/FileField'
+import type { TextareaFieldProps } from '../fields/TextareaField/TextareaField'
 
 declare module '@mui/material/styles' {
   interface ComponentsPropsList {
@@ -25,6 +29,10 @@ declare module '@mui/material/styles' {
     EzFormError: Partial<FormErrorProps>
     EzFormSection: Partial<FormSectionProps>
     EzPasswordField: Partial<PasswordFieldProps>
+    EzPasswordStrength: Partial<PasswordStrengthProps>
+    EzOtpField: Partial<OtpFieldControlProps>
+    EzFileField: Partial<FileFieldProps>
+    EzTextareaField: Partial<TextareaFieldProps>
   }
 
   interface ComponentNameToClassKey {
@@ -39,6 +47,10 @@ declare module '@mui/material/styles' {
     EzFormError: 'root'
     EzFormSection: 'root' | 'legend' | 'description' | 'content'
     EzPasswordField: 'root' | 'toggle'
+    EzPasswordStrength: 'root' | 'bar' | 'label'
+    EzOtpField: 'root' | 'helperText'
+    EzFileField: 'root' | 'fileList'
+    EzTextareaField: 'root' | 'counter'
   }
 
   interface Components<Theme = unknown> {
@@ -85,6 +97,22 @@ declare module '@mui/material/styles' {
     EzPasswordField?: {
       defaultProps?: ComponentsProps['EzPasswordField']
       styleOverrides?: ComponentsOverrides<Theme>['EzPasswordField']
+    }
+    EzPasswordStrength?: {
+      defaultProps?: ComponentsProps['EzPasswordStrength']
+      styleOverrides?: ComponentsOverrides<Theme>['EzPasswordStrength']
+    }
+    EzOtpField?: {
+      defaultProps?: ComponentsProps['EzOtpField']
+      styleOverrides?: ComponentsOverrides<Theme>['EzOtpField']
+    }
+    EzFileField?: {
+      defaultProps?: ComponentsProps['EzFileField']
+      styleOverrides?: ComponentsOverrides<Theme>['EzFileField']
+    }
+    EzTextareaField?: {
+      defaultProps?: ComponentsProps['EzTextareaField']
+      styleOverrides?: ComponentsOverrides<Theme>['EzTextareaField']
     }
   }
 }
