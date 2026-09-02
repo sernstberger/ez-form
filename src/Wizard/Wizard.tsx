@@ -11,14 +11,28 @@ import {
 export type { WizardStepDef, WizardStepStatus } from './WizardContext'
 
 /**
+ * A `FieldError` leaf, recognised by hookform's own shape rather than by any one key: `type`
+ * is always a string (`LiteralUnion<keyof RegisterOptions, string>`, never absent), and
+ * `message` / `ref` are its discriminating optional siblings — see
+ * `node_modules/react-hook-form/dist/types/errors.d.ts`. Checking only `'type' in errors`
+ * misfires on a schema field literally named `type`: that field's own nested errors object
+ * (e.g. `{ type: { message, ref } }`) would satisfy `'type' in errors` at the *parent* level
+ * too, so a bare `'type' in errors` check can't tell "this node is a leaf" from "this node
+ * has a child named type".
+ */
+function isFieldError(node: object): node is { type: string } {
+  return 'type' in node && typeof node.type === 'string' && ('message' in node || 'ref' in node)
+}
+
+/**
  * The field paths that have an error, in schema order. hookform nests `errors` to mirror
  * the values (`{ address: { city: FieldError } }`), so this walks it down to the
- * `FieldError` leaves — recognised by their `type` — and joins the keys back into the
- * dotted paths a step's `fields` are written in.
+ * `FieldError` leaves and joins the keys back into the dotted paths a step's `fields` are
+ * written in.
  */
 function errorFieldPaths(errors: unknown, prefix = ''): string[] {
   if (typeof errors !== 'object' || errors === null) return []
-  if ('type' in errors) return prefix ? [prefix] : []
+  if (isFieldError(errors)) return prefix ? [prefix] : []
   return Object.entries(errors).flatMap(([key, value]) =>
     errorFieldPaths(value, prefix ? `${prefix}.${key}` : key),
   )
@@ -190,6 +204,15 @@ export function Wizard<TIn extends FieldValues>({
 
   useEffect(() => {
     if (submitCount === handledSubmit.current) return
+    // hookform's `reset` sets `submitCount` back to 0 unless `keepSubmitCount` — which a
+    // `<Form resetOptions={{ keepErrors: true }} values={…}>` re-sync does on every value
+    // change, failed submit or not. Only a genuine increase is a new submit to react to; a
+    // decrease just needs the ref resynced so the *next* real submit is still detected as
+    // an increase from wherever the count landed.
+    if (submitCount <= handledSubmit.current) {
+      handledSubmit.current = submitCount
+      return
+    }
     handledSubmit.current = submitCount
     if (!errorPaths.length) return
     // The earliest owning step wins; among that step's errors, the first in schema order.

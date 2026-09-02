@@ -105,6 +105,72 @@ function ClearEmail() {
   )
 }
 
+/**
+ * A schema with a top-level field literally named `type`, and a nested `address` object
+ * whose own leaf is also named `type` (alongside `city`) — regression fixtures for the
+ * `errorFieldPaths` leaf check, which used to mistake a node with a `type` key for a
+ * `FieldError` leaf regardless of what else was on it.
+ */
+const typeFieldSchema = z.object({
+  type: z.string().min(1, 'Type is required'),
+  address: z.object({
+    type: z.string().min(1, 'Address type is required'),
+    city: z.string().min(1, 'City is required'),
+  }),
+})
+type TypeFieldInput = z.input<typeof typeFieldSchema>
+const typeFieldSteps = [
+  { id: 'kind', label: 'Kind', fields: ['type'] },
+  { id: 'address', label: 'Address', fields: ['address.type', 'address.city'] },
+  { id: 'review', label: 'Review' },
+] as const satisfies WizardStepDef<TypeFieldInput>[]
+const typeFieldFilled: TypeFieldInput = {
+  type: 'personal',
+  address: { type: 'home', city: 'Ada' },
+}
+
+/** Invalidates the top-level `type` field from a step that does not mount it. */
+function ClearType() {
+  const { setValue } = useFormContext<TypeFieldInput>()
+  return (
+    <button type="button" onClick={() => setValue('type', '')}>
+      clear type
+    </button>
+  )
+}
+
+function TypeFieldSteps() {
+  return (
+    <>
+      <WizardStep id="kind">
+        <TextField name="type" label="Type" />
+      </WizardStep>
+      <WizardStep id="address">
+        <TextField name="address.type" label="Address type" />
+        <TextField name="address.city" label="City" />
+      </WizardStep>
+      <WizardStep id="review">
+        <p>Review</p>
+      </WizardStep>
+      <Controls />
+    </>
+  )
+}
+
+/**
+ * Re-syncs the form the way `<Form resetOptions={{ keepErrors: true }} values={…}>` does
+ * after a failed submit: hookform's `reset` sets `submitCount` back to 0 unless
+ * `keepSubmitCount`, while `keepErrors` leaves the errors (and hence `errorPaths`) alone.
+ */
+function ResyncWithErrorsKept() {
+  const { reset, getValues } = useFormContext<z.input<typeof unlistedSchema>>()
+  return (
+    <button type="button" onClick={() => reset(getValues(), { keepErrors: true })}>
+      resync
+    </button>
+  )
+}
+
 describe('Wizard', () => {
   it('renders only the current step and starts on the first', () => {
     render(
@@ -431,6 +497,114 @@ describe('Wizard', () => {
       await waitFor(() => expect(screen.getByText('Invalid email')).toBeInTheDocument())
       expect(screen.getByTestId('current')).toHaveTextContent('account')
       expect(screen.getByTestId('visited')).toHaveTextContent('account')
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    // Regression for a schema with a field literally named `type`: the old leaf check
+    // (`'type' in errors`) treated the root errors object as a `FieldError` leaf itself,
+    // since it has a `type` key one level down — `errorFieldPaths` returned `[]` and every
+    // step read as error-free.
+    it('a top-level field named "type" is still detected and navigated to on failed submit', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={typeFieldSchema} defaultValues={typeFieldFilled} onSubmit={onSubmit}>
+          <Wizard steps={typeFieldSteps}>
+            <TypeFieldSteps />
+            <ClearType />
+            <SubmitButton />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('address'))
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('review'))
+      // "kind" (which owns `type`) is unmounted from "review", so — like `ClearEmail`
+      // above — submit is the only thing left that can catch an invalid `type`. Before the
+      // fix, the root errors object (which has a `type` key one level down, for the
+      // top-level field) itself matched the old `'type' in errors` leaf check, so
+      // `errorFieldPaths` returned `[]` and this failed submit went undetected.
+      await user.click(screen.getByRole('button', { name: 'clear type' }))
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('kind'))
+      await waitFor(() => expect(screen.getByRole('textbox', { name: 'Type' })).toHaveFocus())
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    // Regression for the nested case: before the fix, `address.type` (a `FieldError` leaf
+    // one level under `address`) truncated to just `['address']` because `isFieldError`
+    // never got a chance to look past the top-level `type` key. Driven through the
+    // component per the "no export-for-testing precedent" fallback: `stepStatus` for the
+    // `address` step (which lists `address.type` and `address.city`) only reads "visited"
+    // (not "completed") if the flattener actually reached the `address.type` leaf — mirrors
+    // the existing "a visited step with an error is visited" test above, one step over.
+    it('flattens a nested object whose own leaf is named "type" (address.type, address.city)', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form
+          schema={typeFieldSchema}
+          defaultValues={typeFieldFilled}
+          onSubmit={() => {}}
+          mode="onChange"
+        >
+          <Wizard steps={typeFieldSteps}>
+            <TypeFieldSteps />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('address'))
+      await user.clear(screen.getByRole('textbox', { name: 'Address type' }))
+      // Both address.type and address.city errors would be produced by a correct flatten;
+      // asserting on address.type alone is the regression-specific one — before the fix it
+      // never appeared at all, since `errorFieldPaths` truncated to `['address']`.
+      await screen.findByText('Address type is required')
+      await user.click(screen.getByRole('button', { name: 'prev' }))
+      await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('address:visited'))
+    })
+
+    // Regression for the submitCount-decrease bug: `<Form resetOptions={{ keepErrors:
+    // true }} values={…}>` re-syncs with `reset`, which resets `submitCount` to 0 unless
+    // `keepSubmitCount` — with errors kept, the old `submitCount !== handledSubmit.current`
+    // check treated that decrease as a brand-new failed submit and yanked the user to
+    // another step a second time.
+    it('does not navigate again when a resync (reset with keepErrors) drops submitCount', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={unlistedSchema} defaultValues={unlistedEmpty} onSubmit={onSubmit}>
+          <Wizard steps={unlistedSteps}>
+            <WizardStep id="account">
+              <TextField name="name" label="Name" />
+            </WizardStep>
+            <WizardStep id="review">
+              <p>Review</p>
+            </WizardStep>
+            <Controls />
+            <ResyncWithErrorsKept />
+            <SubmitButton />
+          </Wizard>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('review'))
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      // `nickname` is in no step's fields (see the "belongs to the last step" test above),
+      // so it is never revalidated — and its error never cleared — by navigating with
+      // `go`/`next`. That keeps `errors.nickname` populated for the rest of this test
+      // while still letting the wizard move freely, which is what lets a *second* move
+      // after the resync (were the bug still present) be observable at all.
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('review'))
+      await user.click(screen.getByRole('button', { name: 'go account' }))
+      expect(screen.getByTestId('current')).toHaveTextContent('account')
+      // Resync: submitCount drops to 0 with `nickname`'s error kept, but this is not a new
+      // submit. With the bug, the decrease was mishandled as one and re-ran the failed-
+      // submit navigation, bouncing the user from "account" back to "review" (nickname's
+      // owning step) a second time.
+      await user.click(screen.getByRole('button', { name: 'resync' }))
+      await new Promise((r) => setTimeout(r, 0))
+      expect(screen.getByTestId('current')).toHaveTextContent('account')
       expect(onSubmit).not.toHaveBeenCalled()
     })
   })
