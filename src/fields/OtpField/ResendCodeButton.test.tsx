@@ -219,4 +219,63 @@ describe('ResendCodeButton', () => {
     )
     expect(document.getElementById('resend-status')).toBe(screen.getByRole('status'))
   })
+
+  it('shows the error text and re-enables immediately (no cooldown) when onResend rejects', async () => {
+    const user = userEvent.setup()
+    const onResend = vi.fn(() => Promise.reject(new Error('network down')))
+    render(
+      <Form schema={schema} defaultValues={{ code: '' }} onSubmit={() => {}}>
+        <ResendCodeButton onResend={onResend} cooldown={30} />
+      </Form>,
+    )
+    const btn = screen.getByRole('button', { name: 'Resend code' })
+    const status = screen.getByRole('status')
+    await user.click(btn)
+    await waitFor(() => expect(status).toHaveTextContent('Code could not be sent'))
+    expect(btn).toBeEnabled()
+    expect(btn).toHaveTextContent('Resend code')
+    expect(btn).not.toHaveTextContent(/\(\d+s\)/)
+  })
+
+  it('shows a custom errorText on rejection', async () => {
+    const user = userEvent.setup()
+    const onResend = vi.fn(() => Promise.reject(new Error('nope')))
+    render(
+      <Form schema={schema} defaultValues={{ code: '' }} onSubmit={() => {}}>
+        <ResendCodeButton onResend={onResend} errorText="Try again later" />
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Resend code' }))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Try again later'))
+  })
+
+  it('calls onResendError with the rejection and does not leave an unhandled rejection', async () => {
+    const user = userEvent.setup()
+    const error = new Error('boom')
+    const onResend = vi.fn(() => Promise.reject(error))
+    const onResendError = vi.fn()
+    render(
+      <Form schema={schema} defaultValues={{ code: '' }} onSubmit={() => {}}>
+        <ResendCodeButton onResend={onResend} onResendError={onResendError} />
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Resend code' }))
+    await waitFor(() => expect(onResendError).toHaveBeenCalledWith(error))
+  })
+
+  it('swallows the rejection when onResendError is not provided', async () => {
+    const user = userEvent.setup()
+    const onResend = vi.fn(() => Promise.reject(new Error('quiet failure')))
+    render(
+      <Form schema={schema} defaultValues={{ code: '' }} onSubmit={() => {}}>
+        <ResendCodeButton onResend={onResend} />
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Resend code' }))
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Code could not be sent'),
+    )
+    // No unhandled rejection: vitest fails the run on one, so reaching this
+    // point (and the file finishing green) is the assertion.
+  })
 })

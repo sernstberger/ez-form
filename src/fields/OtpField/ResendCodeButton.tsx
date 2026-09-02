@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ComponentProps } from 'react'
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import Button, { type ButtonProps } from '@mui/material/Button'
 import { styled } from '@mui/material/styles'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
@@ -17,6 +17,19 @@ export interface ResendCodeButtonProps extends Omit<ButtonProps, 'type' | 'onCli
   onResend: () => void | Promise<void>
   /** Seconds the button stays disabled after a resend. Default 30. */
   cooldown?: number
+  /**
+   * Shown in the `status` slot when `onResend` rejects, instead of "Code
+   * sent". No cooldown starts on failure — the button re-enables immediately
+   * so the consumer can retry. Default "Code could not be sent".
+   */
+  errorText?: ReactNode
+  /**
+   * Called with the rejection when `onResend` fails, for logging. The error
+   * is otherwise swallowed — the `status` slot is what surfaces it to the
+   * user, so this is optional and never required to avoid an unhandled
+   * rejection.
+   */
+  onResendError?: (error: unknown) => void
   /** The status region (a visible `role="status"`), which announces "Code sent" once per resend. */
   slotProps?: { status?: ComponentProps<'span'> }
 }
@@ -33,11 +46,18 @@ const ResendCodeButtonStatus = styled('span', {
  * region — announcing every second would spam assistive tech — so a
  * separate `status` slot announces "Code sent" once per click, cleared
  * before the next resend so repeated clicks re-announce.
+ *
+ * A rejected `onResend` is caught, not left to reject unhandled: the
+ * `status` slot announces `errorText` instead of "Code sent", no cooldown
+ * starts (the button re-enables immediately so the user can retry), and
+ * `onResendError` (if given) receives the error for logging.
  */
 export function ResendCodeButton(inProps: ResendCodeButtonProps) {
   const {
     onResend,
     cooldown = 30,
+    errorText = 'Code could not be sent',
+    onResendError,
     disabled,
     children = 'Resend code',
     className,
@@ -45,11 +65,11 @@ export function ResendCodeButton(inProps: ResendCodeButtonProps) {
     ...rest
   } = useDefaultProps({ props: inProps, name: 'EzResendCodeButton' })
   useEzFormContext('ResendCodeButton') // guard only; useFormState reads control from context
-  const { isSubmitting, disabled: formDisabled } = useFormState()
+  const { disabled: formDisabled } = useFormState()
 
   const [pending, setPending] = useState(false)
   const [remaining, setRemaining] = useState(0)
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState<ReactNode>('')
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined)
 
   useEffect(
@@ -64,9 +84,13 @@ export function ResendCodeButton(inProps: ResendCodeButtonProps) {
     setPending(true)
     try {
       await onResend()
-    } finally {
+    } catch (error) {
       setPending(false)
+      setStatus(errorText)
+      onResendError?.(error)
+      return
     }
+    setPending(false)
     setStatus('Code sent')
     setRemaining(cooldown)
     clearInterval(intervalRef.current)
@@ -89,7 +113,7 @@ export function ResendCodeButton(inProps: ResendCodeButtonProps) {
     <>
       <ResendCodeButtonRoot
         type="button"
-        disabled={mergeDisabled(disabled, formDisabled) || isSubmitting || pending || cooling}
+        disabled={mergeDisabled(disabled, formDisabled) || pending || cooling}
         className={`${resendCodeButtonClasses.root}${className ? ` ${className}` : ''}`}
         onClick={handleClick}
         {...rest}

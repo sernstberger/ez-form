@@ -14,10 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `ResendCodeButton`: a resend-code helper for `OtpField` (MUI `Button`, `type="button"`).
   `onResend` is awaited if it returns a promise; disabled while pending and then for
   `cooldown` seconds (default 30), the label showing the remaining time
-  (`Resend code (27s)`). A separate `role="status"` slot announces "Code sent" once per
-  resend without spamming assistive tech on every countdown tick. `EzResendCodeButton`
-  theme key (`defaultProps`, `styleOverrides` for `root`, `status`) and the
-  `resendCodeButtonClasses` export — #63.
+  (`Resend code (27s)`). A rejected `onResend` shows `errorText?` (default "Code could
+  not be sent") in the status slot instead of "Code sent", starts no cooldown so the
+  user can retry immediately, and calls `onResendError?(error)` for logging — the
+  rejection itself is always caught, never left unhandled. A separate `role="status"`
+  slot announces "Code sent" (or the error) once per resend without spamming assistive
+  tech on every countdown tick. `EzResendCodeButton` theme key (`defaultProps`,
+  `styleOverrides` for `root`, `status`) and the `resendCodeButtonClasses` export — #63.
 
 ### Changed
 
