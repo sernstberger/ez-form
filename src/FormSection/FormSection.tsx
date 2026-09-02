@@ -116,7 +116,10 @@ export function FormSection(inProps: FormSectionProps) {
         {...slotProps?.content}
         className={`${formSectionClasses.content}${slotProps?.content?.className ? ` ${slotProps.content.className}` : ''}`}
       >
-        <FormSectionDepthContext.Provider value={depth + 1}>
+        {/* A section without a legend renders no heading, so it must not deepen its children:
+            otherwise a `title={null}` step would push nested sections from h3 to h4 under the
+            form's h2 (axe heading-order). */}
+        <FormSectionDepthContext.Provider value={title != null ? depth + 1 : depth}>
           {children}
         </FormSectionDepthContext.Provider>
       </FormSectionContent>

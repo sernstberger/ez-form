@@ -194,4 +194,15 @@ describe('FormSection', () => {
       expect(screen.getByRole('heading', { level: 2, name: 'Inner' })).toBeInTheDocument()
     })
   })
+
+  it('a section without a title does not deepen its children (heading-order stays valid)', () => {
+    wrap(
+      <FormSection aria-label="wrapper">
+        <FormSection title="Inner">
+          <TextField name="street" label="Street" />
+        </FormSection>
+      </FormSection>,
+    )
+    expect(screen.getByRole('heading', { level: 3, name: 'Inner' })).toBeInTheDocument()
+  })
 })
