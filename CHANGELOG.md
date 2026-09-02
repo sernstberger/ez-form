@@ -171,6 +171,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   flat `buttonProps` prop is a deprecated alias — it still works, but (being a flat, non-
   slot prop) a theme can never reach into it. Removed the guardrail allow-comment
   tracking the old literal — #62.
+- **Docs**: README now documents the required-date pattern for `DateField`/`DatePicker`: use
+  `z.date().nullable()` in the schema and `required` on the field (the same pattern as any
+  other field), not a `.refine`-based schema-level check that would fight the rule's message — #78.
 
 ### Notes
 

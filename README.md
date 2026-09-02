@@ -420,6 +420,28 @@ The picker's own validation (`minDate`, `disablePast`, an unparsable date, …) 
 
 `disableFuture` plus a sane `minDate` catches typos without needing a calendar to navigate.
 
+### Required dates
+
+Use `z.date().nullable()` in the schema and `required` on the field — the same pattern as any other field. The `required` rule handles non-null enforcement and shows "Birthday is required." when empty. Do not reach for `z.date().nullable().refine(v => v !== null, { message })` — a schema-level non-null check would fight the `required` rule's message rather than compose with it.
+
+```tsx
+<Form
+  schema={z.object({ birthday: z.date().nullable() })}
+  defaultValues={{ birthday: null }}
+  onSubmit={save}
+>
+  <DateField
+    name="birthday"
+    label="Birthday"
+    disableFuture
+    minDate={new Date(1900, 0, 1)}
+    required
+  />
+</Form>
+```
+
+`disableFuture`, `minDate`, and other picker validations compose with `required` — compose them freely.
+
 ## Autocomplete
 
 Address lookup (Places-style): the options list is fed by an async lookup, and the free-typed text is kept even if it doesn't match a suggestion.
