@@ -19,7 +19,7 @@ for additions.
 | `ConfirmDialog`, `useConfirm` | MUI `Dialog` | no |
 | `useFormGuard` | — | yes |
 | `Form guard` prop | `beforeunload` | — |
-| `SubmitButton confirm` prop | `ConfirmDialog` | — |
+| `Form confirm` prop | `ConfirmDialog` | — |
 
 ## Decisions Steve made
 
@@ -71,8 +71,7 @@ for additions.
 
 ```
 src/
-├─ Form/Form.tsx           + `guard` prop
-├─ SubmitButton/           + `confirm` prop
+├─ Form/Form.tsx           + `guard` and `confirm` props
 ├─ ClearButton/            NEW
 ├─ ConfirmDialog/          NEW  ConfirmDialog + useConfirm
 ├─ useFormGuard.ts         NEW
@@ -165,8 +164,7 @@ export interface WizardProps<TIn extends FieldValues> {
 - `WizardNav` — `Stack direction="row"`: Prev (`variant="text"`, disabled on
   first) and Next (`variant="contained"`, `loading` while `next()` pends).
   On the last step Next is replaced by `<SubmitButton>`; props `prevLabel`,
-  `nextLabel`, `submitLabel`, `confirm` (forwarded to SubmitButton), and
-  `slotProps.{prev,next,submit}` for the rest.
+  `nextLabel`, `submitLabel`, and `slotProps.{prev,next,submit}` for the rest.
 - `useWizard(componentName?)` — returns the context; throws outside `Wizard`.
 
 ### Router mode (story, and the docs recipe)
@@ -230,14 +228,16 @@ the title, `aria-describedby` the message, initial focus on Cancel, Escape and
 backdrop = cancel. `useConfirm` keeps one pending promise; the caller renders
 `dialog` once. Both are exported for consumers' own flows.
 
-### SubmitButton `confirm?: true | ConfirmOptions`
+### Form `confirm?: true | ConfirmOptions`
 
-Click → `trigger()` (whole form) → invalid: errors show, no dialog → valid:
-`confirm(opts)` → `true`: `form.requestSubmit()`. The button stays
-`type="submit"`; the handler intercepts `onClick` with `preventDefault`. Enter
-in a text field submits the form directly (native), bypassing the dialog —
-documented; consumers who need Enter confirmed set `confirm` and also handle
-`onKeyDown`, or we revisit. Default copy: title `Submit?`, no message.
+Confirmation lives on `Form`, not on the button, because every submit path
+(button click, Enter in a text field, `form.requestSubmit()`) funnels through
+`handleSubmit`. Inside the `handleSubmit` callback, after zod has validated:
+`confirm(opts)` → `true`: run `onSubmit`; `false`: nothing, form stays as is.
+So an invalid form never opens the dialog, and no path bypasses it. `Form`
+renders the `useConfirm` dialog itself. Default copy: title `Submit?`, no
+message. `SubmitButton` and `WizardNav` gain no `confirm` prop; `WizardNav`
+on the last step simply renders `SubmitButton`.
 
 ### ClearButton
 
@@ -282,20 +282,18 @@ vitest + RTL + axe, matching the existing test style.
 | Wizard | Next validates only the step's fields and focuses the first error; Prev never validates; visited steps clickable, upcoming disabled; `completed` clears when a field on a visited step becomes invalid; controlled `step` / `onStepChange` round trip; unknown or unreachable `step` triggers redirect to first incomplete; last-step Next is the SubmitButton; vertical renders `StepContent` and passes axe, horizontal passes axe; throws outside `<Form>` |
 | ReadOnlyField | raw value; options label; array join; boolean; empty; `format`; `editStep` shows Edit inside Wizard and nothing outside; label default humanization; axe |
 | ClearButton | disabled pristine; `defaults` resets to defaultValues; `empty` blanks by type; `confirm` cancel keeps values; confirm accept resets |
-| SubmitButton confirm | invalid form shows errors and no dialog; cancel never calls onSubmit; confirm calls onSubmit once; `confirm` object copy appears |
+| Form confirm | invalid form shows errors and no dialog; cancel never calls onSubmit; confirm calls onSubmit once; Enter in a field and `requestSubmit()` both go through the dialog; `confirm` object copy appears |
 | ConfirmDialog / useConfirm | alertdialog roles, initial focus on Cancel, Escape resolves false, promise resolves true/false once; axe |
 | Form guard | listener attached only while dirty and not submitting; removed on unmount |
 | useFormGuard | fake blocker: `shouldBlock` follows dirty; `proceed` / `cancel` forward |
 
 Stories: `Wizard/Horizontal`, `Wizard/Vertical`, `Wizard/ReactRouter`,
-`Buttons/ClearButton`, `Buttons/SubmitConfirm`, `ReadOnlyField`,
+`Buttons/ClearButton`, `Form/ConfirmSubmit`, `ReadOnlyField`,
 `Form/UnsavedChangesGuard`. Each story with interaction (`play`) for Next
 validation and confirm cancel.
 
 ## Open questions parked
 
-- Enter-key submit bypassing `confirm` (see SubmitButton). Decide after using
-  the story.
 - Whether `Wizard` should expose `visited` persistence (`initialVisited` /
   `onVisitedChange`) for consumers who save progress server-side. Not needed
   for the stories; add when a real flow asks.
