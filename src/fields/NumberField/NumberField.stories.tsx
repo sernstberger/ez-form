@@ -1,38 +1,15 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { fn } from 'storybook/test'
-import Stack from '@mui/material/Stack'
 import { z } from 'zod'
-import { Form } from '../../Form'
-import { SubmitButton } from '../../SubmitButton'
+import type { FormParameters } from '../../../.storybook/preview'
 import { NumberField } from './NumberField'
 
 const schema = z.object({ age: z.number({ error: 'Enter your age' }) })
 
-const onSubmit = fn()
-
-/**
- * One <Form> per story: the meta decorator reads the schema and defaults from
- * `parameters.form`, so stories never add a second (nested) Form decorator.
- */
 const meta = {
   title: 'Fields/NumberField',
   component: NumberField,
   args: { name: 'age', label: 'Age' },
-  parameters: { form: { schema, defaultValues: {} } },
-  decorators: [
-    (Story, { parameters }) => (
-      <Form
-        schema={parameters.form.schema}
-        defaultValues={parameters.form.defaultValues}
-        onSubmit={onSubmit}
-      >
-        <Stack spacing={2} sx={{ width: 360 }}>
-          <Story />
-          <SubmitButton />
-        </Stack>
-      </Form>
-    ),
-  ],
+  parameters: { form: { schema, defaultValues: {} } } satisfies FormParameters,
 } satisfies Meta<typeof NumberField>
 
 export default meta

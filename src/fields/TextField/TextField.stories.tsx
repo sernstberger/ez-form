@@ -1,8 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { fn } from 'storybook/test'
-import Stack from '@mui/material/Stack'
 import { z } from 'zod'
-import { Form } from '../../Form'
+import type { FormParameters } from '../../../.storybook/preview'
 import { TextField } from './TextField'
 
 const schema = z.object({
@@ -11,22 +9,13 @@ const schema = z.object({
   nick: z.string().optional(),
 })
 
-const onSubmit = fn()
-
 const meta = {
   title: 'Fields/TextField',
   component: TextField,
   args: { name: 'email', label: 'Email' },
-  decorators: [
-    (Story) => (
-      <Form schema={schema} defaultValues={{ email: '', age: '', nick: '' }} onSubmit={onSubmit}>
-        <Stack spacing={2} sx={{ maxWidth: 360 }}>
-          <Story />
-          <button type="submit">Submit</button>
-        </Stack>
-      </Form>
-    ),
-  ],
+  parameters: {
+    form: { schema, defaultValues: { email: '', age: '', nick: '' } },
+  } satisfies FormParameters,
 } satisfies Meta<typeof TextField>
 
 export default meta

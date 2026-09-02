@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
-import Stack from '@mui/material/Stack'
 import { z } from 'zod'
-import { Form } from '../../Form'
-import { SubmitButton } from '../../SubmitButton'
+import type { FormParameters } from '../../../.storybook/preview'
 import { Autocomplete } from './Autocomplete'
 
 const schema = z.object({ role: z.enum(['admin', 'user', 'viewer'], { error: 'Pick a role' }) })
@@ -15,31 +13,11 @@ const roles = [
   { value: 'viewer', label: 'Viewer' },
 ]
 
-const onSubmit = fn()
-
-/**
- * One <Form> per story: the meta decorator reads the schema and defaults from
- * `parameters.form`, so stories never add a second (nested) Form decorator.
- */
 const meta = {
   title: 'Fields/Autocomplete',
   component: Autocomplete,
   args: { name: 'role', label: 'Role', options: roles },
-  parameters: { form: { schema, defaultValues: {} } },
-  decorators: [
-    (Story, { parameters }) => (
-      <Form
-        schema={parameters.form.schema}
-        defaultValues={parameters.form.defaultValues}
-        onSubmit={onSubmit}
-      >
-        <Stack spacing={2} sx={{ width: 360 }}>
-          <Story />
-          <SubmitButton />
-        </Stack>
-      </Form>
-    ),
-  ],
+  parameters: { form: { schema, defaultValues: {} } } satisfies FormParameters,
 } satisfies Meta<typeof Autocomplete>
 
 export default meta
@@ -52,7 +30,9 @@ export const Disabled: Story = { args: { disabled: true } }
 const multiSchema = z.object({ roles: z.array(z.string()).min(1, 'Pick at least one') })
 
 export const Multiple: Story = {
-  parameters: { form: { schema: multiSchema, defaultValues: { roles: [] } } },
+  parameters: {
+    form: { schema: multiSchema, defaultValues: { roles: [] } },
+  } satisfies FormParameters,
   args: { name: 'roles', label: 'Roles', multiple: true },
 }
 

@@ -1,14 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { fn } from 'storybook/test'
-import Stack from '@mui/material/Stack'
 import { z } from 'zod'
-import { Form } from '../../Form'
-import { SubmitButton } from '../../SubmitButton'
+import type { FormParameters } from '../../../.storybook/preview'
 import { RadioGroup } from './RadioGroup'
 
 const schema = z.object({ plan: z.number({ error: 'Pick a plan' }) })
-
-const onSubmit = fn()
 
 const meta = {
   title: 'Fields/RadioGroup',
@@ -22,16 +17,7 @@ const meta = {
       { value: 3, label: 'Enterprise' },
     ],
   },
-  decorators: [
-    (Story) => (
-      <Form schema={schema} defaultValues={{}} onSubmit={onSubmit}>
-        <Stack spacing={2} sx={{ width: 360 }}>
-          <Story />
-          <SubmitButton />
-        </Stack>
-      </Form>
-    ),
-  ],
+  parameters: { form: { schema, defaultValues: {} } } satisfies FormParameters,
 } satisfies Meta<typeof RadioGroup>
 
 export default meta

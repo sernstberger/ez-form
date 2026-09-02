@@ -108,7 +108,11 @@ function NumberInput({
         ...inputProps,
         onChange: (e) => {
           const event = e as ChangeEvent<HTMLInputElement>
-          if (separators) {
+          // Skip the rewrite mid-composition: reassigning `.value` while an IME is
+          // composing cancels the composition. React types `nativeEvent` as `Event`,
+          // but a change from typing is an InputEvent, which carries `isComposing`.
+          const composing = (event.nativeEvent as InputEvent).isComposing === true
+          if (separators && !composing) {
             const typed = event.currentTarget.value
             const { text, caret } = groupWhileTyping(
               typed,
@@ -126,8 +130,11 @@ function NumberInput({
                 // (backspace at `1,|000`). Nothing is re-rendering, so place the caret now.
                 event.currentTarget.setSelectionRange(caret, caret)
               } else {
-                // Text changes, so a commit is coming and it will reset the caret to the end
-                // of the controlled value; the layout effect restores it afterwards.
+                // The text differs from what the input already showed, so assigning `.value`
+                // above moved the caret to the end (React's own `updateInput` would have left
+                // it alone — it skips the assignment when `node.value` already equals the new
+                // prop, which is not the case here). Restore it in the layout effect, after
+                // the commit Base UI is about to trigger.
                 pendingCaret.current = caret
               }
             }

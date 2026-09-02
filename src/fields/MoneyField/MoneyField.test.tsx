@@ -48,11 +48,26 @@ describe('MoneyField', () => {
     expect(input()).toHaveValue('1,234')
   })
 
-  it('throws outside <Form> naming MoneyField', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect(() => render(<MoneyField name="price" label="Price" />)).toThrow(
-      'ez-form: <MoneyField> must be rendered inside <Form>',
+  it('rounds a sub-cent entry to the cent it displays', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={onSubmit}>
+        <MoneyField name="price" label="Price" />
+        <button type="submit">Go</button>
+      </Form>,
     )
+    // Blur-then-submit: the display says $20.00, so the value must be 20, not 19.999.
+    await user.type(input(), '19.999')
+    await user.tab()
+    expect(input()).toHaveValue('$20.00')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(onSubmit).toHaveBeenLastCalledWith({ price: 20 }, expect.anything())
+
+    // Enter-submit, without an intervening blur.
+    await user.clear(input())
+    await user.type(input(), '19.999{Enter}')
+    expect(onSubmit).toHaveBeenLastCalledWith({ price: 20 }, expect.anything())
   })
 
   it('shows the min rule message for a value below the bound', async () => {
