@@ -293,6 +293,26 @@ describe('Wizard', () => {
       render(<Controlled initial="review" visited={['account', 'plan']} />)
       await waitFor(() => expect(screen.getByTestId('param')).toHaveTextContent('plan'))
     })
+
+    it('ignores a stale visited id and redirects to the last id that still matches a step', async () => {
+      render(<Controlled initial="review" visited={['gone', 'plan']} />)
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+      expect(screen.getByTestId('param')).toHaveTextContent('plan')
+    })
+
+    it('falls back to the first step when no visited id matches a step', async () => {
+      render(<Controlled initial="review" visited={['gone']} />)
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('account'))
+      expect(screen.getByTestId('param')).toHaveTextContent('account')
+    })
+
+    it('stepStatus does not throw for a stale id', () => {
+      render(<Controlled initial="account" visited={['account', 'gone']} />)
+      expect(screen.getByTestId('current')).toHaveTextContent('account')
+      expect(screen.getByTestId('status')).toHaveTextContent(
+        'account:current plan:upcoming review:upcoming',
+      )
+    })
   })
 
   it('throws outside <Form> and useWizard throws outside <Wizard>', () => {

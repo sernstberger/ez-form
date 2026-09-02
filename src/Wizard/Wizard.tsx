@@ -31,7 +31,8 @@ export interface WizardProps<TIn extends FieldValues> {
    * Controlled list of step ids the user has reached: which stepper steps are
    * clickable and where an unreachable `step` redirects. Omit for internal
    * state. Save it with draft values so a returning user resumes where they
-   * left off.
+   * left off. Ids that no longer match a step are ignored; if none match, the
+   * wizard starts at the first step.
    */
   visited?: readonly string[]
   onVisitedChange?: (ids: readonly string[]) => void
@@ -68,7 +69,11 @@ export function Wizard<TIn extends FieldValues>({
   const visited = visitedProp ?? visitedState
   const requestedId = step ?? stepState
   const indexOf = useCallback((id: string) => steps.findIndex((s) => s.id === id), [steps])
-  const lastVisitedIndex = Math.max(0, ...visited.map(indexOf))
+  // Stale ids (a renamed step id after a localStorage resume) resolve to -1 from `indexOf`.
+  // Filter them out before Math.max so the fallback to step 0 only happens when nothing in
+  // `visited` matches a step, not as a side effect of -1 losing to the 0 floor.
+  const visitedIndexes = visited.map(indexOf).filter((i) => i !== -1)
+  const lastVisitedIndex = visitedIndexes.length ? Math.max(...visitedIndexes) : 0
   // A controlled `step` that is unknown or not yet visited is shown as the last visited step
   // while the effect below asks the consumer to move there.
   const reachable = indexOf(requestedId) !== -1 && visited.includes(requestedId)
@@ -152,6 +157,8 @@ export function Wizard<TIn extends FieldValues>({
 
   const value = useMemo<WizardContextValue>(
     () => ({
+      // The context is deliberately untyped in `TIn`: WizardStepper / WizardNav / useWizard
+      // consume it without knowing the form's field type, so these casts erase `TIn` on purpose.
       steps: steps as readonly WizardStepDef[],
       current: current as WizardStepDef,
       index,
