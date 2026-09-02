@@ -537,4 +537,36 @@ describe('title and description', () => {
     )
     await expectNoA11yViolations(container)
   })
+
+  it('a slotProps.title id cannot clobber the generated id aria-labelledby points at', () => {
+    render(
+      <Form
+        schema={schema}
+        onSubmit={() => {}}
+        title="Sign up"
+        slotProps={{ title: { id: 'custom' } }}
+      >
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    const form = screen.getByRole('form', { name: 'Sign up' })
+    const heading = screen.getByRole('heading', { level: 2, name: 'Sign up' })
+    expect(form.getAttribute('aria-labelledby')).toBe(heading.id)
+  })
+
+  it('a slotProps.description id cannot clobber the generated id aria-describedby points at', () => {
+    render(
+      <Form
+        schema={schema}
+        onSubmit={() => {}}
+        title="Sign up"
+        description="All fields required"
+        slotProps={{ description: { id: 'custom' } }}
+      >
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    const form = screen.getByRole('form', { name: 'Sign up' })
+    expect(form).toHaveAccessibleDescription('All fields required')
+  })
 })
