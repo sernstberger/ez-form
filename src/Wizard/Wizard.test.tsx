@@ -481,6 +481,62 @@ describe('Wizard', () => {
       expect(onSubmit).not.toHaveBeenCalled()
     })
 
+    // Regression for #40: a controlled wizard can decline the failed-submit move (its
+    // `onStepChange` need not call the `step` setter). The old focus effect only cleared
+    // `focusTarget` once `current.id` became the target — declined, it just sat there — so
+    // a later, unrelated arrival at that same step (the consumer's own navigation, long
+    // after the failed submit) would wrongly focus the stale field on mount.
+    it('clears a stale focusTarget when a controlled wizard declines the failed-submit move', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      function DeclinesMove() {
+        const [step, setStep] = useState('account')
+        const [visited, setVisited] = useState<readonly string[]>(['account'])
+        return (
+          <Form schema={schema} defaultValues={filled} onSubmit={onSubmit}>
+            <Wizard
+              steps={steps}
+              step={step}
+              // Accepts every move except the one the failed-submit effect requests
+              // (back to "account", once "review" has been reached): that one is
+              // declined by not calling `setStep`, the way a consumer with its own
+              // routing/guard logic might veto a particular transition.
+              onStepChange={(s) => {
+                if (step === 'review' && s.id === 'account') return
+                setStep(s.id)
+              }}
+              visited={visited}
+              onVisitedChange={setVisited}
+            >
+              <Steps />
+              <ClearEmail />
+              <SubmitButton />
+              <button type="button" onClick={() => setStep('account')}>
+                jump to account
+              </button>
+            </Wizard>
+          </Form>
+        )
+      }
+      render(<DeclinesMove />)
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('review'))
+      await user.click(screen.getByRole('button', { name: 'clear email' }))
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      // The failed submit requested a move to "account" via onStepChange, which declined
+      // it: current stays on "review".
+      await waitFor(() => expect(onSubmit).not.toHaveBeenCalled())
+      expect(screen.getByTestId('current')).toHaveTextContent('review')
+      // The consumer now moves to "account" on its own, unrelated to the failed submit —
+      // a fresh `step` prop change via a plain setState, not through go/next/move.
+      await user.click(screen.getByRole('button', { name: 'jump to account' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('account'))
+      // The stale focusTarget must not fire: Email is not focused.
+      expect(screen.getByRole('textbox', { name: 'Email' })).not.toHaveFocus()
+    })
+
     it('does not navigate when the errored field is on the current step', async () => {
       const user = userEvent.setup()
       const onSubmit = vi.fn()
