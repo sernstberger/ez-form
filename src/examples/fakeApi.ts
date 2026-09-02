@@ -80,6 +80,8 @@ export async function placeOrderApi(values: PlaceOrderValues): Promise<PlaceOrde
     throw new Error('Your card was declined. Try a different payment method.')
   }
   return { orderId: `ORD-${Math.random().toString(36).slice(2, 10).toUpperCase()}` }
+}
+
 export interface ProfileValues {
   displayName: string
   bio: string

@@ -78,6 +78,11 @@ describe('fakeApi', () => {
     vi.useFakeTimers()
     const promise = placeOrderApi({ cardNumber: DECLINED_CARD_NUMBER, total: 42.5 })
     const assertion = expect(promise).rejects.toThrow('declined')
+    await vi.runAllTimersAsync()
+    await assertion
+    vi.useRealTimers()
+  })
+
   it('loadProfileApi resolves with a saved profile by default', async () => {
     vi.useFakeTimers()
     const promise = loadProfileApi()
