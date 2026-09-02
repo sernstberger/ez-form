@@ -251,4 +251,121 @@ describe('useEzFormContext', () => {
     })
     expect(result.current).toHaveProperty('control')
   })
+
+  describe('confirm', () => {
+    it('opens a dialog after validation and only calls onSubmit on Confirm', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={schema} defaultValues={{ email: 'a@b.co' }} onSubmit={onSubmit} confirm>
+          <SubmitButton />
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      expect(await screen.findByRole('alertdialog', { name: 'Submit?' })).toBeInTheDocument()
+      expect(onSubmit).not.toHaveBeenCalled()
+      await user.click(screen.getByRole('button', { name: 'Confirm' }))
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+      expect(onSubmit).toHaveBeenCalledWith({ email: 'a@b.co' }, expect.anything())
+    })
+
+    it('never opens the dialog for an invalid form; shows the errors instead', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={schema} defaultValues={{ email: 'nope' }} onSubmit={onSubmit} confirm>
+          <TextField name="email" label="Email" />
+          <SubmitButton />
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      expect(await screen.findByText('Invalid email address')).toBeInTheDocument()
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
+    it('Cancel leaves the form untouched and onSubmit uncalled', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form
+          schema={schema}
+          defaultValues={{ email: 'a@b.co' }}
+          onSubmit={onSubmit}
+          confirm={{ title: 'Send it?', message: 'Emails the client.' }}
+        >
+          <SubmitButton />
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      expect(
+        await screen.findByRole('alertdialog', { name: 'Send it?' }),
+      ).toHaveAccessibleDescription('Emails the client.')
+      await user.click(screen.getByRole('button', { name: 'Cancel' }))
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+      expect(onSubmit).not.toHaveBeenCalled()
+      expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled()
+    })
+
+    it('Enter in a field and form.requestSubmit() both go through the dialog', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      const { container } = render(
+        <Form schema={schema} defaultValues={{ email: 'a@b.co' }} onSubmit={onSubmit} confirm>
+          <TextField name="email" label="Email" />
+          <SubmitButton />
+        </Form>,
+      )
+      await user.click(screen.getByRole('textbox', { name: 'Email' }))
+      await user.keyboard('{Enter}')
+      expect(await screen.findByRole('alertdialog')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Cancel' }))
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+      container.querySelector('form')!.requestSubmit()
+      expect(await screen.findByRole('alertdialog')).toBeInTheDocument()
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('guard', () => {
+    const addSpy = () => vi.spyOn(window, 'addEventListener')
+    const removeSpy = () => vi.spyOn(window, 'removeEventListener')
+    const beforeunloadCalls = (spy: ReturnType<typeof addSpy>) =>
+      spy.mock.calls.filter(([type]) => type === 'beforeunload')
+
+    it('does nothing without the prop', async () => {
+      const user = userEvent.setup()
+      const add = addSpy()
+      render(
+        <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+          <TextField name="email" label="Email" />
+        </Form>,
+      )
+      await user.type(screen.getByRole('textbox', { name: 'Email' }), 'a')
+      expect(beforeunloadCalls(add)).toHaveLength(0)
+    })
+
+    it('listens to beforeunload only while dirty, and the handler prevents default', async () => {
+      const user = userEvent.setup()
+      const add = addSpy()
+      const remove = removeSpy()
+      const { unmount } = render(
+        <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}} guard>
+          <TextField name="email" label="Email" />
+        </Form>,
+      )
+      expect(beforeunloadCalls(add)).toHaveLength(0)
+      await user.type(screen.getByRole('textbox', { name: 'Email' }), 'a')
+      await waitFor(() => expect(beforeunloadCalls(add)).toHaveLength(1))
+      const handler = beforeunloadCalls(add)[0]![1] as (e: Event) => void
+      const event = new Event('beforeunload', { cancelable: true })
+      handler(event)
+      expect(event.defaultPrevented).toBe(true)
+      await user.clear(screen.getByRole('textbox', { name: 'Email' }))
+      await waitFor(() =>
+        expect(remove.mock.calls.filter(([t]) => t === 'beforeunload')).toHaveLength(1),
+      )
+      unmount()
+    })
+  })
 })
