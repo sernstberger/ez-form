@@ -130,6 +130,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   without hand-picking `slotProps.legend.component` at every level. An explicit
   `slotProps.legend.component`, or a theme default for it, still overrides the
   automatic level — #64.
+- **Docs**: README section on timeouts (OTP codes, sessions) explaining WCAG 2.2.1
+  Timing Adjustable requirements (warn ≥20s before expiry, allow extension ≥10×
+  longer), a recommended pattern using `<ResendCodeButton>` + visible countdown
+  announced via `role="status"`, and a runnable code sample showing how form values
+  persist across timeouts — #32.
 
 ### Changed
 

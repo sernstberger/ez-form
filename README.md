@@ -306,6 +306,94 @@ A URL for a step the user has not reached (a deep link, a reload) makes the wiza
 - `<Form guard>`: browser prompt on tab close / reload while dirty.
 - `useFormGuard(useBlocker)`: in-app navigation; pass react-router's `useBlocker` and render a `ConfirmDialog` with the result.
 
+## Timeouts (OTP codes, sessions)
+
+WCAG 2.2.1 Timing Adjustable requires that if a timeout — an OTP code expiry, a session timeout, or any server-side time limit — affects the user, you must either disable it, let the user adjust it to ≥20 seconds, or warn them ≥20 seconds before it expires so they can extend it for at least 10× longer. Form values are never lost across timeouts: `<Form>` holds them until submission or reset, so a user can resubmit after resending a code or re-authenticating.
+
+A recommended pattern for OTP codes uses `<ResendCodeButton>` (which announces success/error via `role="status"`) and a countdown announced in a separate status region (not live, so it doesn't tick into assistive tech every second). Warn when ≥20 seconds remain; if the user doesn't act, show a `<FormError>` with the root error and offer resend via `<ResendCodeButton>` or a `Keep me signed in` action for session timeouts. A visible countdown built with native `setInterval` and state (the example shows the pattern) is simpler than a library hook; ez-form ships no timer on purpose, since codegen only if a real flow drives it.
+
+```tsx
+import { useEffect, useRef, useState } from 'react'
+import Stack from '@mui/material/Stack'
+import Typography from '@mui/material/Typography'
+import { Form, FormMethods, OtpField, ResendCodeButton, FormError, SubmitButton } from 'ez-form'
+import { z } from 'zod'
+
+const schema = z.object({ code: z.string().min(6) })
+
+function VerifyOtpContent({ onCodeSent }: { onCodeSent: () => void }) {
+  const [expiry, setExpiry] = useState<number | null>(null)
+  const [secondsLeft, setSecondsLeft] = useState(0)
+  const [warningAnnounced, setWarningAnnounced] = useState(false)
+  const form = useRef<FormMethods<z.input<typeof schema>>>(null)
+
+  useEffect(() => {
+    if (!expiry) return
+    const interval = setInterval(() => {
+      const now = Date.now()
+      const remaining = Math.max(0, Math.ceil((expiry - now) / 1000))
+      setSecondsLeft(remaining)
+      if (remaining === 0) {
+        // Timeout: set root error, clear expiry to stop the countdown, user can resend
+        form.current?.setError('root.timeout', { message: 'Code expired. Send a new one below.' })
+        setExpiry(null)
+        setWarningAnnounced(false)
+      } else if (remaining === 20 && !warningAnnounced) {
+        setWarningAnnounced(true)
+      }
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [expiry, warningAnnounced])
+
+  return (
+    <Stack spacing={2}>
+      <FormError />
+      <OtpField name="code" label="Verification code" length={6} required />
+      {expiry && secondsLeft > 0 && (
+        <Stack spacing={1}>
+          {secondsLeft >= 20 ? (
+            <Typography variant="body2" color="warning.main">
+              Code expires in {secondsLeft}s
+            </Typography>
+          ) : (
+            <Typography variant="body2" color="error.main">
+              Code expires in {secondsLeft}s
+            </Typography>
+          )}
+          {warningAnnounced && secondsLeft < 20 && (
+            <Typography component="span" variant="body2" role="status">
+              Warning: 20 seconds left to enter code.
+            </Typography>
+          )}
+        </Stack>
+      )}
+      <ResendCodeButton
+        onResend={async () => {
+          // Your API call here
+          onCodeSent()
+          setExpiry(Date.now() + 5 * 60 * 1000) // 5-minute expiry
+          setWarningAnnounced(false)
+        }}
+        cooldown={30}
+      />
+      <SubmitButton />
+    </Stack>
+  )
+}
+
+export function VerifyOtp({ onCodeSent }: { onCodeSent: () => void }) {
+  const form = useRef<FormMethods<z.input<typeof schema>>>(null)
+
+  return (
+    <Form ref={form} schema={schema} defaultValues={{ code: '' }} onSubmit={console.log}>
+      <VerifyOtpContent onCodeSent={onCodeSent} />
+    </Form>
+  )
+}
+```
+
+The `sign-up` example (a multi-step form with a verification step) shows this pattern in practice; see `src/examples/SignUp/SignUp.tsx`.
+
 ## Theming
 
 Every ez-form component registers with MUI's theme under `Ez<Name>` (`defaultProps`, `styleOverrides`, and a `<name>Classes` object for slot class names) — no styling is baked into the component itself, so a theme can override every default.
