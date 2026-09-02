@@ -37,8 +37,12 @@ function makeIsGroupChar(group: string): (char: string) => boolean {
  * Re-groups the integer digits of `text` and maps the caret to the same logical
  * position. Fraction digits are left exactly as typed (so `1234.50` stays `1,234.50`
  * and `1234.` keeps its trailing decimal). Returns the input unchanged when the text
- * contains anything other than digits, one leading `-`, the decimal separator, group
- * separators, and whitespace — e.g. a pasted `$` — because Base UI normalizes those on blur.
+ * contains anything other than digits, one leading `-`, the decimal separator,
+ * characters `isGroupChar` recognises as this locale's group separator, or whitespace —
+ * e.g. a pasted `$` — because Base UI normalizes those on blur. Whitespace that isn't
+ * this locale's group separator (a stray ASCII space typed or pasted under a
+ * non-space-group locale, #42) is dropped rather than kept: it isn't a group char here,
+ * so leaving it in place would misplace it relative to the freshly inserted separators.
  */
 export function groupWhileTyping(text: string, caret: number, separators: Separators): GroupedText {
   if (text === '') return { text: '', caret: 0 }
@@ -61,8 +65,10 @@ export function groupWhileTyping(text: string, caret: number, separators: Separa
     if (isSignificant(chars[i]!)) significantBeforeCaret++
   }
 
-  // Strip existing group separators, in every form this locale's separator can arrive as.
-  const stripped = [...text].filter((char) => !isGroupChar(char)).join('')
+  // Strip existing group separators, in every form this locale's separator can arrive as,
+  // and any other whitespace that isn't this locale's group char (#42) — e.g. a plain
+  // ASCII space typed under a locale whose group separator isn't space-like.
+  const stripped = [...text].filter((char) => !isGroupChar(char) && !/\s/.test(char)).join('')
 
   // Split into sign, integer part, and the rest (decimal separator + fraction), on the
   // first decimal separator found.
