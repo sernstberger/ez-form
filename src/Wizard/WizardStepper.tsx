@@ -13,8 +13,12 @@ export type WizardStepperProps = Omit<
   'activeStep' | 'orientation' | 'nonLinear' | 'children'
 >
 
-/** The label content shared by both the horizontal `StepButton` and the
- * vertical plain-list button: a visited step with an error is marked. */
+/** The label content shared by upcoming steps and both clickable-step
+ * renderers (horizontal `StepButton`, vertical `ButtonBase`): `optional`
+ * always comes from here, and a visited step with an error is marked.
+ * `StepButton` clones `{ icon, optional }` onto this element, so callers
+ * that render it as `StepButton`'s child must still pass `optional` to
+ * `StepButton` itself too — see the comment at that call site. */
 function stepLabel(step: WizardStepDef, status: WizardStepStatus) {
   return (
     <StepLabel optional={step.optional} error={status === 'visited'}>
@@ -46,20 +50,30 @@ export function WizardStepper(props: WizardStepperProps) {
         const clickable = status !== 'upcoming'
         let button: ReactNode
         if (!clickable) {
-          button = <StepLabel optional={step.optional}>{step.label}</StepLabel>
+          button = stepLabel(step, status)
         } else if (orientation === 'vertical') {
           button = (
             <ButtonBase
               focusRipple
               onClick={() => void go(step.id)}
-              sx={{ width: '100%', justifyContent: 'flex-start', padding: '8px', margin: '-8px' }}
+              sx={{
+                width: '100%',
+                justifyContent: 'flex-start',
+                boxSizing: 'content-box',
+                padding: '8px',
+                margin: '-8px',
+              }}
             >
               {stepLabel(step, status)}
             </ButtonBase>
           )
         } else {
           button = (
-            <StepButton color="inherit" onClick={() => void go(step.id)}>
+            // `StepButton` clones `{ icon, optional }` onto its `StepLabel`
+            // child (`cloneElement`, which overwrites): without `optional`
+            // here too, that clone stamps `optional: undefined` over the
+            // value `stepLabel()` already set, silently dropping it.
+            <StepButton color="inherit" optional={step.optional} onClick={() => void go(step.id)}>
               {stepLabel(step, status)}
             </StepButton>
           )

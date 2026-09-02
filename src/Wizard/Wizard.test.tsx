@@ -375,4 +375,49 @@ describe('WizardStepper', () => {
       await expectNoA11yViolations(container)
     },
   )
+
+  it.each(['horizontal', 'vertical'] as const)(
+    '%s: a step optional hint renders',
+    async (orientation) => {
+      const optionalSteps = [
+        {
+          id: 'account',
+          label: 'Account',
+          fields: ['name', 'email'],
+          optional: 'Seats are billed monthly',
+        },
+        { id: 'plan', label: 'Plan', fields: ['plan'] },
+        { id: 'review', label: 'Review' },
+      ] as const satisfies WizardStepDef<Input>[]
+      render(
+        <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+          <Wizard steps={optionalSteps} orientation={orientation}>
+            <WizardStepper />
+            <Steps />
+          </Wizard>
+        </Form>,
+      )
+      expect(screen.getByText('Seats are billed monthly')).toBeInTheDocument()
+    },
+  )
+
+  it('a visited step with an error shows the StepLabel error state', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={filled} onSubmit={() => {}} mode="onChange">
+        <Wizard steps={steps}>
+          <WizardStepper />
+          <Steps />
+        </Wizard>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'next' }))
+    await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+    await user.clear(screen.getByRole('textbox', { name: 'Plan' }))
+    await screen.findByText('Plan is required')
+    await user.click(screen.getByRole('button', { name: 'prev' }))
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('plan:visited'))
+    const planLabel = screen.getByText('Plan', { selector: '.MuiStepLabel-label' })
+    expect(planLabel).toHaveClass('Mui-error')
+  })
 })
