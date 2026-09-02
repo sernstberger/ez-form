@@ -1,4 +1,3 @@
-import { useId } from 'react'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import LinearProgress, { type LinearProgressProps } from '@mui/material/LinearProgress'
@@ -66,7 +65,10 @@ const PasswordStrengthLabel = styled(Typography, {
  * communicates "how good is this value", which is the read here) with its
  * own `aria-value*`/`role` overriding MUI's `progressbar` defaults, plus a
  * visible label in an `aria-live="polite"` region so screen reader users
- * hear the tier change as they type.
+ * hear the tier change as they type. `aria-label="Password strength"` is a
+ * default only — `slotProps.bar['aria-label']` (or a theme's
+ * `defaultProps.slotProps.bar`) can localise or replace it; `role` and
+ * `aria-value*` stay fixed, since those carry the meter's actual semantics.
  */
 export function PasswordStrength(inProps: PasswordStrengthProps) {
   const props = useDefaultProps({ props: inProps, name: 'EzPasswordStrength' })
@@ -74,7 +76,6 @@ export function PasswordStrength(inProps: PasswordStrengthProps) {
   useEzFormContext('PasswordStrength')
   const value: unknown = useWatch({ name })
   const password = typeof value === 'string' ? value : ''
-  const labelId = useId()
 
   const isEmpty = password.length === 0
   const level = isEmpty ? 0 : score(password)
@@ -89,17 +90,16 @@ export function PasswordStrength(inProps: PasswordStrengthProps) {
         variant="determinate"
         value={(level / 4) * 100}
         color={COLOR_BY_SCORE[level]}
+        aria-label="Password strength"
         {...slotProps?.bar}
         role="meter"
         aria-valuemin={0}
         aria-valuemax={4}
         aria-valuenow={level}
         aria-valuetext={isEmpty ? undefined : label}
-        aria-label="Password strength"
         className={`${passwordStrengthClasses.bar}${slotProps?.bar?.className ? ` ${slotProps.bar.className}` : ''}`}
       />
       <PasswordStrengthLabel
-        id={labelId}
         variant="caption"
         aria-live="polite"
         {...slotProps?.label}

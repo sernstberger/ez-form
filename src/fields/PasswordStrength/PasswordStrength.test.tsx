@@ -83,6 +83,11 @@ describe('PasswordStrength', () => {
     expect(screen.getByRole('meter')).toHaveAccessibleName('Password strength')
   })
 
+  it('slotProps.bar["aria-label"] overrides the default accessible name', () => {
+    wrap(<PasswordStrength name="password" slotProps={{ bar: { 'aria-label': 'Stärke' } }} />)
+    expect(screen.getByRole('meter', { name: 'Stärke' })).toBeInTheDocument()
+  })
+
   it('has no accessibility violations, empty or filled', async () => {
     const { container, unmount } = wrap(<PasswordStrength name="password" score={() => 3} />, {
       password: 'Tr0ub4dor&3',
