@@ -67,8 +67,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `expectTargetSize`, a shared test helper asserting a control's declared CSS
   guarantees the floor, called from every affected component's test file — #12.
 
-> > > > > > > feat/guardrail
-
 ### Changed
 
 - `NumberField` / `NumberFieldControl` `className` is now `string` only (Base UI's
