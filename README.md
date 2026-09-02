@@ -74,7 +74,7 @@ rules and the checklist a component must pass before it ships.
 pnpm add ez-form @mui/material @mui/icons-material @mui/x-date-pickers @emotion/react @emotion/styled @base-ui/react react-hook-form zod
 ```
 
-`@mui/x-date-pickers` is a required peer even if you use no picker: ez-form has a single entry point, so the package is always resolved. `@base-ui/react` backs `NumberField`, `MoneyField`, and `OtpField`; `@mui/x-date-pickers` backs the three pickers. Both are tree-shakeable, and you also install one date adapter library (`date-fns`, `dayjs`, `luxon`, or `moment`) for the pickers — see "Date pickers" below.
+`@mui/x-date-pickers` is a required peer even if you use no picker: ez-form has a single entry point, so the package is always resolved. `@base-ui/react` backs `NumberField`, `MoneyField`, `PercentField`, and `OtpField`; `@mui/x-date-pickers` backs the three pickers. Both are tree-shakeable, and you also install one date adapter library (`date-fns`, `dayjs`, `luxon`, or `moment`) for the pickers — see "Date pickers" below.
 
 Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >= 5.4 (the types use `NoInfer`).
 
@@ -96,6 +96,7 @@ React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form
 | `Autocomplete`                                 | MUI `Autocomplete`                            | `name`, `options`, `getOptionValue?` (default `o => o.value`; return `o` to store objects), `multiple`, `freeSolo`, `textFieldProps?`; all TextField rules. Options may carry extra fields (they reach `onChange`)                                                                                                                                                                                                                                                               |
 | `NumberField`                                  | Base UI `NumberField` through MUI `TextField` | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max` (also the stepper bounds), `validate`. Value is `number \| null`; digits group while typing (new in v2.1), and `format={{ useGrouping: false }}` turns that off                                                                                                                                                                                                                                         |
 | `MoneyField`                                   | `NumberField` pinned to USD                   | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max`, `validate`. Value is a `number` in dollars, rounded to the cent; shows `$1,234.50` on blur                                                                                                                                                                                                                                                                                                             |
+| `PercentField`                                 | `NumberField` with an Intl `%`                | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min` (default 0), `max` (default 100), `validate`; `step` defaults to 1 and `scale?: 'percent' \| 'fraction'` decides what the value means. Shows `12.5%` on blur; bounds and step are always percentage points                                                                                                                                                                                                     |
 | `ZipField`                                     | `TextField`                                   | `name`; same rules as TextField, plus a built-in "5 digits" rule (`invalidMessage?`, default `'Enter a 5-digit ZIP code'`). Digits only, capped at 5 (anything else is stripped on type/paste); `inputMode="numeric"`, `autoComplete` defaults to `'postal-code'`. Value is the digit string                                                                                                                                                                                     |
 | `FeinField`                                    | ez-form `TextField`                           | `name`; same rules as TextField, plus `format?` (a `#` template, default `'##-#######'`) and `invalidMessage?` (default `'Enter a 9-digit employer identification number'`). The form value is digits only (`'123456789'`); `inputMode="numeric"`, `autoComplete` defaults to `'off'`                                                                                                                                                                                            |
 | `StateSelect`                                  | `Select`                                      | `name`; same rules as Select. Options are the 50 states + DC by default; `territories?` adds PR, GU, VI, AS, MP. `autoComplete` defaults to `'address-level1'`. Value is the USPS abbreviation; also exports `US_STATES`/`US_TERRITORIES` option arrays                                                                                                                                                                                                                          |
@@ -735,20 +736,21 @@ Themeable under `EzTextareaField` (`root`, `counter`, exported as `textareaField
 
 `TextField`, `NumberField`, `MoneyField`, and `OtpField` set `autoComplete` / `inputMode` defaults so mobile keyboards and password managers do the right thing without per-field wiring. A default only applies when the consumer sets neither the prop nor its `slotProps.htmlInput` equivalent — an explicit value always wins.
 
-| Component     | Condition                                                             | `autoComplete`  | `inputMode`     |
-| ------------- | --------------------------------------------------------------------- | --------------- | --------------- |
-| `TextField`   | `type="email"`                                                        | `email`         | `email`         |
-| `TextField`   | `type="tel"`                                                          | `tel`           | `tel`           |
-| `TextField`   | `type="url"`                                                          | `url`           | `url`           |
-| `TextField`   | `type="search"`                                                       | — (not guessed) | `search`        |
-| `TextField`   | any other `type` (including no `type`)                                | — (not guessed) | — (not guessed) |
-| `NumberField` | integer-only (no fractional `step`, no `format` with fraction digits) | —               | `numeric`       |
-| `NumberField` | otherwise (fractional `step`, or a `format` with fraction digits)     | —               | `decimal`       |
-| `MoneyField`  | always (currency has cents)                                           | —               | `decimal`       |
-| `OtpField`    | first slot only, from Base UI itself, not duplicated here             | `one-time-code` | `numeric`       |
-| `PhoneField`  | always — set by the field itself, not the `type="tel"` fallback       | `tel`           | `tel`           |
-| `EmailField`  | always — set by the field itself, via its fixed `type="email"`        | `email`         | `email`         |
-| `FeinField`   | always — a tax ID has no autofill token worth guessing                | `off`           | `numeric`       |
+| Component      | Condition                                                             | `autoComplete`  | `inputMode`     |
+| -------------- | --------------------------------------------------------------------- | --------------- | --------------- |
+| `TextField`    | `type="email"`                                                        | `email`         | `email`         |
+| `TextField`    | `type="tel"`                                                          | `tel`           | `tel`           |
+| `TextField`    | `type="url"`                                                          | `url`           | `url`           |
+| `TextField`    | `type="search"`                                                       | — (not guessed) | `search`        |
+| `TextField`    | any other `type` (including no `type`)                                | — (not guessed) | — (not guessed) |
+| `NumberField`  | integer-only (no fractional `step`, no `format` with fraction digits) | —               | `numeric`       |
+| `NumberField`  | otherwise (fractional `step`, or a `format` with fraction digits)     | —               | `decimal`       |
+| `MoneyField`   | always (currency has cents)                                           | —               | `decimal`       |
+| `PercentField` | always (the percent format allows fraction digits)                    | —               | `decimal`       |
+| `OtpField`     | first slot only, from Base UI itself, not duplicated here             | `one-time-code` | `numeric`       |
+| `PhoneField`   | always — set by the field itself, not the `type="tel"` fallback       | `tel`           | `tel`           |
+| `EmailField`   | always — set by the field itself, via its fixed `type="email"`        | `email`         | `email`         |
+| `FeinField`    | always — a tax ID has no autofill token worth guessing                | `off`           | `numeric`       |
 
 `TextField` never guesses a token from `name` — a wrong guess is worse than none, so only these unambiguous `type`s get a default. `PasswordField` covers `autoComplete="current-password"` / `"new-password"` on its own, above. `PhoneField` sets `type="tel"`, `inputMode="tel"` and its `autoComplete` default itself rather than relying on the `type`-derived fallback — the two agree, but the field owns them — and its `autoComplete` takes a sectioned token (`"shipping tel"`, `"work tel"`) for forms with more than one number. `EmailField` fixes `type="email"` (so `inputMode="email"` comes from `TextField`'s own `type` mapping) and defaults `autoComplete` to `'email'`, which likewise takes a sectioned token (`"work email"`). The remaining v8 date/time/address fields (#17–#19) will extend this table.
 
@@ -773,6 +775,30 @@ USD only: digits group as you type (`1234` shows `1,234`) and the field formats 
 ```ts
 const schema = z.object({ price: z.number().min(0) })
 ```
+
+## PercentField
+
+`NumberField` with a percent sign, put through the same `Intl` `format` slot `MoneyField` uses for `$` — so the `%` is part of the formatted value rather than an adornment beside the input, and it is the theme's `EzNumberField` keys that style the field:
+
+```tsx
+const schema = z.object({ rate: z.number().nullable() })
+
+<PercentField name="rate" label="Rate" />
+// user types 12.5 → shows "12.5%" on blur, submits { rate: 12.5 }
+```
+
+`min` defaults to `0`, `max` to `100` and `step` to `1`, all overridable and all in **percentage points**. Digits group while typing exactly as they do on `NumberField`, and the value rounds to the two fraction digits the display carries.
+
+`scale` decides what the stored number means. The default, `'percent'`, stores what it shows. `'fraction'` leaves the display alone and stores the fraction instead, for schemas and APIs that keep rates that way:
+
+```tsx
+<PercentField name="rate" label="Rate" scale="fraction" />
+// user types 12.5 → shows "12.5%", submits { rate: 0.125 }
+```
+
+Only the stored value moves: `min`, `max` and `step` stay in percentage points under either scale, so `max={50}` means 50% and its message still reads `must be at most 50.` — the bound is scaled with the value so the rule fires at all, but the number you wrote is the number the user is told. A consumer `onValueChange` sees the **stored** value, matching what `onSubmit` receives, and an empty field is `null` rather than a scaled zero.
+
+`scale` and the bound/step defaults are settable app-wide through `theme.components.EzPercentField.defaultProps`; a prop on the element always wins.
 
 ## PasswordField
 

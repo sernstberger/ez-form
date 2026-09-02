@@ -22,6 +22,7 @@ import type { ResendCodeButtonProps } from '../fields/OtpField/ResendCodeButton'
 import type { PhoneFieldProps } from '../fields/PhoneField'
 import type { EmailFieldProps } from '../fields/EmailField'
 import type { FeinFieldProps } from '../fields/FeinField'
+import type { PercentFieldProps } from '../fields/PercentField'
 
 declare module '@mui/material/styles' {
   interface ComponentsPropsList {
@@ -51,6 +52,7 @@ declare module '@mui/material/styles' {
     EzPhoneField: Partial<PhoneFieldProps>
     EzEmailField: Partial<EmailFieldProps>
     EzFeinField: Partial<FeinFieldProps>
+    EzPercentField: Partial<PercentFieldProps>
   }
 
   interface ComponentNameToClassKey {
@@ -172,6 +174,12 @@ declare module '@mui/material/styles' {
     // theme-settable.
     EzFeinField?: {
       defaultProps?: ComponentsProps['EzFeinField']
+    }
+    // Renders a `NumberField`, whose own `EzNumberField` style keys reach it,
+    // so this registers `defaultProps` only — that is what makes `scale` and
+    // the bound/step defaults theme-settable.
+    EzPercentField?: {
+      defaultProps?: ComponentsProps['EzPercentField']
     }
   }
 }
