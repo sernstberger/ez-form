@@ -50,7 +50,7 @@ describe('Profile', () => {
   })
 
   it('saves and reports success with the current form values', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const onSuccess = vi.fn()
     render(withPickers(<Profile onSuccess={onSuccess} />))
     await waitForLoaded()
@@ -65,7 +65,7 @@ describe('Profile', () => {
   })
 
   it('shows the mapped disableFuture message for a birthday in the future', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(withPickers(<Profile />))
     await waitForLoaded()
 
@@ -75,7 +75,7 @@ describe('Profile', () => {
   })
 
   it('shows a bio counter as "n / 280"', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(withPickers(<Profile />))
     await waitForLoaded()
 
@@ -89,7 +89,7 @@ describe('Profile', () => {
   })
 
   it('re-syncing values while dirty keeps the dirty field and updates the pristine one', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(withPickers(<Profile />))
     await waitForLoaded()
 

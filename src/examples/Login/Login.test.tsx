@@ -19,7 +19,7 @@ describe('Login', () => {
   })
 
   it('shows a server error alert when the fake API rejects a wrong password', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Login />)
     await user.type(screen.getByLabelText(/email/i), 'ada@example.com')
     await user.type(screen.getByLabelText(/^password/i), LOGIN_BAD_PASSWORD)
@@ -29,7 +29,7 @@ describe('Login', () => {
   })
 
   it('shows a pending state on the submit button while the fake API call is in flight', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Login />)
     await user.type(screen.getByLabelText(/email/i), 'ada@example.com')
     await user.type(screen.getByLabelText(/^password/i), 'correct-horse')
@@ -39,7 +39,7 @@ describe('Login', () => {
   })
 
   it('calls the fake API exactly once with the submitted values for correct credentials', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const onSuccess = vi.fn()
     render(<Login onSuccess={onSuccess} />)
     await user.type(screen.getByLabelText(/email/i), 'ada@example.com')
@@ -51,7 +51,7 @@ describe('Login', () => {
   })
 
   it('is accessible with no error and with a server error shown', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const { container } = render(<Login />)
     await expectNoA11yViolations(container)
     await user.type(screen.getByLabelText(/email/i), 'ada@example.com')

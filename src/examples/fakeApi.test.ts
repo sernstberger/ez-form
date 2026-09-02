@@ -1,5 +1,6 @@
 import {
   delay,
+  fakeApiTiming,
   loginApi,
   LOGIN_BAD_PASSWORD,
   verifyCodeApi,
@@ -16,6 +17,10 @@ import {
 
 describe('fakeApi', () => {
   it('delay resolves after roughly the given ms', async () => {
+    // The global test setup zeroes fakeApiTiming.scale so example tests don't pay
+    // real time; this test is about `delay()`'s own scaling behavior, so it restores
+    // the real (story) scale for its duration.
+    fakeApiTiming.scale = 1
     vi.useFakeTimers()
     const promise = delay(500)
     let resolved = false
@@ -27,6 +32,7 @@ describe('fakeApi', () => {
     await vi.advanceTimersByTimeAsync(1)
     expect(resolved).toBe(true)
     vi.useRealTimers()
+    fakeApiTiming.scale = 0
   })
 
   it('loginApi resolves for any password other than the known-bad one', async () => {

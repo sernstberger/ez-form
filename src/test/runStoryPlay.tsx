@@ -13,7 +13,7 @@ import userEvent from '@testing-library/user-event'
 export async function runStoryPlay(Story: ComponentType & { play?: (...a: never[]) => unknown }) {
   const { container } = render(<Story />)
   const canvas = within(container)
-  const user = userEvent.setup()
+  const user = userEvent.setup({ delay: null })
   await Story.play?.({ canvasElement: container, canvas, userEvent: user } as never)
   return { container, canvas }
 }

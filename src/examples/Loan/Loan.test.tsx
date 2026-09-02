@@ -3,9 +3,6 @@ import userEvent from '@testing-library/user-event'
 import { Loan } from './Loan'
 import { expectNoA11yViolations } from '../../test/axe'
 
-// Multi-step example flows drive many steps through userEvent; CI runners need more than the 5 s default.
-vi.setConfig({ testTimeout: 20_000 })
-
 /** `DateField` renders its own hidden text input, found by `name` (see `DateField.test.tsx`). */
 const hiddenDateInput = (name: string) =>
   document.querySelector<HTMLInputElement>(`input[name="${name}"]`)!
@@ -73,7 +70,7 @@ describe('Loan', () => {
   })
 
   it('shows only the current step’s error summary after a failed Next, and focuses its heading', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Loan />)
     // Clear the loan amount so the Loan step fails validation.
     const amountInput = screen.getByLabelText(/loan amount/i)
@@ -90,7 +87,7 @@ describe('Loan', () => {
   })
 
   it('adds and removes co-applicant rows, moving focus as it does', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Loan />)
     await fillLoanStep(user)
     await next(user)
@@ -109,7 +106,7 @@ describe('Loan', () => {
   })
 
   it('caps co-applicants at 3 rows (Add disabled at the max)', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Loan />)
     await fillLoanStep(user)
     await next(user)
@@ -125,7 +122,7 @@ describe('Loan', () => {
   })
 
   it('reorders employment rows and the payload reflects the new order', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const onSuccess = vi.fn()
     render(<Loan onSuccess={onSuccess} />)
     await fillLoanStep(user)
@@ -151,7 +148,7 @@ describe('Loan', () => {
   })
 
   it('computes the DTI ratio on the review step from watched totals', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     render(<Loan />)
     await fillThroughDebts(user)
     // Documents step: nothing required, move on.
@@ -179,7 +176,7 @@ describe('Loan', () => {
   })
 
   it('declines a high-DTI application and shows the server alert', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const onSuccess = vi.fn()
     render(<Loan onSuccess={onSuccess} />)
     await fillLoanStep(user)
@@ -211,7 +208,7 @@ describe('Loan', () => {
   })
 
   it('submits with valid data, calling the API once with arrays in submitted order', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const onSuccess = vi.fn()
     render(<Loan onSuccess={onSuccess} />)
     await fillThroughDebts(user)
@@ -233,7 +230,7 @@ describe('Loan', () => {
   })
 
   it('is accessible on the Co-applicants step with a row added', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const { container } = render(<Loan />)
     await fillLoanStep(user)
     await next(user)
@@ -245,7 +242,7 @@ describe('Loan', () => {
   })
 
   it('is accessible on the Review step', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const { container } = render(<Loan />)
     await fillThroughDebts(user)
     await next(user) // review
@@ -253,7 +250,7 @@ describe('Loan', () => {
   })
 
   it("is accessible on the Documents step with a co-applicant's own upload present", async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const { container } = render(<Loan />)
     await fillLoanStep(user)
     await next(user)
