@@ -1,0 +1,534 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import Container from '@mui/material/Container'
+import Paper from '@mui/material/Paper'
+import Stack from '@mui/material/Stack'
+import Button from '@mui/material/Button'
+import { z } from 'zod'
+import { useWatch } from 'react-hook-form'
+import { Form, type FormMethods } from '../../Form'
+import { FormError } from '../../FormError'
+import { FormErrorSummary } from '../../Form/FormErrorSummary'
+import { FormSection } from '../../FormSection'
+import { SubmitButton } from '../../SubmitButton'
+import { Wizard, type WizardStepDef } from '../../Wizard'
+import { WizardStep } from '../../Wizard/WizardStep'
+import { WizardStepper } from '../../Wizard/WizardStepper'
+import { WizardNav } from '../../Wizard/WizardNav'
+import { TextField } from '../../fields/TextField'
+import { DateField } from '../../fields/DateField'
+import { RadioGroup } from '../../fields/RadioGroup'
+import { Slider } from '../../fields/Slider'
+import { MoneyField } from '../../fields/MoneyField'
+import { Switch } from '../../fields/Switch'
+import { NumberField } from '../../fields/NumberField'
+import { TextareaField } from '../../fields/TextareaField'
+import { CheckboxGroup } from '../../fields/CheckboxGroup'
+import { FileField } from '../../fields/FileField'
+import { ReadOnlyField } from '../../fields/ReadOnlyField'
+import type { Option } from '../../fields/Option'
+import { submitApplicationApi } from '../fakeApi'
+
+const COVERAGE_TYPES: readonly Option[] = [
+  { value: 'liability', label: 'Liability only' },
+  { value: 'collision', label: 'Collision' },
+  { value: 'comprehensive', label: 'Comprehensive' },
+]
+
+const INCIDENT_OPTIONS: readonly Option[] = [
+  { value: 'accident', label: 'At-fault accident' },
+  { value: 'ticket', label: 'Moving violation' },
+  { value: 'claim', label: 'Prior insurance claim' },
+]
+
+/** README-recommended birthday pattern: `disableFuture` + a sane `minDate` (see Profile). */
+const MIN_BIRTHDAY = new Date(1900, 0, 1)
+
+const vehicleSchema = z.object({
+  make: z.string().min(1, 'Make is required'),
+  model: z.string().min(1, 'Model is required'),
+  year: z.number('Year is required').min(1980, 'Year must be 1980 or later'),
+  plate: z.string().min(1, 'Plate number is required'),
+})
+
+// The base object below keeps `vehicle` optional at the zod level (mirrors Checkout's
+// `optionalAddressSchema`): its fields are only truly required when `hasVehicle` is true,
+// enforced by the `superRefine` below rather than by `vehicleSchema` itself, since the wizard
+// always submits a `vehicle` object (empty when the step was never shown) and the whole schema
+// is what final submit validates.
+const optionalVehicleSchema = z.object({
+  make: z.string(),
+  model: z.string(),
+  year: z.number().nullable(),
+  plate: z.string(),
+})
+
+export const schema = z
+  .object({
+    // Applicant
+    firstName: z.string().min(1, 'First name is required'),
+    lastName: z.string().min(1, 'Last name is required'),
+    birthday: z.date('Birthday is required'),
+    // Contact
+    email: z.email('Invalid email'),
+    phone: z
+      .string()
+      .min(1, 'Phone is required')
+      .regex(/^\d{3}-\d{3}-\d{4}$/, 'Use the format 555-555-5555'),
+    address: z.object({
+      street: z.string().min(1, 'Street address is required'),
+      city: z.string().min(1, 'City is required'),
+      zip: z.string().min(1, 'ZIP code is required'),
+    }),
+    // Coverage
+    coverageType: z.enum(
+      COVERAGE_TYPES.map((o) => o.value as string) as [string, ...string[]],
+      'Choose a coverage type',
+    ),
+    deductible: z.number(),
+    coverageAmount: z.number('Coverage amount is required').min(1, 'Coverage amount is required'),
+    // Vehicle (conditional)
+    hasVehicle: z.boolean(),
+    vehicle: optionalVehicleSchema,
+    // Drivers
+    driver: z.object({
+      name: z.string().min(1, "Primary driver's name is required"),
+      licenseNumber: z.string().min(1, 'License number is required'),
+      licenseDate: z.date('License issue date is required'),
+    }),
+    // History
+    claims: z.string().max(500, 'Keep claim history under 500 characters'),
+    priorIncidents: z.array(z.string()),
+    // Documents
+    documents: z.array(z.instanceof(File)),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.hasVehicle) return
+    const result = vehicleSchema.safeParse(data.vehicle)
+    if (result.success) return
+    for (const issue of result.error.issues) {
+      ctx.addIssue({ ...issue, path: ['vehicle', ...issue.path] })
+    }
+  })
+
+export type Input = z.input<typeof schema>
+
+export const emptyValues: Input = {
+  firstName: '',
+  lastName: '',
+  birthday: null as unknown as Date,
+  email: '',
+  phone: '',
+  address: { street: '', city: '', zip: '' },
+  coverageType: '',
+  deductible: 500,
+  coverageAmount: null as unknown as number,
+  hasVehicle: false,
+  vehicle: { make: '', model: '', year: null as unknown as number, plate: '' },
+  driver: { name: '', licenseNumber: '', licenseDate: null as unknown as Date },
+  claims: '',
+  priorIncidents: [],
+  documents: [],
+}
+
+const STORAGE_KEY = 'ez-form:insurance-resume'
+
+interface SavedState {
+  step: string
+  visited: string[]
+  values: Partial<Input>
+}
+
+function loadSaved(): SavedState | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    return JSON.parse(raw, (key, value) => {
+      if ((key === 'birthday' || key === 'licenseDate') && typeof value === 'string') {
+        return new Date(value)
+      }
+      return value
+    }) as SavedState
+  } catch {
+    return null
+  }
+}
+
+function saveState(state: SavedState) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    // Storage unavailable (private mode, quota) — resume simply won't work this session.
+  }
+}
+
+function clearSaved() {
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch {
+    // Nothing to clear if storage was never available.
+  }
+}
+
+/** Every step's own field paths + the review/document steps that own nothing to validate. */
+const APPLICANT_FIELDS = ['firstName', 'lastName', 'birthday'] as const
+const CONTACT_FIELDS = ['email', 'phone', 'address'] as const
+const COVERAGE_FIELDS = ['coverageType', 'deductible', 'coverageAmount'] as const
+const HAS_VEHICLE_FIELDS = ['hasVehicle'] as const
+const VEHICLE_FIELDS = ['vehicle'] as const
+const DRIVERS_FIELDS = ['driver'] as const
+const HISTORY_FIELDS = ['claims', 'priorIncidents'] as const
+const DOCUMENTS_FIELDS = ['documents'] as const
+
+/**
+ * All 9 steps, always present in `steps` (`Wizard.steps` must be a stable
+ * reference — see `WizardProps.steps`'s own doc — so the vehicle step can't
+ * be spliced in/out on every render). `useInsuranceSteps` below derives the
+ * *effective* list with `useMemo` keyed on `hasVehicle`, memoized so the
+ * reference only changes when the boolean itself changes; the vehicle step
+ * is filtered out of that derived list when `hasVehicle` is false, which
+ * only ever removes it from *navigation and validation*, not from the
+ * `WizardStep` elements below (`WizardStep` no-ops when its `id` isn't the
+ * current step). Ruling: no library primitive removes a step from `steps`
+ * short of building this filtered array ourselves — `onStepChange`/`go`
+ * alone can't stop the stepper from listing/allowing a step, so this is the
+ * least-hacky option; tracked as a request in #80 for a first-class
+ * `WizardStepDef.when` predicate. Cost if wrong: for now every multi-step
+ * conditional-step form must repeat this `useMemo` pattern by hand.
+ */
+const ALL_STEPS = [
+  { id: 'applicant', label: 'Applicant', fields: APPLICANT_FIELDS },
+  { id: 'contact', label: 'Contact', fields: CONTACT_FIELDS },
+  { id: 'coverage', label: 'Coverage', fields: COVERAGE_FIELDS },
+  { id: 'has-vehicle', label: 'Vehicle?', fields: HAS_VEHICLE_FIELDS },
+  { id: 'vehicle', label: 'Vehicle', fields: VEHICLE_FIELDS },
+  { id: 'drivers', label: 'Drivers', fields: DRIVERS_FIELDS },
+  { id: 'history', label: 'History', fields: HISTORY_FIELDS },
+  { id: 'documents', label: 'Documents', fields: DOCUMENTS_FIELDS },
+  { id: 'review', label: 'Review' },
+] as const satisfies WizardStepDef<Input>[]
+
+export function useInsuranceSteps(hasVehicle: boolean): readonly WizardStepDef<Input>[] {
+  return useMemo(
+    () => (hasVehicle ? ALL_STEPS : ALL_STEPS.filter((s) => s.id !== 'vehicle')),
+    [hasVehicle],
+  )
+}
+
+/** Watches the whole form so the parent can persist it (localStorage resume). */
+function WatchValues({ onValues }: { onValues: (values: Partial<Input>) => void }) {
+  const values = useWatch<Input>() as Partial<Input>
+  const json = JSON.stringify(values)
+  useEffect(() => {
+    onValues(JSON.parse(json) as Partial<Input>)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [json])
+  return null
+}
+
+function ApplicantStep() {
+  return (
+    <WizardStep id="applicant">
+      <Stack spacing={2}>
+        <TextField name="firstName" label="First name" autoComplete="given-name" required />
+        <TextField name="lastName" label="Last name" autoComplete="family-name" required />
+        <DateField name="birthday" label="Birthday" disableFuture minDate={MIN_BIRTHDAY} required />
+      </Stack>
+    </WizardStep>
+  )
+}
+
+function ContactStep() {
+  return (
+    <WizardStep id="contact">
+      <Stack spacing={3}>
+        <TextField name="email" label="Email" autoComplete="email" required />
+        <TextField
+          name="phone"
+          label="Phone"
+          autoComplete="tel"
+          pattern={{ value: /^\d{3}-\d{3}-\d{4}$/, message: 'Use the format 555-555-5555' }}
+          required
+        />
+        <FormSection title="Address">
+          <Stack spacing={2}>
+            <TextField
+              name="address.street"
+              label="Street address"
+              autoComplete="street-address"
+              required
+            />
+            <TextField name="address.city" label="City" autoComplete="address-level2" required />
+            <TextField name="address.zip" label="ZIP code" autoComplete="postal-code" required />
+          </Stack>
+        </FormSection>
+      </Stack>
+    </WizardStep>
+  )
+}
+
+function CoverageStep() {
+  return (
+    <WizardStep id="coverage">
+      <Stack spacing={3}>
+        <RadioGroup name="coverageType" label="Coverage type" options={COVERAGE_TYPES} required />
+        <Slider
+          name="deductible"
+          label="Deductible"
+          min={0}
+          max={2000}
+          step={250}
+          marks
+          valueLabelDisplay="auto"
+        />
+        <MoneyField name="coverageAmount" label="Coverage amount" required />
+      </Stack>
+    </WizardStep>
+  )
+}
+
+function HasVehicleStep() {
+  return (
+    <WizardStep id="has-vehicle">
+      <Switch name="hasVehicle" label="Do you want to insure a vehicle?" />
+    </WizardStep>
+  )
+}
+
+function VehicleStep() {
+  return (
+    <WizardStep id="vehicle">
+      <Stack spacing={2}>
+        <TextField name="vehicle.make" label="Make" required />
+        <TextField name="vehicle.model" label="Model" required />
+        <NumberField name="vehicle.year" label="Year" min={1980} max={2100} required />
+        <TextField name="vehicle.plate" label="Plate number" required />
+      </Stack>
+    </WizardStep>
+  )
+}
+
+function DriversStep() {
+  return (
+    <WizardStep id="drivers">
+      <FormSection title="Primary driver">
+        <Stack spacing={2}>
+          <TextField name="driver.name" label="Full name" required />
+          <TextField name="driver.licenseNumber" label="License number" required />
+          <DateField name="driver.licenseDate" label="License issue date" disableFuture required />
+        </Stack>
+      </FormSection>
+    </WizardStep>
+  )
+}
+
+function HistoryStep() {
+  return (
+    <WizardStep id="history">
+      <Stack spacing={3}>
+        <TextareaField
+          name="claims"
+          label="Describe any claims in the last 5 years"
+          maxLength={500}
+        />
+        <CheckboxGroup name="priorIncidents" label="Prior incidents" options={INCIDENT_OPTIONS} />
+      </Stack>
+    </WizardStep>
+  )
+}
+
+function DocumentsStep() {
+  return (
+    <WizardStep id="documents">
+      <FileField name="documents" label="Upload documents" multiple />
+    </WizardStep>
+  )
+}
+
+function ReviewStep({ hasVehicle }: { hasVehicle: boolean }) {
+  return (
+    <WizardStep id="review">
+      <Stack spacing={2}>
+        <FormErrorSummary />
+        <ReadOnlyField name="firstName" editStep="applicant" />
+        <ReadOnlyField name="lastName" editStep="applicant" />
+        <ReadOnlyField name="birthday" editStep="applicant" />
+        <ReadOnlyField name="email" editStep="contact" />
+        <ReadOnlyField name="phone" editStep="contact" />
+        <ReadOnlyField name="address.street" editStep="contact" />
+        <ReadOnlyField name="address.city" editStep="contact" />
+        <ReadOnlyField name="address.zip" editStep="contact" />
+        <ReadOnlyField name="coverageType" options={COVERAGE_TYPES} editStep="coverage" />
+        <ReadOnlyField name="deductible" editStep="coverage" />
+        <ReadOnlyField
+          name="coverageAmount"
+          editStep="coverage"
+          format={(v) =>
+            typeof v === 'number'
+              ? v.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+              : String(v)
+          }
+        />
+        <ReadOnlyField name="hasVehicle" editStep="has-vehicle" />
+        {hasVehicle && (
+          <>
+            <ReadOnlyField name="vehicle.make" editStep="vehicle" />
+            <ReadOnlyField name="vehicle.model" editStep="vehicle" />
+            <ReadOnlyField name="vehicle.year" editStep="vehicle" />
+            <ReadOnlyField name="vehicle.plate" editStep="vehicle" />
+          </>
+        )}
+        <ReadOnlyField name="driver.name" editStep="drivers" />
+        <ReadOnlyField name="driver.licenseNumber" editStep="drivers" />
+        <ReadOnlyField name="driver.licenseDate" editStep="drivers" />
+        <ReadOnlyField name="claims" editStep="history" />
+        <ReadOnlyField name="priorIncidents" options={INCIDENT_OPTIONS} editStep="history" />
+        <ReadOnlyField name="documents" editStep="documents" />
+      </Stack>
+    </WizardStep>
+  )
+}
+
+/** Every step's content, shared by the Horizontal/Vertical/Page stories. */
+export function InsuranceSteps({ hasVehicle }: { hasVehicle: boolean }) {
+  return (
+    <>
+      <ApplicantStep />
+      <ContactStep />
+      <CoverageStep />
+      <HasVehicleStep />
+      {hasVehicle && <VehicleStep />}
+      <DriversStep />
+      <HistoryStep />
+      <DocumentsStep />
+      <ReviewStep hasVehicle={hasVehicle} />
+    </>
+  )
+}
+
+export interface InsuranceProps {
+  orientation?: 'horizontal' | 'vertical'
+  layout?: 'steps' | 'page'
+  /** Called once the fake API resolves with the submitted application. */
+  onSuccess?: (result: { applicationId: string }) => void
+  /**
+   * The manual precursor of #65 (assisted mode): `autoComplete="off"` on the
+   * form, `confirm`/`guard` off, so an internal agent filling this out on
+   * behalf of someone else doesn't get their own autofill offered and isn't
+   * slowed by a confirm dialog. Renders as a single `layout="page"` form.
+   */
+  agentMode?: boolean
+}
+
+/**
+ * Fifth rung of the example ladder (#56): a 9-step wizard with a conditional
+ * step (Vehicle, shown only when "has vehicle?" is Yes), resumable from
+ * localStorage, and a Review step with per-field Edit links. Documentation
+ * only — not exported from the package (see `tsconfig.build.json`'s
+ * `src/examples` exclusion).
+ */
+export function Insurance({
+  orientation = 'horizontal',
+  layout: layoutProp = 'steps',
+  onSuccess,
+  agentMode = false,
+}: InsuranceProps) {
+  // The manual precursor of #65's "pairs with Wizard layout=page" acceptance bullet: agent
+  // mode always renders as one page, regardless of `layout`.
+  const layout = agentMode ? 'page' : layoutProp
+  const saved = useMemo(() => (agentMode ? null : loadSaved()), [agentMode])
+  const [step, setStep] = useState(saved?.step ?? 'applicant')
+  const [visited, setVisited] = useState<readonly string[]>(saved?.visited ?? ['applicant'])
+  const [values, setValues] = useState<Partial<Input>>(saved?.values ?? emptyValues)
+  const hasVehicle = Boolean(values.hasVehicle)
+  const steps = useInsuranceSteps(hasVehicle)
+  // `defaultValues` only seeds hookform once, at mount; "Start over" needs the already-mounted
+  // form to actually reset, so it goes through the form methods (see Profile's own `form` ref
+  // for the same reasoning) rather than relying on this state change alone.
+  const form = useRef<FormMethods<Input, z.output<typeof schema>>>(null)
+  // A pristine session (still on the first step, nothing visited beyond it, no value changed
+  // from `emptyValues`) has no progress worth resuming — treating it as "nothing to save"
+  // rather than always persisting means "Start over" (which produces exactly this state) never
+  // races its own `clearSaved()` against this effect's next run; see `form.reset` below, which
+  // triggers one more `WatchValues` → `setValues` cycle after the state setters here already
+  // fired, so a ref-based "skip the next save" flag can't reliably target the right run.
+  const isPristine =
+    step === 'applicant' &&
+    visited.length === 1 &&
+    visited[0] === 'applicant' &&
+    JSON.stringify(values) === JSON.stringify(emptyValues)
+
+  useEffect(() => {
+    if (agentMode) return
+    if (isPristine) {
+      clearSaved()
+      return
+    }
+    saveState({ step, visited: [...visited], values })
+  }, [agentMode, isPristine, step, visited, values])
+
+  function startOver() {
+    setStep('applicant')
+    setVisited(['applicant'])
+    setValues(emptyValues)
+    form.current?.reset(emptyValues)
+  }
+
+  return (
+    <Container maxWidth="sm" sx={{ py: 6 }}>
+      <Paper variant="outlined" sx={{ p: 4 }}>
+        <Form
+          ref={form}
+          schema={schema}
+          defaultValues={values}
+          autoComplete={agentMode ? 'off' : undefined}
+          title="Auto insurance application"
+          description="Fields marked with * are required."
+          confirm={agentMode ? undefined : { title: 'Submit application?' }}
+          guard={!agentMode}
+          mode={agentMode ? 'onSubmit' : undefined}
+          onSubmit={async (submitted, form) => {
+            try {
+              const result = await submitApplicationApi(submitted)
+              form.clearErrors('root.server')
+              clearSaved()
+              onSuccess?.(result)
+            } catch (error) {
+              form.setError('root.server', {
+                message: error instanceof Error ? error.message : 'Submission failed',
+              })
+            }
+          }}
+        >
+          <Stack spacing={3}>
+            <FormError />
+            <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
+              <Button type="button" variant="text" onClick={startOver}>
+                Start over
+              </Button>
+            </Stack>
+            <WatchValues onValues={setValues} />
+            {layout === 'page' ? (
+              <Wizard steps={steps} layout="page">
+                <InsuranceSteps hasVehicle={hasVehicle} />
+                <SubmitButton>Submit application</SubmitButton>
+              </Wizard>
+            ) : (
+              <Wizard
+                steps={steps}
+                orientation={orientation}
+                step={step}
+                onStepChange={(s) => setStep(s.id)}
+                visited={visited}
+                onVisitedChange={setVisited}
+              >
+                <WizardStepper />
+                <InsuranceSteps hasVehicle={hasVehicle} />
+                <WizardNav submitLabel="Submit application" />
+              </Wizard>
+            )}
+          </Stack>
+        </Form>
+      </Paper>
+    </Container>
+  )
+}

@@ -1,0 +1,291 @@
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { Insurance } from './Insurance'
+import { APPLICATION_DECLINED_FOR } from '../fakeApi'
+import { expectNoA11yViolations } from '../../test/axe'
+import { withPickers } from '../../test/pickers'
+
+const STORAGE_KEY = 'ez-form:insurance-resume'
+
+/** DateField renders its own hidden text input, found by `name` (see DateField.test.tsx). */
+const hiddenInput = (name: string) =>
+  document.querySelector<HTMLInputElement>(`input[name="${name}"]`)!
+const typeDate = (name: string, text: string) =>
+  fireEvent.change(hiddenInput(name), { target: { value: text } })
+
+async function goNext(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: /^next$/i }))
+}
+
+async function fillApplicant(user: ReturnType<typeof userEvent.setup>, firstName = 'Ada') {
+  await user.type(screen.getByLabelText(/first name/i), firstName)
+  await user.type(screen.getByLabelText(/last name/i), 'Lovelace')
+  typeDate('birthday', '01/01/1985')
+  await goNext(user)
+}
+
+async function fillContact(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
+  await user.type(screen.getByLabelText(/^phone/i), '555-555-5555')
+  const address = screen.getByRole('group', { name: 'Address' })
+  await user.type(within(address).getByLabelText(/street address/i), '1 Analytical Way')
+  await user.type(within(address).getByLabelText(/^city/i), 'London')
+  await user.type(within(address).getByLabelText(/zip code/i), 'SW1A1AA')
+  await goNext(user)
+}
+
+async function fillCoverage(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('radio', { name: 'Liability only' }))
+  await user.type(screen.getByLabelText(/coverage amount/i), '10000')
+  await goNext(user)
+}
+
+async function skipVehicle(user: ReturnType<typeof userEvent.setup>) {
+  // hasVehicle defaults to false: Next goes straight to Drivers.
+  await goNext(user)
+}
+
+async function takeVehicle(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('switch', { name: /insure a vehicle/i }))
+  await goNext(user)
+}
+
+async function fillVehicle(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText(/^make/i), 'Toyota')
+  await user.type(screen.getByLabelText(/^model/i), 'Corolla')
+  await user.type(screen.getByLabelText(/^year/i), '2020')
+  await user.type(screen.getByLabelText(/plate number/i), 'ABC123')
+  await goNext(user)
+}
+
+async function fillDrivers(user: ReturnType<typeof userEvent.setup>) {
+  const drivers = screen.getByRole('group', { name: 'Primary driver' })
+  await user.type(within(drivers).getByLabelText(/full name/i), 'Ada Lovelace')
+  await user.type(within(drivers).getByLabelText(/license number/i), 'D1234567')
+  typeDate('driver.licenseDate', '01/01/2010')
+  await goNext(user)
+}
+
+async function fillHistory(user: ReturnType<typeof userEvent.setup>) {
+  await goNext(user)
+}
+
+async function fillDocuments(user: ReturnType<typeof userEvent.setup>) {
+  await goNext(user)
+}
+
+/** Fills every step from Applicant through Documents, landing on Review. `vehicle: true` also takes the conditional Vehicle step. */
+async function fillThroughReview(
+  user: ReturnType<typeof userEvent.setup>,
+  { vehicle = false, firstName = 'Ada' }: { vehicle?: boolean; firstName?: string } = {},
+) {
+  await fillApplicant(user, firstName)
+  await fillContact(user)
+  await fillCoverage(user)
+  if (vehicle) {
+    await takeVehicle(user)
+    await fillVehicle(user)
+  } else {
+    await skipVehicle(user)
+  }
+  await fillDrivers(user)
+  await fillHistory(user)
+  await fillDocuments(user)
+}
+
+beforeEach(() => {
+  localStorage.clear()
+})
+
+describe('Insurance', () => {
+  it('has an accessible form name "Auto insurance application"', () => {
+    render(withPickers(<Insurance />))
+    expect(screen.getByRole('form', { name: 'Auto insurance application' })).toBeInTheDocument()
+  })
+
+  it('renders exactly one named group per step, with aria-current="step" on the stepper', async () => {
+    const user = userEvent.setup()
+    render(withPickers(<Insurance />))
+    expect(screen.getByRole('group', { name: 'Applicant' })).toBeInTheDocument()
+    const current = screen.getByRole('tab', { name: /Applicant/ })
+    expect(current).toHaveAttribute('aria-current', 'step')
+
+    await fillApplicant(user)
+    expect(screen.getByRole('group', { name: 'Contact' })).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Applicant' })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /Contact/ })).toHaveAttribute('aria-current', 'step')
+  })
+
+  it('skips the Vehicle step when "has vehicle?" is No (the default)', async () => {
+    const user = userEvent.setup()
+    render(withPickers(<Insurance />))
+    await fillApplicant(user)
+    await fillContact(user)
+    await fillCoverage(user)
+    // On the has-vehicle step, still unchecked (default false).
+    expect(screen.getByRole('group', { name: 'Vehicle?' })).toBeInTheDocument()
+    await goNext(user)
+    // Next from has-vehicle (false) lands on Drivers, not Vehicle.
+    expect(screen.getByRole('group', { name: 'Primary driver' })).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: /^Vehicle$/ })).not.toBeInTheDocument()
+  })
+
+  it('shows the Vehicle step when "has vehicle?" is Yes', async () => {
+    const user = userEvent.setup()
+    render(withPickers(<Insurance />))
+    await fillApplicant(user)
+    await fillContact(user)
+    await fillCoverage(user)
+    await user.click(screen.getByRole('switch', { name: /insure a vehicle/i }))
+    await goNext(user)
+    expect(screen.getByRole('group', { name: 'Vehicle' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /^Vehicle$/ })).toBeInTheDocument()
+  })
+
+  it('lists every value on the Review step, with a working Edit link back to its step', async () => {
+    const user = userEvent.setup()
+    render(withPickers(<Insurance />))
+    await fillThroughReview(user, { vehicle: true })
+    const review = screen.getByRole('group', { name: 'Review' })
+    expect(within(review).getByText('Ada')).toBeInTheDocument()
+    expect(within(review).getByText('Lovelace')).toBeInTheDocument()
+    expect(within(review).getByText('ada@example.com')).toBeInTheDocument()
+    expect(within(review).getByText('Toyota')).toBeInTheDocument()
+
+    await user.click(within(review).getByRole('button', { name: /edit first name/i }))
+    expect(screen.getByRole('group', { name: 'Applicant' })).toBeInTheDocument()
+    expect(screen.getByLabelText(/first name/i)).toHaveValue('Ada')
+  })
+
+  it('shows the error summary listing step-owned fields on a failed final submit', async () => {
+    const user = userEvent.setup()
+    render(withPickers(<Insurance />))
+    // Reach Review with "has vehicle?" still No, then flip it on via the Edit link (backward
+    // nav skips validation) without ever visiting/filling the newly-shown Vehicle step: the
+    // whole schema is only checked on final submit, so this is the realistic way an
+    // otherwise-valid wizard reaches Review with an invalid field (see Wizard's own
+    // `fields`-ownership doc: a field listed in no *visited* step is caught at submit). Since
+    // the resulting submit is invalid, <Form confirm> never asks — the error summary appears
+    // directly, with no confirm dialog in between.
+    await fillThroughReview(user)
+    const review = screen.getByRole('group', { name: 'Review' })
+    await user.click(within(review).getByRole('button', { name: /edit has vehicle/i }))
+    await user.click(screen.getByRole('switch', { name: /insure a vehicle/i }))
+    await user.click(screen.getByRole('tab', { name: /Review/ }))
+    await user.click(screen.getByRole('button', { name: /submit application/i }))
+    await screen.findByRole('heading', { name: /there is a problem/i })
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    // No `href` on this summary item: the field it points at (on the now-hidden Vehicle step)
+    // isn't rendered, so `fieldElementId` never resolves one and the link has no accessible
+    // `link` role — see FormErrorSummary's `fieldElementId` doc. The text is still shown.
+    expect(screen.getByText(/make is required/i)).toBeInTheDocument()
+  })
+
+  it('resumes from localStorage after a remount: step and values are restored', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(withPickers(<Insurance />))
+    await fillApplicant(user)
+    await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
+    await waitFor(() => expect(localStorage.getItem(STORAGE_KEY)).toBeTruthy())
+    unmount()
+
+    render(withPickers(<Insurance />))
+    expect(screen.getByRole('group', { name: 'Contact' })).toBeInTheDocument()
+    expect(screen.getByLabelText(/^email/i)).toHaveValue('ada@example.com')
+    // Going back confirms the earlier step's values also survived.
+    await user.click(screen.getByRole('button', { name: /^back$/i }))
+    expect(screen.getByLabelText(/first name/i)).toHaveValue('Ada')
+  })
+
+  it('"Start over" clears localStorage and resets to the first step with empty values', async () => {
+    const user = userEvent.setup()
+    render(withPickers(<Insurance />))
+    await fillApplicant(user)
+    await waitFor(() => expect(localStorage.getItem(STORAGE_KEY)).toBeTruthy())
+    await user.click(screen.getByRole('button', { name: /start over/i }))
+    expect(screen.getByRole('group', { name: 'Applicant' })).toBeInTheDocument()
+    expect(screen.getByLabelText(/first name/i)).toHaveValue('')
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
+  })
+
+  it('submits and reports a server error for a declined application', async () => {
+    const user = userEvent.setup()
+    render(withPickers(<Insurance />))
+    await fillThroughReview(user, { firstName: APPLICATION_DECLINED_FOR })
+    await user.click(screen.getByRole('button', { name: /submit application/i }))
+    const dialog = await screen.findByRole('alertdialog', { name: /submit application\?/i })
+    await user.click(within(dialog).getByRole('button', { name: /^confirm$/i }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/could not process/i)
+  })
+
+  it('submits successfully and clears saved resume state', async () => {
+    const user = userEvent.setup()
+    const onSuccess = vi.fn()
+    render(withPickers(<Insurance onSuccess={onSuccess} />))
+    await fillThroughReview(user)
+    await waitFor(() => expect(localStorage.getItem(STORAGE_KEY)).toBeTruthy())
+    await user.click(screen.getByRole('button', { name: /submit application/i }))
+    const dialog = await screen.findByRole('alertdialog', { name: /submit application\?/i })
+    await user.click(within(dialog).getByRole('button', { name: /^confirm$/i }))
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1))
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
+  })
+
+  describe('page layout', () => {
+    it('renders every step as a named group with valid heading order, and is axe-clean', async () => {
+      const { container } = render(withPickers(<Insurance layout="page" />))
+      ;[
+        'Applicant',
+        'Contact',
+        'Coverage',
+        'Vehicle?',
+        'Primary driver',
+        'History',
+        'Documents',
+        'Review',
+      ].forEach((name) => {
+        expect(screen.getByRole('group', { name })).toBeInTheDocument()
+      })
+      // page layout has no stepper/nav chrome.
+      expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+      await expectNoA11yViolations(container)
+    })
+  })
+
+  describe('agent mode', () => {
+    it('has autoComplete off, renders one page, and shows every error after one submit', async () => {
+      const user = userEvent.setup()
+      render(withPickers(<Insurance agentMode />))
+      const form = screen.getByRole('form', { name: 'Auto insurance application' })
+      expect(form).toHaveAttribute('autocomplete', 'off')
+      expect(screen.getByRole('group', { name: 'Applicant' })).toBeInTheDocument()
+      expect(screen.getByRole('group', { name: 'Review' })).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: /submit application/i }))
+      // No confirm dialog in agent mode.
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+      expect((await screen.findAllByText(/first name is required/i)).length).toBeGreaterThan(0)
+      expect((await screen.findAllByText(/is required/i)).length).toBeGreaterThan(1)
+    })
+  })
+
+  it('is accessible on the Applicant step', async () => {
+    const { container } = render(withPickers(<Insurance />))
+    await expectNoA11yViolations(container)
+  })
+
+  it('is accessible on the Coverage step', async () => {
+    const user = userEvent.setup()
+    const { container } = render(withPickers(<Insurance />))
+    await fillApplicant(user)
+    await fillContact(user)
+    await expectNoA11yViolations(container)
+  })
+
+  it('is accessible on the Review step', async () => {
+    const user = userEvent.setup()
+    const { container } = render(withPickers(<Insurance />))
+    await fillThroughReview(user, { vehicle: true })
+    await expectNoA11yViolations(container)
+  })
+})
