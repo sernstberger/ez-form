@@ -5,6 +5,9 @@ import { APPLICATION_DECLINED_FOR } from '../fakeApi'
 import { expectNoA11yViolations } from '../../test/axe'
 import { withPickers } from '../../test/pickers'
 
+// Multi-step example flows drive many steps through userEvent; CI runners need more than the 5 s default.
+vi.setConfig({ testTimeout: 20_000 })
+
 const STORAGE_KEY = 'ez-form:insurance-resume'
 
 /** DateField renders its own hidden text input, found by `name` (see DateField.test.tsx). */

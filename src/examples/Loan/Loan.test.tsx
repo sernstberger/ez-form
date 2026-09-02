@@ -3,6 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { Loan } from './Loan'
 import { expectNoA11yViolations } from '../../test/axe'
 
+// Multi-step example flows drive many steps through userEvent; CI runners need more than the 5 s default.
+vi.setConfig({ testTimeout: 20_000 })
+
 /** `DateField` renders its own hidden text input, found by `name` (see `DateField.test.tsx`). */
 const hiddenDateInput = (name: string) =>
   document.querySelector<HTMLInputElement>(`input[name="${name}"]`)!

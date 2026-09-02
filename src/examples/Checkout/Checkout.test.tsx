@@ -4,6 +4,9 @@ import { Checkout } from './Checkout'
 import { DECLINED_CARD_NUMBER } from '../fakeApi'
 import { expectNoA11yViolations } from '../../test/axe'
 
+// Multi-step example flows drive many steps through userEvent; CI runners need more than the 5 s default.
+vi.setConfig({ testTimeout: 20_000 })
+
 async function fillShipping(user: ReturnType<typeof userEvent.setup>) {
   const shipping = screen.getByRole('group', { name: 'Shipping address' })
   await user.type(within(shipping).getByLabelText(/full name/i), 'Ada Lovelace')
