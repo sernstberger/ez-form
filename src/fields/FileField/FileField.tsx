@@ -39,6 +39,8 @@ const FileFieldList = styled(Stack, { name: 'EzFileField', slot: 'FileList' })((
 
 export type FileFieldValue = File | null | File[]
 
+type PickerButtonProps = Omit<ButtonProps<'label'>, 'component' | 'htmlFor' | 'children' | 'role'>
+
 export type FileFieldProps = {
   name: string
   /** The button text, and the input's accessible name. */
@@ -49,8 +51,18 @@ export type FileFieldProps = {
   accept?: string
   /** Store `File[]` instead of `File | null`. */
   multiple?: boolean
-  /** Props for the MUI Button (`variant`, `color`, `size`, `startIcon`, …). */
-  buttonProps?: Omit<ButtonProps<'label'>, 'component' | 'htmlFor' | 'children' | 'role'>
+  /**
+   * @deprecated Use `slotProps.button` instead. Unlike this prop, `slotProps.button` is
+   * merged key-by-key against `theme.components.EzFileField.defaultProps.slotProps.button`
+   * (MUI's `resolveProps`), so a theme default and a per-instance override compose. This
+   * prop is a flat object a theme can never reach into — kept only so existing callers
+   * keep working; it is applied before `slotProps.button` and is overridden by it key for key.
+   */
+  buttonProps?: PickerButtonProps
+  slotProps?: {
+    /** Props for the picker's MUI Button (`variant`, `color`, `size`, `startIcon`, …). */
+    button?: PickerButtonProps
+  }
   /**
    * Runs after the form's handler on every value change: a pick of at least
    * one file (a cancelled dialog changes nothing), or a chip's delete click.
@@ -72,6 +84,7 @@ export function FileField(inProps: FileFieldProps) {
     accept,
     multiple,
     buttonProps,
+    slotProps,
     onChange,
     required,
     validate,
@@ -89,10 +102,14 @@ export function FileField(inProps: FileFieldProps) {
     onChange?.(event, value)
   }
 
-  // Slot default (see ConfirmDialog's `confirmProps`): the literal lives in a JS object,
-  // not a JSX attribute, so `theme.components.MuiButton.defaultProps` (or a consumer's
-  // own `buttonProps.variant`) still overrides it — see #62.
-  const pickerButtonProps = { variant: 'outlined' as const, ...buttonProps }
+  // Slot default (see ConfirmDialog's `confirmProps`): `slotProps.button` is what
+  // `useDefaultProps`/`resolveProps` deep-merges key-by-key against
+  // `theme.components.EzFileField.defaultProps.slotProps.button` — a flat prop like
+  // the deprecated `buttonProps` is only ever wholesale-replaced-or-ignored, never
+  // merged, so it cannot carry a themeable default. `variant: 'outlined'` here is the
+  // library fallback and loses to any key `slotProps.button` (theme or instance)
+  // supplies — see #62.
+  const pickerButtonProps = { variant: 'outlined' as const, ...buttonProps, ...slotProps?.button }
 
   return (
     <FormControl
