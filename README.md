@@ -4,7 +4,7 @@ MUI + react-hook-form + zod, wired together so you write plain JSX.
 
 ```tsx
 import { z } from 'zod'
-import { Form, TextField, Select, Autocomplete, RadioGroup, NumberField, Checkbox, Switch, SubmitButton } from 'ez-form'
+import { Form, TextField, Select, Autocomplete, RadioGroup, NumberField, MoneyField, Checkbox, Switch, SubmitButton } from 'ez-form'
 
 const schema = z.object({
   email: z.email({ error: (iss) => (iss.input === '' ? 'Email is required' : 'Invalid email') }),
@@ -57,6 +57,7 @@ Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >
 | `RadioGroup`   | MUI `RadioGroup`       | `name`, `label` (legend), `options: readonly Option[]`, `helperText?`; rules `required`, `validate`. The form value keeps the option's type          |
 | `Autocomplete` | MUI `Autocomplete`     | `name`, `options`, `getOptionValue?` (default `o => o.value`; return `o` to store objects), `multiple`, `freeSolo`, `textFieldProps?`; all TextField rules. Options may carry extra fields (they reach `onChange`) |
 | `NumberField`  | Base UI `NumberField` in MUI's outlined style | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max` (also the stepper bounds), `validate`. Value is `number \| null` |
+| `MoneyField`   | `NumberField` pinned to USD | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max`, `validate`. Value is a `number` in dollars; shows `$1,234.50` on blur |
 | `Checkbox`     | MUI `Checkbox`         | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                        |
 | `Switch`       | MUI `Switch`           | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                        |
 | `SubmitButton` | MUI `Button`           | `loading` while submitting, disabled while the form is                                                                                              |
@@ -114,7 +115,7 @@ Every field also takes hookform-style rules as props. A bare value gets a messag
 | rule                      | fields                          | default message                                                                       |
 | ------------------------- | -------------------------------- | ------------------------------------------------------------------------------------- |
 | `required`                | all                               | `<label> is required.` (also renders the asterisk)                                    |
-| `min` / `max`             | TextField, Select, Autocomplete, NumberField | `<label> must be at least/most <value>.` Numbers, or date strings (compared as dates) |
+| `min` / `max`             | TextField, Select, Autocomplete, NumberField, MoneyField | `<label> must be at least/most <value>.` Numbers, or date strings (compared as dates) |
 | `minLength` / `maxLength` | TextField, Select, Autocomplete   | `<label> must be at least/most <value> characters.`                                   |
 | `pattern`                 | TextField, Select, Autocomplete   | `<label> is invalid.`                                                                 |
 | `validate`                | all                               | a returned string; `false` gives `<label> is invalid.`                                |
@@ -140,6 +141,18 @@ Address lookup (Places-style): the options list is fed by an async lookup, and t
 ```
 
 The form stores the address string (`z.string()`); `placeId` reaches `onChange` but isn't stored. For objects in form state use `getOptionValue={(o) => o}` and a `z.object` schema.
+
+## MoneyField
+
+USD only: digits group as you type (`1234` shows `1,234`) and the field formats to `$1,234.50` on blur. The form value is always a plain `number` in dollars — never cents, never a string.
+
+```tsx
+<MoneyField name="price" label="Price" min={0} />
+```
+
+```ts
+const schema = z.object({ price: z.number().min(0) })
+```
 
 ## Develop
 
