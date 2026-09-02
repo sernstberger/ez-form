@@ -9,6 +9,7 @@ import { useEzField } from '../useEzField'
 import { mergeDisabled } from '../mergeDisabled'
 import type { Option } from '../Option'
 import type { FieldRules } from '../../rules'
+import { warnDuplicateOptions } from '../../devWarn'
 
 /**
  * What the form stores: one value (or null), or an array under `multiple`;
@@ -95,6 +96,8 @@ export function Autocomplete<
   optionalText,
   ...rest
 }: AutocompleteProps<TOption, TValue, Multiple, FreeSolo>) {
+  warnDuplicateOptions('Autocomplete', name, options)
+
   type FormValue = AutocompleteFormValue<TValue, Multiple, FreeSolo>
   type MuiValue = AutocompleteValue<TOption, Multiple, false, FreeSolo>
 
@@ -102,6 +105,10 @@ export function Autocomplete<
     label,
     rules: { required, min, max, minLength, maxLength, pattern, validate },
     optionalText,
+    // The name may be on the rendered input rather than on Autocomplete itself.
+    // Read, not destructured: `rest` and `textFieldProps` still carry them onward.
+    'aria-label': rest['aria-label'] ?? textFieldProps?.['aria-label'],
+    'aria-labelledby': rest['aria-labelledby'] ?? textFieldProps?.['aria-labelledby'],
   })
 
   // form → MUI: find the option for a stored value. When it is not in the

@@ -3,6 +3,7 @@ import { useController, type UseControllerReturn } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
 import { useRequiredIndicator } from '../Form/RequiredIndicatorContext'
 import { isRequired, normalizeRules, type FieldRules } from '../rules'
+import { warnMissingLabel } from '../devWarn'
 
 export interface UseEzFieldOptions<TValue = unknown> {
   /** The field's label; when it is a string it names the field in default rule messages. */
@@ -14,6 +15,14 @@ export interface UseEzFieldOptions<TValue = unknown> {
    * Ignored (and never appended) for a required field or in `asterisk` mode.
    */
   optionalText?: ReactNode | false
+  /**
+   * Not used for rendering — the field passes its own `aria-label` /
+   * `aria-labelledby` straight to the control. They are reported here only so the
+   * dev-mode "no accessible name" warning can see that a label-less field is named
+   * some other way. See `src/devWarn.ts`.
+   */
+  'aria-label'?: string
+  'aria-labelledby'?: string
 }
 
 /** For the real `<input>` (or the radiogroup). `aria-invalid` is omitted when valid. */
@@ -66,10 +75,17 @@ export type UseEzFieldReturn = UseControllerReturn & {
 export function useEzField<TValue = unknown>(
   name: string,
   componentName: string,
-  { label, rules = {}, optionalText: optionalTextOverride }: UseEzFieldOptions<TValue> = {},
+  {
+    label,
+    rules = {},
+    optionalText: optionalTextOverride,
+    'aria-label': ariaLabel,
+    'aria-labelledby': ariaLabelledBy,
+  }: UseEzFieldOptions<TValue> = {},
 ): UseEzFieldReturn {
   // Guard only: inside <Form>'s FormProvider, useController reads control from context.
   useEzFormContext(componentName)
+  warnMissingLabel(componentName, name, label, ariaLabel, ariaLabelledBy)
   const { requiredIndicator, optionalText: formOptionalText } = useRequiredIndicator()
   const normalized = normalizeRules(rules, typeof label === 'string' ? label : undefined)
   const controller = useController({ name, rules: normalized })

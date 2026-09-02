@@ -38,6 +38,9 @@ export function Checkbox({
       rules={{ required, validate }}
       optionalText={optionalText}
       labelAs="control"
+      // Read, not destructured: both still reach the control through `rest`.
+      aria-label={rest['aria-label']}
+      aria-labelledby={rest['aria-labelledby']}
       renderControl={({ field, required: isRequired, inputA11y }) => (
         <MuiCheckbox
           {...rest}

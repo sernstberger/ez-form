@@ -79,6 +79,9 @@ export function NumberField({
     label,
     rules: { required, min, max, validate },
     optionalText,
+    // Read, not destructured: both still reach the control through `rest`.
+    'aria-label': rest['aria-label'],
+    'aria-labelledby': rest['aria-labelledby'],
   })
   const text = f.helperText(helperText)
 

@@ -7,6 +7,7 @@ import { FieldFrame } from '../FieldFrame'
 import { mergeDisabled } from '../mergeDisabled'
 import type { Option } from '../Option'
 import type { FieldRules } from '../../rules'
+import { warnDuplicateOptions } from '../../devWarn'
 
 type Value = Option['value']
 
@@ -46,6 +47,7 @@ export function ToggleButtonGroup({
   onBlur,
   ...rest
 }: ToggleButtonGroupProps) {
+  warnDuplicateOptions('ToggleButtonGroup', name, options)
   return (
     <FieldFrame<Value | null | Value[]>
       componentName="ToggleButtonGroup"
@@ -56,6 +58,9 @@ export function ToggleButtonGroup({
       rules={{ required, validate }}
       optionalText={optionalText}
       labelAs="legend"
+      // Read, not destructured: both still reach the control through `rest`.
+      aria-label={rest['aria-label']}
+      aria-labelledby={rest['aria-labelledby']}
       renderControl={({ field, inputA11y, labelId }) => (
         <MuiToggleButtonGroup
           {...rest}

@@ -5,6 +5,7 @@ import FormGroup, { type FormGroupProps } from '@mui/material/FormGroup'
 import { FieldFrame } from '../FieldFrame'
 import type { Option } from '../Option'
 import type { FieldRules } from '../../rules'
+import { warnDuplicateOptions } from '../../devWarn'
 
 type Value = Option['value']
 
@@ -45,6 +46,7 @@ export function CheckboxGroup({
   onBlur,
   ...rest
 }: CheckboxGroupProps) {
+  warnDuplicateOptions('CheckboxGroup', name, options)
   return (
     <FieldFrame<Value[]>
       componentName="CheckboxGroup"
@@ -55,6 +57,9 @@ export function CheckboxGroup({
       rules={{ required, validate }}
       optionalText={optionalText}
       labelAs="legend"
+      // Read, not destructured: both still reach the control through `rest`.
+      aria-label={rest['aria-label']}
+      aria-labelledby={rest['aria-labelledby']}
       renderControl={({ field, inputA11y, labelId }) => {
         const selected: Value[] = Array.isArray(field.value) ? field.value : []
         return (

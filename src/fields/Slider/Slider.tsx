@@ -109,6 +109,9 @@ export function Slider({
         },
       }}
       labelAs="legend"
+      // Read, not destructured: it still reaches MuiSlider through `rest`.
+      // No `aria-labelledby`: SliderProps omits it (the frame's legend owns it).
+      aria-label={rest['aria-label']}
       renderControl={({ field, inputA11y, labelId }) => (
         <MuiSlider
           {...rest}

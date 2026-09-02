@@ -687,6 +687,42 @@ A meter bound to a password field's live value, read with `useWatch` like `ReadO
 
 Themeable under `EzPasswordStrength` (`defaultProps`, `styleOverrides` for `root` | `bar` | `label`), exported as `passwordStrengthClasses`.
 
+## Developer warnings
+
+Three mistakes leave a form that renders and submits perfectly while quietly failing the
+people using it. There is nothing to throw on and nothing a type can catch, so ez-form
+writes them to the console in development:
+
+| Warning                                                          | Fires when                                                                                                            | Why it matters                                                                                        |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `<Field name="…"> has no accessible name`                        | a field mounts with no `label`, `aria-label` or `aria-labelledby`                                                     | a screen-reader user hears an unlabelled edit box; axe reports it, but only if you run axe            |
+| `<Field name="…"> has duplicate option values`                   | `Select`, `RadioGroup`, `Autocomplete`, `ToggleButtonGroup` or `CheckboxGroup` gets two options with the same `value` | the duplicates collapse: two radios look checked at once, and a `Select` shows the wrong label        |
+| `<Wizard> step "…" lists field(s) … that the form does not know` | a step's `fields` names something absent from the schema and the values                                               | `trigger` on an unknown name returns valid, so **Next** advances past the field you meant to validate |
+
+Each fires **once per mistake** (keyed on the component and field name), so a field
+re-rendering on every keystroke reports once, while two different fields with the same
+problem both get reported.
+
+The last one is deliberately narrow: it asks whether the form _knows_ the name, not whether
+the field is mounted right now. Listing an unmounted field is normal and correct — that is
+exactly how [conditional fields](#conditional-fields) validate, and how a step naming an
+empty `FieldArray` validates the array-level schema. Only a name the form has never heard of
+— a typo, or a field renamed on one side only — warns.
+
+### Silencing them
+
+Fix the cause; there is no mute. A field genuinely named somewhere ez-form cannot see (a
+label rendered by a wrapper, say) should say so with `aria-labelledby`, which is both the fix
+and the thing that makes the warning stop.
+
+### They cost nothing in production
+
+Every warning sits behind a module-level `const isDev = process.env.NODE_ENV !== 'production'`.
+Bundlers substitute that expression before dead-code elimination, so a production build drops
+the call sites _and_ the message strings — no runtime check, no bytes. This is the same
+mechanism React uses for its own development warnings, and it requires nothing of you beyond
+building for production the way you already do.
+
 ## Develop
 
 ```bash

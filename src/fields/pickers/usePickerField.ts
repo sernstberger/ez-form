@@ -52,6 +52,9 @@ interface PickerHandlers<
  * `TSlotProps` only guarantees `textField?: object`, so read them through this.
  */
 interface ConsumerTextFieldSlotProps {
+  /** A label-less picker is named here, not on the picker itself. */
+  'aria-label'?: string
+  'aria-labelledby'?: string
   onBlur?: (event: FocusEvent<HTMLDivElement>) => void
   slotProps?: Record<string, unknown> & {
     formHelperText?: object
@@ -173,6 +176,7 @@ export function usePickerField<
     })
   }
   const labelText = typeof label === 'string' ? label : undefined
+  const consumerTextField = slotProps?.textField as ConsumerTextFieldSlotProps | undefined
   const f = useEzField<TValue>(name, componentName, {
     label,
     rules: {
@@ -190,9 +194,13 @@ export function usePickerField<
       },
     },
     optionalText,
+    // A label-less picker is named through the text field it renders, so that is
+    // where the dev-mode "no accessible name" check has to look. Read, not
+    // removed: `slotProps.textField` is still spread onto the field below.
+    'aria-label': consumerTextField?.['aria-label'],
+    'aria-labelledby': consumerTextField?.['aria-labelledby'],
   })
   const text = f.helperText(helperText)
-  const consumerTextField = slotProps?.textField as ConsumerTextFieldSlotProps | undefined
 
   return {
     name: f.field.name,

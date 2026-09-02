@@ -40,6 +40,14 @@ export interface FieldFrameProps<TValue> {
    * by picking the inner element rather than querying by the shared name alone.
    */
   labelAs: 'control' | 'legend'
+  /**
+   * Not rendered here — the field still passes its own `aria-label` /
+   * `aria-labelledby` to the control it renders. Forwarded only so the dev-mode
+   * "no accessible name" warning can see that a label-less field is named some
+   * other way. See `src/devWarn.ts`.
+   */
+  'aria-label'?: string
+  'aria-labelledby'?: string
   renderControl: (bound: BoundField) => ReactElement
 }
 
@@ -57,9 +65,17 @@ export function FieldFrame<TValue>({
   rules,
   optionalText,
   labelAs,
+  'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledBy,
   renderControl,
 }: FieldFrameProps<TValue>) {
-  const f = useEzField<TValue>(name, componentName, { label, rules, optionalText })
+  const f = useEzField<TValue>(name, componentName, {
+    label,
+    rules,
+    optionalText,
+    'aria-label': ariaLabel,
+    'aria-labelledby': ariaLabelledBy,
+  })
   const labelId = useId()
   const text = f.helperText(helperText)
   const bound: BoundField = {
