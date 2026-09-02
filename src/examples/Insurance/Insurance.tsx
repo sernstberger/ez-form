@@ -26,7 +26,9 @@ import { TextareaField } from '../../fields/TextareaField'
 import { CheckboxGroup } from '../../fields/CheckboxGroup'
 import { FileField } from '../../fields/FileField'
 import { ReadOnlyField } from '../../fields/ReadOnlyField'
+import { resolveAutoComplete } from '../../fields/resolveAutoComplete'
 import type { Option } from '../../fields/Option'
+import { useAssisted } from '../../Form/AssistedContext'
 import { submitApplicationApi } from '../fakeApi'
 
 const COVERAGE_TYPES: readonly Option[] = [
@@ -246,11 +248,29 @@ function WatchValues({ onValues }: { onValues: (values: Partial<Input>) => void 
 }
 
 export function ApplicantStep() {
+  // These fields' tokens (`given-name`, `family-name`, …) have no `type` a plain `TextField`
+  // could derive them from, so — unlike `email`/`tel` below — they are hardcoded here rather
+  // than left to a default. `TextField` only suppresses a *default* token under `assisted`,
+  // never an explicit one (#65 requirement 2), so this step resolves its own hardcoded tokens
+  // against the form's `assisted` flag instead: the Agent story is otherwise the one place in
+  // this example a rep filling out someone else's application would still get autofill offers
+  // for their own name.
+  const assisted = useAssisted()
   return (
     <WizardStep id="applicant">
       <Stack spacing={2}>
-        <TextField name="firstName" label="First name" autoComplete="given-name" required />
-        <TextField name="lastName" label="Last name" autoComplete="family-name" required />
+        <TextField
+          name="firstName"
+          label="First name"
+          autoComplete={resolveAutoComplete('given-name', assisted)}
+          required
+        />
+        <TextField
+          name="lastName"
+          label="Last name"
+          autoComplete={resolveAutoComplete('family-name', assisted)}
+          required
+        />
         <DateField name="birthday" label="Birthday" disableFuture minDate={MIN_BIRTHDAY} required />
       </Stack>
     </WizardStep>
@@ -258,6 +278,12 @@ export function ApplicantStep() {
 }
 
 export function ContactStep() {
+  // See ApplicantStep's comment: street/city/ZIP tokens are hardcoded (no `type` derives
+  // them), so they route through `resolveAutoComplete` the same way. `email` and `tel` would
+  // already be suppressed by `TextField`'s own `type`-derived default — they are hardcoded
+  // here only because this form also carries `phone`'s own `pattern` rule, not to opt out of
+  // that default, so they get the same explicit treatment for consistency.
+  const assisted = useAssisted()
   return (
     <WizardStep id="contact">
       <Stack spacing={3}>
@@ -265,7 +291,7 @@ export function ContactStep() {
         <TextField
           name="phone"
           label="Phone"
-          autoComplete="tel"
+          autoComplete={resolveAutoComplete('tel', assisted)}
           pattern={{ value: /^\d{3}-\d{3}-\d{4}$/, message: 'Use the format 555-555-5555' }}
           required
         />
@@ -274,11 +300,21 @@ export function ContactStep() {
             <TextField
               name="address.street"
               label="Street address"
-              autoComplete="street-address"
+              autoComplete={resolveAutoComplete('street-address', assisted)}
               required
             />
-            <TextField name="address.city" label="City" autoComplete="address-level2" required />
-            <TextField name="address.zip" label="ZIP code" autoComplete="postal-code" required />
+            <TextField
+              name="address.city"
+              label="City"
+              autoComplete={resolveAutoComplete('address-level2', assisted)}
+              required
+            />
+            <TextField
+              name="address.zip"
+              label="ZIP code"
+              autoComplete={resolveAutoComplete('postal-code', assisted)}
+              required
+            />
           </Stack>
         </FormSection>
       </Stack>
@@ -442,10 +478,10 @@ export interface InsuranceProps {
   /** Called once the fake API resolves with the submitted application. */
   onSuccess?: (result: { applicationId: string }) => void
   /**
-   * The manual precursor of #65 (assisted mode): `autoComplete="off"` on the
-   * form, `confirm`/`guard` off, so an internal agent filling this out on
-   * behalf of someone else doesn't get their own autofill offered and isn't
-   * slowed by a confirm dialog. Renders as a single `layout="page"` form.
+   * `<Form assisted>` (#65): an internal agent filling this out on behalf of
+   * someone else doesn't get their own autofill offered, and isn't slowed by
+   * a confirm dialog (`confirm`/`guard` are also off). Renders as a single
+   * `layout="page"` form.
    */
   agentMode?: boolean
 }
@@ -463,8 +499,8 @@ export function Insurance({
   onSuccess,
   agentMode = false,
 }: InsuranceProps) {
-  // The manual precursor of #65's "pairs with Wizard layout=page" acceptance bullet: agent
-  // mode always renders as one page, regardless of `layout`.
+  // #65's "pairs with Wizard layout=page" acceptance bullet: agent mode always renders as
+  // one page, regardless of `layout`.
   const layout = agentMode ? 'page' : layoutProp
   const saved = useMemo(() => (agentMode ? null : loadSaved()), [agentMode])
   const [step, setStep] = useState(saved?.step ?? 'applicant')
@@ -511,7 +547,7 @@ export function Insurance({
           ref={form}
           schema={schema}
           defaultValues={values}
-          autoComplete={agentMode ? 'off' : undefined}
+          assisted={agentMode}
           title="Auto insurance application"
           confirm={agentMode ? undefined : { title: 'Submit application?' }}
           guard={!agentMode}

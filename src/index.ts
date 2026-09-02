@@ -23,6 +23,14 @@ export { MoneyField, type MoneyFieldProps } from './fields/MoneyField'
 export { PercentField, type PercentFieldProps } from './fields/PercentField'
 export { ZipField, type ZipFieldProps } from './fields/ZipField'
 export {
+  AddressField,
+  addressFieldClasses,
+  addressSchema,
+  type AddressFieldProps,
+  type AddressValue,
+  type AddressSchemaOptions,
+} from './fields/AddressField'
+export {
   PasswordField,
   passwordFieldClasses,
   type PasswordFieldProps,
@@ -30,6 +38,7 @@ export {
 export { PhoneField, type PhoneFieldProps } from './fields/PhoneField'
 export { EmailField, type EmailFieldProps } from './fields/EmailField'
 export { FeinField, type FeinFieldProps } from './fields/FeinField'
+export { SsnField, ssnFieldClasses, type SsnFieldProps } from './fields/SsnField'
 export type { FieldRules, BooleanFieldRules } from './rules'
 export {
   Autocomplete,
@@ -65,12 +74,20 @@ export {
   useConfirm,
   type UseConfirmReturn,
 } from './ConfirmDialog'
+export {
+  FormDialog,
+  formDialogClasses,
+  type FormDialogProps,
+  type FormDialogCloseReason,
+} from './FormDialog'
 export { ClearButton, clearButtonClasses, type ClearButtonProps } from './ClearButton'
 export type {} from './theme/augmentation'
 export { useFormGuard, type FormGuardBlocker, type UseFormGuardReturn } from './useFormGuard'
 export {
   Wizard,
+  wizardClasses,
   type WizardProps,
+  type WizardStepAnnouncementInfo,
   type WizardStepDef,
   type WizardStepStatus,
   type WizardContextValue,
