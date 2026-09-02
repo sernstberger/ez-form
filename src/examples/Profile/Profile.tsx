@@ -103,7 +103,7 @@ export function Profile({ onSuccess, loadSeed }: ProfileProps) {
             })
           }}
           title="Your profile"
-          description="Update how you appear to other members. Fields marked with * are required."
+          description="Update how you appear to other members."
           onSubmit={async (values, form) => {
             try {
               const result = await saveProfileApi(values)

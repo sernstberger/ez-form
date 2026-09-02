@@ -291,7 +291,7 @@ export function Loan({ onSuccess }: LoanProps) {
             schema={schema}
             defaultValues={defaultValues}
             title="Loan application"
-            description="Fields marked with * are required. You can go back to any earlier step at any time."
+            description="You can go back to any earlier step at any time."
             confirm={{
               title: 'Submit application?',
               message: 'This submits your application for review.',

@@ -613,7 +613,13 @@ describe('useEzFormContext', () => {
 describe('title and description', () => {
   it('names the form from title and links description', () => {
     render(
-      <Form schema={schema} onSubmit={() => {}} title="Sign up" description="All fields required">
+      <Form
+        schema={schema}
+        onSubmit={() => {}}
+        title="Sign up"
+        description="All fields required"
+        requiredIndicatorText={false}
+      >
         <TextField name="email" label="Email" />
       </Form>,
     )
@@ -624,7 +630,7 @@ describe('title and description', () => {
 
   it('renders no heading and no aria attributes without a title', () => {
     render(
-      <Form schema={schema} onSubmit={() => {}} data-testid="f">
+      <Form schema={schema} onSubmit={() => {}} data-testid="f" requiredIndicatorText={false}>
         <TextField name="email" label="Email" />
       </Form>,
     )
@@ -712,6 +718,7 @@ describe('title and description', () => {
         title="Sign up"
         description="All fields required"
         slotProps={{ description: { id: 'custom' } }}
+        requiredIndicatorText={false}
       >
         <TextField name="email" label="Email" />
       </Form>,
@@ -880,6 +887,16 @@ describe('requiredIndicator', () => {
     expect(form).toHaveAccessibleDescription('All fields are required unless marked optional.')
   })
 
+  it('renders the default requiredIndicatorText as the description in "asterisk" mode', () => {
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}} title="Sign up">
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    const form = screen.getByRole('form', { name: 'Sign up' })
+    expect(form).toHaveAccessibleDescription('Required fields are marked with an asterisk (*).')
+  })
+
   it('appends requiredIndicatorText as a second sentence when description is also set', () => {
     render(
       <Form
@@ -899,7 +916,25 @@ describe('requiredIndicator', () => {
     )
   })
 
-  it('requiredIndicatorText={false} suppresses the sentence entirely', () => {
+  it('appends requiredIndicatorText as a second sentence in "asterisk" mode too', () => {
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: '' }}
+        onSubmit={() => {}}
+        title="Sign up"
+        description="We use this to contact you."
+      >
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    const form = screen.getByRole('form', { name: 'Sign up' })
+    expect(form).toHaveAccessibleDescription(
+      'We use this to contact you. Required fields are marked with an asterisk (*).',
+    )
+  })
+
+  it('requiredIndicatorText={false} suppresses the sentence entirely in "optional" mode', () => {
     render(
       <Form
         schema={schema}
@@ -916,14 +951,36 @@ describe('requiredIndicator', () => {
     expect(form).not.toHaveAttribute('aria-describedby')
   })
 
-  it('requiredIndicatorText is ignored in "asterisk" mode', () => {
+  it('requiredIndicatorText={false} suppresses the sentence entirely in "asterisk" mode', () => {
     render(
-      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}} title="Sign up">
+      <Form
+        schema={schema}
+        defaultValues={{ email: '' }}
+        onSubmit={() => {}}
+        title="Sign up"
+        requiredIndicatorText={false}
+      >
         <TextField name="email" label="Email" />
       </Form>,
     )
     const form = screen.getByRole('form', { name: 'Sign up' })
     expect(form).not.toHaveAttribute('aria-describedby')
+  })
+
+  it('an explicit requiredIndicatorText is used verbatim in "asterisk" mode', () => {
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: '' }}
+        onSubmit={() => {}}
+        title="Sign up"
+        requiredIndicatorText="Starred fields are mandatory."
+      >
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    const form = screen.getByRole('form', { name: 'Sign up' })
+    expect(form).toHaveAccessibleDescription('Starred fields are mandatory.')
   })
 
   it('is theme-defaultable via EzForm.defaultProps.requiredIndicator', () => {

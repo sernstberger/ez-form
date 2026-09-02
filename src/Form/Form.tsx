@@ -139,9 +139,12 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
   /** Appended to a not-required field's label when `requiredIndicator="optional"`. */
   optionalText?: ReactNode
   /**
-   * States the `requiredIndicator="optional"` convention once, in the form's
+   * States the `requiredIndicator` convention once, in the form's
    * `description` (appended as a second sentence when `description` is also
-   * set). `false` suppresses it. Ignored in `'asterisk'` mode.
+   * set). Defaults to `'Required fields are marked with an asterisk (*).'`
+   * in `'asterisk'` mode and `'All fields are required unless marked
+   * optional.'` in `'optional'` mode; an explicit string is used verbatim in
+   * either mode. `false` suppresses it in either mode.
    */
   requiredIndicatorText?: ReactNode | false
   /**
@@ -192,7 +195,7 @@ function FormImpl<TIn extends FieldValues, TOut>(
     description,
     requiredIndicator = 'asterisk',
     optionalText = '(optional)',
-    requiredIndicatorText = 'All fields are required unless marked optional.',
+    requiredIndicatorText,
     submitPendingText = 'Submitting…',
     submitSuccessText = 'Submitted.',
     submitErrorText = 'Submit failed.',
@@ -208,19 +211,27 @@ function FormImpl<TIn extends FieldValues, TOut>(
   const descriptionId = `${baseId}-description`
   const titleProps = { component: 'h2', variant: 'h5', ...slotProps?.title } as const
   const descriptionProps = { component: 'p', variant: 'body2', ...slotProps?.description } as const
-  // The "required unless marked optional" convention is stated once, in the same
-  // slot as `description`: appended as a second sentence when both are set, or
-  // rendered alone when `description` is unset. Only relevant in `optional` mode;
-  // `requiredIndicatorText={false}` (or `asterisk` mode) suppresses it.
-  const showRequiredIndicatorText =
-    requiredIndicator === 'optional' && requiredIndicatorText !== false
+  // The requiredIndicator convention is stated once, in the same slot as
+  // `description`: appended as a second sentence when both are set, or rendered
+  // alone when `description` is unset. The default text is mode-dependent; an
+  // explicit `requiredIndicatorText` (including `false` to suppress it) is used
+  // verbatim in either mode. The `*` in the asterisk-mode default is spelled out
+  // ("asterisk (*)") rather than rendered as a bare glyph, so it reads sensibly
+  // to assistive tech without needing an `aria-hidden` span — mirroring how
+  // MUI's `FormLabel` asterisk is itself `aria-hidden`.
+  const defaultRequiredIndicatorText =
+    requiredIndicator === 'optional'
+      ? 'All fields are required unless marked optional.'
+      : 'Required fields are marked with an asterisk (*).'
+  const resolvedRequiredIndicatorText = requiredIndicatorText ?? defaultRequiredIndicatorText
+  const showRequiredIndicatorText = resolvedRequiredIndicatorText !== false
   const effectiveDescription = showRequiredIndicatorText ? (
     description != null ? (
       <Fragment>
-        {description} {requiredIndicatorText}
+        {description} {resolvedRequiredIndicatorText}
       </Fragment>
     ) : (
-      requiredIndicatorText
+      resolvedRequiredIndicatorText
     )
   ) : (
     description
