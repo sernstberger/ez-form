@@ -62,3 +62,10 @@ export {
   readOnlyFieldClasses,
   type ReadOnlyFieldProps,
 } from './fields/ReadOnlyField'
+export {
+  PasswordStrength,
+  passwordStrengthClasses,
+  scorePassword,
+  type PasswordStrengthProps,
+  type PasswordStrengthScore,
+} from './fields/PasswordStrength'

@@ -7,6 +7,7 @@ import type { WizardNavProps } from '../Wizard/WizardNav'
 import type { ReadOnlyFieldProps } from '../fields/ReadOnlyField'
 import type { NumberFieldControlProps } from '../fields/NumberField/NumberFieldControl'
 import type { PasswordFieldProps } from '../fields/PasswordField'
+import type { PasswordStrengthProps } from '../fields/PasswordStrength'
 
 declare module '@mui/material/styles' {
   interface ComponentsPropsList {
@@ -18,6 +19,7 @@ declare module '@mui/material/styles' {
     EzReadOnlyField: Partial<ReadOnlyFieldProps>
     EzNumberField: Partial<NumberFieldControlProps>
     EzPasswordField: Partial<PasswordFieldProps>
+    EzPasswordStrength: Partial<PasswordStrengthProps>
   }
 
   interface ComponentNameToClassKey {
@@ -29,6 +31,7 @@ declare module '@mui/material/styles' {
     EzReadOnlyField: 'root' | 'header' | 'label' | 'value' | 'edit'
     EzNumberField: 'root' | 'steppers' | 'increment' | 'decrement'
     EzPasswordField: 'root' | 'toggle'
+    EzPasswordStrength: 'root' | 'bar' | 'label'
   }
 
   interface Components<Theme = unknown> {
@@ -63,6 +66,10 @@ declare module '@mui/material/styles' {
     EzPasswordField?: {
       defaultProps?: ComponentsProps['EzPasswordField']
       styleOverrides?: ComponentsOverrides<Theme>['EzPasswordField']
+    }
+    EzPasswordStrength?: {
+      defaultProps?: ComponentsProps['EzPasswordStrength']
+      styleOverrides?: ComponentsOverrides<Theme>['EzPasswordStrength']
     }
   }
 }
