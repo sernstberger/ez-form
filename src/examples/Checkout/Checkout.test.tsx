@@ -57,9 +57,13 @@ describe('Checkout', () => {
     await user.click(within(shipping).getByRole('combobox', { name: /^country/i }))
     await user.click(await screen.findByRole('option', { name: 'United States' }))
     await user.click(within(shipping).getByRole('combobox', { name: /state \/ region/i }))
-    await user.click(await screen.findByRole('option', { name: 'California' }))
+    // `StateSelect`, so all 50 + DC — not a hand-maintained shortlist. Wyoming and DC
+    // would both be missing from the three-state stub this replaced.
+    expect(screen.getAllByRole('option')).toHaveLength(51)
+    expect(screen.getByRole('option', { name: 'District of Columbia' })).toBeInTheDocument()
+    await user.click(await screen.findByRole('option', { name: 'Wyoming' }))
     expect(within(shipping).getByRole('combobox', { name: /state \/ region/i })).toHaveTextContent(
-      'California',
+      'Wyoming',
     )
   })
 

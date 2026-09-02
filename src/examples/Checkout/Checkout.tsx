@@ -9,6 +9,7 @@ import { FormSection } from '../../FormSection'
 import { SubmitButton } from '../../SubmitButton'
 import { TextField } from '../../fields/TextField'
 import { Select } from '../../fields/Select'
+import { StateSelect } from '../../fields/StateSelect'
 import { Checkbox } from '../../fields/Checkbox'
 import { PasswordField } from '../../fields/PasswordField'
 import { MoneyField } from '../../fields/MoneyField'
@@ -26,23 +27,13 @@ const COUNTRY_OPTIONS: readonly Option[] = [
 
 // Pattern 5 (#82): shipping.state becomes a Select with a per-country option list for
 // countries this example knows how to list, and falls back to a free-text field otherwise.
-const US_STATE_OPTIONS: readonly Option[] = [
-  { value: 'CA', label: 'California' },
-  { value: 'NY', label: 'New York' },
-  { value: 'TX', label: 'Texas' },
-]
-
+// The US branch is `StateSelect` (all 50 + DC, no list to maintain here), so only the
+// countries ez-form ships no field for need an option array of their own.
 const CA_PROVINCE_OPTIONS: readonly Option[] = [
   { value: 'ON', label: 'Ontario' },
   { value: 'QC', label: 'Quebec' },
   { value: 'BC', label: 'British Columbia' },
 ]
-
-function regionOptionsFor(country: unknown): readonly Option[] | null {
-  if (country === 'US') return US_STATE_OPTIONS
-  if (country === 'CA') return CA_PROVINCE_OPTIONS
-  return null
-}
 
 // A fixed cart for the example: the summary's subtotal is constant, only the tip varies.
 const SUBTOTAL = 84.97
@@ -170,7 +161,6 @@ function OrderSummary() {
 function ShippingCountryAndRegionFields() {
   const { resetField } = useEzFormContext('Checkout')
   const country = useWatch<Input, 'shipping.country'>({ name: 'shipping.country' })
-  const regionOptions = regionOptionsFor(country)
 
   return (
     <>
@@ -182,11 +172,18 @@ function ShippingCountryAndRegionFields() {
         onChange={() => resetField('shipping.state', { defaultValue: '' })}
         required
       />
-      {regionOptions ? (
+      {country === 'US' ? (
+        <StateSelect
+          name="shipping.state"
+          label="State / region"
+          autoComplete="shipping address-level1"
+          required
+        />
+      ) : country === 'CA' ? (
         <Select
           name="shipping.state"
           label="State / region"
-          options={regionOptions}
+          options={CA_PROVINCE_OPTIONS}
           autoComplete="shipping address-level1"
           required
         />
@@ -258,6 +255,11 @@ export function Checkout({ onSuccess }: CheckoutProps) {
                   required
                 />
                 <ShippingCountryAndRegionFields />
+                {/*
+                  Not a `ZipField`: this checkout ships to four countries, and `ZipField`
+                  strips everything but 5 digits — it would silently eat a Canadian
+                  "M5V 3L9" or a UK "SW1A 1AA". A US-only form should use `ZipField`.
+                */}
                 <TextField
                   name="shipping.postalCode"
                   label="Postal code"
@@ -337,6 +339,14 @@ function BillingSection() {
               options={COUNTRY_OPTIONS}
               autoComplete="billing country"
             />
+            {/*
+              Deliberately a plain TextField, not `StateSelect` like shipping's US branch:
+              billing has no country-conditional rendering here (it mirrors shipping's shape
+              with every part optional, gated by `superRefine`), so there is no `country ===
+              'US'` branch to hang a StateSelect on — and rendering one unconditionally would
+              offer US states to someone billing from Canada. Same reason `billing.postalCode`
+              stays a TextField rather than a `ZipField`.
+            */}
             <TextField
               name="billing.state"
               label="State / region"
