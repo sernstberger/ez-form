@@ -87,7 +87,7 @@ export function PasswordStrength(inProps: PasswordStrengthProps) {
       className={`${passwordStrengthClasses.root}${slotProps?.root?.className ? ` ${slotProps.root.className}` : ''}`}
     >
       <PasswordStrengthBar
-        variant="determinate"
+        variant="determinate" // guardrail: allow #59 default before the slot spread, overridable
         value={(level / 4) * 100}
         color={COLOR_BY_SCORE[level]}
         aria-label="Password strength"
@@ -100,7 +100,7 @@ export function PasswordStrength(inProps: PasswordStrengthProps) {
         className={`${passwordStrengthClasses.bar}${slotProps?.bar?.className ? ` ${slotProps.bar.className}` : ''}`}
       />
       <PasswordStrengthLabel
-        variant="caption"
+        variant="caption" // guardrail: allow #59 default before the slot spread, overridable
         aria-live="polite"
         {...slotProps?.label}
         className={`${passwordStrengthClasses.label}${slotProps?.label?.className ? ` ${slotProps.label.className}` : ''}`}

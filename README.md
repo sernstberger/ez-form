@@ -394,4 +394,14 @@ pnpm test        # vitest + Testing Library, plus jest-axe accessibility checks 
 pnpm build
 ```
 
+`pnpm check:guardrails` enforces rule 2 of `docs/PHILOSOPHY.md`: it scans `src/**/*.tsx`
+(excluding stories, tests, `src/examples/**`, `src/test/**`) for `sx=`, `disableRipple`/
+`focusRipple`, and literal `variant=`/`size=`/`color=` JSX attributes (a prop-driven value
+like `variant={variant}` is fine; a string literal like `variant="contained"` is not), and
+checks that every component exported from `src/index.ts` has a row in this README's
+Components table. A line that's a deliberate, tracked exception can end with
+`// guardrail: allow <reason, ideally an issue number>` to skip it; the script reports how
+many lines were allow-listed so they stay visible. It runs in CI (`pnpm test:scripts` runs
+its own `node --test` suite first).
+
 MIT

@@ -108,7 +108,7 @@ export function FileField(inProps: FileFieldProps) {
       className={fileFieldClasses.root}
     >
       <Button
-        variant="outlined"
+        variant="outlined" // guardrail: allow #62 literal variant on the picker button, tracked
         startIcon={<UploadIcon />}
         {...buttonProps}
         component="label"

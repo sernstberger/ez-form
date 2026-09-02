@@ -34,6 +34,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the `otpFieldClasses` export; `EzFileField` theme key (`defaultProps`, `styleOverrides`
   for `root`, `fileList`) and the `fileFieldClasses` export — the last `sx` usages in
   `src/` (`OtpFieldControl`, `FileField`) now go through styled slots — #50.
+- `pnpm check:guardrails`: a dependency-free CI script that fails on `sx=`, ripple props,
+  and literal `variant`/`size`/`color` JSX attributes in `src/`, and on exported components
+  missing a README Components row; allow-listed via a trailing `// guardrail: allow <reason>`
+  comment. Wired into CI alongside its own `pnpm test:scripts` suite — #44.
+
+> > > > > > > feat/guardrail
 
 ### Changed
 
