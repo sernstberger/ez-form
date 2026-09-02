@@ -19,6 +19,7 @@ import type { OtpFieldControlProps } from '../fields/OtpField/OtpFieldControl'
 import type { FileFieldProps } from '../fields/FileField'
 import type { TextareaFieldProps } from '../fields/TextareaField/TextareaField'
 import type { ResendCodeButtonProps } from '../fields/OtpField/ResendCodeButton'
+import type { PhoneFieldProps } from '../fields/PhoneField'
 
 declare module '@mui/material/styles' {
   interface ComponentsPropsList {
@@ -45,6 +46,7 @@ declare module '@mui/material/styles' {
     EzFileField: Partial<FileFieldProps>
     EzTextareaField: Partial<TextareaFieldProps>
     EzResendCodeButton: Partial<ResendCodeButtonProps>
+    EzPhoneField: Partial<PhoneFieldProps>
   }
 
   interface ComponentNameToClassKey {
@@ -148,6 +150,12 @@ declare module '@mui/material/styles' {
     EzResendCodeButton?: {
       defaultProps?: ComponentsProps['EzResendCodeButton']
       styleOverrides?: ComponentsOverrides<Theme>['EzResendCodeButton']
+    }
+    // Renders a `TextField` and adds no styled slot of its own, so it keeps
+    // MUI's own `Mui*` style keys and registers `defaultProps` only — that is
+    // what makes `format` / `invalidMessage` / `autoComplete` theme-settable.
+    EzPhoneField?: {
+      defaultProps?: ComponentsProps['EzPhoneField']
     }
   }
 }

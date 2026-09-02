@@ -31,6 +31,18 @@ export type TextFieldProps = Omit<
    * @internal
    */
   componentName?: string
+  /**
+   * Renders this text in the input instead of the bound value, for the fields
+   * whose stored value and displayed value deliberately differ: `PhoneField`
+   * stores `'5555555555'` and displays `'555-555-5555'`. The binding is
+   * unchanged — the form value, validation and `aria-*` wiring all still come
+   * from `name` — so a field using this must map the typed text back to a
+   * stored value in its own `onChange` before the form's handler sees it.
+   *
+   * Left `undefined` (the default, and every plain `<TextField>`), the bound
+   * value is displayed as-is.
+   */
+  displayValue?: string
 } & FieldRules<string>
 
 // `type` → mobile keyboard (`inputMode`) and autofill (`autoComplete`) token. Only types
@@ -63,6 +75,7 @@ export function TextField({
   pattern,
   validate,
   optionalText,
+  displayValue,
   type,
   autoComplete = type ? AUTO_COMPLETE_BY_TYPE[type] : undefined,
   componentName = 'TextField',
@@ -91,7 +104,7 @@ export function TextField({
     <MuiTextField
       {...fieldProps}
       label={f.displayLabel}
-      value={value ?? ''}
+      value={displayValue ?? value ?? ''}
       onChange={(e) => {
         fieldOnChange(e)
         onChange?.(e)

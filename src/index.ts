@@ -26,6 +26,7 @@ export {
   passwordFieldClasses,
   type PasswordFieldProps,
 } from './fields/PasswordField'
+export { PhoneField, type PhoneFieldProps } from './fields/PhoneField'
 export type { FieldRules, BooleanFieldRules } from './rules'
 export {
   Autocomplete,
