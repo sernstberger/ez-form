@@ -10,23 +10,30 @@ import { expectNoA11yViolations } from '../test/axe'
 import { Wizard, type WizardStepDef } from './Wizard'
 import { WizardStep } from './WizardStep'
 import { WizardStepper, wizardStepperClasses, type WizardStepperProps } from './WizardStepper'
+import { WizardNav, type WizardNavProps } from './WizardNav'
 import { useWizard } from './useWizard'
 
-// Local augmentation for the themeability test below: `src/theme/augmentation.ts`
+// Local augmentation for the themeability tests below: `src/theme/augmentation.ts`
 // (owned by a separate task) will declare this for real across the whole
 // package. TS module augmentations merge additively, so this scoped
 // declaration is safe to keep even after that file lands.
 declare module '@mui/material/styles' {
   interface ComponentsPropsList {
     EzWizardStepper: Partial<WizardStepperProps>
+    EzWizardNav: Partial<WizardNavProps>
   }
   interface ComponentNameToClassKey {
     EzWizardStepper: 'root' | 'verticalStepButton'
+    EzWizardNav: 'root' | 'prev' | 'next' | 'submit'
   }
   interface Components<Theme = unknown> {
     EzWizardStepper?: {
       defaultProps?: ComponentsProps['EzWizardStepper']
       styleOverrides?: ComponentsOverrides<Theme>['EzWizardStepper']
+    }
+    EzWizardNav?: {
+      defaultProps?: ComponentsProps['EzWizardNav']
+      styleOverrides?: ComponentsOverrides<Theme>['EzWizardNav']
     }
   }
 }
@@ -463,5 +470,85 @@ describe('WizardStepper', () => {
     const accountButton = screen.getByText('Account').closest('button')!
     expect(accountButton).toHaveClass(wizardStepperClasses.verticalStepButton)
     expect(getComputedStyle(accountButton).textTransform).toBe('uppercase')
+  })
+})
+
+describe('WizardNav', () => {
+  function Inline({ onSubmit = () => {} }: { onSubmit?: () => void }) {
+    return (
+      <Form schema={schema} defaultValues={filled} onSubmit={onSubmit}>
+        <Wizard steps={steps}>
+          <WizardStep id="account">
+            <TextField name="name" label="Name" />
+          </WizardStep>
+          <WizardStep id="plan">
+            <TextField name="plan" label="Plan" />
+          </WizardStep>
+          <WizardStep id="review">
+            <p>Review</p>
+          </WizardStep>
+          <WizardNav />
+        </Wizard>
+      </Form>
+    )
+  }
+
+  it('Back is disabled on the first step; Next advances; the last step shows Submit', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(<Inline onSubmit={onSubmit} />)
+    expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Submit' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Plan' })).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Back' })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => expect(screen.getByText('Review')).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(filled, expect.anything()))
+  })
+
+  it('Next stays put and shows the error when the step is invalid', async () => {
+    const user = userEvent.setup()
+    render(<Inline />)
+    await user.clear(screen.getByRole('textbox', { name: 'Name' }))
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    expect(await screen.findByText('Name is required')).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Plan' })).not.toBeInTheDocument()
+  })
+
+  it('custom labels', () => {
+    render(
+      <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+        <Wizard steps={steps}>
+          <WizardNav prevLabel="Previous" nextLabel="Continue" />
+        </Wizard>
+      </Form>,
+    )
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument()
+  })
+
+  it('is themeable: defaultProps.slotProps.next.variant applies to the Next button', () => {
+    const theme = createTheme({
+      components: {
+        EzWizardNav: {
+          defaultProps: {
+            slotProps: { next: { variant: 'outlined' } },
+          },
+        },
+      },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+          <Wizard steps={steps}>
+            <WizardNav />
+          </Wizard>
+        </Form>
+      </ThemeProvider>,
+    )
+    expect(screen.getByRole('button', { name: 'Next' })).toHaveClass('MuiButton-outlined')
   })
 })
