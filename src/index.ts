@@ -24,3 +24,4 @@ export { DateTimePicker, type DateTimePickerProps } from './fields/DateTimePicke
 export type { PickerErrorMessages } from './fields/pickers/pickerMessages'
 export { OtpField, type OtpFieldProps } from './fields/OtpField'
 export { FileField, type FileFieldProps, type FileFieldValue } from './fields/FileField'
+export { useFormGuard, type FormGuardBlocker, type UseFormGuardReturn } from './useFormGuard'
