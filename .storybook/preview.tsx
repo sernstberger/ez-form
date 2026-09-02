@@ -53,6 +53,11 @@ const preview: Preview = {
   ],
   parameters: {
     controls: { expanded: true },
+    options: {
+      storySort: {
+        order: ['Introduction'],
+      },
+    },
   },
 }
 
