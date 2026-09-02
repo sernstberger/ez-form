@@ -96,6 +96,7 @@ React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form
 | `Autocomplete`                                 | MUI `Autocomplete`                            | `name`, `options`, `getOptionValue?` (default `o => o.value`; return `o` to store objects), `multiple`, `freeSolo`, `textFieldProps?`; all TextField rules. Options may carry extra fields (they reach `onChange`)                                                                                                                                                                                                                                                               |
 | `NumberField`                                  | Base UI `NumberField` through MUI `TextField` | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max` (also the stepper bounds), `validate`. Value is `number \| null`; digits group while typing (new in v2.1), and `format={{ useGrouping: false }}` turns that off                                                                                                                                                                                                                                         |
 | `MoneyField`                                   | `NumberField` pinned to USD                   | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max`, `validate`. Value is a `number` in dollars, rounded to the cent; shows `$1,234.50` on blur                                                                                                                                                                                                                                                                                                             |
+| `PhoneField`                                   | ez-form `TextField`                           | `name`; same rules as TextField, plus `format?` (a `#` template, default `'###-###-####'`) and `invalidMessage?`. The form value is digits only (`'5551234567'`); `type="tel"`, `inputMode="tel"`, `autoComplete` defaults to `'tel'`. A non-empty value shorter than the template's digit count fails with `invalidMessage`                                                                                                                                                     |
 | `ZipField`                                     | `TextField`                                   | `name`; same rules as TextField, plus a built-in "5 digits" rule (`invalidMessage?`, default `'Enter a 5-digit ZIP code'`). Digits only, capped at 5 (anything else is stripped on type/paste); `inputMode="numeric"`, `autoComplete` defaults to `'postal-code'`. Value is the digit string                                                                                                                                                                                     |
 | `StateSelect`                                  | `Select`                                      | `name`; same rules as Select. Options are the 50 states + DC by default; `territories?` adds PR, GU, VI, AS, MP. `autoComplete` defaults to `'address-level1'`. Value is the USPS abbreviation; also exports `US_STATES`/`US_TERRITORIES` option arrays                                                                                                                                                                                                                          |
 | `AddressField`                                 | `TextField` + `StateSelect` + `ZipField`      | `name` (nested object), `legend?`/`description?` (renders a `FormSection`), `autoCompleteSection?` (`'shipping'`/`'billing'`/any section token, prefixes every autofill token), `street2?` (default `true`), `streetLabel?`/`street2Label?`/`cityLabel?`/`stateLabel?`/`zipLabel?`, `required`/`disabled`, `slotProps?`. `required` reaches street/city/state/zip, never street2; `addressSchema()` is the matching zod object                                                   |
@@ -112,7 +113,6 @@ React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form
 | `Wizard`                                       | MUI `Stepper`                                 | `steps`, `step?`/`onStepChange?`, `visited?`/`onVisitedChange?`, `orientation?`, `layout?: 'steps' \| 'page'`; with `WizardStepper`, `WizardStep`, `WizardNav` (`actionsOrder?: 'back-next' \| 'next-back'`, default `'back-next'`), `useWizard`                                                                                                                                                                                                                                 |
 | `ReadOnlyField`                                | MUI `Typography`                              | `name`, `label?`, `options?`, `format?`, `empty?`, `editStep?` — or `value` (a caller-computed value, e.g. from its own `useWatch`) with `label` required and no `name`; never calls `useWatch` in that mode                                                                                                                                                                                                                                                                     |
 | `PasswordField`                                | ez-form `TextField`                           | `name`; same rules as TextField. `revealable?` (default `true`) shows a show/hide toggle in the end adornment; `autoComplete` defaults to `'current-password'`; `slotProps.toggle?` reaches the toggle `IconButton`                                                                                                                                                                                                                                                              |
-| `PhoneField`                                   | ez-form `TextField`                           | `name`; same rules as TextField, plus `format?` (a `#` template, default `'###-###-####'`) and `invalidMessage?`. The form value is digits only (`'5551234567'`); `type="tel"`, `inputMode="tel"`, `autoComplete` defaults to `'tel'`. A non-empty value shorter than the template's digit count fails with `invalidMessage`                                                                                                                                                     |
 | `PasswordStrength`                             | MUI `LinearProgress`                          | `name`; `score?: (password) => 0\|1\|2\|3\|4` (default a small built-in heuristic); `labels?` (5 strings). Renders as an ARIA `meter`, never registers or validates                                                                                                                                                                                                                                                                                                              |
 | `TextareaField`                                | `TextField` with `multiline` fixed on         | `name`, `showCount?`; the same rules as TextField. Taller default (`minRows: 4`, `maxRows: 12`, both themeable); shows a `n / max` length meter when `maxLength` is set (or `showCount`), which turns into the validation error past the limit                                                                                                                                                                                                                                   |
 | `DateField`                                    | MUI X `DateField`                             | Same shape as `DatePicker`, but no popup — a keyboard-only, sectioned date input. Better for birthdays and other far-away dates: typing beats paging a calendar back decades                                                                                                                                                                                                                                                                                                     |
@@ -797,20 +797,23 @@ Themeable under `EzTextareaField` (`root`, `counter`, exported as `textareaField
 
 `TextField`, `NumberField`, `MoneyField`, and `OtpField` set `autoComplete` / `inputMode` defaults so mobile keyboards and password managers do the right thing without per-field wiring. A default only applies when the consumer sets neither the prop nor its `slotProps.htmlInput` equivalent — an explicit value always wins.
 
-| Component     | Condition                                                             | `autoComplete`  | `inputMode`     |
-| ------------- | --------------------------------------------------------------------- | --------------- | --------------- |
-| `TextField`   | `type="email"`                                                        | `email`         | `email`         |
-| `TextField`   | `type="tel"`                                                          | `tel`           | `tel`           |
-| `TextField`   | `type="url"`                                                          | `url`           | `url`           |
-| `TextField`   | `type="search"`                                                       | — (not guessed) | `search`        |
-| `TextField`   | any other `type` (including no `type`)                                | — (not guessed) | — (not guessed) |
-| `NumberField` | integer-only (no fractional `step`, no `format` with fraction digits) | —               | `numeric`       |
-| `NumberField` | otherwise (fractional `step`, or a `format` with fraction digits)     | —               | `decimal`       |
-| `MoneyField`  | always (currency has cents)                                           | —               | `decimal`       |
-| `OtpField`    | first slot only, from Base UI itself, not duplicated here             | `one-time-code` | `numeric`       |
-| `PhoneField`  | always — set by the field itself, not the `type="tel"` fallback       | `tel`           | `tel`           |
+| Component      | Condition                                                             | `autoComplete`   | `inputMode`     |
+| -------------- | --------------------------------------------------------------------- | ---------------- | --------------- |
+| `TextField`    | `type="email"`                                                        | `email`          | `email`         |
+| `TextField`    | `type="tel"`                                                          | `tel`            | `tel`           |
+| `TextField`    | `type="url"`                                                          | `url`            | `url`           |
+| `TextField`    | `type="search"`                                                       | — (not guessed)  | `search`        |
+| `TextField`    | any other `type` (including no `type`)                                | — (not guessed)  | — (not guessed) |
+| `NumberField`  | integer-only (no fractional `step`, no `format` with fraction digits) | —                | `numeric`       |
+| `NumberField`  | otherwise (fractional `step`, or a `format` with fraction digits)     | —                | `decimal`       |
+| `MoneyField`   | always (currency has cents)                                           | —                | `decimal`       |
+| `OtpField`     | first slot only, from Base UI itself, not duplicated here             | `one-time-code`  | `numeric`       |
+| `PhoneField`   | always — set by the field itself, not the `type="tel"` fallback       | `tel`            | `tel`           |
+| `ZipField`     | always — set by the field itself                                      | `postal-code`    | `numeric`       |
+| `StateSelect`  | always — reaches `Select`'s hidden native `<input>`                   | `address-level1` | —               |
+| `AddressField` | always — per part, prefixed by `autoCompleteSection`                  | per part         | per part        |
 
-`TextField` never guesses a token from `name` — a wrong guess is worse than none, so only these unambiguous `type`s get a default. `PasswordField` covers `autoComplete="current-password"` / `"new-password"` on its own, above. `PhoneField` sets `type="tel"`, `inputMode="tel"` and its `autoComplete` default itself rather than relying on the `type`-derived fallback — the two agree, but the field owns them — and its `autoComplete` takes a sectioned token (`"shipping tel"`, `"work tel"`) for forms with more than one number. The remaining v8 date/time/address fields (#17–#19) will extend this table.
+`TextField` never guesses a token from `name` — a wrong guess is worse than none, so only these unambiguous `type`s get a default. `PasswordField` covers `autoComplete="current-password"` / `"new-password"` on its own, above. The US fields set their own tokens rather than relying on the `type`-derived fallback — see [US fields](#us-fields) for what each part gets and how `autoCompleteSection` prefixes them. The remaining v8 date/time fields (#17–#18) will extend this table.
 
 ## NumberField
 
@@ -845,9 +848,34 @@ const schema = z.object({ price: z.number().min(0) })
 
 The toggle is a themeable `IconButton` under `EzPasswordField` (`root`, `toggle`, exported as `passwordFieldClasses`); `slotProps.toggle` reaches it directly, but its `children` is always overridden — swap the reveal icons with `icons?: { show?: ReactNode; hide?: ReactNode }` instead, defaulted through `useDefaultProps` so `theme.components.EzPasswordField.defaultProps.icons` can replace them app-wide.
 
+## PasswordStrength
+
+A meter bound to a password field's live value, read with `useWatch` like `ReadOnlyField` — it never registers a field and never validates. Renders MUI `LinearProgress` as an ARIA `meter` (`role="meter"`, `aria-valuemin={0}`, `aria-valuemax={4}`, `aria-valuenow`, `aria-valuetext`) with a visible label in an `aria-live="polite"` region, so the tier is announced as it changes. An empty password renders the track at 0 with no label.
+
+```tsx
+<PasswordField name="password" label="Password" autoComplete="new-password" />
+<PasswordStrength name="password" />
+```
+
+`score?: (password: string) => 0 | 1 | 2 | 3 | 4` defaults to a small built-in heuristic (length thresholds, character-class variety, a penalty for repeats/sequences) exported as `scorePassword`. Pass your own — `zxcvbn` / `@zxcvbn-ts`, for instance — to score by whatever rules you want:
+
+```tsx
+<PasswordStrength name="password" score={(pw) => toEzScore(zxcvbn(pw).score)} />
+```
+
+`labels?: readonly [string, string, string, string, string]` defaults to `['Very weak', 'Weak', 'Fair', 'Strong', 'Very strong']`.
+
+**Bundle size**: `PasswordStrength` lives in its own module and `PasswordField` does not import it, so a consumer using only `PasswordField` never pulls in `PasswordStrength` or `scorePassword` — a scorer like zxcvbn (~400 kB) stays opt-in. This is `sideEffects: false` plus a single ESM entry point (`package.json`) doing the work a bundler needs: unused named exports tree-shake out. `dist/index.js` itself, as a single-entry bundle, still contains every export's source (grepping it for `PasswordStrength` finds it) — the tree-shaking happens in the _consumer's_ bundler, not in this package's own build.
+
+Themeable under `EzPasswordStrength` (`defaultProps`, `styleOverrides` for `root` | `bar` | `label`), exported as `passwordStrengthClasses`.
+
 ## US fields
 
-`PhoneField` is the first of the US-shaped fields. They share one rule: **the form value is the bare digits, and the template only decides how they are displayed.** So a zod schema stays a plain `z.string()` with no regex — the field itself owns completeness — and the value you submit, store and compare is always canonical, whatever the user typed or pasted.
+Small, US-specific conveniences on top of `TextField` and `Select`: `PhoneField`, `ZipField`, `StateSelect`, and the `AddressField` composite. For a non-US audience, build the equivalent with plain `TextField`/`Select`.
+
+They share one rule: **the form value is the canonical data — bare digits, or a USPS abbreviation — and any template only decides how it is displayed.** So a zod schema stays a plain `z.string()` with no regex — the field itself owns completeness — and the value you submit, store and compare is always canonical, whatever the user typed or pasted.
+
+### PhoneField
 
 ```tsx
 const schema = z.object({ phone: z.string() })
@@ -881,32 +909,9 @@ A value that is non-empty but incomplete fails on submit with `invalidMessage`, 
 
 `format`, `invalidMessage` and `autoComplete` are all settable app-wide through `theme.components.EzPhoneField.defaultProps`; a prop on the element always wins. `PhoneField` adds no styled slot of its own — it renders a `TextField`, so MUI's own `MuiTextField` / `MuiOutlinedInput` style keys reach it unchanged.
 
-## PasswordStrength
+### ZipField
 
-A meter bound to a password field's live value, read with `useWatch` like `ReadOnlyField` — it never registers a field and never validates. Renders MUI `LinearProgress` as an ARIA `meter` (`role="meter"`, `aria-valuemin={0}`, `aria-valuemax={4}`, `aria-valuenow`, `aria-valuetext`) with a visible label in an `aria-live="polite"` region, so the tier is announced as it changes. An empty password renders the track at 0 with no label.
-
-```tsx
-<PasswordField name="password" label="Password" autoComplete="new-password" />
-<PasswordStrength name="password" />
-```
-
-`score?: (password: string) => 0 | 1 | 2 | 3 | 4` defaults to a small built-in heuristic (length thresholds, character-class variety, a penalty for repeats/sequences) exported as `scorePassword`. Pass your own — `zxcvbn` / `@zxcvbn-ts`, for instance — to score by whatever rules you want:
-
-```tsx
-<PasswordStrength name="password" score={(pw) => toEzScore(zxcvbn(pw).score)} />
-```
-
-`labels?: readonly [string, string, string, string, string]` defaults to `['Very weak', 'Weak', 'Fair', 'Strong', 'Very strong']`.
-
-**Bundle size**: `PasswordStrength` lives in its own module and `PasswordField` does not import it, so a consumer using only `PasswordField` never pulls in `PasswordStrength` or `scorePassword` — a scorer like zxcvbn (~400 kB) stays opt-in. This is `sideEffects: false` plus a single ESM entry point (`package.json`) doing the work a bundler needs: unused named exports tree-shake out. `dist/index.js` itself, as a single-entry bundle, still contains every export's source (grepping it for `PasswordStrength` finds it) — the tree-shaking happens in the _consumer's_ bundler, not in this package's own build.
-
-Themeable under `EzPasswordStrength` (`defaultProps`, `styleOverrides` for `root` | `bar` | `label`), exported as `passwordStrengthClasses`.
-
-## US fields
-
-Small, US-specific conveniences on top of `TextField` and `Select` — for a non-US audience, build the equivalent with plain `TextField`/`Select`.
-
-**ZipField**: digits only, capped at 5 — anything else (letters, the ZIP+4 dash) is stripped as you type or paste. The form value is always the digit string (`'90210'`), never a formatted one. `inputMode="numeric"` brings up the numeric keypad on mobile; `autoComplete` defaults to `'postal-code'`. A non-empty value shorter than 5 digits fails a built-in rule (`invalidMessage?`, default `'Enter a 5-digit ZIP code'`), composed with any `validate` you pass the same way `required`/`pattern` are — a built-in key is never silently replaced by yours.
+Digits only, capped at 5 — anything else (letters, the ZIP+4 dash) is stripped as you type or paste. The form value is always the digit string (`'90210'`), never a formatted one. `inputMode="numeric"` brings up the numeric keypad on mobile; `autoComplete` defaults to `'postal-code'`. A non-empty value shorter than 5 digits fails a built-in rule (`invalidMessage?`, default `'Enter a 5-digit ZIP code'`), composed with any `validate` you pass the same way `required`/`pattern` are — a built-in key is never silently replaced by yours.
 
 ```tsx
 <ZipField name="zip" label="ZIP code" required />
@@ -916,14 +921,18 @@ Small, US-specific conveniences on top of `TextField` and `Select` — for a non
 const schema = z.object({ zip: z.string().min(1) })
 ```
 
-**StateSelect**: `Select` pre-loaded with the 50 states + DC (`US_STATES`, exported as an `Option[]`); pass `territories` to add PR, GU, VI, AS, MP (`US_TERRITORIES`). Values are USPS abbreviations (`'CA'`), labels are full names (`'California'`). `autoComplete` defaults to `'address-level1'`.
+### StateSelect
+
+`Select` pre-loaded with the 50 states + DC (`US_STATES`, exported as an `Option[]`); pass `territories` to add PR, GU, VI, AS, MP (`US_TERRITORIES`). Values are USPS abbreviations (`'CA'`), labels are full names (`'California'`). `autoComplete` defaults to `'address-level1'`.
 
 ```tsx
 <StateSelect name="state" label="State" required />
 <StateSelect name="state" label="State or territory" territories />
 ```
 
-**AddressField**: the five US address parts as one bound composite under a nested object `name` — `street`, an optional `street2`, `city`, `state` (a `StateSelect`) and `zip` (a `ZipField`). Each part is the real field component, so a per-part error, `required`, `disabled` and focus-on-error behave exactly as they do when you write the five fields out by hand; the composite supplies the names, the autofill tokens, the labels and the layout.
+### AddressField
+
+The five US address parts as one bound composite under a nested object `name` — `street`, an optional `street2`, `city`, `state` (a `StateSelect`) and `zip` (a `ZipField`). Each part is the real field component, so a per-part error, `required`, `disabled` and focus-on-error behave exactly as they do when you write the five fields out by hand; the composite supplies the names, the autofill tokens, the labels and the layout.
 
 ```tsx
 <AddressField name="shipping" legend="Shipping address" autoCompleteSection="shipping" required />
@@ -941,13 +950,9 @@ Every label is a prop with a default (`streetLabel` `'Street address'`, `street2
 
 Themeable under `EzAddressField` (`defaultProps`, `styleOverrides` for `root` | `street` | `street2` | `city` | `state` | `zip`), exported as `addressFieldClasses`. The root is a CSS grid with named areas (`street` / `street2` / `city state zip`, one column below `sm`); re-order or re-span any part by overriding `gridTemplateAreas` on `root`.
 
-**Mobile keyboards & autofill**: each field sets sensible defaults, always overridable by your own `autoComplete` prop:
+### Keyboards & autofill for these fields
 
-| Field          | `inputMode` | `autoComplete` default                   |
-| -------------- | ----------- | ---------------------------------------- |
-| `ZipField`     | `numeric`   | `postal-code`                            |
-| `StateSelect`  | —           | `address-level1`                         |
-| `AddressField` | per part    | per part, `autoCompleteSection`-prefixed |
+Every default is listed in the [Mobile keyboards & autofill](#mobile-keyboards--autofill) table above, and each is overridable by your own `autoComplete` prop. Two details specific to these fields:
 
 `inputMode="numeric"` on `ZipField` brings up the numeric keypad on mobile without changing the underlying `type` (still `text`, so a leading zero like `02134` is never dropped). `StateSelect`'s `autoComplete` reaches the hidden native `<input>` MUI's `Select` renders for autofill via `slotProps.htmlInput` — the same slot a plain `TextField` uses (MUI 9 has no `SelectProps`/native `inputProps` shortcut for this).
 

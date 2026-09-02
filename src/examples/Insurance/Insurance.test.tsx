@@ -175,6 +175,14 @@ function seedReview(values: Record<string, unknown> = COMPLETE_VALUES, step = 'r
   )
 }
 
+// Cleared on both sides: the example autosaves from an effect, so a test that fails or
+// times out part-way through can still have a pending write land after its own teardown.
+// Without the `afterEach`, that leftover state resumes the *next* test onto the wrong
+// step, turning one slow test into a confusing cascade of unrelated failures.
+afterEach(() => {
+  localStorage.clear()
+})
+
 beforeEach(() => {
   localStorage.clear()
 })
@@ -284,20 +292,40 @@ describe('Insurance', () => {
   })
 
   it('shows the error summary listing step-owned fields on a failed final submit', async () => {
+    // The state a session reaches by filling everything with "has vehicle?" No, then
+    // flipping it on from Review's Edit link (backward nav skips validation) without ever
+    // visiting the newly-shown Vehicle step: `hasVehicle` is true, `vehicle` is still
+    // empty, and `visited` never names "vehicle". The whole schema is only checked on
+    // final submit, so this is the realistic way an otherwise-valid wizard reaches Review
+    // with an invalid field (see Wizard's own `fields`-ownership doc: a field listed in no
+    // *visited* step is caught at submit). Seeded rather than walked — the eight-step
+    // `fillThroughReview` walk cost ~5 s here and left this test on the edge of the
+    // timeout, and a timeout mid-walk leaves resume state behind for the next test.
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        step: 'review',
+        visited: [
+          'applicant',
+          'contact',
+          'coverage',
+          'has-vehicle',
+          'drivers',
+          'history',
+          'documents',
+          'review',
+        ],
+        values: {
+          ...COMPLETE_VALUES,
+          hasVehicle: true,
+          vehicle: { make: '', model: '', year: null, plate: '' },
+        },
+      }),
+    )
     const user = userEvent.setup({ delay: null })
     render(withPickers(<Insurance />))
-    // Reach Review with "has vehicle?" still No, then flip it on via the Edit link (backward
-    // nav skips validation) without ever visiting/filling the newly-shown Vehicle step: the
-    // whole schema is only checked on final submit, so this is the realistic way an
-    // otherwise-valid wizard reaches Review with an invalid field (see Wizard's own
-    // `fields`-ownership doc: a field listed in no *visited* step is caught at submit). Since
-    // the resulting submit is invalid, <Form confirm> never asks — the error summary appears
+    // Since the submit is invalid, <Form confirm> never asks — the error summary appears
     // directly, with no confirm dialog in between.
-    await fillThroughReview(user)
-    const review = screen.getByRole('group', { name: 'Review' })
-    await user.click(within(review).getByRole('button', { name: /edit has vehicle/i }))
-    await user.click(screen.getByRole('checkbox', { name: /insure a vehicle/i }))
-    await user.click(screen.getByRole('tab', { name: /Review/ }))
     await user.click(screen.getByRole('button', { name: /submit application/i }))
     await screen.findByRole('heading', { name: /there is a problem/i })
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
