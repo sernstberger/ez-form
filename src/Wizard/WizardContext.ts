@@ -4,7 +4,10 @@ import type { FieldValues, Path } from 'react-hook-form'
 export interface WizardStepDef<TIn extends FieldValues = FieldValues> {
   id: string
   label: ReactNode
-  /** Field paths validated by Next. Omit for steps with nothing to validate (a review step). */
+  /** Field paths validated by Next. Omit for steps with nothing to validate (a review step).
+   * Every field in the schema should appear in exactly one step's `fields`; a field listed
+   * in no step is validated only on final submit, and since it is not mounted its error
+   * cannot be shown or focused. */
   fields?: readonly Path<TIn>[]
   /** Secondary text under the label (`StepLabel optional`). */
   optional?: ReactNode

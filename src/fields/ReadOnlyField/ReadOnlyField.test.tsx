@@ -49,6 +49,11 @@ describe('ReadOnlyField', () => {
     expect(screen.getByText('ada@x.io')).toBeInTheDocument()
   })
 
+  it('root has an accessible name equal to the label, via aria-labelledby', () => {
+    wrap(<ReadOnlyField name="email" label="Email" />)
+    expect(screen.getByText('ada@x.io').closest('[aria-labelledby]')).toHaveAccessibleName('Email')
+  })
+
   it('humanizes the name when there is no label', () => {
     wrap(<ReadOnlyField name="cardNumber" />)
     expect(screen.getByText('Card number')).toBeInTheDocument()

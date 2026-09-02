@@ -20,7 +20,7 @@ declare module '@mui/material/styles' {
     EzClearButton: 'root'
     EzSubmitButton: 'root'
     EzConfirmDialog: 'root' | 'confirm' | 'cancel'
-    EzWizardStepper: 'root' | 'verticalStepButton'
+    EzWizardStepper: 'root' | 'stepButton' | 'verticalStepButton'
     EzWizardNav: 'root' | 'prev' | 'next' | 'submit'
     EzReadOnlyField: 'root' | 'header' | 'label' | 'value' | 'edit'
   }

@@ -92,6 +92,7 @@ export function ReadOnlyField(inProps: ReadOnlyFieldProps) {
   return (
     <ReadOnlyFieldRoot
       {...slotProps?.root}
+      aria-labelledby={labelId}
       className={`${readOnlyFieldClasses.root}${slotProps?.root?.className ? ` ${slotProps.root.className}` : ''}`}
     >
       <ReadOnlyFieldHeader

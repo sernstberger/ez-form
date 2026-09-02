@@ -138,6 +138,8 @@ const steps = [
 </Form>
 ```
 
+Every field in the schema should appear in exactly one step's `fields`; a field listed in no step is validated only on final submit, and since it is not mounted its error cannot be shown or focused.
+
 ### One route per step
 
 `Wizard` is controlled through `step` / `onStepChange`; wire those to your router. With react-router, put `<Form>` + `<Wizard>` in a layout route and render the step routes through `<Outlet>`:

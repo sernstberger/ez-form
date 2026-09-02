@@ -423,6 +423,24 @@ describe('WizardStepper', () => {
     expect(planLabel).toHaveClass('Mui-error')
   })
 
+  // Unlike `verticalStepButton`, the horizontal step button can't be a
+  // `theme.components.EzWizardStepper.styleOverrides` slot: it must render
+  // the literal `StepButton` import (see the comment at the call site in
+  // WizardStepper.tsx) so `Stepper` recognizes it and sets up the
+  // `role="tab"`/`tablist` wiring; a `styled(StepButton)` wrapper is a
+  // different component reference and that detection silently fails. So
+  // this only asserts the class name is present, for consumers to target
+  // with a plain CSS rule on `.EzWizardStepper-stepButton`.
+  it('the horizontal step button carries the stepButton class', async () => {
+    const user = userEvent.setup()
+    render(<Inline orientation="horizontal" />)
+    await user.click(screen.getByRole('button', { name: 'next' }))
+    await waitFor(() => expect(screen.getByRole('tab', { name: /Account/ })).toBeInTheDocument())
+    expect(screen.getByRole('tab', { name: /Account/ })).toHaveClass(
+      wizardStepperClasses.stepButton,
+    )
+  })
+
   it('is themeable: styleOverrides.verticalStepButton applies to the vertical step button', async () => {
     const user = userEvent.setup()
     const theme = createTheme({

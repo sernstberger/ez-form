@@ -18,6 +18,7 @@ export type WizardStepperProps = Omit<
 
 export const wizardStepperClasses = generateUtilityClasses('EzWizardStepper', [
   'root',
+  'stepButton',
   'verticalStepButton',
 ])
 
@@ -97,7 +98,24 @@ export function WizardStepper(inProps: WizardStepperProps) {
             // child (`cloneElement`, which overwrites): without `optional`
             // here too, that clone stamps `optional: undefined` over the
             // value `stepLabel()` already set, silently dropping it.
-            <StepButton color="inherit" optional={step.optional} onClick={() => void go(step.id)}>
+            //
+            // This must render the literal `StepButton` import, not a
+            // `styled(StepButton)` wrapper: `Stepper` detects the tablist
+            // widget with `child.type === StepButton` (strict reference
+            // equality against its own import, see node_modules/@mui/
+            // material/Stepper/Stepper.js), not `isMuiElement`/`muiName`.
+            // A styled wrapper is a different component type, so that
+            // check silently fails, `isTabList` stays false, and the
+            // `role="tab"`/`tablist` ARIA wiring this component depends on
+            // (see the class-level comment) never gets set up. So there is
+            // no `EzWizardStepper.styleOverrides.stepButton` slot here —
+            // only the class name, for consumers to target with a plain
+            // CSS override on `.EzWizardStepper-stepButton`.
+            <StepButton
+              className={wizardStepperClasses.stepButton}
+              optional={step.optional}
+              onClick={() => void go(step.id)}
+            >
               {stepLabel(step, status)}
             </StepButton>
           )
