@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../../Form'
-import { PercentField } from './PercentField'
+import { PercentField, type PercentFieldProps } from './PercentField'
 import { describeFieldContract } from '../../test/describeFieldContract'
 import { expectNoA11yViolations } from '../../test/axe'
 
@@ -301,5 +301,14 @@ describe('PercentField theming', () => {
     await user.type(input(), '25')
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(onSubmit).toHaveBeenCalledWith({ rate: 25 }, expect.anything())
+  })
+})
+
+describe('PercentField type-level', () => {
+  it("rejects NumberField's internal valueScale prop (scale is the public way to ask)", () => {
+    const identity = { toDisplay: (v: number) => v, toStored: (v: number) => v }
+    // @ts-expect-error valueScale is NumberField-internal; PercentField drives it from `scale`
+    const props: PercentFieldProps = { name: 'rate', valueScale: identity }
+    expect(props).toBeDefined()
   })
 })

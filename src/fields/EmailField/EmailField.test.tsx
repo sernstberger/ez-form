@@ -293,3 +293,32 @@ describe("EmailField normalize respects the form's validation mode", () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
+
+describe('EmailField readOnly', () => {
+  it('does not normalize a readOnly field on blur', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{ email: 'Ada@Example.COM' }} onSubmit={() => {}}>
+        <EmailField name="email" label="Email" slotProps={{ input: { readOnly: true } }} />
+      </Form>,
+    )
+    expect(input()).toHaveValue('Ada@Example.COM')
+    // Focusing and leaving a read-only field must not rewrite a value the user
+    // was never able to edit.
+    await user.click(input())
+    await user.tab()
+    expect(input()).toHaveValue('Ada@Example.COM')
+  })
+
+  it('still normalizes a plain (non-readOnly) field, for contrast', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{ email: 'Ada@Example.COM' }} onSubmit={() => {}}>
+        <EmailField name="email" label="Email" />
+      </Form>,
+    )
+    await user.click(input())
+    await user.tab()
+    expect(input()).toHaveValue('ada@example.com')
+  })
+})

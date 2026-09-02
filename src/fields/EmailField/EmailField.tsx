@@ -1,5 +1,4 @@
 import type { FocusEvent } from 'react'
-import type { Message } from 'react-hook-form'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import { mergeSlotProps } from '@mui/material/utils'
 import { TextField, type TextFieldProps } from '../TextField'
@@ -95,6 +94,11 @@ export function EmailField(inProps: EmailFieldProps) {
    */
   const normalizeOnBlur = (event: FocusEvent<HTMLInputElement>) => {
     const input = event.currentTarget
+    // Read off the element rather than a prop: `readOnly` can arrive through
+    // `slotProps.input` (MUI's) or `slotProps.htmlInput`, and a value the user
+    // was never able to edit is not this field's to rewrite. `disabled` needs
+    // no check — a disabled input cannot be focused, so it never blurs.
+    if (input.readOnly) return
     const next = canonicalize(input.value)
     // Only when it actually differs, so an already-canonical value fires no
     // extra change and never marks the field dirty on its own.
@@ -127,7 +131,7 @@ export function EmailField(inProps: EmailFieldProps) {
         // what blur will canonicalize to rather than rejecting a value the field
         // is about to fix itself.
         email: (v: string) =>
-          v == null || v === '' || EMAIL_RE.test(canonicalize(v)) || (invalidMessage as Message),
+          v == null || v === '' || EMAIL_RE.test(canonicalize(v)) || invalidMessage,
       }}
     />
   )
