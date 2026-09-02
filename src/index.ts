@@ -23,6 +23,11 @@ export { TimePicker, type TimePickerProps } from './fields/TimePicker'
 export { DateTimePicker, type DateTimePickerProps } from './fields/DateTimePicker'
 export type { PickerErrorMessages } from './fields/pickers/pickerMessages'
 export { OtpField, type OtpFieldProps } from './fields/OtpField'
+export {
+  ResendCodeButton,
+  resendCodeButtonClasses,
+  type ResendCodeButtonProps,
+} from './fields/OtpField/ResendCodeButton'
 export { FileField, type FileFieldProps, type FileFieldValue } from './fields/FileField'
 export {
   ConfirmDialog,

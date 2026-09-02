@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { z } from 'zod'
+import Stack from '@mui/material/Stack'
 import type { FormParameters } from '../../../.storybook/preview'
 import { OtpField } from './OtpField'
+import { ResendCodeButton } from './ResendCodeButton'
 
 const schema = z.object({ code: z.string() })
 
@@ -29,4 +31,27 @@ export const Incomplete: Story = {
     await userEvent.click(canvas.getByRole('button', { name: 'Submit' }))
     await canvas.findByText('Verification code must be 6 characters.')
   },
+}
+
+export const WithResend: Story = {
+  render: (args) => (
+    <Stack spacing={1}>
+      <OtpField {...args} />
+      <ResendCodeButton onResend={() => new Promise((r) => setTimeout(r, 400))} cooldown={20} />
+    </Stack>
+  ),
+  play: async ({ canvas, userEvent }) => {
+    const resend = canvas.getByRole('button', { name: 'Resend code' })
+    await userEvent.click(resend)
+    await canvas.findByText(/Resend code \(\d+s\)/)
+  },
+}
+
+export const ResendDisabled: Story = {
+  render: (args) => (
+    <Stack spacing={1}>
+      <OtpField {...args} />
+      <ResendCodeButton onResend={() => {}} disabled />
+    </Stack>
+  ),
 }

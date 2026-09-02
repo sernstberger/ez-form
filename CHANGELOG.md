@@ -11,6 +11,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `EzNumberField` theme key (`defaultProps`, `styleOverrides` for `root`, `steppers`,
   `increment`, `decrement`) and the `numberFieldClasses` export; NumberField renders
   through MUI `TextField` — #26.
+- `ResendCodeButton`: a resend-code helper for `OtpField` (MUI `Button`, `type="button"`).
+  `onResend` is awaited if it returns a promise; disabled while pending and then for
+  `cooldown` seconds (default 30), the label showing the remaining time
+  (`Resend code (27s)`). A separate `role="status"` slot announces "Code sent" once per
+  resend without spamming assistive tech on every countdown tick. `EzResendCodeButton`
+  theme key (`defaultProps`, `styleOverrides` for `root`, `status`) and the
+  `resendCodeButtonClasses` export — #63.
 
 ### Changed
 
