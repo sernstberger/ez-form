@@ -48,10 +48,14 @@ export function TextareaField(inProps: TextareaFieldProps) {
     ...rest
   } = props
   useEzFormContext('TextareaField')
-  const value = useWatch({ name })
+  // `useWatch` is typed `any` for an untyped control; the `typeof value === 'string'` check
+  // below is what actually narrows it, so `unknown` loses nothing.
+  const value: unknown = useWatch({ name })
   const max = bound(maxLength)
   const length = typeof value === 'string' ? value.length : 0
-  const showMeter = showCount || max !== undefined
+  // Boolean OR, not a nullish fallback: the meter shows if either the consumer asked for it
+  // or a maxLength gives it something to count against.
+  const showMeter = showCount === true || max !== undefined
 
   const composedHelperText: ReactNode = showMeter ? (
     <>

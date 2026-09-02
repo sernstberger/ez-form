@@ -112,7 +112,9 @@ export function PhoneField(inProps: PhoneFieldProps) {
   // The display is a pure function of the stored digits, read from the form
   // rather than kept as a second copy that could drift out of sync with a
   // reset or a programmatic `setValue`.
-  const stored = useWatch({ name })
+  // `useWatch` is typed `any` for an untyped control; this field stores digits as a string and
+  // the `typeof` check below narrows it.
+  const stored: unknown = useWatch({ name })
   const displayValue = formatTemplate(typeof stored === 'string' ? digitsOnly(stored) : '', format)
 
   const inputRef = useRef<HTMLInputElement | null>(null)

@@ -209,7 +209,7 @@ describe('ReadOnlyField', () => {
     })
 
     it('runs value through format', () => {
-      wrap(<ReadOnlyField value={42} label="Total" format={(v) => `$${v}`} />)
+      wrap(<ReadOnlyField value={42} label="Total" format={(v) => `$${String(v)}`} />)
       expect(screen.getByText('$42')).toBeInTheDocument()
     })
 

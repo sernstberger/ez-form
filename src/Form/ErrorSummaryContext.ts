@@ -23,6 +23,9 @@ export interface ErrorSummaryContextValue {
 
 export const ErrorSummaryContext = createContext<ErrorSummaryContextValue | null>(null)
 
+// Register-and-unregister pair for the no-<Form> case: registering nothing means there is
+// nothing to unregister, so both halves are deliberately empty.
+// eslint-disable-next-line @typescript-eslint/no-empty-function
 const noopRegister = () => () => {}
 
 /**

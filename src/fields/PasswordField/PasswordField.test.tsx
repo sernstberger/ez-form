@@ -14,6 +14,9 @@ const schema = z.object({ password: z.string().min(1, { error: 'Password is requ
 // dodges the required-asterisk label text by querying role instead), so `getByLabelText` is
 // the only way in; querySelector is the fallback for the required case, where the label reads
 // "Password *" to accessible-name computation.
+// A widening cast (Element -> HTMLInputElement), not a non-null one; `!` alone loses
+// `.value`.
+// eslint-disable-next-line @typescript-eslint/non-nullable-type-assertion-style
 const input = () => document.querySelector('input[name="password"]') as HTMLInputElement
 
 describeFieldContract({

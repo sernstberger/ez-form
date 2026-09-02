@@ -236,6 +236,16 @@ function WizardBody<TIn extends FieldValues>({
     if (!reachable) onStepChange?.(steps[lastVisitedIndex]!)
   }, [step, reachable, steps, lastVisitedIndex, onStepChange])
 
+  /*
+   * The four assertions in this callback are reported as unnecessary by
+   * `no-unnecessary-type-assertion` and are load-bearing to the compiler. That is not a
+   * contradiction: the linter type-checks with the TS 6 API (see eslint.config.js) while
+   * `pnpm typecheck` runs TS 7, and the two infer `current.fields` differently across this
+   * generic boundary — dropping them fails `tsc`. The compiler is the authority, so the
+   * assertions stay and the rule is switched off for the callback. Revisit when
+   * typescript-eslint supports TS 7 and both agree.
+   */
+  /* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
   const validateCurrent = useCallback(async () => {
     const fields = current.fields as readonly Path<TIn>[] | undefined
     if (!fields?.length) return true
@@ -258,6 +268,7 @@ function WizardBody<TIn extends FieldValues>({
       setPending(false)
     }
   }, [current, trigger, control, getValues, hasErrorSummary])
+  /* eslint-enable @typescript-eslint/no-unnecessary-type-assertion */
 
   // In `page` layout every step is already visible at once, so Next/Prev/go
   // have nothing to do — the whole schema is validated by `<SubmitButton>`
@@ -344,6 +355,10 @@ function WizardBody<TIn extends FieldValues>({
     const owned = errorPaths.map((path) => ({ path, to: ownerIndex(path) }))
     const to = Math.min(...owned.map((o) => o.to))
     if (to === index) return
+    /* Navigating to the first errored step after a failed submit. `handledSubmit.current`
+       above makes this run once per `submitCount`, and `to === index` stops it once the move
+       has landed. */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     move(to)
     setFocusTarget({ id: steps[to]!.id, path: owned.find((o) => o.to === to)!.path })
   }, [submitCount, errorPaths, ownerIndex, index, move, steps, layout])
@@ -358,9 +373,15 @@ function WizardBody<TIn extends FieldValues>({
       // navigation, long after the failed submit — would wrongly focus a stale field on
       // mount. Any `current.id` change that isn't the requested step means the move didn't
       // happen (or was superseded); either way the target is stale and gets dropped.
+      //
+      // Both this clear and the one below consume a one-shot target rather than deriving
+      // state from props: `if (!focusTarget) return` makes the render either schedules a
+      // no-op, so the effect settles in one extra pass instead of cascading.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFocusTarget(null)
       return
     }
+    // Clearing the one-shot focus target now that it has been used.
     setFocusTarget(null)
     setFocus(focusTarget.path)
   }, [focusTarget, current.id, setFocus])

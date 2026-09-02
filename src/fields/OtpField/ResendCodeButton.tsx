@@ -114,7 +114,16 @@ export function ResendCodeButton(inProps: ResendCodeButtonProps) {
   }
 
   const cooling = remaining > 0
-  const label = cooling ? `${children} (${remaining}s)` : children
+  // The countdown is appended as a sibling node rather than interpolated into a template:
+  // `children` is a `ReactNode`, so a consumer passing an element (an icon plus text, say)
+  // would otherwise render the literal "[object Object] (30s)".
+  const label = cooling ? (
+    <>
+      {children} ({remaining}s)
+    </>
+  ) : (
+    children
+  )
   const { status: statusSlotProps } = slotProps ?? {}
 
   return (

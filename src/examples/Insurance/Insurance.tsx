@@ -172,7 +172,7 @@ function loadSaved(): SavedState | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
-    return JSON.parse(raw, (key, value) => {
+    return JSON.parse(raw, (key: string, value: unknown) => {
       if ((key === 'birthday' || key === 'licenseDate') && typeof value === 'string') {
         return new Date(value)
       }
@@ -237,9 +237,12 @@ export const INSURANCE_STEPS = [
 function WatchValues({ onValues }: { onValues: (values: Partial<Input>) => void }) {
   const values = useWatch<Input>() as Partial<Input>
   const json = JSON.stringify(values)
+  // Keyed on the serialized values, not the object: `useWatch` returns a fresh object every
+  // render, so an identity dep would fire on every keystroke's re-render regardless of whether
+  // anything changed.
   useEffect(() => {
     onValues(JSON.parse(json) as Partial<Input>)
-  }, [json])
+  }, [json, onValues])
   return null
 }
 

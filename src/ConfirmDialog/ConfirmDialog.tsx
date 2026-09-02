@@ -82,6 +82,11 @@ export function ConfirmDialog(inProps: ConfirmDialogProps) {
     <ConfirmDialogCancel
       key="cancel"
       onClick={onCancel}
+      /* The rule is about autofocus on a page, which moves focus without the user asking. A
+         modal dialog is the documented exception: APG requires focus to move *into* the dialog
+         when it opens, and puts it on the least destructive control — here, Cancel. Removing
+         this would strand focus behind the modal. */
+      // eslint-disable-next-line jsx-a11y/no-autofocus
       autoFocus
       className={confirmDialogClasses.cancel}
       {...cancelProps}

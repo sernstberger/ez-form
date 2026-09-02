@@ -123,12 +123,22 @@ export function Profile({ onSuccess, loadSeed }: ProfileProps) {
               <Button
                 type="button"
                 variant="text"
-                onClick={() => {
+                onClick={async () => {
                   reloadCount.current += 1
-                  loadProfileApi({
-                    ...loadSeed,
-                    bio: `Reloaded from the server (reload #${reloadCount.current}).`,
-                  }).then(setReloaded)
+                  // Awaited rather than left as a bare `.then`: an unhandled rejection here
+                  // would surface as a console error with no connection to this button. The
+                  // fake API does not reject today, so the catch simply leaves the form on
+                  // the values it already has.
+                  try {
+                    setReloaded(
+                      await loadProfileApi({
+                        ...loadSeed,
+                        bio: `Reloaded from the server (reload #${reloadCount.current}).`,
+                      }),
+                    )
+                  } catch {
+                    // Keep the current values; a real app would surface this to the user.
+                  }
                 }}
               >
                 Reload from server

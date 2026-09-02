@@ -13,7 +13,8 @@ export interface FieldContractProps {
   /** Slider's failing rule for `errorProps` (it has no `required`). */
   min?: number
   max?: number
-  onChange?: (...args: any[]) => void
+  /** Args vary per field (event, value, reason, …); the contract only ever counts calls. */
+  onChange?: (...args: unknown[]) => void
 }
 
 export interface FieldContract<TIn extends FieldValues, TOut> {
