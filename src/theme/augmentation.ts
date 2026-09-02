@@ -27,6 +27,8 @@ import type { EmailFieldProps } from '../fields/EmailField'
 import type { FeinFieldProps } from '../fields/FeinField'
 import type { PercentFieldProps } from '../fields/PercentField'
 import type { SsnFieldProps } from '../fields/SsnField'
+import type { ZipFieldProps } from '../fields/ZipField'
+import type { StateSelectProps } from '../fields/StateSelect'
 
 declare module '@mui/material/styles' {
   interface ComponentsPropsList {
@@ -62,6 +64,8 @@ declare module '@mui/material/styles' {
     EzFeinField: Partial<FeinFieldProps>
     EzPercentField: Partial<PercentFieldProps>
     EzSsnField: Partial<SsnFieldProps>
+    EzZipField: Partial<ZipFieldProps>
+    EzStateSelect: Partial<StateSelectProps>
   }
 
   interface ComponentNameToClassKey {
@@ -211,6 +215,17 @@ declare module '@mui/material/styles' {
     EzSsnField?: {
       defaultProps?: ComponentsProps['EzSsnField']
       styleOverrides?: ComponentsOverrides<Theme>['EzSsnField']
+    }
+    // A plain `TextField` with no styled slot of its own, so it registers
+    // `defaultProps` only — that is what makes `invalidMessage` and
+    // `autoComplete` theme-settable (a translated ZIP message, say).
+    EzZipField?: {
+      defaultProps?: ComponentsProps['EzZipField']
+    }
+    // A plain `Select` with no styled slot of its own: `defaultProps` only,
+    // which is what makes `territories` and `autoComplete` theme-settable.
+    EzStateSelect?: {
+      defaultProps?: ComponentsProps['EzStateSelect']
     }
   }
 }

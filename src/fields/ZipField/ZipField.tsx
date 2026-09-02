@@ -1,5 +1,6 @@
 import type { Message } from 'react-hook-form'
 import type { ReactNode } from 'react'
+import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import { mergeSlotProps } from '@mui/material/utils'
 import { TextField, type TextFieldProps } from '../TextField'
 import { resolveAutoComplete } from '../resolveAutoComplete'
@@ -29,15 +30,17 @@ function stripToZip(e: React.FormEvent<HTMLInputElement>) {
  * Form value is the digit string (`''` when empty, never `undefined`, so `required` still
  * applies). A built-in rule rejects a non-empty value that isn't exactly 5 digits.
  */
-export function ZipField({
-  validate,
-  invalidMessage = 'Enter a 5-digit ZIP code',
-  autoComplete: autoCompleteProp,
-  slotProps,
-  ...rest
-}: ZipFieldProps) {
+export function ZipField(inProps: ZipFieldProps) {
   // Ahead of TextField's own guard, so the "outside <Form>" error names <ZipField>.
   useEzFormContext('ZipField')
+  const props = useDefaultProps({ props: inProps, name: 'EzZipField' })
+  const {
+    validate,
+    invalidMessage = 'Enter a 5-digit ZIP code',
+    autoComplete: autoCompleteProp,
+    slotProps,
+    ...rest
+  } = props
   const assisted = useAssisted()
   const autoComplete = autoCompleteProp ?? resolveAutoComplete('postal-code', assisted)
   const consumer =

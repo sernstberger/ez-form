@@ -1268,6 +1268,8 @@ Digits only, capped at 5 — anything else (letters, the ZIP+4 dash) is stripped
 const schema = z.object({ zip: z.string().min(1) })
 ```
 
+`invalidMessage` and `autoComplete` are settable app-wide through `theme.components.EzZipField.defaultProps`; a prop on the element always wins. `ZipField` adds no styled slot of its own — it renders a `TextField`, so MUI's own `MuiTextField` / `MuiOutlinedInput` style keys reach it unchanged.
+
 ### StateSelect
 
 `Select` pre-loaded with the 50 states + DC (`US_STATES`, exported as an `Option[]`); pass `territories` to add PR, GU, VI, AS, MP (`US_TERRITORIES`). Values are USPS abbreviations (`'CA'`), labels are full names (`'California'`). `autoComplete` defaults to `'address-level1'`.
@@ -1276,6 +1278,8 @@ const schema = z.object({ zip: z.string().min(1) })
 <StateSelect name="state" label="State" required />
 <StateSelect name="state" label="State or territory" territories />
 ```
+
+`territories` and `autoComplete` are settable app-wide through `theme.components.EzStateSelect.defaultProps` — so "territories on everywhere" is one theme key, not a prop on every element; a prop on the element always wins. `StateSelect` adds no styled slot of its own — it renders a `Select`, so MUI's own `MuiTextField` / `MuiSelect` / `MuiMenuItem` style keys reach it unchanged.
 
 ### AddressField
 

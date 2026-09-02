@@ -3,6 +3,7 @@ import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import { mergeSlotProps } from '@mui/material/utils'
 import { TextField, type TextFieldProps } from '../TextField'
 import { resolveAutoComplete } from '../resolveAutoComplete'
+import { isEmail } from '../emailPattern'
 import { useAssisted } from '../../Form/AssistedContext'
 import { useEzFormContext } from '../../useEzFormContext'
 
@@ -37,17 +38,6 @@ export type EmailFieldProps = Omit<
   normalize?: boolean
   autoComplete?: string
 }
-
-/**
- * The WHATWG HTML "valid e-mail address" grammar, verbatim from
- * https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address — the
- * same production a browser's own `<input type="email">` validity check uses.
- * Reusing it rather than inventing a regex means the field's rule agrees with
- * the browser's native bubble instead of disagreeing with it in either
- * direction.
- */
-const EMAIL_RE =
-  /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
 
 /** Trimmed and lower-cased, the canonical form this field stores on blur. */
 function canonicalize(value: string): string {
@@ -137,8 +127,7 @@ export function EmailField(inProps: EmailFieldProps) {
         // The rule reads the value the same way it is stored, so it agrees with
         // what blur will canonicalize to rather than rejecting a value the field
         // is about to fix itself.
-        email: (v: string) =>
-          v == null || v === '' || EMAIL_RE.test(canonicalize(v)) || invalidMessage,
+        email: (v: string) => v == null || v === '' || isEmail(canonicalize(v)) || invalidMessage,
       }}
     />
   )

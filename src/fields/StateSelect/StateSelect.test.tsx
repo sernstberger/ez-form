@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import { ThemeProvider, createTheme } from '@mui/material/styles'
 import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../../Form'
@@ -124,5 +125,41 @@ describe('StateSelect', () => {
     expect(combobox()).toBeRequired()
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(await screen.findByText('State is required.')).toBeInTheDocument()
+  })
+})
+
+describe('StateSelect theme defaultProps (EzStateSelect)', () => {
+  it('takes territories from theme defaultProps', async () => {
+    const user = userEvent.setup()
+    const theme = createTheme({
+      components: { EzStateSelect: { defaultProps: { territories: true } } },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+          <StateSelect name="state" label="State" />
+        </Form>
+      </ThemeProvider>,
+    )
+    await user.click(combobox())
+    expect(await screen.findByRole('option', { name: 'Puerto Rico' })).toBeInTheDocument()
+    expect(screen.getAllByRole('option')).toHaveLength(56)
+  })
+
+  it("a prop on the element still wins over the theme's default", async () => {
+    const user = userEvent.setup()
+    const theme = createTheme({
+      components: { EzStateSelect: { defaultProps: { territories: true } } },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+          <StateSelect name="state" label="State" territories={false} />
+        </Form>
+      </ThemeProvider>,
+    )
+    await user.click(combobox())
+    expect(await screen.findAllByRole('option')).toHaveLength(51)
+    expect(screen.queryByRole('option', { name: 'Puerto Rico' })).not.toBeInTheDocument()
   })
 })
