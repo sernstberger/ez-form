@@ -104,7 +104,7 @@ React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form
 | `Checkbox`                                     | MUI `Checkbox`                                | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `Switch`                                       | MUI `Switch`                                  | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `SubmitButton`                                 | MUI `Button`                                  | `loading` while submitting, disabled while the form is                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `Form` (v4 additions)                          | —                                             | `confirm?: true \| ConfirmOptions` asks after validation on every submit path; `guard?: boolean` warns on tab close while dirty                                                                                                                                                                                                                                                                                                                                                  |
+| `Form` (v4 additions)                          | —                                             | `confirm?: true \| ConfirmOptions` asks after validation on every submit path; `guard?: boolean` warns on tab close while dirty; `submitPendingText?`/`submitSuccessText?`/`submitErrorText?` are the submit announcements (`false` suppresses one)                                                                                                                                                                                                                              |
 | `ClearButton`                                  | MUI `Button`                                  | `to?: 'defaults' \| 'empty'`, `confirm?`; disabled while pristine                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `ConfirmDialog`                                | MUI `Dialog`                                  | `open`, `title`, `message?`, `confirmLabel?`, `cancelLabel?`, `confirmColor?`, `onConfirm`, `onCancel`, `actionsOrder?: 'cancel-confirm' \| 'confirm-cancel'` (default `'cancel-confirm'`; Cancel keeps `autoFocus` either way); `useConfirm()` gives a promise API                                                                                                                                                                                                              |
 | `Wizard`                                       | MUI `Stepper`                                 | `steps`, `step?`/`onStepChange?`, `visited?`/`onVisitedChange?`, `orientation?`, `layout?: 'steps' \| 'page'`; with `WizardStepper`, `WizardStep`, `WizardNav` (`actionsOrder?: 'back-next' \| 'next-back'`, default `'back-next'`), `useWizard`                                                                                                                                                                                                                                 |
@@ -116,6 +116,7 @@ React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form
 | `ResendCodeButton`                             | MUI `Button`                                  | `onResend` (awaited if a promise; disabled while pending), `cooldown?` (seconds, default 30) shown in the label (`Resend code (27s)`); a rejected `onResend` shows `errorText?` (default "Code could not be sent") in the status slot instead, starts no cooldown, and calls `onResendError?(error)`. `slotProps.status` for the `role="status"` region that announces "Code sent" (or the error) once per resend. Disabled while the form is disabled (which covers submitting) |
 | `FormError`                                    | MUI `Alert`                                   | Renders `formState.errors.root` (set via `form.setError('root.<key>', { message })`, e.g. a rejected async `onSubmit`); renders nothing when there is no root error                                                                                                                                                                                                                                                                                                              |
 | `FormErrorSummary`                             | —                                             | `title?` (default "There is a problem"), `slotProps?` (`heading`, `list`, `item`, `link`); lists the last failed validation's errors as focusable links, GOV.UK-style — see "Error summary" below                                                                                                                                                                                                                                                                                |
+| `LiveRegion`                                   | —                                             | `message`, `announcementKey?` (bump to re-announce identical text), `politeness?` (`polite`/`assertive`), `visuallyHidden?` (default `true`), `component?`; the shared announcement region. `<Form>` renders one for submit status — see "Announcements" below                                                                                                                                                                                                                   |
 | `FieldArray`                                   | hookform `useFieldArray`                      | `name`, `label` (array legend), `emptyRow`, `singular?`/`rowLabel?`, `minRows?`/`maxRows?`, `addLabel?`/`removeLabel?`, `reorder?`, `slotProps?`; children is a render prop `(row) => ...` given `row.name('field')` for the array path. Rows are keyed by hookform's `field.id`; Add/Remove/Move move focus and announce in a `role="status"` region                                                                                                                            |
 
 `Form`'s `title` / `description` give the form its accessible name and instructions (wired to the `<form>` via `aria-labelledby` / `aria-describedby`); `slotProps.title.component` sets the heading level (default `h2`). `FormSection` groups fields in a `<fieldset>` named by its `title` (`<legend>`, heading level configurable via `slotProps.legend.component`, default `h3`); `description` is helper text wired via `aria-describedby`.
@@ -181,6 +182,64 @@ field" behavior so the two don't fight over focus.
 
 Inside a `Wizard`, place one `<FormErrorSummary />` per `WizardStep`: each shows only that step's
 own `fields` from its last failed `Next`, not the whole form's errors.
+
+## Announcements
+
+Screen reader users get no feedback from a button that quietly starts an async submit, so
+`<Form>` announces the submit lifecycle in a live region it renders itself — no wiring, and
+nothing visible changes:
+
+```tsx
+<Form schema={schema} onSubmit={save}>   {/* announces "Submitting…", then "Submitted." or "Submit failed." */}
+```
+
+Each string is a prop, so it can be localised or turned off individually
+(`false` suppresses just that one):
+
+```tsx
+<Form
+  schema={schema}
+  onSubmit={save}
+  submitPendingText="Saving your answers…"
+  submitSuccessText="Saved."
+  submitErrorText={false}          // the page shows its own error banner instead
+>
+```
+
+A _validation_ failure is deliberately not announced here: `onSubmit` never ran, and
+`<FormErrorSummary />` already announces and lists what needs fixing. "Submit failed." is
+reserved for a submit that started and then rejected.
+
+The region itself is `<LiveRegion />`, exported for your own announcements:
+
+```tsx
+<LiveRegion message={saved ? 'Draft saved' : ''} />
+```
+
+It is visually hidden by default, `polite` by default (`politeness="assertive"` renders an
+`alert` instead of a `status`), and takes `component` to render as something else — MUI's
+`Typography`, say, when the text is also visible UI (`visuallyHidden={false}`).
+
+Assistive tech only announces a live region when its _content changes_, so setting the same
+text twice is silent. Pass a counter as `announcementKey` to force a re-announcement — it keys
+the node, so an identical message mounts a fresh region and is heard again:
+
+```tsx
+<LiveRegion message="Could not save" announcementKey={attempt} />
+```
+
+Render a `LiveRegion` unconditionally with an empty `message` at rest, rather than mounting it
+alongside its text: a region that appears in the same commit as its content has nothing to
+change _from_, and that first announcement is unreliable. `Form`, `FieldArray`,
+`ResendCodeButton` and `PasswordStrength` all use this same component internally.
+
+Because several of them can be on screen at once, one form may hold more than one
+`role="status"` region — so in a test, query the one you mean by its slot class rather than by
+role. The form's own submit-status region is `formClasses.status`:
+
+```tsx
+document.querySelector(`.${formClasses.status}`) // the form's, not a field's
+```
 
 ## Field arrays
 

@@ -31,6 +31,7 @@ import type { z } from 'zod'
 import { ezResolver } from './ezResolver'
 import { useConfirm, type ConfirmOptions } from '../ConfirmDialog'
 import { ErrorSummaryContext } from './ErrorSummaryContext'
+import { LiveRegion, type LiveRegionProps } from './LiveRegion'
 import { RequiredIndicatorContext } from './RequiredIndicatorContext'
 import { shouldBlockUnsavedChanges } from '../useFormGuard'
 
@@ -42,7 +43,12 @@ import { shouldBlockUnsavedChanges } from '../useFormGuard'
  */
 export type FormMethods<TIn extends FieldValues, TOut> = UseFormReturn<TIn, unknown, TOut>
 
-export const formClasses = generateUtilityClasses('EzForm', ['root', 'title', 'description'])
+export const formClasses = generateUtilityClasses('EzForm', [
+  'root',
+  'title',
+  'description',
+  'status',
+])
 
 /** Typography plus `component`, so a slot can pick its element (heading level). */
 export type FormTextSlotProps = TypographyProps & { component?: ElementType }
@@ -50,6 +56,12 @@ export type FormTextSlotProps = TypographyProps & { component?: ElementType }
 const FormRoot = styled('form', { name: 'EzForm', slot: 'Root' })({})
 const FormTitle = styled(Typography, { name: 'EzForm', slot: 'Title' })({})
 const FormDescription = styled(Typography, { name: 'EzForm', slot: 'Description' })({})
+// The submit-status region gets its own EzForm slot rather than rendering a bare
+// LiveRegion: every migrated call site now carries `EzLiveRegion-root` too, so
+// that class alone no longer identifies *this* region — a form containing a
+// FieldArray or ResendCodeButton has several, and this one renders last.
+// `formClasses.status` is what names it, for a theme and for a test query.
+const FormStatus = styled(LiveRegion, { name: 'EzForm', slot: 'Status' })({})
 
 export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
   FormHTMLAttributes<HTMLFormElement>,
@@ -132,9 +144,26 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
    * set). `false` suppresses it. Ignored in `'asterisk'` mode.
    */
   requiredIndicatorText?: ReactNode | false
+  /**
+   * Announced when a submit starts. `false` suppresses just this one.
+   * Default "Submitting…".
+   */
+  submitPendingText?: ReactNode | false
+  /** Announced when `onSubmit` resolves. `false` suppresses. Default "Submitted." */
+  submitSuccessText?: ReactNode | false
+  /**
+   * Announced when `onSubmit` rejects. `false` suppresses. Default "Submit failed."
+   *
+   * A *validation* failure is not this: the schema rejected, `onSubmit` never
+   * ran, and `<FormErrorSummary>` already announces and lists what is wrong.
+   * Announcing "Submit failed." there would talk over it.
+   */
+  submitErrorText?: ReactNode | false
   slotProps?: {
     title?: FormTextSlotProps
     description?: FormTextSlotProps
+    /** The form's submit-status live region. `message`/`announcementKey` are owned by the form. */
+    liveRegion?: Omit<LiveRegionProps, 'message' | 'announcementKey'>
   }
   children: ReactNode
 }
@@ -164,6 +193,9 @@ function FormImpl<TIn extends FieldValues, TOut>(
     requiredIndicator = 'asterisk',
     optionalText = '(optional)',
     requiredIndicatorText = 'All fields are required unless marked optional.',
+    submitPendingText = 'Submitting…',
+    submitSuccessText = 'Submitted.',
+    submitErrorText = 'Submit failed.',
     slotProps,
     className,
     children,
@@ -334,10 +366,39 @@ function FormImpl<TIn extends FieldValues, TOut>(
     return () => window.removeEventListener('beforeunload', handler)
   }, [guard, isDirty, isSubmitting, isSubmitSuccessful])
 
+  // Ruling: announce from inside this handler rather than from an effect on
+  // formState — the existing submit path is already the one place that knows all
+  // three outcomes, and hookform's own flags cannot tell them apart on their own.
+  // `isSubmitSuccessful` is false both when the schema rejected and when
+  // `onSubmit` threw (handleSubmit sets it to `isEmptyObject(errors) &&
+  // !onValidError`), so an effect would have to re-derive "did onValid actually
+  // run" from the errors object to avoid announcing "Submit failed." at a
+  // validation failure — which requirement 2 forbids, since FormErrorSummary
+  // owns that case. Here the distinction is free: this callback only runs when
+  // validation passed, so its catch is unambiguously a submit failure. Cost if
+  // wrong: a validation failure would announce over the error summary, and the
+  // pending/settled pair could drift out of step with the real submit.
+  const [announcement, setAnnouncement] = useState<{ text: ReactNode; seq: number }>({
+    text: null,
+    seq: 0,
+  })
+  // `seq` (not the text) is what makes a repeat audible: a second failed submit
+  // sets the identical string, which is not a content change on its own. See
+  // LiveRegion's `announcementKey`.
+  const announce = useCallback((text: ReactNode | false) => {
+    if (text === false) return
+    setAnnouncement((prev) => ({ text, seq: prev.seq + 1 }))
+  }, [])
+
   const submit = methods.handleSubmit(async (submitted) => {
     setSubmitting(true)
+    announce(submitPendingText)
     try {
       await onSubmit(submitted, methods)
+      announce(submitSuccessText)
+    } catch (error) {
+      announce(submitErrorText)
+      throw error
     } finally {
       setSubmitting(false)
     }
@@ -402,6 +463,17 @@ function FormImpl<TIn extends FieldValues, TOut>(
           <RequiredIndicatorContext.Provider value={{ requiredIndicator, optionalText }}>
             {children}
           </RequiredIndicatorContext.Provider>
+          {/*
+            Rendered unconditionally, empty at rest: a live region has to be in
+            the DOM before its text arrives, or assistive tech has no prior
+            content to observe changing and the first announcement is missed.
+          */}
+          <FormStatus
+            {...slotProps?.liveRegion}
+            message={announcement.text}
+            announcementKey={announcement.seq}
+            className={`${formClasses.status}${slotProps?.liveRegion?.className ? ` ${slotProps.liveRegion.className}` : ''}`}
+          />
           {dialog}
         </FormRoot>
       </ErrorSummaryContext.Provider>

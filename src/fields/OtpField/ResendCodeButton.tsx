@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Button, { type ButtonProps } from '@mui/material/Button'
 import { styled } from '@mui/material/styles'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
@@ -6,6 +6,7 @@ import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import { useFormState } from 'react-hook-form'
 import { useEzFormContext } from '../../useEzFormContext'
 import { mergeDisabled } from '../mergeDisabled'
+import { LiveRegion, type LiveRegionProps } from '../../Form/LiveRegion'
 
 export const resendCodeButtonClasses = generateUtilityClasses('EzResendCodeButton', [
   'root',
@@ -31,11 +32,13 @@ export interface ResendCodeButtonProps extends Omit<ButtonProps, 'type' | 'onCli
    */
   onResendError?: (error: unknown) => void
   /** The status region (a visible `role="status"`), which announces "Code sent" once per resend. */
-  slotProps?: { status?: ComponentProps<'span'> }
+  slotProps?: { status?: Omit<LiveRegionProps, 'message' | 'announcementKey'> }
 }
 
 const ResendCodeButtonRoot = styled(Button, { name: 'EzResendCodeButton', slot: 'Root' })({})
-const ResendCodeButtonStatus = styled('span', {
+// Visible (it is sighted confirmation of the resend as well as the announcement),
+// so it opts out of LiveRegion's visually-hidden default.
+const ResendCodeButtonStatus = styled(LiveRegion, {
   name: 'EzResendCodeButton',
   slot: 'Status',
 })({})
@@ -44,8 +47,8 @@ const ResendCodeButtonStatus = styled('span', {
  * Resends a one-time code, then disables itself for `cooldown` seconds with
  * the remaining time in its own label. The countdown text is not a live
  * region — announcing every second would spam assistive tech — so a
- * separate `status` slot announces "Code sent" once per click, cleared
- * before the next resend so repeated clicks re-announce.
+ * separate `status` slot announces "Code sent" once per click, remounted per
+ * announcement so repeated clicks re-announce.
  *
  * A rejected `onResend` is caught, not left to reject unhandled: the
  * `status` slot announces `errorText` instead of "Code sent", no cooldown
@@ -69,7 +72,13 @@ export function ResendCodeButton(inProps: ResendCodeButtonProps) {
 
   const [pending, setPending] = useState(false)
   const [remaining, setRemaining] = useState(0)
-  const [status, setStatus] = useState<ReactNode>('')
+  // `{ text, seq }`, not a bare node: `seq` becomes the region's
+  // `announcementKey`, so two resends in a row both announce "Code sent" even
+  // though the text is identical. The previous shape leaned on the `await` in
+  // `handleClick` to separate the clear from the set into two renders — true
+  // today, but only by accident of the async path.
+  const [status, setStatus] = useState<{ text: ReactNode; seq: number }>({ text: '', seq: 0 })
+  const announce = (text: ReactNode) => setStatus((prev) => ({ text, seq: prev.seq + 1 }))
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined)
 
   useEffect(
@@ -80,18 +89,17 @@ export function ResendCodeButton(inProps: ResendCodeButtonProps) {
   )
 
   const handleClick = async () => {
-    setStatus('')
     setPending(true)
     try {
       await onResend()
     } catch (error) {
       setPending(false)
-      setStatus(errorText)
+      announce(errorText)
       onResendError?.(error)
       return
     }
     setPending(false)
-    setStatus('Code sent')
+    announce('Code sent')
     setRemaining(cooldown)
     clearInterval(intervalRef.current)
     intervalRef.current = setInterval(() => {
@@ -121,12 +129,12 @@ export function ResendCodeButton(inProps: ResendCodeButtonProps) {
         {label}
       </ResendCodeButtonRoot>
       <ResendCodeButtonStatus
-        role="status"
+        visuallyHidden={false}
         {...statusSlotProps}
+        message={status.text}
+        announcementKey={status.seq}
         className={`${resendCodeButtonClasses.status}${statusSlotProps?.className ? ` ${statusSlotProps.className}` : ''}`}
-      >
-        {status}
-      </ResendCodeButtonStatus>
+      />
     </>
   )
 }

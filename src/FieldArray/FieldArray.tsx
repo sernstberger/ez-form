@@ -17,6 +17,7 @@ import { styled } from '@mui/material/styles'
 import { useFieldArray, useFormState, type UseFieldArrayProps } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
 import { FormSection, type FormSectionProps } from '../FormSection'
+import { LiveRegion, type LiveRegionProps } from '../Form/LiveRegion'
 
 // `errorText`, not `error`: MUI reserves `error` (with `active`, `checked`,
 // `disabled`, `required`, …) as a *global state* class, so
@@ -87,7 +88,7 @@ export interface FieldArrayProps<TRow = Record<string, unknown>> extends Pick<
     add?: ButtonProps
     remove?: ButtonProps
     move?: IconButtonProps
-    status?: ComponentProps<'span'>
+    status?: Omit<LiveRegionProps, 'message' | 'announcementKey'>
     error?: FormHelperTextProps
   }
 }
@@ -112,7 +113,10 @@ const FieldArrayMove = styled(IconButton, { name: 'EzFieldArray', slot: 'Move' }
   minWidth: 24,
   minHeight: 24,
 })
-const FieldArrayStatus = styled('span', { name: 'EzFieldArray', slot: 'Status' })({})
+// The status line is visible (it doubles as sighted feedback for Add/Remove/Move),
+// so it opts out of LiveRegion's visually-hidden default while still getting the
+// region's role/aria-live and its re-announce handling.
+const FieldArrayStatus = styled(LiveRegion, { name: 'EzFieldArray', slot: 'Status' })({})
 const FieldArrayError = styled(FormHelperText, { name: 'EzFieldArray', slot: 'Error' })({})
 
 const cx = (base: string, extra?: string) => (extra ? `${base} ${extra}` : base)
@@ -167,13 +171,11 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
   const { fields, append, remove, move } = useFieldArray({ name, rules, shouldUnregister })
   const { errors } = useFormState()
 
-  // `seq` is not decoration: it keys the status element, so every announcement
-  // mounts a *fresh* node. Clearing then setting the text in one handler (the
-  // `ResendCodeButton` shape) does not work here — React batches both updates
-  // into a single render, so the region never empties and repeating an action
-  // with an identical message (removing row 2 twice) would be silent.
-  // `ResendCodeButton` gets away with it only because an `await` separates its
-  // two `setState` calls into different renders.
+  // `seq` is not decoration: it becomes the region's `announcementKey`, so every
+  // announcement mounts a *fresh* node. Clearing then setting the text in one
+  // handler does not work here — React batches both updates into a single
+  // render, so the region never empties and repeating an action with an
+  // identical message (removing row 2 twice) would be silent.
   const [status, setStatus] = useState({ text: '', seq: 0 })
   const [pendingFocus, setPendingFocus] = useState<PendingFocus | null>(null)
   const rowRefs = useRef(new Map<string, HTMLFieldSetElement>())
@@ -362,13 +364,12 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
         </FieldArrayError>
       )}
       <FieldArrayStatus
-        key={status.seq}
-        role="status"
+        visuallyHidden={false}
         {...statusSlotProps}
+        message={status.text}
+        announcementKey={status.seq}
         className={cx(fieldArrayClasses.status, statusSlotProps?.className)}
-      >
-        {status.text}
-      </FieldArrayStatus>
+      />
     </FieldArrayRoot>
   )
 }

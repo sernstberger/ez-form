@@ -78,6 +78,18 @@ describe('PasswordStrength', () => {
     expect(label.closest('[aria-live]')).toHaveAttribute('aria-live', 'polite')
   })
 
+  it("slotProps.label['aria-live'] overrides the polite default", () => {
+    wrap(
+      <PasswordStrength
+        name="password"
+        score={() => 1}
+        slotProps={{ label: { 'aria-live': 'assertive' } }}
+      />,
+      { password: 'x' },
+    )
+    expect(screen.getByText('Weak')).toHaveAttribute('aria-live', 'assertive')
+  })
+
   it('has an accessible name of "Password strength"', () => {
     wrap(<PasswordStrength name="password" />)
     expect(screen.getByRole('meter')).toHaveAccessibleName('Password strength')

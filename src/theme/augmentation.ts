@@ -9,6 +9,7 @@ import type { ReadOnlyFieldProps } from '../fields/ReadOnlyField'
 import type { NumberFieldControlProps } from '../fields/NumberField/NumberFieldControl'
 import type { FormProps } from '../Form'
 import type { FormErrorProps } from '../FormError'
+import type { LiveRegionProps } from '../Form/LiveRegion'
 import type { FormErrorSummaryProps } from '../Form/FormErrorSummary'
 import type { FormSectionProps } from '../FormSection'
 import type { FieldArrayProps } from '../FieldArray'
@@ -33,6 +34,7 @@ declare module '@mui/material/styles' {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     EzForm: Partial<FormProps<any, any>>
     EzFormError: Partial<FormErrorProps>
+    EzLiveRegion: Partial<LiveRegionProps>
     EzFormErrorSummary: Partial<FormErrorSummaryProps>
     EzFormSection: Partial<FormSectionProps>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -53,8 +55,9 @@ declare module '@mui/material/styles' {
     EzWizardNav: 'root' | 'prev' | 'next' | 'submit'
     EzReadOnlyField: 'root' | 'header' | 'label' | 'value' | 'edit'
     EzNumberField: 'root' | 'steppers' | 'increment' | 'decrement'
-    EzForm: 'root' | 'title' | 'description'
+    EzForm: 'root' | 'title' | 'description' | 'status'
     EzFormError: 'root'
+    EzLiveRegion: 'root'
     EzFormErrorSummary: 'root' | 'heading' | 'list' | 'item' | 'link'
     EzFormSection: 'root' | 'legend' | 'description' | 'content'
     EzFieldArray: 'root' | 'row' | 'actions' | 'add' | 'remove' | 'move' | 'status' | 'error'
@@ -105,6 +108,10 @@ declare module '@mui/material/styles' {
     EzFormError?: {
       defaultProps?: ComponentsProps['EzFormError']
       styleOverrides?: ComponentsOverrides<Theme>['EzFormError']
+    }
+    EzLiveRegion?: {
+      defaultProps?: ComponentsProps['EzLiveRegion']
+      styleOverrides?: ComponentsOverrides<Theme>['EzLiveRegion']
     }
     EzFormErrorSummary?: {
       defaultProps?: ComponentsProps['EzFormErrorSummary']
