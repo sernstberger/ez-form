@@ -25,6 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   replaced by the normal `maxLength` validation error. `EzTextareaField` theme key
   (`defaultProps`, `styleOverrides` for `root`, `counter`) and the `textareaFieldClasses`
   export — #49.
+- `.github/PULL_REQUEST_TEMPLATE.md` mirroring the "a component ships when" checklist
+  from `docs/PHILOSOPHY.md` — #46.
 - `EzNumberField` theme key (`defaultProps`, `styleOverrides` for `root`, `steppers`,
   `increment`, `decrement`) and the `numberFieldClasses` export; NumberField renders
   through MUI `TextField` — #26.
