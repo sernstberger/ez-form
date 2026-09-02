@@ -16,3 +16,4 @@ export {
   type AutocompleteFormValue,
 } from './fields/Autocomplete'
 export { Slider, type SliderProps, type SliderValue } from './fields/Slider'
+export { ToggleButtonGroup, type ToggleButtonGroupProps } from './fields/ToggleButtonGroup'
