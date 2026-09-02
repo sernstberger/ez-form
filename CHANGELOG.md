@@ -182,6 +182,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (`aria-label="Show password"`) or `PasswordStrength`'s meter
   (`aria-label="Password strength"`); each query is now anchored the same way the
   components' own unit tests already disambiguate it — #77.
+- `NumberField` / `MoneyField`: pasting a number formatted for a _different_ locale (e.g.
+  `1.234,56` — the de-CH/de-DE shape for 1234.56 — pasted into an `en-US` field) no longer
+  silently reinterprets it into an unrelated number (previously submitted `1.23456`).
+  `groupWhileTyping` now detects the unambiguous case — a string containing both `.` and
+  `,` has its last separator as the decimal and every earlier one as a group separator —
+  and rewrites it into the field's own locale before regrouping; a single separator with no
+  other separator present stays ambiguous and is resolved per the field's locale, as before.
+  Paste is intercepted separately (`NumberFieldControl`'s `onPaste`, ahead of Base UI's own
+  paste handler) since Base UI's paste path parses `clipboardData` directly and never runs
+  through `onChange`. Trailing non-numeric text after a valid numeric prefix in a paste
+  (`12abc`, `1 234,56 €`) is a separate, general permissiveness in Base UI's own
+  `parseNumber` (backed by `parseFloat`) and is out of scope here — documented on the issue
+  and left as `it.todo` — #72.
 
 ### Notes
 

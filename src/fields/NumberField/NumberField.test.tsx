@@ -274,6 +274,104 @@ describe('NumberField', () => {
     })
   })
 
+  describe('cross-locale paste (#72)', () => {
+    it('en-US: pasting "1.234,56" (a de-CH/de-DE-shaped 1234.56) submits 1234.56, not 1.23456', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      const decimalSchema = z.object({ age: z.number().nullable() })
+      render(
+        <Form schema={decimalSchema} defaultValues={{ age: null }} onSubmit={onSubmit}>
+          <NumberField name="age" label="Age" />
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      await user.click(input())
+      await user.paste('1.234,56')
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      expect(onSubmit).toHaveBeenCalledWith({ age: 1234.56 }, expect.anything())
+    })
+
+    it('de-CH: pasting "1,234.56" (an en-US-shaped 1234.56) submits 1234.56, not truncating to 1', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      const decimalSchema = z.object({ age: z.number().nullable() })
+      render(
+        <Form schema={decimalSchema} defaultValues={{ age: null }} onSubmit={onSubmit}>
+          <NumberField name="age" label="Age" locale="de-CH" />
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      await user.click(input())
+      await user.paste('1,234.56')
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      expect(onSubmit).toHaveBeenCalledWith({ age: 1234.56 }, expect.anything())
+    })
+
+    it('minus sign U+2212 pastes as a negative number, not mangled', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      const decimalSchema = z.object({ age: z.number().nullable() })
+      render(
+        <Form schema={decimalSchema} defaultValues={{ age: null }} onSubmit={onSubmit}>
+          <NumberField name="age" label="Age" />
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      await user.click(input())
+      await user.paste('−5')
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      expect(onSubmit).toHaveBeenCalledWith({ age: -5 }, expect.anything())
+    })
+
+    it('Arabic-Indic digits paste as the equivalent ASCII number, not mangled', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      const decimalSchema = z.object({ age: z.number().nullable() })
+      render(
+        <Form schema={decimalSchema} defaultValues={{ age: null }} onSubmit={onSubmit}>
+          <NumberField name="age" label="Age" />
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      await user.click(input())
+      await user.paste('١٢٣') // ١٢٣
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      expect(onSubmit).toHaveBeenCalledWith({ age: 123 }, expect.anything())
+    })
+
+    it('"1e3" is either accepted as 1000 or rejected — never mangled to a different plausible number', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      const decimalSchema = z.object({ age: z.number().nullable() })
+      render(
+        <Form schema={decimalSchema} defaultValues={{ age: null }} onSubmit={onSubmit}>
+          <NumberField name="age" label="Age" />
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      await user.click(input())
+      await user.paste('1e3')
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      if (onSubmit.mock.calls.length > 0) {
+        expect(onSubmit).toHaveBeenCalledWith({ age: 1000 }, expect.anything())
+      }
+    })
+
+    // Base UI's own paste handler parses the clipboard text with `parseNumber`, which falls
+    // back to plain `parseFloat` — permissive about trailing non-numeric characters after a
+    // valid numeric prefix (`parseFloat('12abc') === 12`, `parseFloat('1 23456 €') === 1`).
+    // ez-form's paste normalization (`normalizeForeignShape`) only rewrites text that
+    // unambiguously reads as a *different* locale's grouping (both `.` and `,` present); it
+    // does not — and, short of re-implementing Base UI's full parser (currency/unit/percent
+    // stripping, numeral-system detection, etc.), cannot — validate that the *entire* pasted
+    // string was consumed. That full-consumption check is Base UI's own parser's job. Filed
+    // upstream-scoped rather than bundled into this fix; see the ruling in
+    // .superpowers/sdd/qa72/report.md.
+    it.todo(
+      'upstream (Base UI parseNumber): trailing garbage after a valid numeric prefix should reject, not silently truncate (e.g. "12abc" -> 12, "1 234,56 €" -> 1)',
+    )
+  })
+
   describe('leading minus', () => {
     it('keeps a lone minus and groups the digits typed after it', async () => {
       const user = userEvent.setup()
