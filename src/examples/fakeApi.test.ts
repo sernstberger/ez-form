@@ -10,6 +10,8 @@ import {
   saveProfileApi,
   PROFILE_LOAD_FAILS_FOR,
   type ProfileValues,
+  submitLoanApi,
+  LOAN_MAX_DTI,
 } from './fakeApi'
 
 describe('fakeApi', () => {
@@ -127,5 +129,36 @@ describe('fakeApi', () => {
     await vi.runAllTimersAsync()
     await expect(promise).resolves.toEqual(values)
     vi.useRealTimers()
+  })
+
+  it('submitLoanApi resolves with an application id when DTI is at or below the max', async () => {
+    vi.useFakeTimers()
+    const promise = submitLoanApi({ totalMonthlyIncome: 10000, totalMonthlyDebt: 4500 })
+    await vi.runAllTimersAsync()
+    const result = await promise
+    expect(result.applicationId).toMatch(/^LOAN-/)
+    vi.useRealTimers()
+  })
+
+  it('submitLoanApi rejects with a decline message when DTI exceeds the max', async () => {
+    vi.useFakeTimers()
+    const promise = submitLoanApi({ totalMonthlyIncome: 10000, totalMonthlyDebt: 4501 })
+    const assertion = expect(promise).rejects.toThrow(/debt-to-income ratio is too high/i)
+    await vi.runAllTimersAsync()
+    await assertion
+    vi.useRealTimers()
+  })
+
+  it('submitLoanApi rejects when income is zero (DTI treated as maximal)', async () => {
+    vi.useFakeTimers()
+    const promise = submitLoanApi({ totalMonthlyIncome: 0, totalMonthlyDebt: 0 })
+    const assertion = expect(promise).rejects.toThrow(/debt-to-income ratio is too high/i)
+    await vi.runAllTimersAsync()
+    await assertion
+    vi.useRealTimers()
+  })
+
+  it('LOAN_MAX_DTI is 0.45', () => {
+    expect(LOAN_MAX_DTI).toBe(0.45)
   })
 })

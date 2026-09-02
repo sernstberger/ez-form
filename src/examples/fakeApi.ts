@@ -127,3 +127,33 @@ export async function saveProfileApi(values: ProfileValues): Promise<ProfileValu
   await delay(300)
   return values
 }
+
+export interface SubmitLoanValues {
+  /** Total monthly income across the primary applicant, co-applicants, and employment rows. */
+  totalMonthlyIncome: number
+  /** Total monthly payment across all debt rows. */
+  totalMonthlyDebt: number
+}
+
+export interface SubmitLoanResult {
+  applicationId: string
+}
+
+/** DTI above this ratio (debt / income) is a decline, same threshold the Review step computes. */
+export const LOAN_MAX_DTI = 0.45
+
+/**
+ * Fake loan-application endpoint for the Loan example (#57): a short delay,
+ * then resolves with an application id, or rejects with a generic decline
+ * message when the debt-to-income ratio is too high — the one server-side
+ * check the example needs, surfaced through `FormError` (root.server).
+ */
+export async function submitLoanApi(values: SubmitLoanValues): Promise<SubmitLoanResult> {
+  await delay(600)
+  const dti =
+    values.totalMonthlyIncome > 0 ? values.totalMonthlyDebt / values.totalMonthlyIncome : 1
+  if (dti > LOAN_MAX_DTI) {
+    throw new Error('Your debt-to-income ratio is too high for this loan. Try a smaller amount.')
+  }
+  return { applicationId: `LOAN-${Math.random().toString(36).slice(2, 10).toUpperCase()}` }
+}
