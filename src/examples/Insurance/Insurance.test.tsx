@@ -93,6 +93,55 @@ async function fillThroughReview(
   await fillDocuments(user)
 }
 
+/** A complete, schema-valid set of values matching what `fillThroughReview({ vehicle: true })` produces by hand. */
+const COMPLETE_VALUES = {
+  firstName: 'Ada',
+  lastName: 'Lovelace',
+  birthday: new Date(1985, 0, 1),
+  email: 'ada@example.com',
+  phone: '555-555-5555',
+  address: { street: '1 Analytical Way', city: 'London', zip: 'SW1A1AA' },
+  coverageType: 'liability',
+  deductible: 500,
+  coverageAmount: 10000,
+  hasVehicle: true,
+  vehicle: { make: 'Toyota', model: 'Corolla', year: 2020, plate: 'ABC123' },
+  driver: { name: 'Ada Lovelace', licenseNumber: 'D1234567', licenseDate: new Date(2010, 0, 1) },
+  claims: '',
+  priorIncidents: [],
+  documents: [],
+}
+
+/**
+ * Writes the example's own localStorage resume payload (see `saveState`/`loadSaved` in
+ * `Insurance.tsx`) so the wizard mounts directly on Review with values restored, instead of
+ * driving all eight prior steps through `userEvent` first. `visited` lists every step id so
+ * every Review row's Edit link resolves to a real, reachable step (mirrors what a genuine
+ * walk-through would have left behind). `JSON.stringify` serializes the `Date` fields as ISO
+ * strings exactly as `saveState` does, and `loadSaved`'s reviver turns them back into `Date`s
+ * on the way in.
+ */
+function seedReview(values: Record<string, unknown> = COMPLETE_VALUES) {
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({
+      step: 'review',
+      visited: [
+        'applicant',
+        'contact',
+        'coverage',
+        'has-vehicle',
+        'vehicle',
+        'drivers',
+        'history',
+        'documents',
+        'review',
+      ],
+      values,
+    }),
+  )
+}
+
 beforeEach(() => {
   localStorage.clear()
 })
@@ -144,8 +193,8 @@ describe('Insurance', () => {
 
   it('lists every value on the Review step, with a working Edit link back to its step', async () => {
     const user = userEvent.setup({ delay: null })
+    seedReview()
     render(withPickers(<Insurance />))
-    await fillThroughReview(user, { vehicle: true })
     const review = screen.getByRole('group', { name: 'Review' })
     expect(within(review).getByText('Ada')).toBeInTheDocument()
     expect(within(review).getByText('Lovelace')).toBeInTheDocument()
@@ -342,9 +391,8 @@ describe('Insurance', () => {
   })
 
   it('is accessible on the Review step', async () => {
-    const user = userEvent.setup({ delay: null })
+    seedReview()
     const { container } = render(withPickers(<Insurance />))
-    await fillThroughReview(user, { vehicle: true })
     await expectNoA11yViolations(container)
   })
 })
