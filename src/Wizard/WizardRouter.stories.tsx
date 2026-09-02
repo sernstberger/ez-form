@@ -44,7 +44,12 @@ function SignupLayout() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   return (
-    <Form schema={schema} defaultValues={emptyValues} onSubmit={onSubmit}>
+    <Form
+      schema={schema}
+      defaultValues={emptyValues}
+      onSubmit={onSubmit}
+      title="Create your account"
+    >
       <Stack spacing={3} sx={{ width: 480 }}>
         <Typography variant="body2" color="text.secondary">
           URL: {pathname}

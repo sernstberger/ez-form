@@ -151,6 +151,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   flat `buttonProps` prop is a deprecated alias — it still works, but (being a flat, non-
   slot prop) a theme can never reach into it. Removed the guardrail allow-comment
   tracking the old literal — #62.
+- Wizard stories (`wizard--horizontal`, `wizard--page-layout`,
+  `wizard--page-layout-nested-sections`, `wizard--resume`, both
+  `wizard-reactrouter--*`) now give their `Form` a `title`, so the step's `FormSection`
+  legend (`h3`) sits under the form's own `h2` instead of being the first heading on
+  the page (`h1` → `h3` skip) — #76.
+- Login/Sign-up example stories: `WrongPassword`, `SignedIn`, `MismatchedPasswords`,
+  `WrongCode`, and `Verified` no longer throw during `play` on an ambiguous
+  `getByLabelText(/password/i)` match against `PasswordField`'s reveal toggle
+  (`aria-label="Show password"`) or `PasswordStrength`'s meter
+  (`aria-label="Password strength"`); each query is now anchored the same way the
+  components' own unit tests already disambiguate it — #77.
 
 ### Notes
 
