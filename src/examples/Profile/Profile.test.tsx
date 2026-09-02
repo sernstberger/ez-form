@@ -30,7 +30,7 @@ describe('Profile', () => {
     const preferences = screen.getByRole('group', { name: 'Preferences' })
     expect(within(preferences).getByLabelText(/country/i)).toBeInTheDocument()
     expect(
-      within(preferences).getByRole('switch', { name: /marketing emails/i }),
+      within(preferences).getByRole('checkbox', { name: /marketing emails/i }),
     ).toBeInTheDocument()
     expect(within(preferences).getByLabelText(/language/i)).toBeInTheDocument()
 
