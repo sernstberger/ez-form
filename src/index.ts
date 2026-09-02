@@ -57,3 +57,4 @@ export {
   readOnlyFieldClasses,
   type ReadOnlyFieldProps,
 } from './fields/ReadOnlyField'
+export { FormSection, formSectionClasses, type FormSectionProps } from './FormSection'
