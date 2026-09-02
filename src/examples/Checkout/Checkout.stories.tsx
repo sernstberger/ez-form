@@ -59,7 +59,7 @@ export const CascadingRegionOptions: Story = {
     docs: {
       description: {
         story:
-          "Country picks the region field's shape (#82): United States lists US states, Canada lists provinces, and any other country falls back to a free-text field. Changing the country resets the region value.",
+          "Country picks the region field's shape (#82): United States renders `StateSelect` (all 50 + DC), Canada lists provinces from this example's own array, and any other country falls back to a free-text field. Changing the country resets the region value.",
       },
     },
   },

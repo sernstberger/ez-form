@@ -358,6 +358,26 @@ describe('PhoneField input attributes', () => {
   })
 })
 
+describe('PhoneField under <Form assisted> (#65)', () => {
+  it('emits autoComplete="off" instead of the tel default', () => {
+    render(
+      <Form schema={schema} defaultValues={{ phone: '' }} onSubmit={vi.fn()} assisted>
+        <PhoneField name="phone" label="Phone" />
+      </Form>,
+    )
+    expect(input()).toHaveAttribute('autocomplete', 'off')
+  })
+
+  it('a consumer autoComplete still wins under assisted', () => {
+    render(
+      <Form schema={schema} defaultValues={{ phone: '' }} onSubmit={vi.fn()} assisted>
+        <PhoneField name="phone" label="Phone" autoComplete="shipping tel" />
+      </Form>,
+    )
+    expect(input()).toHaveAttribute('autocomplete', 'shipping tel')
+  })
+})
+
 describe('PhoneField a11y', () => {
   it('has no violations in the default state', async () => {
     const { container } = renderPhone({ helperText: 'We only call about your claim' })

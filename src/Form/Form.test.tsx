@@ -3,7 +3,7 @@ import { act, render, renderHook, screen, waitFor } from '@testing-library/react
 import userEvent from '@testing-library/user-event'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { z } from 'zod'
-import { Form, formClasses, type FormMethods } from './Form'
+import { Form, formClasses, willRenderFormDescription, type FormMethods } from './Form'
 import { liveRegionClasses } from './LiveRegion'
 import { SubmitButton } from '../SubmitButton'
 import { TextField } from '../fields/TextField'
@@ -610,6 +610,92 @@ describe('useEzFormContext', () => {
       })
     })
   })
+
+  describe('assisted (#65)', () => {
+    it('does not set autoComplete="off" without the prop', () => {
+      const { container } = render(
+        <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+          <TextField name="email" label="Email" />
+        </Form>,
+      )
+      expect(container.querySelector('form')).not.toHaveAttribute('autocomplete', 'off')
+    })
+
+    it('sets autoComplete="off" on the <form> element', () => {
+      const { container } = render(
+        <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}} assisted>
+          <TextField name="email" label="Email" />
+        </Form>,
+      )
+      expect(container.querySelector('form')).toHaveAttribute('autoComplete', 'off')
+    })
+
+    it('an explicit autoComplete on <Form> itself still wins', () => {
+      const { container } = render(
+        <Form
+          schema={schema}
+          defaultValues={{ email: '' }}
+          onSubmit={() => {}}
+          assisted
+          autoComplete="on"
+        >
+          <TextField name="email" label="Email" />
+        </Form>,
+      )
+      expect(container.querySelector('form')).toHaveAttribute('autoComplete', 'on')
+    })
+
+    it('flows the flag to fields so their default autoComplete becomes "off"', () => {
+      render(
+        <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}} assisted>
+          <TextField name="email" label="Email" type="email" />
+        </Form>,
+      )
+      expect(screen.getByLabelText('Email')).toHaveAttribute('autoComplete', 'off')
+    })
+
+    it('toggling assisted at runtime updates every field', () => {
+      const { rerender } = render(
+        <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+          <TextField name="email" label="Email" type="email" />
+        </Form>,
+      )
+      expect(screen.getByLabelText('Email')).toHaveAttribute('autoComplete', 'email')
+      rerender(
+        <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}} assisted>
+          <TextField name="email" label="Email" type="email" />
+        </Form>,
+      )
+      expect(screen.getByLabelText('Email')).toHaveAttribute('autoComplete', 'off')
+      rerender(
+        <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+          <TextField name="email" label="Email" type="email" />
+        </Form>,
+      )
+      expect(screen.getByLabelText('Email')).toHaveAttribute('autoComplete', 'email')
+    })
+
+    it('is theme-defaultable via theme.components.EzForm.defaultProps.assisted', () => {
+      const theme = createTheme({ components: { EzForm: { defaultProps: { assisted: true } } } })
+      render(
+        <ThemeProvider theme={theme}>
+          <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+            <TextField name="email" label="Email" type="email" />
+          </Form>
+        </ThemeProvider>,
+      )
+      expect(screen.getByLabelText('Email')).toHaveAttribute('autoComplete', 'off')
+    })
+
+    it('has no axe violations while assisted', async () => {
+      const { container } = render(
+        <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}} assisted>
+          <TextField name="email" label="Email" />
+        </Form>,
+      )
+      await expectNoA11yViolations(container)
+    })
+  })
 })
 
 describe('title and description', () => {
@@ -984,6 +1070,38 @@ describe('requiredIndicator', () => {
     const form = screen.getByRole('form', { name: 'Sign up' })
     expect(form).toHaveAccessibleDescription('Starred fields are mandatory.')
   })
+
+  // `FormDialog` predicts this from outside to point the dialog's own
+  // `aria-describedby` at the description element, so the helper has to agree
+  // with what Form actually renders in every combination — not just the two
+  // obvious ones.
+  it.each([
+    { description: undefined, requiredIndicatorText: undefined },
+    { description: 'Who is this?', requiredIndicatorText: undefined },
+    { description: undefined, requiredIndicatorText: false as const },
+    { description: 'Who is this?', requiredIndicatorText: false as const },
+    { description: undefined, requiredIndicatorText: 'Custom.' },
+    { description: 'Who is this?', requiredIndicatorText: 'Custom.' },
+  ])(
+    'willRenderFormDescription agrees with what Form renders (%o)',
+    ({ description, requiredIndicatorText }) => {
+      const { container, unmount } = render(
+        <Form
+          schema={schema}
+          defaultValues={{ email: '' }}
+          onSubmit={() => {}}
+          title="Sign up"
+          description={description}
+          requiredIndicatorText={requiredIndicatorText}
+        >
+          <TextField name="email" label="Email" />
+        </Form>,
+      )
+      const rendered = container.querySelector(`.${formClasses.description}`) != null
+      expect(willRenderFormDescription({ description, requiredIndicatorText })).toBe(rendered)
+      unmount()
+    },
+  )
 
   it('is theme-defaultable via EzForm.defaultProps.requiredIndicator', () => {
     const theme = createTheme({

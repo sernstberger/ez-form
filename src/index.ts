@@ -22,17 +22,38 @@ export {
 export { MoneyField, type MoneyFieldProps } from './fields/MoneyField'
 export { ZipField, type ZipFieldProps } from './fields/ZipField'
 export {
+  AddressField,
+  addressFieldClasses,
+  addressSchema,
+  type AddressFieldProps,
+  type AddressValue,
+  type AddressSchemaOptions,
+} from './fields/AddressField'
+export {
   PasswordField,
   passwordFieldClasses,
   type PasswordFieldProps,
 } from './fields/PasswordField'
-export { PhoneField, type PhoneFieldProps } from './fields/PhoneField'
+export { PhoneField, PHONE_FORMAT, type PhoneFieldProps } from './fields/PhoneField'
+// The display half of the US digit fields' one rule (the stored value is bare
+// digits; a template decides only how it looks). Public so a consumer can render
+// a stored value the way the field does — on a review screen, in a table, in an
+// email — instead of re-implementing the template walk.
+export { formatTemplate, type FormatTemplate } from './fields/formatTemplate'
+export { SsnField, ssnFieldClasses, type SsnFieldProps } from './fields/SsnField'
 export type { FieldRules, BooleanFieldRules } from './rules'
 export {
   Autocomplete,
   type AutocompleteProps,
   type AutocompleteFormValue,
 } from './fields/Autocomplete'
+export {
+  EmailListField,
+  emailListFieldClasses,
+  type EmailListFieldProps,
+  type EmailOption,
+} from './fields/EmailListField'
+export { EMAIL_PATTERN, isEmail } from './fields/emailPattern'
 export { Slider, type SliderProps, type SliderValue } from './fields/Slider'
 export { Rating, type RatingProps } from './fields/Rating'
 export { ToggleButtonGroup, type ToggleButtonGroupProps } from './fields/ToggleButtonGroup'
@@ -62,12 +83,20 @@ export {
   useConfirm,
   type UseConfirmReturn,
 } from './ConfirmDialog'
+export {
+  FormDialog,
+  formDialogClasses,
+  type FormDialogProps,
+  type FormDialogCloseReason,
+} from './FormDialog'
 export { ClearButton, clearButtonClasses, type ClearButtonProps } from './ClearButton'
 export type {} from './theme/augmentation'
 export { useFormGuard, type FormGuardBlocker, type UseFormGuardReturn } from './useFormGuard'
 export {
   Wizard,
+  wizardClasses,
   type WizardProps,
+  type WizardStepAnnouncementInfo,
   type WizardStepDef,
   type WizardStepStatus,
   type WizardContextValue,

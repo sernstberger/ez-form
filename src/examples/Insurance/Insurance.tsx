@@ -15,6 +15,9 @@ import { WizardStep } from '../../Wizard/WizardStep'
 import { WizardStepper } from '../../Wizard/WizardStepper'
 import { WizardNav } from '../../Wizard/WizardNav'
 import { TextField } from '../../fields/TextField'
+import { PhoneField, PHONE_FORMAT, formatTemplate } from '../../fields/PhoneField'
+import { AddressField, addressSchema } from '../../fields/AddressField'
+import { US_STATES } from '../../fields/StateSelect'
 import { DateField } from '../../fields/DateField'
 import { RadioGroup } from '../../fields/RadioGroup'
 import { Slider } from '../../fields/Slider'
@@ -25,7 +28,9 @@ import { TextareaField } from '../../fields/TextareaField'
 import { CheckboxGroup } from '../../fields/CheckboxGroup'
 import { FileField } from '../../fields/FileField'
 import { ReadOnlyField } from '../../fields/ReadOnlyField'
+import { resolveAutoComplete } from '../../fields/resolveAutoComplete'
 import type { Option } from '../../fields/Option'
+import { useAssisted } from '../../Form/AssistedContext'
 import { submitApplicationApi } from '../fakeApi'
 
 const COVERAGE_TYPES: readonly Option[] = [
@@ -70,15 +75,12 @@ export const schema = z
     birthday: z.date('Birthday is required'),
     // Contact
     email: z.email('Invalid email'),
-    phone: z
-      .string()
-      .min(1, 'Phone is required')
-      .regex(/^\d{3}-\d{3}-\d{4}$/, 'Use the format 555-555-5555'),
-    address: z.object({
-      street: z.string().min(1, 'Street address is required'),
-      city: z.string().min(1, 'City is required'),
-      zip: z.string().min(1, 'ZIP code is required'),
-    }),
+    // No regex: `PhoneField` stores bare digits and owns the "all ten digits" check
+    // itself, so zod only asks that something was entered (see README "US fields").
+    phone: z.string().min(1, 'Phone is required'),
+    // `AddressField`'s five parts, straight from `addressSchema()` rather than restated
+    // here; `street2` is hidden below, so the schema drops the key nothing writes.
+    address: addressSchema({ street2: false }),
     // Coverage
     coverageType: z.enum(
       COVERAGE_TYPES.map((o) => o.value as string) as [string, ...string[]],
@@ -132,7 +134,7 @@ export const emptyValues: Input = {
   birthday: null as unknown as Date,
   email: '',
   phone: '',
-  address: { street: '', city: '', zip: '' },
+  address: { street: '', city: '', state: '', zip: '' },
   coverageType: '',
   deductible: 500,
   coverageAmount: null as unknown as number,
@@ -247,11 +249,29 @@ function WatchValues({ onValues }: { onValues: (values: Partial<Input>) => void 
 }
 
 export function ApplicantStep() {
+  // These fields' tokens (`given-name`, `family-name`, …) have no `type` a plain `TextField`
+  // could derive them from, so — unlike `email`/`tel` below — they are hardcoded here rather
+  // than left to a default. `TextField` only suppresses a *default* token under `assisted`,
+  // never an explicit one (#65 requirement 2), so this step resolves its own hardcoded tokens
+  // against the form's `assisted` flag instead: the Agent story is otherwise the one place in
+  // this example a rep filling out someone else's application would still get autofill offers
+  // for their own name.
+  const assisted = useAssisted()
   return (
     <WizardStep id="applicant">
       <Stack spacing={2}>
-        <TextField name="firstName" label="First name" autoComplete="given-name" required />
-        <TextField name="lastName" label="Last name" autoComplete="family-name" required />
+        <TextField
+          name="firstName"
+          label="First name"
+          autoComplete={resolveAutoComplete('given-name', assisted)}
+          required
+        />
+        <TextField
+          name="lastName"
+          label="Last name"
+          autoComplete={resolveAutoComplete('family-name', assisted)}
+          required
+        />
         <DateField name="birthday" label="Birthday" disableFuture minDate={MIN_BIRTHDAY} required />
       </Stack>
     </WizardStep>
@@ -259,29 +279,33 @@ export function ApplicantStep() {
 }
 
 export function ContactStep() {
+  // See ApplicantStep's comment: street/city/ZIP tokens are hardcoded (no `type` derives
+  // them), so they route through `resolveAutoComplete` the same way. `email` and `tel` would
+  // already be suppressed by `TextField`'s own `type`-derived default — they are hardcoded
+  // here only because this form also carries `phone`'s own `pattern` rule, not to opt out of
+  // that default, so they get the same explicit treatment for consistency.
+  const assisted = useAssisted()
   return (
     <WizardStep id="contact">
       <Stack spacing={3}>
-        <TextField name="email" label="Email" autoComplete="email" required />
         <TextField
-          name="phone"
-          label="Phone"
-          autoComplete="tel"
-          pattern={{ value: /^\d{3}-\d{3}-\d{4}$/, message: 'Use the format 555-555-5555' }}
+          name="email"
+          label="Email"
+          autoComplete={resolveAutoComplete('email', assisted)}
           required
         />
-        <FormSection title="Address">
-          <Stack spacing={2}>
-            <TextField
-              name="address.street"
-              label="Street address"
-              autoComplete="street-address"
-              required
-            />
-            <TextField name="address.city" label="City" autoComplete="address-level2" required />
-            <TextField name="address.zip" label="ZIP code" autoComplete="postal-code" required />
-          </Stack>
-        </FormSection>
+        {/*
+          No `pattern` rule: `PhoneField` formats as you type and carries its own
+          "all ten digits" check, so the format lives in one place instead of being
+          restated as a regex here and again in the schema.
+        */}
+        <PhoneField name="phone" label="Phone" required />
+        {/*
+          One `AddressField` in place of the four parts written out by hand. `street2`
+          is off — a personal auto policy takes the mailing address, and the schema
+          above matches with `addressSchema({ street2: false })`.
+        */}
+        <AddressField name="address" legend="Address" street2={false} required />
       </Stack>
     </WizardStep>
   )
@@ -384,9 +408,30 @@ export function ReviewStep({ hasVehicle }: { hasVehicle: boolean }) {
         <ReadOnlyField name="lastName" editStep="applicant" />
         <ReadOnlyField name="birthday" editStep="applicant" />
         <ReadOnlyField name="email" editStep="contact" />
-        <ReadOnlyField name="phone" editStep="contact" />
+        {/*
+          `PhoneField` stores bare digits, so the raw value would review as
+          "5555555555". `formatTemplate` and `PHONE_FORMAT` are the same helper and
+          template the field itself displays through — both exported — so the review
+          row reads exactly as the input did and cannot drift from it.
+        */}
+        <ReadOnlyField
+          name="phone"
+          editStep="contact"
+          format={(v) =>
+            // `format` wins over `empty`, so an unanswered phone is spelled out here
+            // rather than rendering as a blank row.
+            typeof v === 'string' && v !== '' ? formatTemplate(v, PHONE_FORMAT) : '—'
+          }
+        />
         <ReadOnlyField name="address.street" editStep="contact" />
         <ReadOnlyField name="address.city" editStep="contact" />
+        {/*
+          `ReadOnlyField` has no way to reach a `Select`'s option list on its own, so
+          the state row would otherwise print the stored USPS abbreviation. Passing
+          `StateSelect`'s own `US_STATES` renders the full name instead — the same
+          `options` mechanism the `coverageType` row above uses.
+        */}
+        <ReadOnlyField name="address.state" options={US_STATES} editStep="contact" />
         <ReadOnlyField name="address.zip" editStep="contact" />
         <ReadOnlyField name="coverageType" options={COVERAGE_TYPES} editStep="coverage" />
         <ReadOnlyField name="deductible" editStep="coverage" />
@@ -443,10 +488,10 @@ export interface InsuranceProps {
   /** Called once the fake API resolves with the submitted application. */
   onSuccess?: (result: { applicationId: string }) => void
   /**
-   * The manual precursor of #65 (assisted mode): `autoComplete="off"` on the
-   * form, `confirm`/`guard` off, so an internal agent filling this out on
-   * behalf of someone else doesn't get their own autofill offered and isn't
-   * slowed by a confirm dialog. Renders as a single `layout="page"` form.
+   * `<Form assisted>` (#65): an internal agent filling this out on behalf of
+   * someone else doesn't get their own autofill offered, and isn't slowed by
+   * a confirm dialog (`confirm`/`guard` are also off). Renders as a single
+   * `layout="page"` form.
    */
   agentMode?: boolean
 }
@@ -464,8 +509,8 @@ export function Insurance({
   onSuccess,
   agentMode = false,
 }: InsuranceProps) {
-  // The manual precursor of #65's "pairs with Wizard layout=page" acceptance bullet: agent
-  // mode always renders as one page, regardless of `layout`.
+  // #65's "pairs with Wizard layout=page" acceptance bullet: agent mode always renders as
+  // one page, regardless of `layout`.
   const layout = agentMode ? 'page' : layoutProp
   const saved = useMemo(() => (agentMode ? null : loadSaved()), [agentMode])
   const [step, setStep] = useState(saved?.step ?? 'applicant')
@@ -512,7 +557,7 @@ export function Insurance({
           ref={form}
           schema={schema}
           defaultValues={values}
-          autoComplete={agentMode ? 'off' : undefined}
+          assisted={agentMode}
           title="Auto insurance application"
           confirm={agentMode ? undefined : { title: 'Submit application?' }}
           guard={!agentMode}

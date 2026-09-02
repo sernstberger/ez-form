@@ -77,6 +77,19 @@ export interface WizardContextValue {
   /** Vertical orientation: where the active step's content is portaled (set by `WizardStepper`). */
   contentEl: HTMLElement | null
   setContentEl: (el: HTMLElement | null) => void
+  /**
+   * The step a `next`/`prev`/`go` just navigated to, and a counter bumped once per such
+   * navigation — the signal a `WizardStep` watches to move focus to its own heading. A
+   * counter rather than a boolean because two navigations can land on the same step (forward,
+   * back, forward again) and each still has to re-focus; `seq: 0` with a `null` `stepId` is
+   * the resting value the wizard mounts with, which is what keeps initial mount from stealing
+   * focus. `stepId` keeps a *controlled* wizard honest: `onStepChange` may decline the move,
+   * and only the step whose id matches acts on the request.
+   *
+   * Deliberately *not* raised by the failed-final-submit jump: `FormErrorSummary` focuses its
+   * own heading there, and a step heading grabbing focus in the same commit would fight it.
+   */
+  focusRequest: { stepId: string | null; seq: number }
 }
 
 export const WizardContext = createContext<WizardContextValue | null>(null)

@@ -44,6 +44,24 @@ describe('ZipField', () => {
     expect(input()).toHaveAttribute('autoComplete', 'off')
   })
 
+  it('under <Form assisted> emits autoComplete="off" instead of the postal-code default (#65)', () => {
+    render(
+      <Form schema={schema} defaultValues={{ zip: '' }} onSubmit={() => {}} assisted>
+        <ZipField name="zip" label="Zip" />
+      </Form>,
+    )
+    expect(input()).toHaveAttribute('autoComplete', 'off')
+  })
+
+  it('a consumer autoComplete still wins under assisted', () => {
+    render(
+      <Form schema={schema} defaultValues={{ zip: '' }} onSubmit={() => {}} assisted>
+        <ZipField name="zip" label="Zip" autoComplete="postal-code" />
+      </Form>,
+    )
+    expect(input()).toHaveAttribute('autoComplete', 'postal-code')
+  })
+
   it('strips non-digit characters while typing', async () => {
     const user = userEvent.setup()
     renderForm()

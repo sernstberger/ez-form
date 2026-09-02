@@ -9,8 +9,19 @@
  * renders `5551234` as `555-123-4`.
  */
 
+/**
+ * A `#`-slot display template, such as `PHONE_FORMAT`'s `'###-###-####'`. An
+ * alias for `string` rather than a template-literal type: the useful templates
+ * are open-ended (`'(###) ###-####'`, `'###-####'`, an SSN's `'###-##-####'`),
+ * so a narrower type would reject valid ones while catching nothing a
+ * consumer is likely to get wrong. It exists to name the parameter in a
+ * signature — `formatTemplate(digits, template: FormatTemplate)` reads as
+ * intended where a second bare `string` would not.
+ */
+export type FormatTemplate = string
+
 /** How many digits the template holds: the number of `#` slots. */
-export function templateDigitCount(template: string): number {
+export function templateDigitCount(template: FormatTemplate): number {
   let count = 0
   for (const char of template) if (char === '#') count += 1
   return count
@@ -27,7 +38,7 @@ export function digitsOnly(text: string): string {
  * `'555-'`). Digits past the template's capacity are ignored — the caller is
  * expected to have truncated already, but formatting must not invent slots.
  */
-export function formatTemplate(digits: string, template: string): string {
+export function formatTemplate(digits: string, template: FormatTemplate): string {
   if (digits === '') return ''
   let out = ''
   let digitIndex = 0

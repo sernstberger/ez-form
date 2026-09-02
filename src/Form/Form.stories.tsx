@@ -326,3 +326,15 @@ export const UnsavedChangesGuard: Story = {
     },
   },
 }
+
+export const Assisted: Story = {
+  args: { assisted: true },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'For a form filled out on someone else\'s behalf (#65): autoComplete="off" on the <form> element and on every field\'s own default token — inspect the Name/Email fields to see it. No browser prompts to save or fill "your own" details for the person actually typing.',
+      },
+    },
+  },
+}

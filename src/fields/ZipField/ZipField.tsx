@@ -2,6 +2,8 @@ import type { Message } from 'react-hook-form'
 import type { ReactNode } from 'react'
 import { mergeSlotProps } from '@mui/material/utils'
 import { TextField, type TextFieldProps } from '../TextField'
+import { resolveAutoComplete } from '../resolveAutoComplete'
+import { useAssisted } from '../../Form/AssistedContext'
 import { useEzFormContext } from '../../useEzFormContext'
 
 export type ZipFieldProps = Omit<
@@ -30,12 +32,14 @@ function stripToZip(e: React.FormEvent<HTMLInputElement>) {
 export function ZipField({
   validate,
   invalidMessage = 'Enter a 5-digit ZIP code',
-  autoComplete = 'postal-code',
+  autoComplete: autoCompleteProp,
   slotProps,
   ...rest
 }: ZipFieldProps) {
   // Ahead of TextField's own guard, so the "outside <Form>" error names <ZipField>.
   useEzFormContext('ZipField')
+  const assisted = useAssisted()
+  const autoComplete = autoCompleteProp ?? resolveAutoComplete('postal-code', assisted)
   const consumer =
     validate === undefined ? {} : typeof validate === 'function' ? { validate } : validate
 
