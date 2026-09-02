@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## Unreleased
 
 - Considering subpath exports (e.g. `ez-form/pickers`) so consumers who use no date
-  picker aren't forced to resolve `@mui/x-date-pickers` as a peer. Tracked in #31.
+  picker aren't forced to resolve `@mui/x-date-pickers` as a peer. Tracked in #43.
 
 ## 0.2.0 — 2026-09-02
 
@@ -62,6 +62,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Raised the `react-hook-form` peer floor to `^7.87.0`.
+- Narrowed the `zod` peer to `^4.0.0` (zod 3 is no longer supported).
+- Added `@base-ui/react ^1.7.0` as a required peer, for `NumberField` and `OtpField`.
+- Added `@mui/x-date-pickers ^9.0.0` as a required peer, for `DatePicker`, `TimePicker`,
+  and `DateTimePicker`.
 - `min`/`max` rule comparisons now mirror hookform: numeric compare when the value is
   numeric, otherwise a string bound is compared as a `Date` (skipped on an invalid
   date) rather than a raw string/lexicographic compare.
@@ -103,6 +107,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   accessible name is announced.
 - Every field's error helper text is a live region (`role="alert"`), so validation
   errors are announced in `onChange`/`onBlur` modes, not just on submit.
+- `NumberField`: pasted grouped numbers under space-group locales (fr-FR's narrow
+  no-break space, de-CH's apostrophe) no longer stall live grouping; the grouper now
+  accepts the same separator variants Base UI's parser strips (#24).
+- `Wizard`: a controlled wizard that declines the failed-submit navigation no longer
+  keeps a stale focus target that could focus an old field on a later arrival at that
+  step (#40).
 
 ## 0.1.0 — 2026-09-01
 

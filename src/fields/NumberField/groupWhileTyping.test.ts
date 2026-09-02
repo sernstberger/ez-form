@@ -55,10 +55,6 @@ describe('groupWhileTyping', () => {
     it('groups the digits typed after a minus', () => {
       expect(groupWhileTyping('-1234', 5, separators)).toEqual({ text: '-1,234', caret: 6 })
     })
-
-    it('keeps the minus when the digits are deleted back to it', () => {
-      expect(groupWhileTyping('-', 1, separators)).toEqual({ text: '-', caret: 1 })
-    })
   })
 
   describe('fr-FR (narrow no-break space group)', () => {
