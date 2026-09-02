@@ -154,13 +154,19 @@ describe('Checkout', () => {
     const user = userEvent.setup()
     render(<Checkout />)
     const summary = screen.getByRole('group', { name: 'Order summary' })
-    expect(within(summary).getByText(/^total: \$84\.97/i)).toBeInTheDocument()
+    expect(within(summary).getByText('Total').closest('[aria-labelledby]')).toHaveTextContent(
+      '$84.97',
+    )
     const payment = screen.getByRole('group', { name: 'Payment' })
     const tipInput = within(payment).getByLabelText(/^tip$/i)
     await user.clear(tipInput)
     await user.type(tipInput, '10')
     await user.tab()
-    await waitFor(() => expect(within(summary).getByText(/^total: \$94\.97/i)).toBeInTheDocument())
+    await waitFor(() =>
+      expect(within(summary).getByText('Total').closest('[aria-labelledby]')).toHaveTextContent(
+        '$94.97',
+      ),
+    )
   })
 
   it('is accessible when idle', async () => {

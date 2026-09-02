@@ -1,7 +1,6 @@
 import Container from '@mui/material/Container'
 import Paper from '@mui/material/Paper'
 import Stack from '@mui/material/Stack'
-import Typography from '@mui/material/Typography'
 import { z } from 'zod'
 import { useWatch } from 'react-hook-form'
 import { Form } from '../../Form'
@@ -116,18 +115,19 @@ function OrderSummary() {
     typeof value === 'number'
       ? value.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
       : String(value)
-  // Spread (rather than a literal `component="p"` prop) so TS resolves Typography's
-  // polymorphic-component overload the same way Form/FormSection's own slot defaults do.
-  const totalProps = { variant: 'subtitle1', component: 'p', fontWeight: 'bold' } as const
 
   return (
     <FormSection title="Order summary">
       <Stack spacing={1}>
-        <Typography variant="body2" color="text.secondary">
-          Subtotal: {format(SUBTOTAL)}
-        </Typography>
+        {/*
+          Subtotal and Total are computed values, not form paths, so they go through
+          `ReadOnlyField`'s `value` mode (#68) rather than a hand-rolled `Typography` —
+          one rendering pipeline (`format`/`options`/`empty`) for every read-only row
+          in this summary, watched or computed.
+        */}
+        <ReadOnlyField value={SUBTOTAL} label="Subtotal" format={format} />
         <ReadOnlyField name="tip" label="Tip amount" format={format} />
-        <Typography {...totalProps}>Total: {format(total)}</Typography>
+        <ReadOnlyField value={total} label="Total" format={format} />
       </Stack>
     </FormSection>
   )
