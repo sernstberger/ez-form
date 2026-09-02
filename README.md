@@ -913,6 +913,50 @@ pnpm test        # vitest + Testing Library, plus jest-axe accessibility checks 
 pnpm build
 ```
 
+### The gates
+
+CI runs these in order, and all seven have to be green. Every one of them fails on a
+_warning_, not just an error — a warning nobody has to act on is one nobody reads.
+
+| Command                 | What fails it                                                             |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `pnpm lint`             | `eslint . --max-warnings 0` — any finding at all                          |
+| `pnpm typecheck`        | `tsc --noEmit` under `strict` plus the `noUnused*` / `noImplicit*` family |
+| `pnpm test`             | a failing test, **or** unexpected `console.error` / `console.warn` output |
+| `pnpm test:scripts`     | the guardrail script's own `node --test` suite                            |
+| `pnpm check:guardrails` | a styling-rule violation, or an exported component with no README row     |
+| `pnpm build`            | a rollup build warning (unresolved import, circular dependency, …)        |
+| `pnpm build-storybook`  | the same, for the Storybook bundle                                        |
+
+**ESLint** is a flat config (`eslint.config.js`) running typescript-eslint's
+`recommendedTypeChecked` and `stylisticTypeChecked`, react-hooks (rules-of-hooks and
+exhaustive-deps both errors), jsx-a11y, and eslint-plugin-storybook, with
+eslint-config-prettier last. Every rule that is off, and every inline `eslint-disable`, has
+its reason written next to it.
+
+Typed linting needs the classic TypeScript compiler API, which the project's own compiler —
+TypeScript 7, the native build — does not ship. Following [typescript-eslint's own
+side-by-side setup](https://github.com/typescript-eslint/typescript-eslint/blob/main/pnpm-workspace.yaml),
+the bare `typescript` specifier resolves to the TS 6 API package for the linter's benefit
+while the project compiler is aliased as `@typescript/native`. `node_modules/.bin/tsc` still
+runs 7.x, so `pnpm typecheck` is unaffected. Where the two versions disagree about whether a
+type assertion is necessary, the compiler wins and the lint rule is disabled at that line.
+
+**React StrictMode** is on in both the test suite (`configure({ reactStrictMode: true })` in
+`src/test/setup.ts`) and Storybook (`framework.options.strictMode`), so every effect, ref
+callback and state updater double-invokes exactly as it will in a consumer's StrictMode app.
+
+**Console output fails tests.** Vitest hides `console.warn` from passing tests, so a React
+`act()` warning could otherwise sit in the suite indefinitely. `src/test/setup.ts` installs a
+guard that fails any test producing unexpected output; a test that _means_ to log — the
+`devWarn` suite, for one — opts in per message:
+
+```ts
+import { expectConsole } from './test/expectConsole'
+
+expectConsole('warn', /has no accessible name/)
+```
+
 `pnpm check:guardrails` enforces rule 2 of `docs/PHILOSOPHY.md`: it scans `src/**/*.tsx`
 (excluding stories, tests, `src/examples/**`, `src/test/**`) for `sx=`, `disableRipple`/
 `focusRipple`, and literal `variant=`/`size=`/`color=` JSX attributes (a prop-driven value
