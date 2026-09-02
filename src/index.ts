@@ -34,7 +34,12 @@ export {
   passwordFieldClasses,
   type PasswordFieldProps,
 } from './fields/PasswordField'
-export { PhoneField, type PhoneFieldProps } from './fields/PhoneField'
+export { PhoneField, PHONE_FORMAT, type PhoneFieldProps } from './fields/PhoneField'
+// The display half of the US digit fields' one rule (the stored value is bare
+// digits; a template decides only how it looks). Public so a consumer can render
+// a stored value the way the field does — on a review screen, in a table, in an
+// email — instead of re-implementing the template walk.
+export { formatTemplate, type FormatTemplate } from './fields/formatTemplate'
 export type { FieldRules, BooleanFieldRules } from './rules'
 export {
   Autocomplete,

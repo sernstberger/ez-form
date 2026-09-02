@@ -15,10 +15,9 @@ import { WizardStep } from '../../Wizard/WizardStep'
 import { WizardStepper } from '../../Wizard/WizardStepper'
 import { WizardNav } from '../../Wizard/WizardNav'
 import { TextField } from '../../fields/TextField'
-import { PhoneField } from '../../fields/PhoneField'
+import { PhoneField, PHONE_FORMAT, formatTemplate } from '../../fields/PhoneField'
 import { AddressField, addressSchema } from '../../fields/AddressField'
 import { US_STATES } from '../../fields/StateSelect'
-import { formatTemplate } from '../../fields/formatTemplate'
 import { DateField } from '../../fields/DateField'
 import { RadioGroup } from '../../fields/RadioGroup'
 import { Slider } from '../../fields/Slider'
@@ -377,8 +376,9 @@ export function ReviewStep({ hasVehicle }: { hasVehicle: boolean }) {
         <ReadOnlyField name="email" editStep="contact" />
         {/*
           `PhoneField` stores bare digits, so the raw value would review as
-          "5555555555". `formatTemplate` is the same helper the field itself displays
-          through, so the review row reads exactly as the input did.
+          "5555555555". `formatTemplate` and `PHONE_FORMAT` are the same helper and
+          template the field itself displays through — both exported — so the review
+          row reads exactly as the input did and cannot drift from it.
         */}
         <ReadOnlyField
           name="phone"
@@ -386,7 +386,7 @@ export function ReviewStep({ hasVehicle }: { hasVehicle: boolean }) {
           format={(v) =>
             // `format` wins over `empty`, so an unanswered phone is spelled out here
             // rather than rendering as a blank row.
-            typeof v === 'string' && v !== '' ? formatTemplate(v, '###-###-####') : '—'
+            typeof v === 'string' && v !== '' ? formatTemplate(v, PHONE_FORMAT) : '—'
           }
         />
         <ReadOnlyField name="address.street" editStep="contact" />

@@ -339,6 +339,14 @@ function BillingSection() {
               options={COUNTRY_OPTIONS}
               autoComplete="billing country"
             />
+            {/*
+              Deliberately a plain TextField, not `StateSelect` like shipping's US branch:
+              billing has no country-conditional rendering here (it mirrors shipping's shape
+              with every part optional, gated by `superRefine`), so there is no `country ===
+              'US'` branch to hang a StateSelect on — and rendering one unconditionally would
+              offer US states to someone billing from Canada. Same reason `billing.postalCode`
+              stays a TextField rather than a `ZipField`.
+            */}
             <TextField
               name="billing.state"
               label="State / region"

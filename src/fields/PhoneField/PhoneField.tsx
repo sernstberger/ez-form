@@ -27,7 +27,8 @@ export type PhoneFieldProps = Omit<
 > & {
   /**
    * Display template: each `#` is one digit slot, every other character is a
-   * separator inserted between them. Defaults to `'###-###-####'`. The number
+   * separator inserted between them. Defaults to `PHONE_FORMAT`
+   * (`'###-###-####'`). The number
    * of `#`s is also how many digits the field accepts and what the built-in
    * completeness rule requires, so `'(###) ###-####'` still means ten digits
    * while `'###-####'` means seven.
@@ -48,7 +49,14 @@ export type PhoneFieldProps = Omit<
   autoComplete?: string
 }
 
-const DEFAULT_FORMAT = '###-###-####'
+/**
+ * `PhoneField`'s default display template, exported so a consumer can render a
+ * stored phone the same way the field does — `formatTemplate(digits,
+ * PHONE_FORMAT)` on a review screen, in a table, or in a confirmation email.
+ * Without it, reproducing the field's own display means re-typing the template
+ * and silently drifting from it if the default ever changes.
+ */
+export const PHONE_FORMAT = '###-###-####'
 
 /**
  * A US 11-digit entry is the country code plus the number — `+1 555 555 5555`
@@ -98,7 +106,7 @@ export function PhoneField(inProps: PhoneFieldProps) {
   const props = useDefaultProps({ props: inProps, name: 'EzPhoneField' })
   const {
     name,
-    format = DEFAULT_FORMAT,
+    format = PHONE_FORMAT,
     invalidMessage,
     autoComplete = 'tel',
     validate,

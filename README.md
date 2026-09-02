@@ -909,6 +909,20 @@ A value that is non-empty but incomplete fails on submit with `invalidMessage`, 
 
 `format`, `invalidMessage` and `autoComplete` are all settable app-wide through `theme.components.EzPhoneField.defaultProps`; a prop on the element always wins. `PhoneField` adds no styled slot of its own — it renders a `TextField`, so MUI's own `MuiTextField` / `MuiOutlinedInput` style keys reach it unchanged.
 
+Because the stored value is bare digits, anywhere you display it _outside_ the field — a review step, a table, a confirmation email — has to apply the template itself. Format a stored phone for display with `formatTemplate(digits, PHONE_FORMAT)`, both exported, so the display matches the field's own and cannot drift from it if the default template changes:
+
+```tsx
+import { formatTemplate, PHONE_FORMAT } from 'ez-form'
+
+;<ReadOnlyField
+  name="phone"
+  format={(v) => (typeof v === 'string' && v !== '' ? formatTemplate(v, PHONE_FORMAT) : '—')}
+/>
+// { phone: '5551234567' } → "555-123-4567"
+```
+
+`formatTemplate` takes any `#` template, not just the phone one, so a custom `format` formats the same way: `formatTemplate(digits, '(###) ###-####')`. The `Insurance` example's Review step uses exactly this.
+
 ### ZipField
 
 Digits only, capped at 5 — anything else (letters, the ZIP+4 dash) is stripped as you type or paste. The form value is always the digit string (`'90210'`), never a formatted one. `inputMode="numeric"` brings up the numeric keypad on mobile; `autoComplete` defaults to `'postal-code'`. A non-empty value shorter than 5 digits fails a built-in rule (`invalidMessage?`, default `'Enter a 5-digit ZIP code'`), composed with any `validate` you pass the same way `required`/`pattern` are — a built-in key is never silently replaced by yours.

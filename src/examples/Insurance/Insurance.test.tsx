@@ -179,11 +179,11 @@ function seedReview(values: Record<string, unknown> = COMPLETE_VALUES, step = 'r
 // times out part-way through can still have a pending write land after its own teardown.
 // Without the `afterEach`, that leftover state resumes the *next* test onto the wrong
 // step, turning one slow test into a confusing cascade of unrelated failures.
-afterEach(() => {
+beforeEach(() => {
   localStorage.clear()
 })
 
-beforeEach(() => {
+afterEach(() => {
   localStorage.clear()
 })
 
@@ -252,11 +252,13 @@ describe('Insurance', () => {
   it('Contact step: phone formats as you type and blocks Next on a partial number, with no pattern rule', async () => {
     // The point of the US fields: the format lives in `PhoneField`, so the example
     // carries no `pattern={{ value: /^\d{3}-\d{3}-\d{4}$/ }}` and the schema no regex.
-    seedReview(COMPLETE_VALUES, 'contact')
+    // Seeded with the phone already empty rather than seeding a valid number and
+    // clearing it, so the test starts from the state it actually means to exercise.
+    seedReview({ ...COMPLETE_VALUES, phone: '' }, 'contact')
     const user = userEvent.setup({ delay: null })
     render(withPickers(<Insurance />))
     const phone = screen.getByLabelText(/^phone/i)
-    await user.clear(phone)
+    expect(phone).toHaveValue('')
     await user.type(phone, '5551234')
     // Separators are inserted by the field, not typed by the user.
     expect(phone).toHaveValue('555-123-4')
@@ -289,6 +291,27 @@ describe('Insurance', () => {
     await user.click(within(review).getByRole('button', { name: /edit first name/i }))
     expect(screen.getByRole('group', { name: 'Applicant' })).toBeInTheDocument()
     expect(screen.getByLabelText(/first name/i)).toHaveValue('Ada')
+  })
+
+  it('Review\'s Edit link navigates back without validating, and flipping "has vehicle?" on reveals the Vehicle step', async () => {
+    // The cause of the failed-submit case below: from Review, the Edit link jumps back to
+    // the has-vehicle step (backward nav skips validation, so it goes even though the
+    // form is mid-flow), and ticking the box makes the conditional Vehicle step appear in
+    // the stepper without it ever having been visited or filled. Seeded onto Review with
+    // "has vehicle?" No, exactly as a completed no-vehicle session would leave it.
+    seedReview({ ...COMPLETE_VALUES, hasVehicle: false })
+    const user = userEvent.setup({ delay: null })
+    render(withPickers(<Insurance />))
+    const review = screen.getByRole('group', { name: 'Review' })
+    // Vehicle is hidden while hasVehicle is false.
+    expect(screen.queryByRole('tab', { name: /^Vehicle$/ })).not.toBeInTheDocument()
+
+    await user.click(within(review).getByRole('button', { name: /edit has vehicle/i }))
+    expect(screen.getByRole('group', { name: 'Vehicle?' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('checkbox', { name: /insure a vehicle/i }))
+    // The step is revealed by the flip alone — no Next, nothing filled.
+    expect(await screen.findByRole('tab', { name: /^Vehicle$/ })).toBeInTheDocument()
   })
 
   it('shows the error summary listing step-owned fields on a failed final submit', async () => {
@@ -422,9 +445,13 @@ describe('Insurance', () => {
   })
 
   it('submits and reports a server error for a declined application', async () => {
+    // Seeded, not walked: what this asserts is how a *rejected* API response surfaces, so
+    // the eight-step walk is incidental to it — and the walk is what put this test on the
+    // edge of the timeout. `submits successfully` below still walks the whole wizard by
+    // hand, so the "a real walk produces submittable values" path stays covered once.
+    seedReview({ ...COMPLETE_VALUES, firstName: APPLICATION_DECLINED_FOR })
     const user = userEvent.setup({ delay: null })
     render(withPickers(<Insurance />))
-    await fillThroughReview(user, { firstName: APPLICATION_DECLINED_FOR })
     await user.click(screen.getByRole('button', { name: /submit application/i }))
     const dialog = await screen.findByRole('alertdialog', { name: /submit application\?/i })
     await user.click(within(dialog).getByRole('button', { name: /^confirm$/i }))
