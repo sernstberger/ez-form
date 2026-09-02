@@ -8,6 +8,9 @@ import { describeFieldContract } from '../../test/describeFieldContract'
 import { expectNoA11yViolations } from '../../test/axe'
 
 const schema = z.object({ rate: z.number().nullable() })
+// Widens HTMLElement to HTMLInputElement so `.value` / `.selectionStart` are reachable;
+// TS 7 needs the assertion, the linter's TS 6 thinks it redundant (see eslint.config.js).
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
 const input = () => screen.getByRole('textbox', { name: /Rate/ }) as HTMLInputElement
 
 describeFieldContract({

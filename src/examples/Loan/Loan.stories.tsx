@@ -16,7 +16,9 @@ type PlayContext = Parameters<NonNullable<Story['play']>>[0]
 /** `DateField` renders its own hidden text input, found by `name` (see the Loan/DateField tests). */
 const typeDate = (name: string, text: string) => {
   const input = document.querySelector<HTMLInputElement>(`input[name="${name}"]`)!
-  fireEvent.change(input, { target: { value: text } })
+  // `fireEvent` from `storybook/test` is the promise-returning variant; a play function's
+  // caller does not await this and the change is dispatched synchronously regardless.
+  void fireEvent.change(input, { target: { value: text } })
 }
 
 async function fillLoanStep({ canvas, userEvent }: PlayContext) {

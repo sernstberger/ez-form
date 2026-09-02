@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react'
+import { Fragment, useId, type ReactNode } from 'react'
 import Button, { type ButtonProps } from '@mui/material/Button'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
@@ -50,7 +50,23 @@ const isEmpty = (v: unknown) =>
   v === '' || v === null || v === undefined || (Array.isArray(v) && v.length === 0)
 
 function display(value: unknown, options?: readonly Option[]): ReactNode {
-  if (Array.isArray(value)) return value.map((v) => display(v, options)).join(', ')
+  /*
+   * Composed as React nodes rather than `Array.join(', ')`.
+   *
+   * Today every non-array branch below returns a string, so the two produce identical output
+   * and this is defensive, not a bug fix — `no-base-to-string` flags the `join` because the
+   * declared return type is `ReactNode`, and that type is the contract. The moment any branch
+   * returns an actual element (an `Option.label` widened to `ReactNode`, a formatted chip),
+   * `join` would call `toString` on it and render "[object Object]"; composing nodes cannot.
+   */
+  if (Array.isArray(value)) {
+    return value.map((v, i) => (
+      <Fragment key={i}>
+        {i > 0 ? ', ' : null}
+        {display(v, options)}
+      </Fragment>
+    ))
+  }
   if (options) {
     const match = options.find((o) => o.value === value)
     if (match) return match.label
@@ -169,7 +185,10 @@ interface WatchedReadOnlyFieldProps extends ReadOnlyFieldBaseProps {
 
 /** `name` mode: reads the form path with `useWatch`. Never registered, never validated. */
 function WatchedReadOnlyField({ name, label, ...rest }: WatchedReadOnlyFieldProps) {
-  const value = useWatch({ name })
+  // `useWatch` is typed `any` for an untyped control; this field displays whatever is there
+  // (`ReadOnlyFieldView.value` is `unknown` and `display`/`format` narrow it), so `unknown` is
+  // both honest and what the consumer already accepts.
+  const value: unknown = useWatch({ name })
   return <ReadOnlyFieldView value={value} text={label ?? humanize(name)} name={name} {...rest} />
 }
 
@@ -202,6 +221,6 @@ export function ReadOnlyField(inProps: ReadOnlyFieldProps) {
   return 'value' in props && props.value !== undefined ? (
     <StaticReadOnlyField {...props} value={props.value} />
   ) : (
-    <WatchedReadOnlyField {...props} name={props.name as string} />
+    <WatchedReadOnlyField {...props} name={props.name!} />
   )
 }

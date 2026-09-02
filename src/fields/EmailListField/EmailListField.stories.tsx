@@ -75,6 +75,11 @@ function fakeDirectory(query: string, signal: AbortSignal): Promise<EmailOption[
     const timer = setTimeout(() => resolve(hits), 400)
     signal.addEventListener('abort', () => {
       clearTimeout(timer)
+      // `signal.reason` is typed `any` by lib.dom, so the rule cannot see that it is an
+      // Error; at runtime it is the `DOMException` (`AbortError`) the abort produced, which
+      // is exactly what an aborted fetch rejects with. Rejecting with anything else would
+      // hide the abort from the caller's `err.name === 'AbortError'` check.
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
       reject(signal.reason)
     })
   })

@@ -16,6 +16,7 @@ import { NumberField } from '../fields/NumberField'
 import { FieldArray } from '../FieldArray'
 import { useEzFormContext } from '../useEzFormContext'
 import { expectNoA11yViolations } from '../test/axe'
+import { expectConsole } from '../test/expectConsole'
 
 const schema = z.object({ email: z.email() })
 
@@ -246,8 +247,10 @@ describe('Form', () => {
         <TextField name="email" label="Email" />
       </Form>,
     )
-    expect(received).toHaveLength(1)
-    expect(typeof received[0]?.reset).toBe('function')
+    // StrictMode mounts, unmounts and remounts, so the callback runs more than once; what
+    // this test is about is that every call hands over the form methods.
+    expect(received.length).toBeGreaterThan(0)
+    for (const methods of received) expect(typeof methods.reset).toBe('function')
   })
 
   // #71: the suite runs React 19, where a plain function component receives `ref` as an
@@ -349,7 +352,10 @@ describe('Form with every component', () => {
 
 describe('useEzFormContext', () => {
   it('throws a clear error outside <Form>', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
+    // React logs every error it caught while rendering before rethrowing it. The `toThrow`
+    // below is the assertion; these allow the noise that necessarily comes with it.
+    expectConsole('error', 'must be rendered inside <Form>')
+    expectConsole('error', 'The above error occurred')
     expect(() => renderHook(() => useEzFormContext('Probe'))).toThrow(
       'ez-form: <Probe> must be rendered inside <Form>',
     )

@@ -9,6 +9,8 @@ import { describeFieldContract } from '../../test/describeFieldContract'
 import { expectTargetSize } from '../../test/targetSize'
 
 const schema = z.object({ code: z.string() })
+// Widens HTMLElement to HTMLInputElement so `.value` is reachable; TS 7 needs it.
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
 const inputs = () => screen.getAllByRole('textbox') as HTMLInputElement[]
 
 describeFieldContract({

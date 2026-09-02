@@ -312,9 +312,13 @@ describe('FormDialog', () => {
     await openDialog(user)
     await type(user, 'Ada')
     await user.keyboard('{Escape}')
-    // Let the prompt's enter transition settle before axe walks the tree, so
-    // its final state update lands inside act() rather than mid-audit.
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Keep editing' })).toHaveFocus())
+    // Let the prompt's enter transition settle before axe walks the tree, so its final state
+    // update lands inside act() rather than mid-audit. Waiting on the prompt being *present*
+    // rather than focused: this prompt is a dialog inside a dialog, and the outer Dialog's
+    // focus trap keeps focus on its paper, so ConfirmDialog's `autoFocus` on Cancel does not
+    // win the race here. Focus behaviour has its own tests (ConfirmDialog.test.tsx); what
+    // this one is for is the axe audit below.
+    expect(await screen.findByRole('button', { name: 'Keep editing' })).toBeInTheDocument()
     await expectNoA11yViolations(baseElement)
   })
 
@@ -417,22 +421,25 @@ describe('FormDialog', () => {
     expect(screen.getByRole('dialog', { name: 'Edit contact' })).toBeInTheDocument()
   })
 
-  // Finding 3: a Form prop must reach <Form>, not the Dialog's div. React
-  // silently drops an unknown prop rather than rendering it, so the attribute
-  // alone proves nothing — its "does not recognize the X prop on a DOM element"
-  // warning is the actual signal, and this asserts on that.
+  /*
+   * Finding 3: a Form prop must reach <Form>, not the Dialog's div. React silently drops an
+   * unknown prop rather than rendering it, so the attribute alone proves nothing — its "does
+   * not recognize the X prop on a DOM element" warning is the actual signal.
+   *
+   * That signal is now the console guard's (src/test/expectConsole.ts): any `console.error`
+   * this test does not opt into fails it. So the assertion is the *absence* of an
+   * `expectConsole` call — if `submitPendingText` ever lands on the dialog div, React warns
+   * and the guard fails this test with the warning text. Collecting the messages by hand here
+   * would only re-implement, less strictly, what the guard already does for every test.
+   */
   it('forwards Form-only props to the form, never onto the dialog element', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     render(<Harness submitPendingText="Saving your contact…" onSubmit={onSubmit} />)
     await openDialog(user)
     await type(user, 'Ada')
     await user.click(screen.getByRole('button', { name: 'Submit' }))
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
-    const messages = consoleError.mock.calls.map((call) => call.join(' '))
-    expect(messages.filter((m) => m.includes('does not recognize'))).toEqual([])
-    expect(messages.filter((m) => m.toLowerCase().includes('submitpendingtext'))).toEqual([])
   })
 
   // Finding 4: two stacked modals — Escape must peel one layer at a time.

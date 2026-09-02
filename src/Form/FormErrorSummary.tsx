@@ -186,7 +186,6 @@ export function FormErrorSummary(inProps: FormErrorSummaryProps) {
   // point of giving `lastFailed` a fresh reference on each failure.
   useEffect(() => {
     if (visible) headingRef.current?.focus()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wizard?.lastFailed, submitCount, failedConfirmAttempt, visible])
 
   // href lookups touch the DOM (see fieldElementId's ruling), so they run after commit rather
@@ -195,6 +194,11 @@ export function FormErrorSummary(inProps: FormErrorSummaryProps) {
   const [fieldIds, setFieldIds] = useState<Record<string, string | undefined>>({})
   useEffect(() => {
     if (!visible) return
+    /* The ids come from a DOM lookup, which is only possible after commit; this is the
+       "synchronize with an external system" case the rule exempts in spirit. The dep key is the
+       serialized field-name list, so the resulting render recomputes the same ids and does not
+       re-fire. */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFieldIds(
       Object.fromEntries(entries.map((entry) => [entry.name, fieldElementId(entry.name)])),
     )

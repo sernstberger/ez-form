@@ -23,7 +23,9 @@ async function fillLoanStep(user: ReturnType<typeof userEvent.setup>, amount = '
 /** Below Loan's LOW_INCOME_THRESHOLD (see Loan.tsx): the co-signer note becomes required. */
 const LOW_INCOME_THRESHOLD = 3000
 
-async function fillApplicantStep(user: ReturnType<typeof userEvent.setup>, income = '8000') {
+// `_user`: this step now fills every field through `setValue` (see #85), so it needs no
+// userEvent instance — but the parameter stays so every fill* helper is called the same way.
+async function fillApplicantStep(_user: ReturnType<typeof userEvent.setup>, income = '8000') {
   setValue(screen.getByLabelText(/full name/i), 'Ada Lovelace')
   setValue(screen.getByLabelText(/^email/i), 'ada@example.com')
   typeDate('applicantBirthday', '12/10/1985')

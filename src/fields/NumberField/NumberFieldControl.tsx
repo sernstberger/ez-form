@@ -314,7 +314,7 @@ export function NumberFieldControl(inProps: NumberFieldControlProps) {
       <BaseNumberField.Input
         render={(inputRenderProps, state) => (
           <NumberInput
-            baseProps={inputRenderProps as ComponentPropsWithRef<'input'>}
+            baseProps={inputRenderProps}
             inputValue={state.inputValue}
             label={label}
             size={size}

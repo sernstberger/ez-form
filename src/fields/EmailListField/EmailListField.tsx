@@ -12,7 +12,6 @@ import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import { styled } from '@mui/material/styles'
 import { useWatch } from 'react-hook-form'
-import type { Message } from 'react-hook-form'
 import { Autocomplete, type AutocompleteProps } from '../Autocomplete'
 import { useEzFormContext } from '../../useEzFormContext'
 import { useAssisted } from '../../Form/AssistedContext'
@@ -418,7 +417,7 @@ export function EmailListField(inProps: EmailListFieldProps) {
               : validate),
           emails: (v: unknown) =>
             !(Array.isArray(v) ? (v as string[]) : []).some((e) => !isAccepted(e)) ||
-            (invalidMessage as Message),
+            invalidMessage,
         }}
         onChange={(event, next, reason, details) => {
           // The single place a change is normalized, whatever produced it — an
@@ -427,9 +426,7 @@ export function EmailListField(inProps: EmailListFieldProps) {
           // MUI's raw proposal to the form by the time this runs; `applyChange`
           // rewrites it to the folded list, so a duplicate never survives and a
           // multi-address entry is split even when MUI appended it whole.
-          const proposed = (next as (EmailOption | string)[]).map((v) =>
-            typeof v === 'string' ? v : v.value,
-          )
+          const proposed = next.map((v) => (typeof v === 'string' ? v : v.value))
           // A removal is already exactly what it should be; only additions need folding.
           if (reason === 'removeOption' || reason === 'clear') {
             applyChange(value, proposed)

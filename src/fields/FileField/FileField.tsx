@@ -144,6 +144,13 @@ export type FileFieldProps = {
   onChange?: (event: SyntheticEvent, value: FileFieldValue) => void
 } & Pick<FieldRules<FileFieldValue>, 'required' | 'validate'>
 
+/**
+ * "This effect has not run yet" marker for the rejection-revalidation effect below. A distinct
+ * sentinel rather than `undefined`, because `undefined` is itself a real `rejection` value
+ * (meaning "nothing rejected").
+ */
+const MOUNT = Symbol('mount')
+
 /** 1 kB = 1000 B, matching how OS file dialogs and `accept`-adjacent UI report sizes. */
 const SIZE_UNITS = ['B', 'kB', 'MB', 'GB', 'TB'] as const
 
@@ -295,14 +302,19 @@ export function FileField(inProps: FileFieldProps) {
   // the state re-registers the `accepted` rule with (or without) the message,
   // and this effect then re-runs it. It fires on *both* edges: only re-running
   // on the setting edge would leave a cleared rejection's stale error on screen.
-  // The ref skips the mount pass, so a fresh field is never validated into an
-  // error it hasn't earned.
-  const validated = useRef(false)
+  // The remembered previous value skips the mount pass, so a fresh field is never validated
+  // into an error it hasn't earned.
+  //
+  // This tracks the last `rejection` rather than a "have I run once" boolean: under
+  // StrictMode the effect runs twice on mount, and a boolean ref would be set by the first
+  // pass and then read as "not the mount pass" by the second — firing `trigger` on a freshly
+  // mounted field and updating the form outside `act`. Comparing values is idempotent, so
+  // running the effect any number of times with an unchanged `rejection` does nothing.
+  const lastRejection = useRef<string | undefined | typeof MOUNT>(MOUNT)
   useEffect(() => {
-    if (!validated.current) {
-      validated.current = true
-      return
-    }
+    const previous = lastRejection.current
+    lastRejection.current = rejection
+    if (previous === MOUNT || previous === rejection) return
     void trigger(name)
   }, [rejection, trigger, name])
 

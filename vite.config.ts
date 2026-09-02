@@ -3,6 +3,7 @@ import { dirname } from 'node:path'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import dts from 'vite-plugin-dts'
+import { failOnWarning } from './rollupWarnings.ts'
 
 // api-extractor's own analyzer depends on the classic TypeScript compiler API
 // (`require('typescript').createProgram`, etc.), which the project's pinned
@@ -42,7 +43,8 @@ export default defineConfig(({ mode }) => ({
   ],
   build: {
     lib: { entry: 'src/index.ts', formats: ['es'], fileName: 'index' },
-    rollupOptions: { external },
+    // A build warning fails the build — see rollupWarnings.ts.
+    rollupOptions: { external, onwarn: failOnWarning },
     sourcemap: true,
   },
   test: {

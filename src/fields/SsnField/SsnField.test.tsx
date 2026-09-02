@@ -1,5 +1,5 @@
 import { createTheme, ThemeProvider } from '@mui/material/styles'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../../Form'
@@ -11,6 +11,9 @@ import { expectTargetSize } from '../../test/targetSize'
 const schema = z.object({ ssn: z.string() })
 // Hidden by default, and a password input exposes no `textbox` role, so the
 // element has to be reached by name rather than by role.
+// A widening cast (Element -> HTMLInputElement), not a non-null one; `!` alone loses
+// `.value` and `.selectionStart`.
+// eslint-disable-next-line @typescript-eslint/non-nullable-type-assertion-style
 const input = () => document.querySelector('input[name="ssn"]') as HTMLInputElement
 const showToggle = () => screen.getByRole('button', { name: 'Show Social Security number' })
 const hideToggle = () => screen.getByRole('button', { name: 'Hide Social Security number' })
@@ -160,8 +163,12 @@ describe('SsnField reveal', () => {
     await user.type(input(), '123456789')
     // Reached by keyboard with focus already on the button: the user put focus
     // there deliberately, so yanking it into the input would be wrong.
-    input().blur()
-    showToggle().focus()
+    // Wrapped in `act`: blurring/focusing a MUI input flips its FormControl's focused
+    // state, and a raw call would land that update outside React's batching.
+    act(() => {
+      input().blur()
+      showToggle().focus()
+    })
     await user.keyboard('{Enter}')
     expect(hideToggle()).toHaveFocus()
     expect(input()).not.toHaveFocus()

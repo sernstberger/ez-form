@@ -141,7 +141,7 @@ export const emptyValues: Input = {
   deductible: 500,
   coverageAmount: null as unknown as number,
   hasVehicle: false,
-  vehicle: { make: '', model: '', year: null as unknown as number, plate: '' },
+  vehicle: { make: '', model: '', year: null, plate: '' },
   driver: { name: '', licenseNumber: '', licenseDate: null as unknown as Date },
   claims: '',
   priorIncidents: [],
@@ -176,7 +176,7 @@ function loadSaved(): SavedState | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
-    return JSON.parse(raw, (key, value) => {
+    return JSON.parse(raw, (key: string, value: unknown) => {
       if ((key === 'birthday' || key === 'licenseDate') && typeof value === 'string') {
         return new Date(value)
       }
@@ -241,9 +241,12 @@ export const INSURANCE_STEPS = [
 function WatchValues({ onValues }: { onValues: (values: Partial<Input>) => void }) {
   const values = useWatch<Input>() as Partial<Input>
   const json = JSON.stringify(values)
+  // Keyed on the serialized values, not the object: `useWatch` returns a fresh object every
+  // render, so an identity dep would fire on every keystroke's re-render regardless of whether
+  // anything changed.
   useEffect(() => {
     onValues(JSON.parse(json) as Partial<Input>)
-  }, [json])
+  }, [json, onValues])
   return null
 }
 
@@ -278,12 +281,9 @@ export function ApplicantStep() {
 }
 
 export function ContactStep() {
-  // See ApplicantStep's comment: street/city/ZIP tokens are hardcoded (no `type` derives
-  // them), so they route through `resolveAutoComplete` the same way. `email` and `tel` would
-  // already be suppressed by `TextField`'s own `type`-derived default — they are hardcoded
-  // here only because this form also carries `phone`'s own `pattern` rule, not to opt out of
-  // that default, so they get the same explicit treatment for consistency.
-  const assisted = useAssisted()
+  // No `resolveAutoComplete` call here any more: `EmailField`, `PhoneField` and
+  // `AddressField` each derive their own autofill tokens and suppress them under
+  // `<Form assisted>` internally, so this step has no token to route by hand.
   return (
     <WizardStep id="contact">
       <Stack spacing={3}>

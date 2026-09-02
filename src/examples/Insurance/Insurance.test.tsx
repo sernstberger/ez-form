@@ -394,7 +394,7 @@ describe('Insurance', () => {
     const { unmount } = render(withPickers(<Insurance />))
     // On Documents: upload a file, then let the autosave effect run before remounting.
     const file = new File(['%PDF'], 'policy.pdf', { type: 'application/pdf' })
-    await user.upload(screen.getByLabelText(/^upload documents/i) as HTMLInputElement, file)
+    await user.upload(screen.getByLabelText(/^upload documents/i), file)
     expect(screen.getByText('policy.pdf')).toBeInTheDocument()
     await waitFor(() => expect(localStorage.getItem(STORAGE_KEY)).toBeTruthy())
     // A `File` has no own-enumerable properties (they're prototype getters), so

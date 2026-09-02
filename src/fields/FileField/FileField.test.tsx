@@ -16,8 +16,7 @@ const jpg = new File(['jpg'], 'b.jpg', { type: 'image/jpeg' })
 
 // The button's accessible name includes the required asterisk span
 // ("Resume *"), so match a label that only starts with the given text.
-const fileInput = (label: string) =>
-  screen.getByLabelText(new RegExp(`^${label}`)) as HTMLInputElement
+const fileInput = (label: string) => screen.getByLabelText(new RegExp(`^${label}`))
 
 describeFieldContract({
   componentName: 'FileField',
@@ -240,7 +239,7 @@ describe('FileField', () => {
     const chip = screen.getByText('resume.pdf')
     const fileList = chip.closest(`.${fileFieldClasses.fileList}`)
     expect(fileList).not.toBeNull()
-    expect(getComputedStyle(fileList as Element).marginTop).toBe('9px')
+    expect(getComputedStyle(fileList!).marginTop).toBe('9px')
   })
 
   it('Form requiredIndicator="optional": required stays required with no asterisk in the label', () => {
@@ -254,7 +253,7 @@ describe('FileField', () => {
         <FileField name="resume" label="Resume" required />
       </Form>,
     )
-    const input = screen.getByLabelText('Resume') as HTMLInputElement
+    const input = screen.getByLabelText('Resume')
     expect(input).toBeRequired()
   })
 
@@ -277,6 +276,8 @@ describe('FileField', () => {
 // only `files` is read here.
 const dataTransfer = (files: File[]) => ({ files, items: [], types: ['Files'] })
 
+// A widening cast (Element -> HTMLElement), not a non-null one.
+// eslint-disable-next-line @typescript-eslint/non-nullable-type-assertion-style
 const dropZone = () => document.querySelector(`.${fileFieldClasses.dropZone}`) as HTMLElement
 
 describe('FileField dropzone', () => {
@@ -665,6 +666,9 @@ describe('FileField progress hooks', () => {
     expect(onFilesAdded).toHaveBeenLastCalledWith([jpg])
     // A rejected pick adds nothing and tells no one.
     fireEvent.drop(dropZone(), { dataTransfer: dataTransfer([pdf]) })
+    // Awaited because setting the rejection re-runs the field's `accepted` rule, which
+    // updates the form asynchronously; the alert appearing is that update landing.
+    expect(await screen.findByRole('alert')).toHaveTextContent('File type not accepted')
     expect(onFilesAdded).toHaveBeenCalledTimes(2)
   })
 })

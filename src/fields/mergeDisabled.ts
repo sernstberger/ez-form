@@ -3,4 +3,6 @@
  * consumer `disabled={false}`; a consumer `disabled` still disables on its own.
  */
 export const mergeDisabled = (consumer: boolean | undefined, form: boolean | undefined): boolean =>
-  Boolean(consumer || form)
+  // Boolean OR, not a nullish fallback: either source disabling is enough, and `??` would
+  // let a consumer `disabled={false}` mask the form's lock.
+  Boolean(consumer) || Boolean(form)

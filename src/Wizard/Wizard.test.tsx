@@ -15,6 +15,7 @@ import { WizardStep } from './WizardStep'
 import { WizardStepper, wizardStepperClasses } from './WizardStepper'
 import { WizardNav } from './WizardNav'
 import { useWizard } from './useWizard'
+import { expectConsole } from '../test/expectConsole'
 
 // A spy on the real `useWatch` — proves a `when`-less `Wizard` never calls it at all
 // (the fix for the reviewed bug: `disabled: true` still subscribed at the react-hook-form
@@ -27,7 +28,7 @@ vi.mock('react-hook-form', async (importOriginal) => {
     ...actual,
     useWatch: (...args: Parameters<typeof actual.useWatch>) => {
       useWatchSpy(...args)
-      return actual.useWatch(...(args as unknown as []))
+      return actual.useWatch(...args)
     },
   }
 })
@@ -1250,7 +1251,8 @@ describe('Wizard', () => {
           <Wizard
             steps={steps}
             stepAnnouncement={({ index, count, label, step }) =>
-              `${label} (${step.id}) — ${index + 1}/${count}`
+              // `label` is a ReactNode; every step in this fixture uses a string one.
+              `${typeof label === 'string' ? label : ''} (${step.id}) — ${index + 1}/${count}`
             }
           >
             <Steps />
@@ -1428,7 +1430,10 @@ describe('Wizard', () => {
   })
 
   it('throws outside <Form> and useWizard throws outside <Wizard>', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
+    // React logs every error it caught while rendering before rethrowing it. The `toThrow`
+    // assertions below are the point; these allow the noise that comes with them.
+    expectConsole('error', 'must be rendered inside')
+    expectConsole('error', 'The above error occurred')
     expect(() =>
       render(
         <Wizard steps={steps}>
@@ -1446,7 +1451,10 @@ describe('Wizard', () => {
   })
 
   it('a wizard with a `when` step also throws the ez-form message outside <Form> (not a bare useWatch TypeError)', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
+    // React logs every error it caught while rendering before rethrowing it. The `toThrow`
+    // assertions below are the point; these allow the noise that comes with them.
+    expectConsole('error', 'must be rendered inside')
+    expectConsole('error', 'The above error occurred')
     expect(() =>
       render(
         <Wizard steps={conditionalSteps}>
@@ -1830,7 +1838,7 @@ describe('Wizard layout="page"', () => {
   })
 
   it('a WizardStep id matching no step renders nothing (not an unnamed group) and warns', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expectConsole('warn', 'not-a-real-step')
     render(
       <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
         <Wizard steps={steps} layout="page">
@@ -1845,12 +1853,14 @@ describe('Wizard layout="page"', () => {
     )
     expect(screen.queryByText('orphaned')).not.toBeInTheDocument()
     expect(screen.getAllByRole('group')).toHaveLength(1)
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('not-a-real-step'))
-    warn.mockRestore()
+    // The single group proves the orphaned step rendered nothing. The `expectConsole` above
+    // is what lets the (correct) warning through: without it the guard would fail this test,
+    // so naming the message there still ties the test to the warning's text.
   })
 
   it('page layout: a WizardStep hidden by `when` renders nothing and does not warn', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    // "does not warn" is the console guard's job (src/test/expectConsole.ts): with no
+    // `expectConsole` call, any console.warn fails this test.
     render(
       <Form schema={conditionalSchema} defaultValues={conditionalFilled} onSubmit={() => {}}>
         <Wizard steps={conditionalSteps} layout="page">
@@ -1859,8 +1869,6 @@ describe('Wizard layout="page"', () => {
       </Form>,
     )
     expect(screen.queryByRole('group', { name: 'Extra' })).not.toBeInTheDocument()
-    expect(warn).not.toHaveBeenCalled()
-    warn.mockRestore()
   })
 })
 

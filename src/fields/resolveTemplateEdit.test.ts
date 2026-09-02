@@ -48,7 +48,7 @@ describe('toEditKind', () => {
     ['historyUndo', 'other'],
     [undefined, 'other'],
   ])('%s -> %s', (input, expected) => {
-    expect(toEditKind(input as string | undefined)).toBe(expected)
+    expect(toEditKind(input)).toBe(expected)
   })
 })
 

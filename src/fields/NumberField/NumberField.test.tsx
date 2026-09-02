@@ -507,6 +507,9 @@ describe('NumberField', () => {
     )
     const el = input() as HTMLInputElement
     await user.click(el)
+    // Deliberately unbound: it is `.call(el, …)`-ed below to drive the *native* setter,
+    // bypassing React's value tracker the way a real IME does.
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     const setNativeValue = Object.getOwnPropertyDescriptor(
       HTMLInputElement.prototype,
       'value',

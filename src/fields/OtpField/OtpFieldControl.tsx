@@ -57,23 +57,23 @@ const Slot = styled(OTPField.Input, {
   textAlign: 'center',
   font: 'inherit',
   fontSize: theme.typography.pxToRem(small ? 14 : 16),
-  color: (theme.vars || theme).palette.text.primary,
+  color: (theme.vars ?? theme).palette.text.primary,
   background: 'transparent',
-  border: `1px solid ${(theme.vars || theme).palette.divider}`,
-  borderRadius: (theme.vars || theme).shape.borderRadius,
+  border: `1px solid ${(theme.vars ?? theme).palette.divider}`,
+  borderRadius: (theme.vars ?? theme).shape.borderRadius,
   outline: 'none',
-  '&:hover:not(:disabled)': { borderColor: (theme.vars || theme).palette.text.primary },
+  '&:hover:not(:disabled)': { borderColor: (theme.vars ?? theme).palette.text.primary },
   '&:focus': {
-    borderColor: (theme.vars || theme).palette.primary.main,
-    boxShadow: `inset 0 0 0 1px ${(theme.vars || theme).palette.primary.main}`,
+    borderColor: (theme.vars ?? theme).palette.primary.main,
+    boxShadow: `inset 0 0 0 1px ${(theme.vars ?? theme).palette.primary.main}`,
   },
   '&:disabled': {
-    color: (theme.vars || theme).palette.text.disabled,
-    borderColor: (theme.vars || theme).palette.action.disabledBackground,
+    color: (theme.vars ?? theme).palette.text.disabled,
+    borderColor: (theme.vars ?? theme).palette.action.disabledBackground,
   },
   '[aria-invalid="true"]&': {
-    borderColor: (theme.vars || theme).palette.error.main,
-    '&:focus': { boxShadow: `inset 0 0 0 1px ${(theme.vars || theme).palette.error.main}` },
+    borderColor: (theme.vars ?? theme).palette.error.main,
+    '&:focus': { boxShadow: `inset 0 0 0 1px ${(theme.vars ?? theme).palette.error.main}` },
   },
 }))
 
@@ -108,7 +108,7 @@ export function OtpFieldControl(inProps: OtpFieldControlProps) {
   // touched (and validate it) after every character.
   const handleBlur = (event: FocusEvent<HTMLInputElement>) => {
     const group = event.currentTarget.closest('[role="group"]')
-    if (group?.contains(event.relatedTarget as Node | null)) return
+    if (group?.contains(event.relatedTarget)) return
     onBlur?.()
   }
   return (

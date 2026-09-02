@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { Form } from '../../Form'
 import { ResendCodeButton, resendCodeButtonClasses } from './ResendCodeButton'
 import { expectNoA11yViolations } from '../../test/axe'
+import { expectConsole } from '../../test/expectConsole'
 
 const schema = z.object({ code: z.string() })
 
@@ -114,9 +115,15 @@ describe('ResendCodeButton', () => {
     vi.useRealTimers()
   })
 
+  /*
+   * The "without act warnings" part is the console guard's job now
+   * (src/test/expectConsole.ts): any `console.error` this test does not opt into fails it, and
+   * the guard also unmounts inside its own afterEach, so a stray timer firing after teardown
+   * is caught there too. Hence no spy and no explicit assertion — the absence of an
+   * `expectConsole` call *is* the assertion.
+   */
   it('clears the interval on unmount without act warnings', async () => {
     vi.useFakeTimers()
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const onResend = vi.fn()
     const { unmount } = render(
       <Form schema={schema} defaultValues={{ code: '' }} onSubmit={() => {}}>
@@ -132,7 +139,6 @@ describe('ResendCodeButton', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(6000)
     })
-    expect(errorSpy).not.toHaveBeenCalled()
     vi.useRealTimers()
   })
 
@@ -171,7 +177,10 @@ describe('ResendCodeButton', () => {
   })
 
   it('throws outside <Form>', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
+    // React logs every error it caught while rendering before rethrowing it. The `toThrow`
+    // below is the assertion; these allow the noise that necessarily comes with it.
+    expectConsole('error', 'must be rendered inside <Form>')
+    expectConsole('error', 'The above error occurred')
     expect(() => render(<ResendCodeButton onResend={() => {}} />)).toThrow(
       'ez-form: <ResendCodeButton> must be rendered inside <Form>',
     )

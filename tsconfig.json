@@ -7,12 +7,26 @@
     "jsx": "react-jsx",
     "strict": true,
     "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
+    // The two Vite configs import `rollupWarnings.ts` with its extension: Vite's future
+    // native config loader warns on an extensionless import, and these files are executed by
+    // Vite, never emitted by tsc. `noEmit` is already true here, which is what this option
+    // requires; the library build (tsconfig.build.json) excludes both configs.
+    "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "noEmit": true,
     "types": ["vitest/globals"]
   },
-  "include": ["src", ".storybook", "vite.config.ts"],
+  // `.storybook` as a bare directory name silently missed `main.ts`, so the Storybook build
+  // config was never typechecked (only `preview.tsx` was, because a `.tsx` under a dotted
+  // directory does get picked up). Naming the extensions explicitly covers both files.
+  "include": ["src", ".storybook/*.ts", ".storybook/*.tsx", "vite.config.ts", "rollupWarnings.ts"],
   "exclude": ["src/__qa__"]
 }

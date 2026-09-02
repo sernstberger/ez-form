@@ -6,6 +6,7 @@ import { Form } from '../../Form'
 import { PasswordField } from '../PasswordField'
 import { PasswordStrength, passwordStrengthClasses } from './PasswordStrength'
 import { expectNoA11yViolations } from '../../test/axe'
+import { expectConsole } from '../../test/expectConsole'
 
 const schema = z.object({ password: z.string() })
 
@@ -112,7 +113,10 @@ describe('PasswordStrength', () => {
   })
 
   it('throws outside <Form>', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
+    // React logs every error it caught while rendering before rethrowing it. The `toThrow`
+    // below is the assertion; these allow the noise that necessarily comes with it.
+    expectConsole('error', 'must be rendered inside <Form>')
+    expectConsole('error', 'The above error occurred')
     expect(() => render(<PasswordStrength name="password" />)).toThrow(
       'ez-form: <PasswordStrength> must be rendered inside <Form>',
     )

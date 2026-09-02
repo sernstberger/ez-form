@@ -192,6 +192,10 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
   // fields needs.
   useEffect(() => {
     if (!pendingFocus) return
+    /* Consuming a one-shot focus request queued by an event handler, not deriving state from
+       props. The `if (!pendingFocus) return` above makes the re-render this schedules a no-op,
+       so it settles in one extra pass rather than cascading. */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPendingFocus(null)
     if (pendingFocus.kind === 'add') {
       addRef.current?.focus()
@@ -231,10 +235,25 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
       ?.focus()
   }, [pendingFocus, fields])
 
-  const nameRow = (index: number): ReactNode =>
-    rowLabel
-      ? rowLabel(index)
-      : `${singular ?? (typeof label === 'string' ? label.replace(/s$/, '') : 'Row')} ${index + 1}`
+  /** The generated `<singular> <n>` name, always a string. */
+  const defaultRowName = (index: number): string =>
+    `${singular ?? (typeof label === 'string' ? label.replace(/s$/, '') : 'Row')} ${index + 1}`
+
+  const nameRow = (index: number): ReactNode => (rowLabel ? rowLabel(index) : defaultRowName(index))
+
+  /**
+   * The row name for the Remove / Move buttons' `aria-label`, which is an attribute and so
+   * must be a string. `rowLabel` may legitimately return an element (it names the *visible*
+   * `FormSection` legend, where JSX is fine); interpolating that into a template would
+   * announce "Remove [object Object]", so a non-string `rowLabel` falls back to the generated
+   * name rather than stringifying whatever it returned.
+   */
+  const nameRowForAria = (index: number): string => {
+    const label = rowLabel?.(index)
+    return typeof label === 'string' || typeof label === 'number'
+      ? String(label)
+      : defaultRowName(index)
+  }
 
   const announce = (text: string) => setStatus((prev) => ({ text, seq: prev.seq + 1 }))
 
@@ -242,7 +261,7 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
     const row = typeof emptyRow === 'function' ? (emptyRow as () => TRow)() : emptyRow
     // hookform focuses the input it registered for the new row; this component
     // focuses the row's first focusable control itself, in the effect above.
-    append(row as never, { shouldFocus: false })
+    append(row, { shouldFocus: false })
     // Resolve the target at commit time rather than storing `fields.length`
     // from this render's closure: a double invoke would read the same stale
     // length twice and aim at a row that is no longer the appended one.
@@ -289,6 +308,7 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
     <FieldArrayRoot title={label} className={fieldArrayClasses.root}>
       {fields.map((field, index) => {
         const rowName = nameRow(index)
+        const rowAriaName = nameRowForAria(index)
         return (
           <FieldArrayRow
             key={field.id}
@@ -306,7 +326,7 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
                 type="button"
                 {...removeProps}
                 disabled={atMin || removeProps.disabled}
-                aria-label={`Remove ${rowName}`}
+                aria-label={`Remove ${rowAriaName}`}
                 className={cx(fieldArrayClasses.remove, removeProps.className)}
                 onClick={() => handleRemove(index)}
               >
@@ -319,7 +339,7 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
                     {...moveProps}
                     data-direction="up"
                     disabled={index === 0 || moveProps.disabled}
-                    aria-label={`Move ${rowName} up`}
+                    aria-label={`Move ${rowAriaName} up`}
                     className={cx(fieldArrayClasses.move, moveProps.className)}
                     onClick={() => handleMove(index, 'up')}
                   >
@@ -330,7 +350,7 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
                     {...moveProps}
                     data-direction="down"
                     disabled={index === fields.length - 1 || moveProps.disabled}
-                    aria-label={`Move ${rowName} down`}
+                    aria-label={`Move ${rowAriaName} down`}
                     className={cx(fieldArrayClasses.move, moveProps.className)}
                     onClick={() => handleMove(index, 'down')}
                   >

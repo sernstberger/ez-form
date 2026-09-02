@@ -31,6 +31,9 @@ export function FormError(inProps: FormErrorProps) {
   // `setError('root.<key>', { message })` (root.server, root.random, …) nests under
   // `errors.root[<key>]`; a bare `setError('root', { message })` sets `errors.root`
   // itself. Read whichever is present so either form works.
+  // Required by TS 7 (`pnpm typecheck`); the linter's TS 6 API reads `errors.root`
+  // differently and thinks it is redundant. See eslint.config.js on the two compilers.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
   const root = errors.root as Record<string, { message?: string }> | undefined
   const message =
     root && typeof root.message === 'string'

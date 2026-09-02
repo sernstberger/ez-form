@@ -243,7 +243,7 @@ function FormImpl<TIn extends FieldValues, TOut>(
     // the same "explicit prop wins" shape every field's own default uses.
     autoComplete = assisted ? 'off' : undefined,
     ...formProps
-  } = useDefaultProps({ props: inProps, name: 'EzForm' }) as FormProps<TIn, TOut>
+  } = useDefaultProps({ props: inProps, name: 'EzForm' })
   const baseId = useId()
   const titleId = `${baseId}-title`
   const descriptionId = `${baseId}-description`
@@ -400,6 +400,10 @@ function FormImpl<TIn extends FieldValues, TOut>(
       pendingDefaultValuesError.current = null
       onDefaultValuesError?.(error)
     }
+    /* Mirroring the `isLoading` prop into the context every field reads. Setting it to the
+       value the dep array is keyed on means the follow-up render finds it unchanged and stops
+       there. */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(isLoading)
   }, [isLoading, onDefaultValuesError])
   useImperativeHandle(forwardedRef, () => methods, [methods])

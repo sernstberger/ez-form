@@ -208,13 +208,7 @@ export function usePickerField<
       validate: {
         ...toRecord<TValue>(validate),
         picker: () =>
-          pickerError.current
-            ? pickerMessage(
-                pickerError.current,
-                labelText,
-                errorMessages as Record<string, string | undefined>,
-              )
-            : true,
+          pickerError.current ? pickerMessage(pickerError.current, labelText, errorMessages) : true,
       },
     },
     optionalText,
