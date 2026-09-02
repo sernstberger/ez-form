@@ -88,10 +88,9 @@ export function PasswordField(inProps: PasswordFieldProps) {
                   toggleSlotProps?.onClick?.(e)
                 }}
               >
-                {revealed ? <VisibilityOffOutlined /> : <VisibilityOutlined />}
                 {revealed
-                  ? (icons?.hide ?? <VisibilityOffIcon />)
-                  : (icons?.show ?? <VisibilityIcon />)}
+                  ? (icons?.hide ?? <VisibilityOffOutlined />)
+                  : (icons?.show ?? <VisibilityOutlined />)}
               </PasswordFieldToggle>
             </InputAdornment>
           ) : undefined,
