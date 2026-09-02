@@ -111,7 +111,7 @@ export interface WizardProps<TIn extends FieldValues> {
   /**
    * Called with the step the wizard wants to show: after Next / Prev /
    * stepper click, and on mount / `step` change when `step` is unknown or
-   * not yet reachable (redirect to the first incomplete step). A controlled
+   * not yet visited (redirect to the last visited step). A controlled
    * wizard does not move until the consumer feeds the new `step` back.
    */
   onStepChange?: (step: WizardStepDef<TIn>) => void
@@ -155,10 +155,13 @@ export interface WizardProps<TIn extends FieldValues> {
 - `stepStatus`: `completed` when visited, not current, and none of its
   `fields` currently has an error; `visited` when visited with errors (shown
   with `StepLabel error`); `upcoming` otherwise.
-- Redirect: when `step` (controlled) names an unknown id or an `upcoming`
-  step that is not reachable, an effect calls `onStepChange(firstIncomplete)`
-  where `firstIncomplete` is the first step not `completed`. This is the
-  deep-link / refresh case for the router story.
+- Redirect: when `step` (controlled) names an unknown id or a step that is
+  not in `visited`, the wizard renders the last visited step (highest index
+  in `visited`) and an effect calls `onStepChange` with it. "Last visited" is
+  where the user left off, which is what a resumed session wants; "first
+  incomplete" was rejected because restored values have not been validated,
+  so every visited step looks complete. This is the deep-link / refresh case
+  for the router story.
 
 ### Components
 
