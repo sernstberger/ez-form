@@ -156,3 +156,35 @@ and `Components` — the type bundler did not drop it. `dist/index.d.ts` also de
 `ReadOnlyField`, `ClearButton`, `ConfirmDialog`, `useFormGuard`, and their prop types.
 
 v4 integration landed at 8f6f9f7; this ledger fix round landed at this commit.
+
+## Final whole-branch review (912e812..6530f56) and fix wave
+
+Reviewer (opus) verdict: ready with fixes. Two Important findings, both single-line
+spec violations; four Minor.
+
+- **Important 1 — ReadOnlyField root lacked `aria-labelledby` (spec S3).** The ledger
+  above had mis-triaged the `useId()` call as vestigial; it was the missing wiring.
+  Fixed in fdbd8ba: `aria-labelledby={labelId}` applied after `{...slotProps?.root}` so a
+  consumer cannot drop it; test asserts the accessible name.
+- **Important 2 — literal `color="inherit"` on the horizontal `StepButton` (spec S5).**
+  Fixed in fdbd8ba. Deviation: `styled(StepButton)` is impossible because MUI `Stepper`
+  detects the tablist by `child.type === StepButton` reference equality, and a wrapper
+  silently loses the `role="tab"` wiring (verified with axe). Ruling: keep a bare MUI
+  `StepButton` with class `EzWizardStepper-stepButton` and no literal styling; theme it
+  through `MuiStepButton` styleOverrides or a nested selector under
+  `EzWizardStepper.styleOverrides.root`. `stepButton` is in `wizardStepperClasses` and
+  `ComponentNameToClassKey` but deliberately has no `styleOverrides` slot. Cost if wrong:
+  a slightly asymmetric theme API for that one element.
+- **Minor — silent submit failure when a schema key is in no step's `fields`.** Cheapest
+  mitigation shipped in fdbd8ba: README note plus mirrored JSDoc on `WizardContext`.
+  Proper fix tracked as #34.
+- **Remaining minors → GitHub Issues** #35 (stale `visited` ids, TIn-erasing casts),
+  #36 (guard `trigger()`/`ask()` rejections), #37 (ConfirmDialog `autoFocus` opt-out),
+  #38 (ReadOnlyField array + `options`; header gap via theme), #39 (CI build-storybook).
+
+Scoped re-review of fdbd8ba (sonnet): **Clean** — all three items addressed, no
+regressions, augmentation consistent. Gate at fdbd8ba: `pnpm typecheck` clean,
+332/332 tests, `pnpm build` succeeded.
+
+v4 closes at fdbd8ba plus this ledger commit. Merged worktrees removed; branches
+`v4/confirm`, `v4/guard`, `v4/wizard` retained.
