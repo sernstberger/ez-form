@@ -39,7 +39,7 @@ export type ReadOnlyFieldProps = ReadOnlyFieldBaseProps &
       }
     | {
         name?: never
-        /** An already-computed value to display, e.g. a caller's own `useWatch`-derived total. Wins over `name`; when set, the field never calls `useWatch` itself. */
+        /** An already-computed value to display, e.g. a caller's own `useWatch`-derived total. Wins over `name`; when set, the field never calls `useWatch` at all. */
         value: unknown
         /** Required: there is no `name` to humanize into a default. */
         label: ReactNode
@@ -84,24 +84,33 @@ const ReadOnlyFieldLabel = styled(Typography, { name: 'EzReadOnlyField', slot: '
 const ReadOnlyFieldValue = styled(Typography, { name: 'EzReadOnlyField', slot: 'Value' })({})
 const ReadOnlyFieldEdit = styled(Button, { name: 'EzReadOnlyField', slot: 'Edit' })({})
 
+interface ReadOnlyFieldViewProps extends ReadOnlyFieldBaseProps {
+  value: unknown
+  /** Resolved label text (either the given `label`, or `humanize(name)`). */
+  text: ReactNode
+  /** Only present in `name` mode; used as the Edit button's last-resort accessible-name fallback. */
+  name?: string
+}
+
 /**
- * A value from the form, read-only: small secondary label above, the value
- * below. For review / summary steps. Typography, not a disabled TextField,
- * so the value keeps full contrast.
+ * The rendering half of `ReadOnlyField`, shared by both the watched and static
+ * variants below: layout, `format`/`options`/`empty`, the Wizard Edit button,
+ * and every theme slot. Neither variant that calls this reads or watches
+ * anything — that's each caller's own job — so this component has no opinion
+ * on where `value` came from.
  */
-export function ReadOnlyField(inProps: ReadOnlyFieldProps) {
-  const props = useDefaultProps({ props: inProps, name: 'EzReadOnlyField' })
-  const { name, label, options, format, empty = '—', editStep, slotProps } = props
-  useEzFormContext('ReadOnlyField')
-  // `value` wins when given; the hook itself must still run every render (rules of
-  // hooks), so it's disabled rather than skipped, and `name` falls back to a dummy
-  // path so `useWatch` never subscribes to a real field while a `value` is in use.
-  const hasValue = 'value' in props && props.value !== undefined
-  const watched = useWatch({ name: name ?? '__ez_readonly_unused__', disabled: hasValue })
-  const value = hasValue ? props.value : watched
+function ReadOnlyFieldView({
+  value,
+  text,
+  name,
+  options,
+  format,
+  empty = '—',
+  editStep,
+  slotProps,
+}: ReadOnlyFieldViewProps) {
   const wizard = useOptionalWizard()
   const labelId = useId()
-  const text = label ?? (name !== undefined ? humanize(name) : undefined)
   const content = format ? format(value) : isEmpty(value) ? empty : display(value, options)
   // In `page` layout every step (and so every field) is already on screen at once, so
   // `wizard.go()` has nothing to do there — it's a no-op that always resolves `false`. An
@@ -112,6 +121,7 @@ export function ReadOnlyField(inProps: ReadOnlyFieldProps) {
 
   const labelProps = { variant: 'caption', color: 'text.secondary', ...slotProps?.label } as const
   const valueProps = { variant: 'body1', ...slotProps?.value } as const
+  const editableName = typeof text === 'string' ? text : (name ?? 'Edit')
 
   return (
     <ReadOnlyFieldRoot
@@ -134,7 +144,7 @@ export function ReadOnlyField(inProps: ReadOnlyFieldProps) {
           <ReadOnlyFieldEdit
             type="button"
             onClick={() => void wizard.go(editStep)}
-            aria-label={`Edit ${typeof text === 'string' ? text : (name ?? 'value')}`}
+            aria-label={`Edit ${editableName}`}
             {...slotProps?.edit}
             className={`${readOnlyFieldClasses.edit}${slotProps?.edit?.className ? ` ${slotProps.edit.className}` : ''}`}
           >
@@ -149,5 +159,49 @@ export function ReadOnlyField(inProps: ReadOnlyFieldProps) {
         {content}
       </ReadOnlyFieldValue>
     </ReadOnlyFieldRoot>
+  )
+}
+
+interface WatchedReadOnlyFieldProps extends ReadOnlyFieldBaseProps {
+  name: string
+  label?: ReactNode
+}
+
+/** `name` mode: reads the form path with `useWatch`. Never registered, never validated. */
+function WatchedReadOnlyField({ name, label, ...rest }: WatchedReadOnlyFieldProps) {
+  const value = useWatch({ name })
+  return <ReadOnlyFieldView value={value} text={label ?? humanize(name)} name={name} {...rest} />
+}
+
+interface StaticReadOnlyFieldProps extends ReadOnlyFieldBaseProps {
+  value: unknown
+  label: ReactNode
+}
+
+/**
+ * `value` mode: renders an already-computed value. Calls `useWatch` for
+ * nothing — react-hook-form counts every `useWatch`, `disabled` or not, as a
+ * `formState.values` subscriber (`_valuesSubscriberCount`), which makes it
+ * `cloneObject` the entire form's values on every field's change anywhere in
+ * the form for as long as the hook is mounted. `disabled: true` only skips
+ * that subscriber's own re-render, not the subscription itself — so the only
+ * way to keep this mode free of a whole-form cost is to never call the hook.
+ */
+function StaticReadOnlyField({ value, label, ...rest }: StaticReadOnlyFieldProps) {
+  return <ReadOnlyFieldView value={value} text={label} {...rest} />
+}
+
+/**
+ * A value from the form, read-only: small secondary label above, the value
+ * below. For review / summary steps. Typography, not a disabled TextField,
+ * so the value keeps full contrast.
+ */
+export function ReadOnlyField(inProps: ReadOnlyFieldProps) {
+  const props = useDefaultProps({ props: inProps, name: 'EzReadOnlyField' })
+  useEzFormContext('ReadOnlyField')
+  return 'value' in props && props.value !== undefined ? (
+    <StaticReadOnlyField {...props} value={props.value} />
+  ) : (
+    <WatchedReadOnlyField {...props} name={props.name as string} />
   )
 }

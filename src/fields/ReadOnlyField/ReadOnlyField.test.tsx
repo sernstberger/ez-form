@@ -2,13 +2,20 @@ import { useState } from 'react'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { useFormContext } from 'react-hook-form'
+import { useFormContext, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import { Form } from '../../Form'
 import { TextField } from '../TextField'
 import { Wizard, WizardStep } from '../../Wizard'
 import { ReadOnlyField, readOnlyFieldClasses, type ReadOnlyFieldProps } from './ReadOnlyField'
 import { expectNoA11yViolations } from '../../test/axe'
+
+// Spied (not mocked away) so every other test in this file still exercises the
+// real hook; only the "never calls useWatch" test below reads the call count.
+vi.mock('react-hook-form', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-hook-form')>()
+  return { ...actual, useWatch: vi.fn(actual.useWatch) }
+})
 
 const schema = z.object({
   email: z.string(),
@@ -241,6 +248,18 @@ describe('ReadOnlyField', () => {
         </>,
       )
       expect(screen.getByTestId('dirty')).toHaveTextContent('false')
+    })
+
+    // react-hook-form's `useWatch` unconditionally calls `control._subscribe({
+    // formState: { values: true } })`, which bumps `_valuesSubscriberCount` and
+    // makes it `cloneObject` the *entire* form's values on every field's change
+    // anywhere in the form — `disabled: true` only skips that subscriber's own
+    // re-render, not the subscription. So the only way `value` mode avoids that
+    // whole-form cost is to never call the hook at all; this asserts exactly that.
+    it('never calls useWatch: no whole-form subscription cost', () => {
+      vi.mocked(useWatch).mockClear()
+      wrap(<ReadOnlyField value={1} label="Total" />)
+      expect(useWatch).not.toHaveBeenCalled()
     })
 
     it('has no accessibility violations in value mode', async () => {
