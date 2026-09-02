@@ -91,6 +91,8 @@ describe('MoneyField', () => {
     )
     expect(input()).toBeRequired()
     expect(container.querySelector('[class*="asterisk"]')).toBeNull()
+  })
+
   describe('pasting a currency-formatted amount (#72)', () => {
     it('"$1,234.56" (its own en-US/USD shape) submits 1234.56', async () => {
       const user = userEvent.setup()
