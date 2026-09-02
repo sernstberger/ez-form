@@ -92,6 +92,7 @@ Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >
 | `Autocomplete`                                 | MUI `Autocomplete`                            | `name`, `options`, `getOptionValue?` (default `o => o.value`; return `o` to store objects), `multiple`, `freeSolo`, `textFieldProps?`; all TextField rules. Options may carry extra fields (they reach `onChange`)                           |
 | `NumberField`                                  | Base UI `NumberField` through MUI `TextField` | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max` (also the stepper bounds), `validate`. Value is `number \| null`; digits group while typing (new in v2.1), and `format={{ useGrouping: false }}` turns that off     |
 | `MoneyField`                                   | `NumberField` pinned to USD                   | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max`, `validate`. Value is a `number` in dollars, rounded to the cent; shows `$1,234.50` on blur                                                                         |
+| `PasswordField`                                | ez-form `TextField`                           | `name`; same rules as TextField. `revealable?` (default `true`) shows a show/hide toggle in the end adornment; `autoComplete` defaults to `'current-password'`; `slotProps.toggle?` reaches the toggle `IconButton`                          |
 | `DatePicker` / `TimePicker` / `DateTimePicker` | MUI X pickers                                 | `name`, `label?`, `helperText?`, `errorMessages?`; rules `required`, `validate`. The picker's own props (`minDate`, `disablePast`, `views`, …) pass through. Value is the adapter's date type or `null`                                      |
 | `OtpField`                                     | Base UI `OTPField` in MUI's outlined style    | `name`, `label?`, `helperText?`, `length?` (6), `mask?`, `validationType?`, `size?`; rules `required`, `validate`. Value is the code string; a partial code fails with `<label> must be <length> characters.`                                |
 | `FileField`                                    | MUI `Button` + hidden `<input type="file">`   | `name`, `label` (button text), `accept?`, `multiple?`, `buttonProps?`, `helperText?`; rules `required`, `validate`. Value is `File \| null`, or `File[]` under `multiple`. `onChange(event, value)` fires on a pick and on a chip delete     |
@@ -195,6 +196,10 @@ const theme = createTheme({
     },
     EzNumberField: {
       styleOverrides: { steppers: { borderLeft: 'none' } },
+    },
+    EzPasswordField: {
+      defaultProps: { slotProps: { toggle: { size: 'small' } } },
+      styleOverrides: { toggle: { color: 'primary' } },
     },
   },
 })
@@ -306,6 +311,17 @@ USD only: digits group as you type (`1234` shows `1,234`) and the field formats 
 ```ts
 const schema = z.object({ price: z.number().min(0) })
 ```
+
+## PasswordField
+
+`TextField` with `type` fixed to `password`/`text` by a show/hide toggle in the end adornment. The reveal state is local UI state only — it never reaches the form value, and it resets to hidden if the field unmounts. `autoComplete` defaults to `'current-password'`; pass `'new-password'` for sign-up/change-password fields.
+
+```tsx
+<PasswordField name="password" label="Password" />
+<PasswordField name="newPassword" label="New password" autoComplete="new-password" revealable={false} />
+```
+
+The toggle is a themeable `IconButton` under `EzPasswordField` (`root`, `toggle`, exported as `passwordFieldClasses`); `slotProps.toggle` reaches it directly.
 
 ## Develop
 

@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `PasswordField`: ez-form `TextField` with `type` fixed to `password`/`text` and a
+  show/hide toggle in the end adornment. `revealable` (default `true`) hides the toggle
+  entirely; `autoComplete` defaults to `'current-password'`. Themeable under
+  `EzPasswordField` (`defaultProps`, `styleOverrides` for `root` | `toggle`), exported as
+  `passwordFieldClasses` — #58.
 - `EzNumberField` theme key (`defaultProps`, `styleOverrides` for `root`, `steppers`,
   `increment`, `decrement`) and the `numberFieldClasses` export; NumberField renders
   through MUI `TextField` — #26.
