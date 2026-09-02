@@ -29,6 +29,10 @@ prove it, and file it. You never fix anything.
 - Stay on target. A break in another group goes in your report's "Out of scope" list,
   not in an issue.
 - Budget: stop after the checklist is exhausted or 45 minutes, whichever first.
+- The Playwright MCP browser is ONE shared session on this machine. If the dispatch says other
+  breakers run in parallel, keep browser use to short atomic bursts (open story → snapshot →
+  act → snapshot → close your tab) and never rely on a tab staying open between tool calls;
+  put everything stateful in vitest probes. Expect tabs to vanish; re-open, don't retry blindly.
 
 ## Attack checklist (run every applicable line, record pass/fail)
 

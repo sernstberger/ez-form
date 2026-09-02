@@ -47,3 +47,7 @@ controller (this session)        ──▶  .claude/agents/qa-breaker.md  ×N in
 - Ruling: Playwright MCP against the running Storybook, no Playwright dependency added to
   the repo — cost if wrong: browser probes are not reproducible in CI; issues carry manual
   repro steps instead.
+- Ruling (after the first sweep, Sept 2): the Playwright MCP browser is a single shared session,
+  so five parallel breakers hijacked each other's tabs. Next sweep: run browser-heavy groups
+  sequentially (or one breaker at a time per browser) and let vitest probes carry the parallel
+  load — cost if wrong: a longer sweep wall-clock.
