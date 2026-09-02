@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../../Form'
@@ -204,6 +204,212 @@ describe('NumberField', () => {
     await user.keyboard('{Delete}')
     expect(input()).toHaveValue('1,000')
     expect((input() as HTMLInputElement).selectionStart).toBe(1)
+  })
+
+  describe('paste', () => {
+    it('parses pasted grouped text to the right number without regrouping during the paste', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={schema} defaultValues={{}} onSubmit={onSubmit}>
+          <NumberField name="age" label="Age" />
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      await user.click(input())
+      await user.paste('1,234,567')
+      // The pasted text stands as pasted; Base UI's own paste handler owns the value.
+      expect(input()).toHaveValue('1,234,567')
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      expect(onSubmit).toHaveBeenCalledWith({ age: 1234567 }, expect.anything())
+    })
+
+    it('leaves ungrouped pasted digits ungrouped until blur', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+          <NumberField name="age" label="Age" />
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      await user.click(input())
+      await user.paste('1234567')
+      expect(input()).toHaveValue('1234567')
+      await user.tab()
+      expect(input()).toHaveValue('1,234,567')
+    })
+
+    it('leaves the caret after the pasted text', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+          <NumberField name="age" label="Age" />
+        </Form>,
+      )
+      await user.click(input())
+      await user.paste('1,234,567')
+      expect((input() as HTMLInputElement).selectionStart).toBe('1,234,567'.length)
+    })
+
+    it('keeps grouping correctly when typing continues after a paste', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={schema} defaultValues={{}} onSubmit={onSubmit}>
+          <NumberField name="age" label="Age" />
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      await user.click(input())
+      await user.paste('1,234,567')
+      await user.type(input(), '8')
+      expect(input()).toHaveValue('12,345,678')
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      expect(onSubmit).toHaveBeenCalledWith({ age: 12345678 }, expect.anything())
+    })
+  })
+
+  describe('leading minus', () => {
+    it('keeps a lone minus and groups the digits typed after it', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={schema} defaultValues={{}} onSubmit={onSubmit}>
+          <NumberField name="age" label="Age" />
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      await user.type(input(), '-')
+      expect(input()).toHaveValue('-')
+      await user.type(input(), '1234')
+      expect(input()).toHaveValue('-1,234')
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      expect(onSubmit).toHaveBeenCalledWith({ age: -1234 }, expect.anything())
+    })
+
+    it('keeps the minus without producing NaN when the digits are deleted back to it', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+          <NumberField name="age" label="Age" />
+        </Form>,
+      )
+      await user.type(input(), '-1234')
+      expect(input()).toHaveValue('-1,234')
+      await user.keyboard('{Backspace}{Backspace}{Backspace}{Backspace}')
+      expect(input()).toHaveValue('-')
+      expect(input()).not.toHaveValue('NaN')
+    })
+  })
+
+  describe('space-group locales', () => {
+    // fr-FR groups with U+202F (narrow no-break space), de-CH with U+2019 (’).
+    const NNBSP = '\u202f'
+    const RSQUO = '\u2019'
+
+    it('groups fr-FR with its narrow no-break space and submits the number', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={schema} defaultValues={{}} onSubmit={onSubmit}>
+          <NumberField name="age" label="Age" locale="fr-FR" />
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      await user.type(input(), '1234567')
+      expect(input()).toHaveValue(`1${NNBSP}234${NNBSP}567`)
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      expect(onSubmit).toHaveBeenCalledWith({ age: 1234567 }, expect.anything())
+    })
+
+    it('groups de-CH with its apostrophe and submits the number', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={schema} defaultValues={{}} onSubmit={onSubmit}>
+          <NumberField name="age" label="Age" locale="de-CH" />
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      await user.type(input(), '1234567')
+      expect(input()).toHaveValue(`1${RSQUO}234${RSQUO}567`)
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      expect(onSubmit).toHaveBeenCalledWith({ age: 1234567 }, expect.anything())
+    })
+
+    it('keeps grouping fr-FR after a paste that used plain spaces', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={schema} defaultValues={{}} onSubmit={onSubmit}>
+          <NumberField name="age" label="Age" locale="fr-FR" />
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      await user.click(input())
+      await user.paste('1 234 567')
+      expect(input()).toHaveValue('1 234 567')
+      await user.type(input(), '8')
+      expect(input()).toHaveValue(`12${NNBSP}345${NNBSP}678`)
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      expect(onSubmit).toHaveBeenCalledWith({ age: 12345678 }, expect.anything())
+    })
+
+    it('keeps grouping de-CH after a paste that used ASCII apostrophes', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={schema} defaultValues={{}} onSubmit={onSubmit}>
+          <NumberField name="age" label="Age" locale="de-CH" />
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      await user.click(input())
+      await user.paste("1'234'567")
+      expect(input()).toHaveValue("1'234'567")
+      await user.type(input(), '8')
+      expect(input()).toHaveValue(`12${RSQUO}345${RSQUO}678`)
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      expect(onSubmit).toHaveBeenCalledWith({ age: 12345678 }, expect.anything())
+    })
+
+    it('keeps the leading minus in both space-group locales', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+          <NumberField name="age" label="Age" locale="fr-FR" />
+        </Form>,
+      )
+      await user.type(input(), '-1234')
+      expect(input()).toHaveValue(`-1${NNBSP}234`)
+    })
+  })
+
+  it('does not rewrite the input value mid-IME-composition', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <NumberField name="age" label="Age" />
+      </Form>,
+    )
+    const el = input() as HTMLInputElement
+    await user.click(el)
+    const setNativeValue = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!
+
+    // A composing change must be left exactly as the IME wrote it: reassigning `.value`
+    // mid-composition cancels the composition in real browsers.
+    setNativeValue.call(el, '1234')
+    fireEvent(el, new InputEvent('input', { bubbles: true, isComposing: true, data: '1234' }))
+    expect(input()).toHaveValue('1234')
+
+    // The same edit outside composition is grouped, proving the guard — not a dead
+    // grouping path — is what kept the value above untouched.
+    setNativeValue.call(input(), '5678')
+    fireEvent(input(), new InputEvent('input', { bubbles: true, isComposing: false, data: '5678' }))
+    expect(input()).toHaveValue('5,678')
   })
 
   it('calls a consumer onValueChange after updating the form', async () => {
