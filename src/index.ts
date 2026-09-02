@@ -1,4 +1,10 @@
 export { Form, formClasses, type FormProps, type FormMethods, type FormTextSlotProps } from './Form'
+export {
+  FormErrorSummary,
+  formErrorSummaryClasses,
+  type FormErrorSummaryProps,
+  type FormErrorSummaryHeadingProps,
+} from './Form/FormErrorSummary'
 export { SubmitButton, submitButtonClasses, type SubmitButtonProps } from './SubmitButton'
 export { TextField, type TextFieldProps } from './fields/TextField'
 export { Select, type SelectProps, type SelectOption } from './fields/Select'

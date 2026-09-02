@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useFormState, type FieldValues, type Path } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
+import { useHasErrorSummary } from '../Form/ErrorSummaryContext'
 import {
   WizardContext,
   type WizardContextValue,
@@ -85,6 +86,10 @@ export function Wizard<TIn extends FieldValues>({
 }: WizardProps<TIn>) {
   const { trigger, control, setFocus } = useEzFormContext('Wizard')
   const { errors, submitCount } = useFormState({ control })
+  // A mounted <FormErrorSummary> moves focus to its own heading on a failed Next; letting
+  // hookform also focus the first invalid field here would fight it — same principle as
+  // <Form>'s own shouldFocusError suppression, applied to this step-local trigger() call.
+  const hasErrorSummary = useHasErrorSummary()
   const id = useId()
   // `steps` is required and a wizard with no steps has nothing to render;
   // every index below is derived from it and clamped to its range, so the
@@ -94,6 +99,7 @@ export function Wizard<TIn extends FieldValues>({
   const [visitedState, setVisitedState] = useState<readonly string[]>([firstId])
   const [pending, setPending] = useState(false)
   const [contentEl, setContentEl] = useState<HTMLElement | null>(null)
+  const [lastFailed, setLastFailed] = useState<readonly string[] | null>(null)
 
   const visited = visitedProp ?? visitedState
   const requestedId = step ?? stepState
@@ -123,6 +129,10 @@ export function Wizard<TIn extends FieldValues>({
     (to: number) => {
       const target = steps[to]!
       markVisited(target.id)
+      // `lastFailed` scopes a step's own last failed validation; leaving the step (forward
+      // after a pass — already null from validateCurrent — or backward without validating)
+      // must not leak it onto whichever step becomes current next.
+      setLastFailed(null)
       if (step === undefined) setStepState(target.id)
       onStepChange?.(target)
     },
@@ -139,11 +149,19 @@ export function Wizard<TIn extends FieldValues>({
     if (!fields?.length) return true
     setPending(true)
     try {
-      return await trigger(fields as unknown as Path<FieldValues>[], { shouldFocus: true })
+      const valid = await trigger(fields as unknown as Path<FieldValues>[], {
+        shouldFocus: !hasErrorSummary,
+      })
+      // A fresh array on every failure, even a repeat failure of the same step with the same
+      // `fields` — `FormErrorSummary` re-focuses its heading keyed on this reference, and two
+      // consecutive failed `Next` clicks (nothing fixed in between) must still move focus back
+      // to the heading the second time, which a reused `current.fields` reference would not do.
+      setLastFailed(valid ? null : (fields.slice() as readonly string[]))
+      return valid
     } finally {
       setPending(false)
     }
-  }, [current, trigger])
+  }, [current, trigger, hasErrorSummary])
 
   const next = useCallback(async () => {
     if (index >= steps.length - 1) return false
@@ -254,6 +272,7 @@ export function Wizard<TIn extends FieldValues>({
       isFirst: index === 0,
       isLast: index === steps.length - 1,
       pending,
+      lastFailed,
       next,
       prev,
       go,
@@ -269,6 +288,7 @@ export function Wizard<TIn extends FieldValues>({
       visited,
       orientation,
       pending,
+      lastFailed,
       next,
       prev,
       go,

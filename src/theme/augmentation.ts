@@ -8,6 +8,7 @@ import type { ReadOnlyFieldProps } from '../fields/ReadOnlyField'
 import type { NumberFieldControlProps } from '../fields/NumberField/NumberFieldControl'
 import type { FormProps } from '../Form'
 import type { FormErrorProps } from '../FormError'
+import type { FormErrorSummaryProps } from '../Form/FormErrorSummary'
 import type { FormSectionProps } from '../FormSection'
 import type { PasswordFieldProps } from '../fields/PasswordField'
 import type { PasswordStrengthProps } from '../fields/PasswordStrength'
@@ -28,6 +29,7 @@ declare module '@mui/material/styles' {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     EzForm: Partial<FormProps<any, any>>
     EzFormError: Partial<FormErrorProps>
+    EzFormErrorSummary: Partial<FormErrorSummaryProps>
     EzFormSection: Partial<FormSectionProps>
     EzPasswordField: Partial<PasswordFieldProps>
     EzPasswordStrength: Partial<PasswordStrengthProps>
@@ -47,6 +49,7 @@ declare module '@mui/material/styles' {
     EzNumberField: 'root' | 'steppers' | 'increment' | 'decrement'
     EzForm: 'root' | 'title' | 'description'
     EzFormError: 'root'
+    EzFormErrorSummary: 'root' | 'heading' | 'list' | 'item' | 'link'
     EzFormSection: 'root' | 'legend' | 'description' | 'content'
     EzPasswordField: 'root' | 'toggle'
     EzPasswordStrength: 'root' | 'bar' | 'label'
@@ -92,6 +95,10 @@ declare module '@mui/material/styles' {
     EzFormError?: {
       defaultProps?: ComponentsProps['EzFormError']
       styleOverrides?: ComponentsOverrides<Theme>['EzFormError']
+    }
+    EzFormErrorSummary?: {
+      defaultProps?: ComponentsProps['EzFormErrorSummary']
+      styleOverrides?: ComponentsOverrides<Theme>['EzFormErrorSummary']
     }
     EzFormSection?: {
       defaultProps?: ComponentsProps['EzFormSection']
