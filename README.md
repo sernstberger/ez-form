@@ -93,6 +93,7 @@ Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >
 | `NumberField`                                  | Base UI `NumberField` through MUI `TextField` | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max` (also the stepper bounds), `validate`. Value is `number \| null`; digits group while typing (new in v2.1), and `format={{ useGrouping: false }}` turns that off     |
 | `MoneyField`                                   | `NumberField` pinned to USD                   | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max`, `validate`. Value is a `number` in dollars, rounded to the cent; shows `$1,234.50` on blur                                                                         |
 | `DatePicker` / `TimePicker` / `DateTimePicker` | MUI X pickers                                 | `name`, `label?`, `helperText?`, `errorMessages?`; rules `required`, `validate`. The picker's own props (`minDate`, `disablePast`, `views`, …) pass through. Value is the adapter's date type or `null`                                      |
+| `DateField`                                    | MUI X `DateField`                             | Same shape as `DatePicker`, but no popup — a keyboard-only, sectioned date input. Better for birthdays and other far-away dates: typing beats paging a calendar back decades                                                                 |
 | `OtpField`                                     | Base UI `OTPField` in MUI's outlined style    | `name`, `label?`, `helperText?`, `length?` (6), `mask?`, `validationType?`, `size?`; rules `required`, `validate`. Value is the code string; a partial code fails with `<label> must be <length> characters.`                                |
 | `FileField`                                    | MUI `Button` + hidden `<input type="file">`   | `name`, `label` (button text), `accept?`, `multiple?`, `buttonProps?`, `helperText?`; rules `required`, `validate`. Value is `File \| null`, or `File[]` under `multiple`. `onChange(event, value)` fires on a pick and on a chip delete     |
 | `Checkbox`                                     | MUI `Checkbox`                                | `name`, `label`, `helperText?`; rules `required`, `validate`                                                                                                                                                                                 |
@@ -246,7 +247,7 @@ When you pass `validate` as a record, the keys `complete` (OtpField), `picker` (
 
 ## Date pickers
 
-`DatePicker`, `TimePicker`, and `DateTimePicker` wrap MUI X. Wrap your app in MUI X's `LocalizationProvider` with the adapter you use; the form stores whatever that adapter produces (a `Date` under `AdapterDateFns`, a `Dayjs` under `AdapterDayjs`), so type the field accordingly (`z.date()`, or `z.custom<Dayjs>()`).
+`DatePicker`, `TimePicker`, `DateTimePicker`, and `DateField` wrap MUI X. Wrap your app in MUI X's `LocalizationProvider` with the adapter you use; the form stores whatever that adapter produces (a `Date` under `AdapterDateFns`, a `Dayjs` under `AdapterDayjs`), so type the field accordingly (`z.date()`, or `z.custom<Dayjs>()`).
 
 ```tsx
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
@@ -264,6 +265,21 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
 ```
 
 The picker's own validation (`minDate`, `disablePast`, an unparsable date, …) shows through the field like any rule: `Start is too early.`, `Start must be in the future.`, `Start is invalid.`, `Start is not available.` Override per code with `errorMessages={{ minDate: 'Pick a later day' }}`.
+
+### When to use which
+
+| Use case                                 | Prefer       | Why                                                                |
+| ---------------------------------------- | ------------ | ------------------------------------------------------------------ |
+| Birthdays, anniversaries, document dates | `DateField`  | Typing a date beats paging a calendar back 20/30/50+ years         |
+| Scheduling near today                    | `DatePicker` | A calendar is faster to scan than typing when the date is close by |
+
+`DateField` is a keyboard-only, sectioned input with no popup — the same `value`/`onChange`/`onError` contract as `DatePicker`, so it drops in wherever a birthday-shaped date is collected:
+
+```tsx
+<DateField name="birthday" label="Birthday" disableFuture minDate={new Date(1900, 0, 1)} required />
+```
+
+`disableFuture` plus a sane `minDate` catches typos without needing a calendar to navigate.
 
 ## Autocomplete
 
