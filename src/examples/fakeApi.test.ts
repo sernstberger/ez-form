@@ -1,4 +1,12 @@
-import { delay, loginApi, LOGIN_BAD_PASSWORD, verifyCodeApi, SIGNUP_GOOD_CODE } from './fakeApi'
+import {
+  delay,
+  loginApi,
+  LOGIN_BAD_PASSWORD,
+  verifyCodeApi,
+  SIGNUP_GOOD_CODE,
+  placeOrderApi,
+  DECLINED_CARD_NUMBER,
+} from './fakeApi'
 
 describe('fakeApi', () => {
   it('delay resolves after roughly the given ms', async () => {
@@ -48,6 +56,24 @@ describe('fakeApi', () => {
     vi.useFakeTimers()
     const promise = verifyCodeApi('000000')
     const assertion = expect(promise).rejects.toThrow('That code is incorrect')
+    await vi.runAllTimersAsync()
+    await assertion
+    vi.useRealTimers()
+  })
+
+  it('placeOrderApi resolves with an order id for any card other than the known-declined one', async () => {
+    vi.useFakeTimers()
+    const promise = placeOrderApi({ cardNumber: '4111111111111111', total: 42.5 })
+    await vi.runAllTimersAsync()
+    const result = await promise
+    expect(result.orderId).toMatch(/^ORD-/)
+    vi.useRealTimers()
+  })
+
+  it('placeOrderApi rejects for the known-declined card number with a message', async () => {
+    vi.useFakeTimers()
+    const promise = placeOrderApi({ cardNumber: DECLINED_CARD_NUMBER, total: 42.5 })
+    const assertion = expect(promise).rejects.toThrow('declined')
     await vi.runAllTimersAsync()
     await assertion
     vi.useRealTimers()

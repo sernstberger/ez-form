@@ -55,3 +55,29 @@ export async function verifyCodeApi(code: string): Promise<VerifyCodeResult> {
   }
   return { verified: true }
 }
+
+export interface PlaceOrderValues {
+  cardNumber: string
+  total: number
+}
+
+export interface PlaceOrderResult {
+  orderId: string
+}
+
+/** The one card number `placeOrderApi` declines, so stories/tests can trigger the error path on demand. */
+export const DECLINED_CARD_NUMBER = '4000000000000002'
+
+/**
+ * Fake checkout endpoint for the Checkout example (#55): a short delay, then
+ * resolves with an order id for any card other than `DECLINED_CARD_NUMBER`,
+ * or rejects with a generic decline message (never say why a real processor
+ * declined a card).
+ */
+export async function placeOrderApi(values: PlaceOrderValues): Promise<PlaceOrderResult> {
+  await delay(600)
+  if (values.cardNumber === DECLINED_CARD_NUMBER) {
+    throw new Error('Your card was declined. Try a different payment method.')
+  }
+  return { orderId: `ORD-${Math.random().toString(36).slice(2, 10).toUpperCase()}` }
+}
