@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `styleOverrides.root`) and the `formErrorClasses` export — #60.
 - `docs/DECISIONS.md`: rulings extracted from every SDD ledger, newest first, with links
   to source documents and the decisions behind each design choice — #45.
-- `FormErrorSummary`: a `role="alert"` list of the last failed validation attempt's errors
+- `FormErrorSummary`: a focus-announced list of the last failed validation attempt's errors
   (GOV.UK-style), placed as a child under the form title or inside the current `WizardStep`.
   Each item links to its field (`setFocus`, with `href="#<id>"` when the field's rendered
   element has one); the heading receives focus on each new failed attempt. Inside a `Wizard`
