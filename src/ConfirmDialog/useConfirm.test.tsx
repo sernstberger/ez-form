@@ -40,4 +40,35 @@ describe('useConfirm', () => {
     await waitFor(() => expect(onResult).toHaveBeenCalledTimes(2))
     expect(onResult).toHaveBeenLastCalledWith(false)
   })
+
+  it('resolves an unanswered pending confirm() as false when a second confirm() starts', async () => {
+    const user = userEvent.setup()
+    const first = vi.fn()
+    const second = vi.fn()
+    function TwoAsks() {
+      const { confirm, dialog } = useConfirm()
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              void confirm({ title: 'First?' }).then(first)
+              void confirm({ title: 'Second?' }).then(second)
+            }}
+          >
+            Ask Both
+          </button>
+          {dialog}
+        </>
+      )
+    }
+    render(<TwoAsks />)
+    await user.click(screen.getByRole('button', { name: 'Ask Both' }))
+    await waitFor(() => expect(first).toHaveBeenCalledWith(false))
+    expect(second).not.toHaveBeenCalled()
+    expect(screen.getByRole('alertdialog', { name: 'Second?' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
+    await waitFor(() => expect(second).toHaveBeenCalledWith(true))
+    expect(first).toHaveBeenCalledTimes(1)
+  })
 })

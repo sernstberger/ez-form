@@ -38,7 +38,6 @@ export function ConfirmDialog({
   confirmColor,
   onConfirm,
   onCancel,
-  slotProps,
   ...rest
 }: ConfirmDialogProps) {
   const titleId = useId()
@@ -48,15 +47,9 @@ export function ConfirmDialog({
       {...rest}
       open={open}
       onClose={onCancel}
+      role="alertdialog"
       aria-labelledby={titleId}
       aria-describedby={message ? messageId : undefined}
-      slotProps={{
-        ...slotProps,
-        paper: {
-          role: 'alertdialog',
-          ...(typeof slotProps?.paper === 'object' ? slotProps.paper : {}),
-        },
-      }}
     >
       <DialogTitle id={titleId}>{title}</DialogTitle>
       {message && (
