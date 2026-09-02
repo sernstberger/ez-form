@@ -101,6 +101,11 @@ describe('ConfirmDialog', () => {
     expect(getComputedStyle(confirmBtn).textTransform).toBe('lowercase')
   })
 
+  it('defaults the Confirm button to contained when no theme is provided', () => {
+    render(<ConfirmDialog open title="Sure?" onConfirm={() => {}} onCancel={() => {}} />)
+    expect(screen.getByRole('button', { name: 'Confirm' })).toHaveClass('MuiButton-contained')
+  })
+
   it('forwards a consumer slotProps.paper to Dialog while slotProps.confirm still reaches the Confirm button', () => {
     render(
       <ConfirmDialog
