@@ -98,6 +98,7 @@ React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form
 | `MoneyField`                                   | `NumberField` pinned to USD                   | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max`, `validate`. Value is a `number` in dollars, rounded to the cent; shows `$1,234.50` on blur                                                                                                                                                                                                                                                                                                             |
 | `ZipField`                                     | `TextField`                                   | `name`; same rules as TextField, plus a built-in "5 digits" rule (`invalidMessage?`, default `'Enter a 5-digit ZIP code'`). Digits only, capped at 5 (anything else is stripped on type/paste); `inputMode="numeric"`, `autoComplete` defaults to `'postal-code'`. Value is the digit string                                                                                                                                                                                     |
 | `StateSelect`                                  | `Select`                                      | `name`; same rules as Select. Options are the 50 states + DC by default; `territories?` adds PR, GU, VI, AS, MP. `autoComplete` defaults to `'address-level1'`. Value is the USPS abbreviation; also exports `US_STATES`/`US_TERRITORIES` option arrays                                                                                                                                                                                                                          |
+| `AddressField`                                 | `TextField` + `StateSelect` + `ZipField`      | `name` (nested object), `legend?`/`description?` (renders a `FormSection`), `autoCompleteSection?` (`'shipping'`/`'billing'`/any section token, prefixes every autofill token), `street2?` (default `true`), `streetLabel?`/`street2Label?`/`cityLabel?`/`stateLabel?`/`zipLabel?`, `required`/`disabled`, `slotProps?`. `required` reaches street/city/state/zip, never street2; `addressSchema()` is the matching zod object                                                   |
 | `DatePicker` / `TimePicker` / `DateTimePicker` | MUI X pickers                                 | `name`, `label?`, `helperText?`, `errorMessages?`; rules `required`, `validate`. The picker's own props (`minDate`, `disablePast`, `views`, …) pass through. Value is the adapter's date type or `null`                                                                                                                                                                                                                                                                          |
 | `OtpField`                                     | Base UI `OTPField` in MUI's outlined style    | `name`, `label?`, `helperText?`, `length?` (6), `mask?`, `validationType?`, `size?`; rules `required`, `validate`. Value is the code string; a partial code fails with `<label> must be <length> characters.`                                                                                                                                                                                                                                                                    |
 | `FileField`                                    | MUI `Button` + hidden `<input type="file">`   | `name`, `label` (button text), `accept?`, `multiple?`, `buttonProps?`, `helperText?`; rules `required`, `validate`. Value is `File \| null`, or `File[]` under `multiple`. `onChange(event, value)` fires on a pick and on a chip delete                                                                                                                                                                                                                                         |
@@ -859,12 +860,31 @@ const schema = z.object({ zip: z.string().min(1) })
 <StateSelect name="state" label="State or territory" territories />
 ```
 
+**AddressField**: the five US address parts as one bound composite under a nested object `name` — `street`, an optional `street2`, `city`, `state` (a `StateSelect`) and `zip` (a `ZipField`). Each part is the real field component, so a per-part error, `required`, `disabled` and focus-on-error behave exactly as they do when you write the five fields out by hand; the composite supplies the names, the autofill tokens, the labels and the layout.
+
+```tsx
+<AddressField name="shipping" legend="Shipping address" autoCompleteSection="shipping" required />
+```
+
+```ts
+const schema = z.object({ shipping: addressSchema() })
+```
+
+`required` applies to street, city, state and ZIP — never `street2`, which is optional by definition. `autoCompleteSection` prefixes every token at once (`shipping street-address`, `shipping address-level2`, …), which is what lets a browser fill a shipping and a billing address on the same page separately. `legend` (with optional `description`) wraps the group in a `FormSection` fieldset; without one the parts sit in a plain container named by their own labels. `street2={false}` hides the second line — pair it with `addressSchema({ street2: false })` so the schema does not declare a key nothing writes.
+
+Every label is a prop with a default (`streetLabel` `'Street address'`, `street2Label` `'Apartment, suite, etc.'`, `cityLabel` `'City'`, `stateLabel` `'State'`, `zipLabel` `'ZIP code'`), and `slotProps.street` / `.street2` / `.city` / `.state` / `.zip` reach the individual field components for anything else (per-part `helperText`, an extra rule, a `size`).
+
+`addressSchema({ street2?, messages? })` returns the matching `z.object` so a form does not restate the five keys: all four required parts are non-empty strings with `'<Part> is required'` messages (override via `messages`), and `street2` is `z.string().optional()`. ZIP is only checked for presence — `ZipField`'s own 5-digit rule already covers the format, and duplicating it in zod would show two messages for one mistake. The messages have no trailing period, matching every other zod message in this codebase; the built-in `required` _rule_ messages do end with one (`'City is required.'`), so pass `messages` if a form surfaces both and you want them identical.
+
+Themeable under `EzAddressField` (`defaultProps`, `styleOverrides` for `root` | `street` | `street2` | `city` | `state` | `zip`), exported as `addressFieldClasses`. The root is a CSS grid with named areas (`street` / `street2` / `city state zip`, one column below `sm`); re-order or re-span any part by overriding `gridTemplateAreas` on `root`.
+
 **Mobile keyboards & autofill**: each field sets sensible defaults, always overridable by your own `autoComplete` prop:
 
-| Field         | `inputMode` | `autoComplete` default |
-| ------------- | ----------- | ---------------------- |
-| `ZipField`    | `numeric`   | `postal-code`          |
-| `StateSelect` | —           | `address-level1`       |
+| Field          | `inputMode` | `autoComplete` default                   |
+| -------------- | ----------- | ---------------------------------------- |
+| `ZipField`     | `numeric`   | `postal-code`                            |
+| `StateSelect`  | —           | `address-level1`                         |
+| `AddressField` | per part    | per part, `autoCompleteSection`-prefixed |
 
 `inputMode="numeric"` on `ZipField` brings up the numeric keypad on mobile without changing the underlying `type` (still `text`, so a leading zero like `02134` is never dropped). `StateSelect`'s `autoComplete` reaches the hidden native `<input>` MUI's `Select` renders for autofill via `slotProps.htmlInput` — the same slot a plain `TextField` uses (MUI 9 has no `SelectProps`/native `inputProps` shortcut for this).
 ## Developer warnings
