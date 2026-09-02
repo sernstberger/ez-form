@@ -15,6 +15,7 @@ import { PasswordField } from '../../fields/PasswordField'
 import { MoneyField } from '../../fields/MoneyField'
 import { ReadOnlyField } from '../../fields/ReadOnlyField'
 import type { Option } from '../../fields/Option'
+import { useEzFormContext } from '../../useEzFormContext'
 import { placeOrderApi } from '../fakeApi'
 
 const COUNTRY_OPTIONS: readonly Option[] = [
@@ -23,6 +24,26 @@ const COUNTRY_OPTIONS: readonly Option[] = [
   { value: 'GB', label: 'United Kingdom' },
   { value: 'AU', label: 'Australia' },
 ]
+
+// Pattern 5 (#82): shipping.state becomes a Select with a per-country option list for
+// countries this example knows how to list, and falls back to a free-text field otherwise.
+const US_STATE_OPTIONS: readonly Option[] = [
+  { value: 'CA', label: 'California' },
+  { value: 'NY', label: 'New York' },
+  { value: 'TX', label: 'Texas' },
+]
+
+const CA_PROVINCE_OPTIONS: readonly Option[] = [
+  { value: 'ON', label: 'Ontario' },
+  { value: 'QC', label: 'Quebec' },
+  { value: 'BC', label: 'British Columbia' },
+]
+
+function regionOptionsFor(country: unknown): readonly Option[] | null {
+  if (country === 'US') return US_STATE_OPTIONS
+  if (country === 'CA') return CA_PROVINCE_OPTIONS
+  return null
+}
 
 // A fixed cart for the example: the summary's subtotal is constant, only the tip varies.
 const SUBTOTAL = 84.97
@@ -141,6 +162,47 @@ function OrderSummary() {
 }
 
 /**
+ * Pattern 5 (#82): country picks the region field's shape — a Select listing that
+ * country's states/provinces where this example has a list, a free-text field
+ * otherwise — and resets the region value whenever the country changes so a stale
+ * state/province (or free-text value) from the old country never lingers.
+ */
+function ShippingCountryAndRegionFields() {
+  const { resetField } = useEzFormContext('Checkout')
+  const country = useWatch<Input, 'shipping.country'>({ name: 'shipping.country' })
+  const regionOptions = regionOptionsFor(country)
+
+  return (
+    <>
+      <Select
+        name="shipping.country"
+        label="Country"
+        options={COUNTRY_OPTIONS}
+        autoComplete="shipping country"
+        onChange={() => resetField('shipping.state', { defaultValue: '' })}
+        required
+      />
+      {regionOptions ? (
+        <Select
+          name="shipping.state"
+          label="State / region"
+          options={regionOptions}
+          autoComplete="shipping address-level1"
+          required
+        />
+      ) : (
+        <TextField
+          name="shipping.state"
+          label="State / region"
+          autoComplete="shipping address-level1"
+          required
+        />
+      )}
+    </>
+  )
+}
+
+/**
  * Fourth rung of the example ladder (#55): shipping + billing addresses (a
  * "same as shipping" toggle that hides and mirrors billing), a payment
  * section, and a confirm dialog before the fake API is called. Documentation
@@ -195,19 +257,7 @@ export function Checkout({ onSuccess }: CheckoutProps) {
                   autoComplete="shipping address-level2"
                   required
                 />
-                <Select
-                  name="shipping.country"
-                  label="Country"
-                  options={COUNTRY_OPTIONS}
-                  autoComplete="shipping country"
-                  required
-                />
-                <TextField
-                  name="shipping.state"
-                  label="State / region"
-                  autoComplete="shipping address-level1"
-                  required
-                />
+                <ShippingCountryAndRegionFields />
                 <TextField
                   name="shipping.postalCode"
                   label="Postal code"
