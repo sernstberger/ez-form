@@ -106,6 +106,7 @@ Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >
 | `Wizard`                                       | MUI `Stepper`                                 | `steps`, `step?`/`onStepChange?`, `visited?`/`onVisitedChange?`, `orientation?`, `layout?: 'steps' \| 'page'`; with `WizardStepper`, `WizardStep`, `WizardNav`, `useWizard`                                                                                                                                                                                                                                                                                                      |
 | `ReadOnlyField`                                | MUI `Typography`                              | `name`, `label?`, `options?`, `format?`, `empty?`, `editStep?` — or `value` (a caller-computed value, e.g. from its own `useWatch`) with `label` required and no `name`; never calls `useWatch` in that mode                                                                                                                                                                                                                                                                     |
 | `PasswordField`                                | ez-form `TextField`                           | `name`; same rules as TextField. `revealable?` (default `true`) shows a show/hide toggle in the end adornment; `autoComplete` defaults to `'current-password'`; `slotProps.toggle?` reaches the toggle `IconButton`                                                                                                                                                                                                                                                              |
+| `PhoneField`                                   | ez-form `TextField`                           | `name`; same rules as TextField, plus `format?` (a `#` template, default `'###-###-####'`) and `invalidMessage?`. The form value is digits only (`'5551234567'`); `type="tel"`, `inputMode="tel"`, `autoComplete` defaults to `'tel'`. A non-empty value shorter than the template's digit count fails with `invalidMessage`                                                                                                                                                     |
 | `PasswordStrength`                             | MUI `LinearProgress`                          | `name`; `score?: (password) => 0\|1\|2\|3\|4` (default a small built-in heuristic); `labels?` (5 strings). Renders as an ARIA `meter`, never registers or validates                                                                                                                                                                                                                                                                                                              |
 | `TextareaField`                                | `TextField` with `multiline` fixed on         | `name`, `showCount?`; the same rules as TextField. Taller default (`minRows: 4`, `maxRows: 12`, both themeable); shows a `n / max` length meter when `maxLength` is set (or `showCount`), which turns into the validation error past the limit                                                                                                                                                                                                                                   |
 | `DateField`                                    | MUI X `DateField`                             | Same shape as `DatePicker`, but no popup — a keyboard-only, sectioned date input. Better for birthdays and other far-away dates: typing beats paging a calendar back decades                                                                                                                                                                                                                                                                                                     |
@@ -665,6 +666,42 @@ const schema = z.object({ price: z.number().min(0) })
 ```
 
 The toggle is a themeable `IconButton` under `EzPasswordField` (`root`, `toggle`, exported as `passwordFieldClasses`); `slotProps.toggle` reaches it directly, but its `children` is always overridden — swap the reveal icons with `icons?: { show?: ReactNode; hide?: ReactNode }` instead, defaulted through `useDefaultProps` so `theme.components.EzPasswordField.defaultProps.icons` can replace them app-wide.
+
+## US fields
+
+`PhoneField` is the first of the US-shaped fields. They share one rule: **the form value is the bare digits, and the template only decides how they are displayed.** So a zod schema stays a plain `z.string()` with no regex — the field itself owns completeness — and the value you submit, store and compare is always canonical, whatever the user typed or pasted.
+
+```tsx
+const schema = z.object({ phone: z.string() })
+
+<PhoneField name="phone" label="Phone" required />
+// user types 5551234567 → shows "555-123-4567", submits { phone: '5551234567' }
+```
+
+`format` is a `#` template: every `#` is a digit slot, every other character is a separator inserted between them. It also sets the field's capacity — the number of `#`s is how many digits the input accepts and how many the built-in completeness rule requires:
+
+```tsx
+<PhoneField name="phone" label="Phone" format="(###) ###-####" />
+```
+
+Typing formats progressively (`555`, then `555-5`), so a separator only appears once a digit follows it. Pasting normalises: `(555) 555-5555`, `555.555.5555` and `+1 555 555 5555` all land as `5555555555` — a leading `1` on an eleven-digit paste is read as the country code and dropped. Anything that is not a digit is ignored, and extra digits past the template's capacity never make it in.
+
+The caret stays with the digit being edited rather than jumping to the end: the field records how many digits sit to the left of the caret _before_ reformatting and restores that position afterwards. Backspace onto a separator deletes the digit that separator follows, so the key does what it looks like it should instead of silently doing nothing.
+
+A value that is non-empty but incomplete fails on submit with `invalidMessage`, which defaults to `Enter a <n>-digit phone number` with `<n>` derived from the template. An empty value is left to `required` (so an optional phone field can simply be left blank), and the value is `''` rather than `undefined` when empty, so `required` still applies:
+
+```tsx
+<PhoneField name="phone" label="Phone" invalidMessage="We need all ten digits" />
+```
+
+`autoComplete` defaults to `'tel'`; pass a sectioned token when the form has more than one number:
+
+```tsx
+<PhoneField name="homePhone" label="Home" autoComplete="home tel" />
+<PhoneField name="workPhone" label="Work" autoComplete="work tel" />
+```
+
+`format`, `invalidMessage` and `autoComplete` are all settable app-wide through `theme.components.EzPhoneField.defaultProps`; a prop on the element always wins. `PhoneField` adds no styled slot of its own — it renders a `TextField`, so MUI's own `MuiTextField` / `MuiOutlinedInput` style keys reach it unchanged.
 
 ## PasswordStrength
 

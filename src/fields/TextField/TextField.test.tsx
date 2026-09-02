@@ -183,3 +183,26 @@ describe('TextField', () => {
     expect(container.querySelector('[class*="asterisk"]')).not.toBeNull()
   })
 })
+
+describe('TextField displayValue', () => {
+  it('renders the bound value when displayValue is not set', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    await user.type(screen.getByLabelText('Email'), 'a@b.co')
+    expect(screen.getByLabelText('Email')).toHaveValue('a@b.co')
+  })
+
+  it('renders displayValue in the input while the form value stays the bound one', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      <Form schema={schema} defaultValues={{ email: 'a@b.co' }} onSubmit={onSubmit}>
+        <TextField name="email" label="Email" displayValue="shown instead" />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    expect(screen.getByLabelText('Email')).toHaveValue('shown instead')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(onSubmit).toHaveBeenCalledWith({ email: 'a@b.co' }, expect.anything())
+  })
+})
