@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `EzNumberField` theme key (`defaultProps`, `styleOverrides` for `root`, `steppers`,
   `increment`, `decrement`) and the `numberFieldClasses` export; NumberField renders
   through MUI `TextField` — #26.
+- `EzOtpField` theme key (`defaultProps`, `styleOverrides` for `root`, `helperText`) and
+  the `otpFieldClasses` export; `EzFileField` theme key (`defaultProps`, `styleOverrides`
+  for `root`, `fileList`) and the `fileFieldClasses` export — the last `sx` usages in
+  `src/` (`OtpFieldControl`, `FileField`) now go through styled slots — #50.
 
 ### Changed
 

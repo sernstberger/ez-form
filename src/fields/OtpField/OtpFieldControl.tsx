@@ -1,8 +1,10 @@
 import { useId, type FocusEvent, type ReactNode, type Ref } from 'react'
 import { OTPField } from '@base-ui/react/otp-field'
+import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import FormControl from '@mui/material/FormControl'
 import FormHelperText from '@mui/material/FormHelperText'
 import FormLabel from '@mui/material/FormLabel'
+import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import { styled } from '@mui/material/styles'
 
 export interface OtpFieldInputProps {
@@ -22,10 +24,22 @@ export interface OtpFieldControlProps extends Omit<OTPField.Root.Props, 'render'
   inputProps?: OtpFieldInputProps
 }
 
+export const otpFieldClasses = generateUtilityClasses('EzOtpField', ['root', 'helperText'])
+
 const Slots = styled('div')(({ theme }) => ({
   display: 'flex',
   gap: theme.spacing(1),
 }))
+
+// FormHelperText's own left margin lines up with a TextField's outline notch;
+// OTPField.Root has none, so the helper text would sit indented under the
+// slots with no notch to match. Zeroing it is the component's minimum — the
+// helper text otherwise reads as misaligned — so it lives on the styled
+// slot's default style block, still overridable via
+// `theme.components.EzOtpField.styleOverrides.helperText`.
+const OtpFieldHelperText = styled(FormHelperText, { name: 'EzOtpField', slot: 'HelperText' })({
+  marginLeft: 0,
+})
 
 /** One slot, in the outlined TextField's voice: same border, radius, focus ring, and error color. */
 const Slot = styled(OTPField.Input, {
@@ -63,20 +77,22 @@ const Slot = styled(OTPField.Input, {
  * group div and derives `aria-invalid` from its own Field context, so the
  * a11y props go on every slot input instead (element props win).
  */
-export function OtpFieldControl({
-  id: idProp,
-  label,
-  size = 'medium',
-  error,
-  helperText,
-  helperTextProps,
-  inputRef,
-  inputProps,
-  length,
-  disabled,
-  required,
-  ...rootProps
-}: OtpFieldControlProps) {
+export function OtpFieldControl(inProps: OtpFieldControlProps) {
+  const props = useDefaultProps({ props: inProps, name: 'EzOtpField' })
+  const {
+    id: idProp,
+    label,
+    size = 'medium',
+    error,
+    helperText,
+    helperTextProps,
+    inputRef,
+    inputProps,
+    length,
+    disabled,
+    required,
+    ...rootProps
+  } = props
   const generatedId = useId()
   const id = idProp ?? generatedId
   const { onBlur, ...a11y } = inputProps ?? {}
@@ -89,7 +105,13 @@ export function OtpFieldControl({
     onBlur?.()
   }
   return (
-    <FormControl size={size} error={error} disabled={disabled} required={required}>
+    <FormControl
+      size={size}
+      error={error}
+      disabled={disabled}
+      required={required}
+      className={otpFieldClasses.root}
+    >
       {label ? <FormLabel htmlFor={id}>{label}</FormLabel> : null}
       <OTPField.Root
         {...rootProps}
@@ -111,9 +133,9 @@ export function OtpFieldControl({
         ))}
       </OTPField.Root>
       {helperText ? (
-        <FormHelperText {...helperTextProps} sx={{ ml: 0 }}>
+        <OtpFieldHelperText {...helperTextProps} className={otpFieldClasses.helperText}>
           {helperText}
-        </FormHelperText>
+        </OtpFieldHelperText>
       ) : null}
     </FormControl>
   )

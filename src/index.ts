@@ -22,8 +22,13 @@ export { DatePicker, type DatePickerProps } from './fields/DatePicker'
 export { TimePicker, type TimePickerProps } from './fields/TimePicker'
 export { DateTimePicker, type DateTimePickerProps } from './fields/DateTimePicker'
 export type { PickerErrorMessages } from './fields/pickers/pickerMessages'
-export { OtpField, type OtpFieldProps } from './fields/OtpField'
-export { FileField, type FileFieldProps, type FileFieldValue } from './fields/FileField'
+export { OtpField, otpFieldClasses, type OtpFieldProps } from './fields/OtpField'
+export {
+  FileField,
+  fileFieldClasses,
+  type FileFieldProps,
+  type FileFieldValue,
+} from './fields/FileField'
 export {
   ConfirmDialog,
   confirmDialogClasses,

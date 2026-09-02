@@ -196,6 +196,12 @@ const theme = createTheme({
     EzNumberField: {
       styleOverrides: { steppers: { borderLeft: 'none' } },
     },
+    EzOtpField: {
+      styleOverrides: { helperText: { marginLeft: 8 } },
+    },
+    EzFileField: {
+      styleOverrides: { fileList: { marginTop: 16 } },
+    },
   },
 })
 ```
