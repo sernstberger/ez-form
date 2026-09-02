@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../../Form'
 import { NumberField } from './NumberField'
+import { getSeparators } from './groupWhileTyping'
 import { describeFieldContract } from '../../test/describeFieldContract'
 
 const schema = z.object({ age: z.number({ error: 'Enter your age' }) })
@@ -303,9 +304,19 @@ describe('NumberField', () => {
   })
 
   describe('space-group locales', () => {
-    // fr-FR groups with U+202F (narrow no-break space), de-CH with U+2019 (’).
+    // fr-FR groups with U+202F (narrow no-break space). de-CH groups with an apostrophe, but
+    // which variant depends on the ICU build: local Node 22.13.0 gives U+2019 (RIGHT SINGLE
+    // QUOTATION MARK), while GitHub Actions' Node 22.x gives the ASCII U+0027 APOSTROPHE.
+    // `getSeparators` and `groupWhileTyping` already treat the two as equivalent (see
+    // groupWhileTyping.ts's makeIsGroupChar), so the de-CH assertions below derive the
+    // expected separator from `getSeparators('de-CH')` at runtime rather than hardcoding one
+    // variant, and the paste test feeds the *other* variant to prove cross-variant acceptance
+    // on both environments.
     const NNBSP = '\u202f'
     const RSQUO = '\u2019'
+    const APOS = "'"
+    const chGroup = getSeparators('de-CH').group
+    const chOther = chGroup === APOS ? RSQUO : APOS
 
     it('groups fr-FR with its narrow no-break space and submits the number', async () => {
       const user = userEvent.setup()
@@ -332,7 +343,7 @@ describe('NumberField', () => {
         </Form>,
       )
       await user.type(input(), '1234567')
-      expect(input()).toHaveValue(`1${RSQUO}234${RSQUO}567`)
+      expect(input()).toHaveValue(`1${chGroup}234${chGroup}567`)
       await user.click(screen.getByRole('button', { name: 'Go' }))
       expect(onSubmit).toHaveBeenCalledWith({ age: 1234567 }, expect.anything())
     })
@@ -355,7 +366,7 @@ describe('NumberField', () => {
       expect(onSubmit).toHaveBeenCalledWith({ age: 12345678 }, expect.anything())
     })
 
-    it('keeps grouping de-CH after a paste that used ASCII apostrophes', async () => {
+    it('keeps grouping de-CH after a paste that used the other apostrophe variant', async () => {
       const user = userEvent.setup()
       const onSubmit = vi.fn()
       render(
@@ -365,10 +376,10 @@ describe('NumberField', () => {
         </Form>,
       )
       await user.click(input())
-      await user.paste("1'234'567")
-      expect(input()).toHaveValue("1'234'567")
+      await user.paste(`1${chOther}234${chOther}567`)
+      expect(input()).toHaveValue(`1${chOther}234${chOther}567`)
       await user.type(input(), '8')
-      expect(input()).toHaveValue(`12${RSQUO}345${RSQUO}678`)
+      expect(input()).toHaveValue(`12${chGroup}345${chGroup}678`)
       await user.click(screen.getByRole('button', { name: 'Go' }))
       expect(onSubmit).toHaveBeenCalledWith({ age: 12345678 }, expect.anything())
     })

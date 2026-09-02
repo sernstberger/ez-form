@@ -3,8 +3,16 @@ import { getSeparators, groupWhileTyping } from './groupWhileTyping'
 // The separators these locales actually use, spelled out so the tests fail loudly if an
 // ICU build disagrees rather than silently asserting whatever `getSeparators` returned.
 const NNBSP = '\u202f' // fr-FR group: NARROW NO-BREAK SPACE
-const RSQUO = '\u2019' // de-CH group: RIGHT SINGLE QUOTATION MARK
+const RSQUO = '\u2019' // de-CH group, on most ICU builds: RIGHT SINGLE QUOTATION MARK
+const APOS = "'" // de-CH group, on some ICU builds (observed in CI on Node 22.x): ASCII APOSTROPHE
 
+// de-CH's group separator is ICU-build-dependent: local Node 22.13.0 (full-icu) formats
+// 1234567 as "1\u2019234\u2019567" (U+2019 RIGHT SINGLE QUOTATION MARK), but GitHub Actions' Node 22.x
+// formats it as "1'234'567" (U+0027 ASCII APOSTROPHE) \u2014 same CLDR data, different apostrophe
+// glyph choice. `getSeparators` and `groupWhileTyping`'s `makeIsGroupChar` already treat the
+// two as equivalent, so the tests below derive the expected separator from `getSeparators`
+// itself instead of hardcoding one variant, and use the *other* variant to exercise the
+// cross-variant (paste) case on both environments.
 describe('getSeparators', () => {
   it('en-US', () => {
     expect(getSeparators('en-US')).toEqual({ group: ',', decimal: '.' })
@@ -18,8 +26,10 @@ describe('getSeparators', () => {
     expect(getSeparators('fr-FR')).toEqual({ group: NNBSP, decimal: ',' })
   })
 
-  it('de-CH groups with a right single quotation mark', () => {
-    expect(getSeparators('de-CH')).toEqual({ group: RSQUO, decimal: '.' })
+  it('de-CH groups with an apostrophe (either the ASCII or the right single quote variant)', () => {
+    const { group, decimal } = getSeparators('de-CH')
+    expect([APOS, RSQUO]).toContain(group)
+    expect(decimal).toBe('.')
   })
 })
 
@@ -90,33 +100,38 @@ describe('groupWhileTyping', () => {
 
   describe('de-CH (apostrophe group)', () => {
     const ch = getSeparators('de-CH')
+    // Whichever apostrophe variant this ICU build's group separator is, use the *other*
+    // variant for the cross-variant (paste) case below.
+    const chGroup = ch.group
+    const chOther = chGroup === APOS ? RSQUO : APOS
 
     it('inserts the locale separator', () => {
       expect(groupWhileTyping('1234567', 7, ch)).toEqual({
-        text: `1${RSQUO}234${RSQUO}567`,
+        text: `1${chGroup}234${chGroup}567`,
         caret: 9,
       })
     })
 
     it('leaves already-grouped text alone', () => {
-      expect(groupWhileTyping(`1${RSQUO}234${RSQUO}567`, 9, ch)).toEqual({
-        text: `1${RSQUO}234${RSQUO}567`,
+      expect(groupWhileTyping(`1${chGroup}234${chGroup}567`, 9, ch)).toEqual({
+        text: `1${chGroup}234${chGroup}567`,
         caret: 9,
       })
     })
 
-    it('regroups text grouped with the ASCII apostrophe', () => {
+    it('regroups text grouped with the other apostrophe variant', () => {
       // Base UI's parser accepts both `'` and `’` as the Swiss group separator, so the
-      // grouper must too — otherwise a pasted `1'234'567` is left as an unrecognised
-      // string and every later keystroke is dropped from the display.
-      expect(groupWhileTyping("1'234'5678", 10, ch)).toEqual({
-        text: `12${RSQUO}345${RSQUO}678`,
+      // grouper must too — otherwise a pasted `1'234'567` (or `1’234’567`, depending on
+      // which variant is the locale's native one on this ICU build) is left as an
+      // unrecognised string and every later keystroke is dropped from the display.
+      expect(groupWhileTyping(`1${chOther}234${chOther}5678`, 10, ch)).toEqual({
+        text: `12${chGroup}345${chGroup}678`,
         caret: 10,
       })
     })
 
     it('keeps the dot decimal and the minus', () => {
-      expect(groupWhileTyping('-1234.5', 7, ch)).toEqual({ text: `-1${RSQUO}234.5`, caret: 8 })
+      expect(groupWhileTyping('-1234.5', 7, ch)).toEqual({ text: `-1${chGroup}234.5`, caret: 8 })
     })
   })
 })
