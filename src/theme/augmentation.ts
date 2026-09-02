@@ -22,6 +22,7 @@ import type { FileFieldProps } from '../fields/FileField'
 import type { TextareaFieldProps } from '../fields/TextareaField/TextareaField'
 import type { ResendCodeButtonProps } from '../fields/OtpField/ResendCodeButton'
 import type { PhoneFieldProps } from '../fields/PhoneField'
+import type { EmailListFieldProps } from '../fields/EmailListField'
 import type { SsnFieldProps } from '../fields/SsnField'
 
 declare module '@mui/material/styles' {
@@ -53,6 +54,7 @@ declare module '@mui/material/styles' {
     EzTextareaField: Partial<TextareaFieldProps>
     EzResendCodeButton: Partial<ResendCodeButtonProps>
     EzPhoneField: Partial<PhoneFieldProps>
+    EzEmailListField: Partial<EmailListFieldProps>
     EzSsnField: Partial<SsnFieldProps>
   }
 
@@ -80,6 +82,7 @@ declare module '@mui/material/styles' {
     EzFileField: 'root' | 'fileList' | 'deleteIcon' | 'dropZone' | 'dragActive' | 'dropText'
     EzTextareaField: 'root' | 'counter'
     EzResendCodeButton: 'root' | 'status'
+    EzEmailListField: 'chip' | 'deleteIcon' | 'status'
   }
 
   interface Components<Theme = unknown> {
@@ -176,6 +179,10 @@ declare module '@mui/material/styles' {
     // what makes `format` / `invalidMessage` / `autoComplete` theme-settable.
     EzPhoneField?: {
       defaultProps?: ComponentsProps['EzPhoneField']
+    }
+    EzEmailListField?: {
+      defaultProps?: ComponentsProps['EzEmailListField']
+      styleOverrides?: ComponentsOverrides<Theme>['EzEmailListField']
     }
     EzSsnField?: {
       defaultProps?: ComponentsProps['EzSsnField']

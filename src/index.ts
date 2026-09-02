@@ -47,6 +47,13 @@ export {
   type AutocompleteProps,
   type AutocompleteFormValue,
 } from './fields/Autocomplete'
+export {
+  EmailListField,
+  emailListFieldClasses,
+  type EmailListFieldProps,
+  type EmailOption,
+} from './fields/EmailListField'
+export { EMAIL_PATTERN, isEmail } from './fields/emailPattern'
 export { Slider, type SliderProps, type SliderValue } from './fields/Slider'
 export { Rating, type RatingProps } from './fields/Rating'
 export { ToggleButtonGroup, type ToggleButtonGroupProps } from './fields/ToggleButtonGroup'
