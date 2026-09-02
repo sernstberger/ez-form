@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `FormError`: renders `formState.errors.root` (set via `form.setError('root.<key>',
+{ message })`, e.g. a rejected async `onSubmit`) as an MUI `Alert`; renders nothing
+  when there is no root error. `EzFormError` theme key (`defaultProps`,
+  `styleOverrides.root`) and the `formErrorClasses` export — #60.
 - `Form` `title` / `description` props with `aria-labelledby` / `aria-describedby` wiring;
   `EzForm` theme key (`root`, `title`, `description`) and `formClasses` — #51.
 - `FormSection`: `<fieldset>`/`<legend>` group with `EzFormSection` theme key
@@ -35,6 +39,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `EzNumberField` theme key (`defaultProps`, `styleOverrides` for `root`, `steppers`,
   `increment`, `decrement`) and the `numberFieldClasses` export; NumberField renders
   through MUI `TextField` — #26.
+- `Form`: `title` and `description` props render an accessible heading and helper text
+  wired to the form's `aria-labelledby`/`aria-describedby`. `EzForm` theme key
+  (`defaultProps`, `styleOverrides` for `root`, `title`, `description`) — #51.
+- `FormSection`: fieldset/legend grouping for related fields, with an optional
+  `description`. `EzFormSection` theme key (`defaultProps`, `styleOverrides` for `root`,
+  `legend`, `description`, `content`) and the `formSectionClasses` export — #51.
 - `PasswordStrength`: a meter bound to a password field's live value via `useWatch`
   (never registers, never validates), with a pluggable `score` (default a small
   built-in heuristic, exported as `scorePassword`) and `labels`. Renders MUI

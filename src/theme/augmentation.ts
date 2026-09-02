@@ -7,6 +7,7 @@ import type { WizardNavProps } from '../Wizard/WizardNav'
 import type { ReadOnlyFieldProps } from '../fields/ReadOnlyField'
 import type { NumberFieldControlProps } from '../fields/NumberField/NumberFieldControl'
 import type { FormProps } from '../Form'
+import type { FormErrorProps } from '../FormError'
 import type { FormSectionProps } from '../FormSection'
 import type { PasswordFieldProps } from '../fields/PasswordField'
 import type { PasswordStrengthProps } from '../fields/PasswordStrength'
@@ -25,6 +26,7 @@ declare module '@mui/material/styles' {
     EzNumberField: Partial<NumberFieldControlProps>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     EzForm: Partial<FormProps<any, any>>
+    EzFormError: Partial<FormErrorProps>
     EzFormSection: Partial<FormSectionProps>
     EzPasswordField: Partial<PasswordFieldProps>
     EzPasswordStrength: Partial<PasswordStrengthProps>
@@ -42,6 +44,7 @@ declare module '@mui/material/styles' {
     EzReadOnlyField: 'root' | 'header' | 'label' | 'value' | 'edit'
     EzNumberField: 'root' | 'steppers' | 'increment' | 'decrement'
     EzForm: 'root' | 'title' | 'description'
+    EzFormError: 'root'
     EzFormSection: 'root' | 'legend' | 'description' | 'content'
     EzPasswordField: 'root' | 'toggle'
     EzPasswordStrength: 'root' | 'bar' | 'label'
@@ -82,6 +85,10 @@ declare module '@mui/material/styles' {
     EzForm?: {
       defaultProps?: ComponentsProps['EzForm']
       styleOverrides?: ComponentsOverrides<Theme>['EzForm']
+    }
+    EzFormError?: {
+      defaultProps?: ComponentsProps['EzFormError']
+      styleOverrides?: ComponentsOverrides<Theme>['EzFormError']
     }
     EzFormSection?: {
       defaultProps?: ComponentsProps['EzFormSection']
