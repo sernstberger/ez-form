@@ -42,6 +42,14 @@ integrated on `main`. Base for all worktrees: 912e812.
   incomplete" step; Task 5's implementer and reviewer converged on "last visited step"
   instead (matches `visited`/`onVisitedChange` resume semantics better), and the spec
   was amended on `main` mid-run to match. Cost if wrong: a wording revert.
+- **`Wizard`'s `steps` prop must be a stable reference.** Task 5's reviewer flagged that
+  an inline `steps={[...]}` array literal defeats the internal `useMemo`; Ruling:
+  document "pass a stable array" on the prop instead of restructuring the memoization —
+  cost if wrong is an extra re-render, not a correctness bug.
+- **Task 8's `editStep` test used the brief's `ReviewFirst` controlled variant.** The
+  brief's wording for that test amended itself mid-writing; since the first version of
+  a brief can't move once dispatched, Ruling: the implementer follows the `ReviewFirst`
+  variant as instructed. Cost if wrong: nothing (the brief text is what it is).
 - **WizardStepper horizontal vs. vertical step control.** MUI 9's `Stepper` switches the
   whole list to `role="tablist"` the moment any `StepButton` appears anywhere in the
   tree, and a tablist may only contain `tab` elements — but vertical steps host
@@ -74,6 +82,11 @@ integrated on `main`. Base for all worktrees: 912e812.
   looked like it narrowed `DialogProps['slotProps']`; on inspection there was no real
   collision (disjoint keys), so the type stands as extension, not replacement — kept per
   the "extend MUI types" rule.
+- **`ConfirmDialog` uses MUI's native `Dialog` `role` prop instead of `slotProps.paper`.**
+  Task 1's reviewer raised this as a Minor (the plan's original shape routed
+  `role="alertdialog"` through `slotProps.paper`); Ruling: take the Minor too — the
+  native `role` prop is simpler and produces the same DOM result, so there's nothing to
+  lose by taking it. Cost if wrong: none (same DOM result either way).
 
 ## Ruling: three concurrent worktrees (standing instruction)
 
@@ -142,4 +155,4 @@ and `Components` — the type bundler did not drop it. `dist/index.d.ts` also de
 `Wizard`, `WizardStep`, `WizardStepper`, `WizardNav`, `useWizard`, `useOptionalWizard`,
 `ReadOnlyField`, `ClearButton`, `ConfirmDialog`, `useFormGuard`, and their prop types.
 
-v4 complete at the commit(s) this ledger ships with.
+v4 integration landed at 8f6f9f7; this ledger fix round landed at this commit.
