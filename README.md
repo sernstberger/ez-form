@@ -318,6 +318,51 @@ function SignupLayout() {
 
 A URL for a step the user has not reached (a deep link, a reload) makes the wizard call `onStepChange` with the last visited step. To resume across reloads, save `visited` (via `onVisitedChange`) with your draft values and pass both back.
 
+## Conditional fields
+
+Show, hide, or require a field based on another field's value with `useWatch` + conditional JSX; the schema, not a hookform rule prop, decides what actually gets validated. `Form/ConditionalFields` in Storybook is a working reference for six patterns — checkbox reveal, select-value reveal, switch-toggled section, threshold, cascading selects, and mutually-exclusive fields — and `Checkout` (same-as-shipping, country → region), `SignUp` (referral source → "Other"), and `Loan` (employment "Other", income-below-threshold co-signer) use them in full examples.
+
+```tsx
+function BillingSection() {
+  const sameAsShipping = useWatch<Input, 'sameAsShipping'>({ name: 'sameAsShipping' })
+  return (
+    <FormSection title="Billing address">
+      <Checkbox name="sameAsShipping" label="Same as shipping address" />
+      {!sameAsShipping && (
+        <>
+          <TextField name="billing.street" label="Street address" />
+          {/* …rest of the address, no `required` prop… */}
+        </>
+      )}
+    </FormSection>
+  )
+}
+```
+
+**Schema side.** A hookform `required` (or any rule prop) always wins over zod's message for that field (see the Validation rules section), so a field that is required only sometimes should carry no rule prop at all — express "required when" once, in the schema:
+
+- **`superRefine`** for "required only when shown": check the controlling value and `ctx.addIssue` with an explicit `path` when the dependent field is empty. This is the right tool whenever the branches mostly share the same shape (`Checkout`'s billing address, `SignUp`'s referral-other, `Loan`'s co-signer note).
+- **`z.discriminatedUnion`** reads better when the branches genuinely don't share fields — "contact by phone" needs a phone number, "contact by email" needs an email address, and neither needs the other's field. Tag the union on the controlling field (`contactBy`) and let each branch declare only what it needs; `ConditionalFields`'s pattern 6 is a worked example.
+
+Either way, the message shown to the user comes from the schema, not from a rule prop that can't tell "hidden" from "shown but empty" apart.
+
+> **Zod gotcha:** by default, zod skips a top-level `.refine()`/`.superRefine()` entirely once anything else in the same object produced a "non-continuable" issue — a `z.enum`/`z.literal`/discriminated-union mismatch, among others — even in a completely unrelated field on a completely unrelated step. A blank `purpose` `Select` three steps away can silently swallow your `superRefine`'s messages, and an unchecked "accept terms" `z.literal(true)` can just as easily swallow a `.refine()` checking two other fields match. Pass `{ when: () => true }` as the second argument to make the refinement run regardless of what else in the object failed: `.refine(fn, { when: () => true, ... })` / `.superRefine(fn, { when: () => true })`. Every top-level `refine`/`superRefine` in `ConditionalFields`, `Checkout`, `SignUp`, and `Loan` does this for exactly that reason — a `.refine()` chained directly on a single field's own schema (not the object) is unaffected, since it runs as part of that field's own type resolution rather than the object's post-parse checks. Where the field itself is the thing that starts "empty," consider sidestepping the whole issue: a placeholder-select value can be typed as `z.union([z.enum([...]), z.literal('')])` so the empty state is a valid (if still-incomplete) member of the type rather than an aborting mismatch — trade-off is that "required" then has to be enforced by a separate check instead of the enum's own validation.
+
+**Hidden values.** react-hook-form's default `shouldUnregister: false` means an unmounted field's value is **not** cleared when it disappears from the JSX — re-checking the box brings back what was typed before, which is usually what you want. Two cases call for clearing it on purpose instead:
+
+- **The hidden value would be stale and wrong if left in the payload** — a state chosen for the old country no longer matches the new one's option list. Reset it explicitly with `resetField` (or `setValue`) in the change handler of the field that controls visibility, as `ConditionalFields`'s cascading-select pattern does:
+  ```tsx
+  <Select
+    name="address.country"
+    label="Country"
+    options={COUNTRY_OPTIONS}
+    onChange={() => resetField('address.region', { defaultValue: '' })}
+  />
+  ```
+- **The hidden value must not be submitted at all** — omit it from the schema's output (a discriminated union already does this: the non-matching branch's fields are simply not part of that variant's type), or strip it in `onSubmit` before calling your API.
+
+**Accessibility.** A revealed field gets focus only on an explicit user action (never automatically on reveal) — the section's `<legend>` already names the group, so a screen reader user tabbing in hears the group name before the new field, with no extra announcement needed. Nothing here uses a live region: a `role="status"`/`role="alert"` announcement is for something the user didn't directly cause (a server response, an array add/remove elsewhere on the page — see Field arrays); a field appearing directly under the control the user just operated needs no separate announcement. The one exception is a cascading reset (country → region): that clears a value the user can't see change, so keep the reset visible in the UI (the newly-emptied field renders with its placeholder, not a stale label) rather than trying to announce it.
+
 ## Confirmations and guards
 
 - `<Form confirm>`: dialog after validation, before `onSubmit`, on every submit path.

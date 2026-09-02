@@ -14,6 +14,7 @@ import { PasswordField } from '../../fields/PasswordField'
 import { MoneyField } from '../../fields/MoneyField'
 import { ReadOnlyField } from '../../fields/ReadOnlyField'
 import type { Option } from '../../fields/Option'
+import { useEzFormContext } from '../../useEzFormContext'
 import { placeOrderApi } from '../fakeApi'
 
 const COUNTRY_OPTIONS: readonly Option[] = [
@@ -22,6 +23,26 @@ const COUNTRY_OPTIONS: readonly Option[] = [
   { value: 'GB', label: 'United Kingdom' },
   { value: 'AU', label: 'Australia' },
 ]
+
+// Pattern 5 (#82): shipping.state becomes a Select with a per-country option list for
+// countries this example knows how to list, and falls back to a free-text field otherwise.
+const US_STATE_OPTIONS: readonly Option[] = [
+  { value: 'CA', label: 'California' },
+  { value: 'NY', label: 'New York' },
+  { value: 'TX', label: 'Texas' },
+]
+
+const CA_PROVINCE_OPTIONS: readonly Option[] = [
+  { value: 'ON', label: 'Ontario' },
+  { value: 'QC', label: 'Quebec' },
+  { value: 'BC', label: 'British Columbia' },
+]
+
+function regionOptionsFor(country: unknown): readonly Option[] | null {
+  if (country === 'US') return US_STATE_OPTIONS
+  if (country === 'CA') return CA_PROVINCE_OPTIONS
+  return null
+}
 
 // A fixed cart for the example: the summary's subtotal is constant, only the tip varies.
 const SUBTOTAL = 84.97
@@ -62,26 +83,33 @@ const schema = z
     cvc: z.string().min(1, 'CVC is required'),
     tip: z.number().min(0, 'Tip cannot be negative'),
   })
-  .superRefine((data, ctx) => {
-    if (data.sameAsShipping) return
-    const required: (keyof z.infer<typeof optionalAddressSchema>)[] = [
-      'name',
-      'street',
-      'city',
-      'country',
-      'state',
-      'postalCode',
-    ]
-    for (const key of required) {
-      if (!data.billing[key]) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `Billing ${key === 'postalCode' ? 'postal code' : key} is required`,
-          path: ['billing', key] as const,
-        })
+  .superRefine(
+    (data, ctx) => {
+      if (data.sameAsShipping) return
+      const required: (keyof z.infer<typeof optionalAddressSchema>)[] = [
+        'name',
+        'street',
+        'city',
+        'country',
+        'state',
+        'postalCode',
+      ]
+      for (const key of required) {
+        if (!data.billing[key]) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `Billing ${key === 'postalCode' ? 'postal code' : key} is required`,
+            path: ['billing', key] as const,
+          })
+        }
       }
-    }
-  })
+    },
+    // Zod skips a `superRefine` once any other issue in the object is "non-continuable"
+    // (an enum's `invalid_value`, among others) — an empty `shipping.country` (also a
+    // `z.enum`) would otherwise silently swallow every issue above before the user has
+    // touched shipping at all. `when: () => true` forces this refinement to always run.
+    { when: () => true },
+  )
 
 type Input = z.input<typeof schema>
 
@@ -130,6 +158,47 @@ function OrderSummary() {
         <ReadOnlyField value={total} label="Total" format={format} />
       </Stack>
     </FormSection>
+  )
+}
+
+/**
+ * Pattern 5 (#82): country picks the region field's shape — a Select listing that
+ * country's states/provinces where this example has a list, a free-text field
+ * otherwise — and resets the region value whenever the country changes so a stale
+ * state/province (or free-text value) from the old country never lingers.
+ */
+function ShippingCountryAndRegionFields() {
+  const { resetField } = useEzFormContext('Checkout')
+  const country = useWatch<Input, 'shipping.country'>({ name: 'shipping.country' })
+  const regionOptions = regionOptionsFor(country)
+
+  return (
+    <>
+      <Select
+        name="shipping.country"
+        label="Country"
+        options={COUNTRY_OPTIONS}
+        autoComplete="shipping country"
+        onChange={() => resetField('shipping.state', { defaultValue: '' })}
+        required
+      />
+      {regionOptions ? (
+        <Select
+          name="shipping.state"
+          label="State / region"
+          options={regionOptions}
+          autoComplete="shipping address-level1"
+          required
+        />
+      ) : (
+        <TextField
+          name="shipping.state"
+          label="State / region"
+          autoComplete="shipping address-level1"
+          required
+        />
+      )}
+    </>
   )
 }
 
@@ -188,19 +257,7 @@ export function Checkout({ onSuccess }: CheckoutProps) {
                   autoComplete="shipping address-level2"
                   required
                 />
-                <Select
-                  name="shipping.country"
-                  label="Country"
-                  options={COUNTRY_OPTIONS}
-                  autoComplete="shipping country"
-                  required
-                />
-                <TextField
-                  name="shipping.state"
-                  label="State / region"
-                  autoComplete="shipping address-level1"
-                  required
-                />
+                <ShippingCountryAndRegionFields />
                 <TextField
                   name="shipping.postalCode"
                   label="Postal code"

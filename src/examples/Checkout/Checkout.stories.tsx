@@ -54,6 +54,28 @@ export const BillingAddressRevealed: Story = {
   },
 }
 
+export const CascadingRegionOptions: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Country picks the region field's shape (#82): United States lists US states, Canada lists provinces, and any other country falls back to a free-text field. Changing the country resets the region value.",
+      },
+    },
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole('combobox', { name: /^country/i }))
+    await userEvent.click(await screen.findByRole('option', { name: 'United States' }))
+    await userEvent.click(canvas.getByRole('combobox', { name: /state \/ region/i }))
+    await userEvent.click(await screen.findByRole('option', { name: 'California' }))
+
+    await userEvent.click(canvas.getByRole('combobox', { name: /^country/i }))
+    await userEvent.click(await screen.findByRole('option', { name: 'Canada' }))
+    await userEvent.click(canvas.getByRole('combobox', { name: /state \/ region/i }))
+    await userEvent.click(await screen.findByRole('option', { name: 'Ontario' }))
+  },
+}
+
 export const DeclinedCard: Story = {
   parameters: {
     docs: {

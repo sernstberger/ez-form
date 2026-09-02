@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
+import { screen } from 'storybook/test'
 import { SignUp } from './SignUp'
 import { SIGNUP_GOOD_CODE } from '../fakeApi'
 
@@ -30,6 +31,28 @@ export const MismatchedPasswords: Story = {
     await userEvent.click(canvas.getByRole('checkbox', { name: /terms/i }))
     await userEvent.click(canvas.getByRole('button', { name: /next/i }))
     await canvas.findByText(/passwords do not match/i)
+  },
+}
+
+export const ReferralOtherRequired: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Choosing "Other" for "How did you hear about us?" reveals "Please specify", required only in that state (#82).',
+      },
+    },
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.type(canvas.getByLabelText(/^email/i), 'ada@example.com')
+    await userEvent.type(canvas.getByLabelText(/^password(?! strength)/i), 'correct-horse-1')
+    await userEvent.type(canvas.getByLabelText(/confirm password/i), 'correct-horse-1')
+    await userEvent.type(canvas.getByLabelText(/display name/i), 'Ada Lovelace')
+    await userEvent.click(canvas.getByRole('checkbox', { name: /terms/i }))
+    await userEvent.click(canvas.getByRole('combobox', { name: /how did you hear/i }))
+    await userEvent.click(await screen.findByRole('option', { name: 'Other' }))
+    await userEvent.click(canvas.getByRole('button', { name: /next/i }))
+    await canvas.findByRole('alert')
   },
 }
 

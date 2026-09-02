@@ -10,6 +10,8 @@ async function fillStepOne(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/confirm password/i), 'correct-horse-1')
   await user.type(screen.getByLabelText(/display name/i), 'Ada Lovelace')
   await user.click(screen.getByRole('checkbox', { name: /terms/i }))
+  await user.click(screen.getByRole('combobox', { name: /how did you hear/i }))
+  await user.click(await screen.findByRole('option', { name: 'Search engine' }))
 }
 
 describe('SignUp', () => {
@@ -29,6 +31,45 @@ describe('SignUp', () => {
     const profile = screen.getByRole('group', { name: 'Profile' })
     expect(within(profile).getByLabelText(/display name/i)).toBeInTheDocument()
     expect(within(profile).getByRole('checkbox', { name: /terms/i })).toBeInTheDocument()
+    expect(within(profile).getByRole('combobox', { name: /how did you hear/i })).toBeInTheDocument()
+  })
+
+  it('hides "Please specify" until the referral source is "Other"', async () => {
+    const user = userEvent.setup()
+    render(<SignUp />)
+    expect(screen.queryByLabelText(/please specify/i)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('combobox', { name: /how did you hear/i }))
+    await user.click(await screen.findByRole('option', { name: 'Other' }))
+    expect(screen.getByLabelText(/please specify/i)).toBeInTheDocument()
+  })
+
+  it('requires "Please specify" only when the referral source is "Other"', async () => {
+    const user = userEvent.setup()
+    render(<SignUp />)
+    await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
+    await user.type(screen.getByLabelText(/^password(?! strength)/i), 'correct-horse-1')
+    await user.type(screen.getByLabelText(/confirm password/i), 'correct-horse-1')
+    await user.type(screen.getByLabelText(/display name/i), 'Ada Lovelace')
+    await user.click(screen.getByRole('checkbox', { name: /terms/i }))
+    await user.click(screen.getByRole('combobox', { name: /how did you hear/i }))
+    await user.click(await screen.findByRole('option', { name: 'Other' }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await screen.findByRole('alert')
+    // Still on step 1: Next was blocked by the empty "Other" specify field.
+    expect(screen.queryByRole('textbox', { name: /verification code/i })).not.toBeInTheDocument()
+  })
+
+  it('advances once "Please specify" is filled in for an "Other" referral source', async () => {
+    const user = userEvent.setup()
+    render(<SignUp />)
+    await fillStepOne(user)
+    await user.click(screen.getByRole('combobox', { name: /how did you hear/i }))
+    await user.click(await screen.findByRole('option', { name: 'Other' }))
+    await user.type(screen.getByLabelText(/please specify/i), 'A podcast ad')
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await waitFor(() =>
+      expect(screen.getByRole('group', { name: 'Verification' })).toBeInTheDocument(),
+    )
   })
 
   it('shows the refine message on confirm password when the two passwords do not match', async () => {
@@ -39,6 +80,22 @@ describe('SignUp', () => {
     await user.type(screen.getByLabelText(/confirm password/i), 'different-1')
     await user.type(screen.getByLabelText(/display name/i), 'Ada Lovelace')
     await user.click(screen.getByRole('checkbox', { name: /terms/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    const confirmField = screen.getByLabelText(/confirm password/i)
+    await waitFor(() => expect(confirmField).toHaveAccessibleDescription(/do not match|match/i))
+  })
+
+  it('shows the mismatch message even when the terms checkbox is left unchecked', async () => {
+    // Regression: zod skips a `.refine` once any other field has a "non-continuable"
+    // issue -- `terms` is a `z.literal(true)` starting `false`, which would otherwise
+    // silently swallow the "Passwords do not match" message until terms is checked.
+    const user = userEvent.setup()
+    render(<SignUp />)
+    await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
+    await user.type(screen.getByLabelText(/^password(?! strength)/i), 'correct-horse-1')
+    await user.type(screen.getByLabelText(/confirm password/i), 'different-1')
+    await user.type(screen.getByLabelText(/display name/i), 'Ada Lovelace')
+    // terms left unchecked on purpose
     await user.click(screen.getByRole('button', { name: /next/i }))
     const confirmField = screen.getByLabelText(/confirm password/i)
     await waitFor(() => expect(confirmField).toHaveAccessibleDescription(/do not match|match/i))

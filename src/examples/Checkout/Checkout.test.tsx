@@ -50,6 +50,57 @@ describe('Checkout', () => {
     expect(screen.getByRole('group', { name: 'Order summary' })).toBeInTheDocument()
   })
 
+  it('shows a State select with US states when the country is United States', async () => {
+    const user = userEvent.setup()
+    render(<Checkout />)
+    const shipping = screen.getByRole('group', { name: 'Shipping address' })
+    await user.click(within(shipping).getByRole('combobox', { name: /^country/i }))
+    await user.click(await screen.findByRole('option', { name: 'United States' }))
+    await user.click(within(shipping).getByRole('combobox', { name: /state \/ region/i }))
+    await user.click(await screen.findByRole('option', { name: 'California' }))
+    expect(within(shipping).getByRole('combobox', { name: /state \/ region/i })).toHaveTextContent(
+      'California',
+    )
+  })
+
+  it('shows a province select with Canadian provinces when the country is Canada', async () => {
+    const user = userEvent.setup()
+    render(<Checkout />)
+    const shipping = screen.getByRole('group', { name: 'Shipping address' })
+    await user.click(within(shipping).getByRole('combobox', { name: /^country/i }))
+    await user.click(await screen.findByRole('option', { name: 'Canada' }))
+    await user.click(within(shipping).getByRole('combobox', { name: /state \/ region/i }))
+    await user.click(await screen.findByRole('option', { name: 'Ontario' }))
+    expect(within(shipping).getByRole('combobox', { name: /state \/ region/i })).toHaveTextContent(
+      'Ontario',
+    )
+  })
+
+  it('falls back to a free-text state/region field for a country with no list (e.g. United Kingdom)', async () => {
+    const user = userEvent.setup()
+    render(<Checkout />)
+    const shipping = screen.getByRole('group', { name: 'Shipping address' })
+    await user.click(within(shipping).getByRole('combobox', { name: /^country/i }))
+    await user.click(await screen.findByRole('option', { name: 'United Kingdom' }))
+    expect(within(shipping).getByRole('textbox', { name: /state \/ region/i })).toBeInTheDocument()
+  })
+
+  it('resets the state/region value when the country changes', async () => {
+    const user = userEvent.setup()
+    render(<Checkout />)
+    const shipping = screen.getByRole('group', { name: 'Shipping address' })
+    await user.click(within(shipping).getByRole('combobox', { name: /^country/i }))
+    await user.click(await screen.findByRole('option', { name: 'United States' }))
+    await user.click(within(shipping).getByRole('combobox', { name: /state \/ region/i }))
+    await user.click(await screen.findByRole('option', { name: 'California' }))
+
+    // Switching to Canada must not keep California selected/lingering as a stale value.
+    await user.click(within(shipping).getByRole('combobox', { name: /^country/i }))
+    await user.click(await screen.findByRole('option', { name: 'Canada' }))
+    const region = within(shipping).getByRole('combobox', { name: /state \/ region/i })
+    expect(region).not.toHaveTextContent('California')
+  })
+
   it('hides the billing address fields while "same as shipping" is checked (the default)', () => {
     render(<Checkout />)
     const billing = screen.getByRole('group', { name: 'Billing address' })
