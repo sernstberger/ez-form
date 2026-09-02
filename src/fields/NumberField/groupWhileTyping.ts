@@ -34,6 +34,47 @@ function makeIsGroupChar(group: string): (char: string) => boolean {
 }
 
 /**
+ * Rewrites `text` into this locale's own `.`/`,` roles when it unambiguously reads as a
+ * *different* locale's grouping (#72). `.` and `,` are the only two ASCII punctuation marks
+ * either locale style ever uses for decimal/group, so a string containing both is never
+ * genuinely ambiguous: whichever of the two occurs last is the decimal separator (the same
+ * "keep only the last separator as decimal" rule Base UI's own `parseNumber` falls back to
+ * for mixed-locale text), and every earlier `.` or `,` is a group separator. Rewriting here —
+ * before the existing regroup logic runs — means a pasted `1.234,56` under an `en-US` field
+ * (whose own separators are `,` group / `.` decimal) is recognised as the de-CH/de-DE shape
+ * it is and resolves to `1234.56`, not silently reinterpreted as `1.23456`.
+ *
+ * A single `.`/`,` with no other separator character present stays ambiguous (it could be a
+ * thousands group or a decimal fraction) and is left for the existing locale-native handling
+ * below, unchanged from before this fix.
+ */
+export function normalizeForeignShape(text: string, separators: Separators): string {
+  const { group, decimal } = separators
+  const positions: number[] = []
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]!
+    if (char === '.' || char === ',') positions.push(i)
+  }
+  // Need at least one '.' and one ',' present to know which is which; a single kind
+  // repeated (e.g. "1,234,567") is already this locale's own grouping, not a foreign shape.
+  const hasDot = [...text].includes('.')
+  const hasComma = [...text].includes(',')
+  if (!hasDot || !hasComma) return text
+
+  const decimalIndex = positions[positions.length - 1]!
+  let out = ''
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]!
+    if (char !== '.' && char !== ',') {
+      out += char
+    } else {
+      out += i === decimalIndex ? decimal : group
+    }
+  }
+  return out
+}
+
+/**
  * Re-groups the integer digits of `text` and maps the caret to the same logical
  * position. Fraction digits are left exactly as typed (so `1234.50` stays `1,234.50`
  * and `1234.` keeps its trailing decimal). Returns the input unchanged when the text
@@ -46,6 +87,16 @@ function makeIsGroupChar(group: string): (char: string) => boolean {
  */
 export function groupWhileTyping(text: string, caret: number, separators: Separators): GroupedText {
   if (text === '') return { text: '', caret: 0 }
+
+  const normalized = normalizeForeignShape(text, separators)
+  if (normalized !== text) {
+    // The foreign-shape rewrite changes which characters are significant (a `,` that was
+    // the pasted string's decimal point becomes this locale's group separator, or vice
+    // versa), so recompute the caret as "same count of characters from the end" rather
+    // than reusing the caller's index against the rewritten string.
+    const caretFromEnd = text.length - caret
+    return groupWhileTyping(normalized, normalized.length - caretFromEnd, separators)
+  }
 
   const { group, decimal } = separators
   const isGroupChar = makeIsGroupChar(group)

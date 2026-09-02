@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   type ChangeEvent,
+  type ClipboardEvent,
   type ComponentPropsWithRef,
   type FocusEvent,
   type FocusEventHandler,
@@ -20,7 +21,12 @@ import { styled, type Theme } from '@mui/material/styles'
 import { useForkRef } from '@mui/material/utils'
 import KeyboardArrowUp from '@mui/icons-material/KeyboardArrowUp'
 import KeyboardArrowDown from '@mui/icons-material/KeyboardArrowDown'
-import { getSeparators, groupWhileTyping, type Separators } from './groupWhileTyping'
+import {
+  getSeparators,
+  groupWhileTyping,
+  normalizeForeignShape,
+  type Separators,
+} from './groupWhileTyping'
 
 export interface NumberFieldInputProps {
   'aria-invalid'?: true
@@ -199,6 +205,27 @@ function NumberInput({
               }
             }
             rest.onChange?.(e)
+          },
+          // Base UI's own paste handler (already merged into `rest.onPaste`) `preventDefault()`s
+          // the browser's insertion and parses `event.clipboardData` itself — our `onChange`
+          // rewrite above never runs for a paste (#72). Rewriting the clipboard text here, before
+          // calling through, means Base UI's parser sees this locale's own separators instead of
+          // reinterpreting a differently-shaped paste (e.g. `1.234,56` under `en-US`) into an
+          // unrelated number. `normalizeForeignShape` only rewrites when the text unambiguously
+          // reads as a different locale's grouping (both `.` and `,` present); anything else,
+          // including text that isn't a number at all, passes through unchanged for Base UI's
+          // own parser/validation to accept or reject.
+          onPaste: (e: ClipboardEvent<HTMLInputElement>) => {
+            if (separators) {
+              const pasted = e.clipboardData?.getData('text/plain')
+              if (pasted) {
+                const normalized = normalizeForeignShape(pasted, separators)
+                if (normalized !== pasted) {
+                  e.clipboardData.setData('text/plain', normalized)
+                }
+              }
+            }
+            rest.onPaste?.(e)
           },
           onBlur: (e: FocusEvent<HTMLInputElement>) => {
             rest.onBlur?.(e)

@@ -113,6 +113,44 @@ describe('groupWhileTyping', () => {
     })
   })
 
+  describe('cross-locale paste detection (#72)', () => {
+    // These reproduce the issue's repro directly against the pure function: a pasted
+    // string shaped like a *different* locale's grouping, fed straight into the field's
+    // own locale separators, must not be silently reinterpreted into an unrelated number.
+    it('en-US: paste "1.234,56" (a de-CH/de-DE-shaped 1234.56) resolves to 1,234.56, not 1.23456', () => {
+      const en = getSeparators('en-US')
+      expect(groupWhileTyping('1.234,56', 8, en)).toEqual({ text: '1,234.56', caret: 8 })
+    })
+
+    it('de-CH: paste "1,234.56" (an en-US-shaped 1234.56) resolves to the de-CH grouping, not truncating to 1', () => {
+      const ch = getSeparators('de-CH')
+      expect(groupWhileTyping('1,234.56', 8, ch)).toEqual({
+        text: `1${ch.group}234.56`,
+        caret: 8,
+      })
+    })
+
+    it('unambiguous single-group-of-3 stays locale-native: en-US "1,234" is not reinterpreted', () => {
+      // Single separator, exactly 3 digits after it, no other separator: ambiguous between
+      // "grouped thousand" and "decimal fraction" - resolved per the field's own locale,
+      // same as today.
+      const en = getSeparators('en-US')
+      expect(groupWhileTyping('1,234', 5, en)).toEqual({ text: '1,234', caret: 5 })
+    })
+
+    it('unambiguous single-group-of-3 stays locale-native: de-DE "1.234" is not reinterpreted', () => {
+      const de = getSeparators('de-DE')
+      expect(groupWhileTyping('1.234', 5, de)).toEqual({ text: '1.234', caret: 5 })
+    })
+
+    it('a single separator not followed by exactly 3 digits is ambiguous, so it is treated per the field locale as today: en-US "1,23" strips the comma as a stray group separator', () => {
+      const en = getSeparators('en-US')
+      // Only one separator present (no both-separators case to detect), so the existing
+      // single-separator handling applies unchanged: `,` is en-US's group char, stripped.
+      expect(groupWhileTyping('1,23', 4, en)).toEqual({ text: '123', caret: 3 })
+    })
+  })
+
   describe('de-CH (apostrophe group)', () => {
     const ch = getSeparators('de-CH')
     // Whichever apostrophe variant this ICU build's group separator is, use the *other*

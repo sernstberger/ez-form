@@ -82,4 +82,33 @@ describe('MoneyField', () => {
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(await screen.findByText('Price must be at least 0.')).toBeInTheDocument()
   })
+
+  describe('pasting a currency-formatted amount (#72)', () => {
+    it('"$1,234.56" (its own en-US/USD shape) submits 1234.56', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={schema} defaultValues={{}} onSubmit={onSubmit}>
+          <MoneyField name="price" label="Price" />
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      await user.click(input())
+      await user.paste('$1,234.56')
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      expect(onSubmit).toHaveBeenCalledWith({ price: 1234.56 }, expect.anything())
+    })
+
+    // "1 234,56 €" has no '.', so `normalizeForeignShape`'s both-separators detection does not
+    // apply (correctly: a single ',' under en-US/USD is the existing, unrelated ambiguous-
+    // single-separator case). What actually happens is Base UI's own `parseNumber`, which
+    // strips the USD currency symbol '$' but not '€', then falls back to `parseFloat` on
+    // "1 23456 €" — silently truncating to 1 rather than rejecting. This is the general
+    // trailing-garbage permissiveness in Base UI's parser (see the `it.todo` in
+    // NumberField.test.tsx), not something this fix's locale-shape detection covers; scoped
+    // out as upstream in the #72 ruling rather than bundled into this fix.
+    it.todo(
+      'upstream (Base UI parseNumber): "1 234,56 €" pasted into a USD MoneyField should reject or resolve to 1234.56, not silently truncate to 1',
+    )
+  })
 })
