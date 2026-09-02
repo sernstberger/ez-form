@@ -20,6 +20,20 @@ export interface GroupedText {
 }
 
 /**
+ * Whether `char` reads as `group` for grouping purposes, mirroring the equivalences Base UI's
+ * `parseNumber` applies: a space-like separator (fr-FR's U+202F) matches any Unicode space
+ * separator, and an apostrophe separator (de-CH's `’`) matches the ASCII `'` too. Without this,
+ * text pasted with the plainer variant — a spreadsheet copy, another locale's rendering — is
+ * either left unrecognised (so later keystrokes never regroup) or treated as a digit-run
+ * boundary and regrouped into nonsense, while Base UI parses it to the right number regardless.
+ */
+function makeIsGroupChar(group: string): (char: string) => boolean {
+  if (/\p{Zs}/u.test(group)) return (char) => /\p{Zs}/u.test(char)
+  if (group === "'" || group === '’') return (char) => char === "'" || char === '’'
+  return (char) => char === group
+}
+
+/**
  * Re-groups the integer digits of `text` and maps the caret to the same logical
  * position. Fraction digits are left exactly as typed (so `1234.50` stays `1,234.50`
  * and `1234.` keeps its trailing decimal). Returns the input unchanged when the text
@@ -30,9 +44,10 @@ export function groupWhileTyping(text: string, caret: number, separators: Separa
   if (text === '') return { text: '', caret: 0 }
 
   const { group, decimal } = separators
+  const isGroupChar = makeIsGroupChar(group)
 
   const isAllowedChar = (char: string) =>
-    /\d/.test(char) || char === '-' || char === decimal || char === group || /\s/.test(char)
+    /\d/.test(char) || char === '-' || char === decimal || isGroupChar(char) || /\s/.test(char)
   if (![...text].every(isAllowedChar)) {
     return { text, caret }
   }
@@ -46,8 +61,8 @@ export function groupWhileTyping(text: string, caret: number, separators: Separa
     if (isSignificant(chars[i]!)) significantBeforeCaret++
   }
 
-  // Strip existing group separators.
-  const stripped = [...text].filter((char) => char !== group).join('')
+  // Strip existing group separators, in every form this locale's separator can arrive as.
+  const stripped = [...text].filter((char) => !isGroupChar(char)).join('')
 
   // Split into sign, integer part, and the rest (decimal separator + fraction), on the
   // first decimal separator found.
