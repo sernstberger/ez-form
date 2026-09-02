@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react'
 import MuiSlider, { type SliderProps as MuiSliderProps } from '@mui/material/Slider'
 import { mergeSlotProps } from '@mui/material/utils'
-import type { ValidationRule } from 'react-hook-form'
+import type { FieldValues, Validate, ValidationRule } from 'react-hook-form'
 import { FieldFrame } from '../FieldFrame'
 import { mergeDisabled } from '../mergeDisabled'
-import type { FieldRules } from '../../rules'
+import { FALLBACK_LABEL, defaultMessages, type FieldRules } from '../../rules'
 
 export type SliderValue = number | number[]
 
@@ -20,23 +20,50 @@ export type SliderProps = Omit<
   /** One prop for both: the slider's bound and the validation message. */
   min?: ValidationRule<number>
   max?: ValidationRule<number>
-} & Pick<FieldRules<SliderValue>, 'required' | 'validate'>
+} & Pick<FieldRules<SliderValue>, 'validate'>
 
 const bound = (rule: ValidationRule<number> | undefined): number | undefined =>
   rule === undefined ? undefined : typeof rule === 'number' ? rule : rule.value
+
+const toRecord = (
+  validate: FieldRules<SliderValue>['validate'],
+): Record<string, Validate<SliderValue, FieldValues>> =>
+  validate === undefined ? {} : typeof validate === 'function' ? { validate } : validate
+
+/**
+ * `min`/`max` are checked here rather than through hookform's own rules: those
+ * compare the value directly, so an array (a range slider) never fails them.
+ */
+const boundCheck = (
+  rule: ValidationRule<number> | undefined,
+  label: string,
+  edge: (values: number[]) => number,
+  ok: (edgeValue: number, limit: number) => boolean,
+  message: (label: string, value: number) => string,
+): Validate<SliderValue, FieldValues> => {
+  return (value) => {
+    const limit = bound(rule)
+    if (limit === undefined || value == null) return true
+    const values = Array.isArray(value) ? value : [value]
+    if (values.length === 0) return true
+    if (ok(edge(values), limit)) return true
+    return (typeof rule === 'object' && rule.message) || message(label, limit)
+  }
+}
 
 /**
  * Form value is a `number`, or `[number, number]` when the default value is an
  * array (MUI renders a range slider for an array value). A slider cannot leave
  * its bounds by itself; `min`/`max` still validate a default or `setValue`
- * outside them.
+ * outside them, for a number and for both ends of a range. There is no
+ * `required`: HTML gives it no meaning on a range input, and a slider always
+ * reports a value.
  */
 export function Slider({
   name,
   label,
   helperText,
   disabled,
-  required,
   min,
   max,
   validate,
@@ -46,6 +73,7 @@ export function Slider({
   ...rest
 }: SliderProps) {
   const minBound = bound(min)
+  const l = typeof label === 'string' ? label : FALLBACK_LABEL
   return (
     <FieldFrame<SliderValue>
       componentName="Slider"
@@ -53,7 +81,26 @@ export function Slider({
       label={label}
       helperText={helperText}
       disabled={disabled}
-      rules={{ required, min, max, validate }}
+      rules={{
+        // Consumer entries first: a built-in key must not be silently replaced.
+        validate: {
+          ...toRecord(validate),
+          min: boundCheck(
+            min,
+            l,
+            (v) => Math.min(...v),
+            (e, m) => e >= m,
+            defaultMessages.min,
+          ),
+          max: boundCheck(
+            max,
+            l,
+            (v) => Math.max(...v),
+            (e, m) => e <= m,
+            defaultMessages.max,
+          ),
+        },
+      }}
       labelAs="legend"
       renderControl={({ field, inputA11y, labelId }) => (
         <MuiSlider

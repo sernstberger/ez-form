@@ -1,4 +1,4 @@
-import { useCallback, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import MuiRating, { type RatingProps as MuiRatingProps } from '@mui/material/Rating'
 import { FieldFrame } from '../FieldFrame'
 import { mergeDisabled } from '../mergeDisabled'
@@ -37,12 +37,13 @@ export function Rating({
       disabled={disabled}
       rules={{ required, validate }}
       labelAs="legend"
-      renderControl={({ field, inputA11y, labelId }) => (
+      renderControl={({ field, required: isRequired, inputA11y, labelId }) => (
         <RatingControl
           {...rest}
           {...inputA11y}
           role="radiogroup"
           aria-labelledby={labelId}
+          aria-required={isRequired || undefined}
           name={field.name}
           value={(field.value as number | null | undefined) ?? null}
           disabled={mergeDisabled(disabled, field.disabled)}
@@ -66,9 +67,10 @@ function RatingControl({
   fieldRef,
   ...props
 }: MuiRatingProps & { fieldRef: (el: HTMLInputElement | null) => void }) {
-  const ref = useCallback(
-    (root: HTMLSpanElement | null) => fieldRef(root?.querySelector('input') ?? null),
-    [fieldRef],
+  return (
+    <MuiRating
+      {...props}
+      ref={(root: HTMLSpanElement | null) => fieldRef(root?.querySelector('input') ?? null)}
+    />
   )
-  return <MuiRating {...props} ref={ref} />
 }

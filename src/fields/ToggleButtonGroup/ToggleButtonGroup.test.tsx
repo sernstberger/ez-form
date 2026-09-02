@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { Form } from '../../Form'
 import { ToggleButtonGroup } from './ToggleButtonGroup'
 import { describeFieldContract } from '../../test/describeFieldContract'
+import { getInnerGroup } from '../../test/getInnerGroup'
 
 const schema = z.object({ align: z.string().nullable() })
 const multiSchema = z.object({ format: z.array(z.number()) })
@@ -26,11 +27,10 @@ describeFieldContract({
   render: (props) => (
     <ToggleButtonGroup name="align" label="Align" options={aligns} exclusive {...props} />
   ),
-  // The enclosing <fieldset> also matches role "group" named "Align" (native
-  // legend association), so disambiguate to the inner MUI group, the element
-  // that actually carries aria-describedby/aria-invalid.
-  getControl: () =>
-    screen.getAllByRole('group', { name: 'Align' }).find((el) => el.tagName !== 'FIELDSET')!,
+  // The inner MUI group, not the enclosing <fieldset>: that is the element
+  // carrying aria-describedby/aria-invalid.
+  getControl: () => getInnerGroup('Align'),
+  requiredNotAnnounced: true,
   expectDisabled: () => expect(screen.getByRole('button', { name: 'Left' })).toBeDisabled(),
   interact: (user) => user.click(screen.getByRole('button', { name: 'Center' })),
 })

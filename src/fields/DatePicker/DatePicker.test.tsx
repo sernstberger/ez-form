@@ -25,6 +25,7 @@ describeFieldContract({
   defaultValues: { start: null },
   render: (props) => withPickers(<DatePicker name="start" label="Start" {...props} />),
   getControl: () => screen.getByRole('group', { name: 'Start' }),
+  requiredNotAnnounced: true,
   expectDisabled: () => expect(hiddenInput('start')).toBeDisabled(),
   interact: async () => {
     typeDate('start', '01/15/2030')

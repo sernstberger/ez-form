@@ -78,9 +78,10 @@ describe('FileField', () => {
   it('multiple: submits an array, and chip delete removes one', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
+    const onChange = vi.fn()
     render(
       <Form schema={multiSchema} defaultValues={{ photos: [] }} onSubmit={onSubmit}>
-        <FileField name="photos" label="Photos" multiple />
+        <FileField name="photos" label="Photos" multiple onChange={onChange} />
         <button type="submit">Go</button>
       </Form>,
     )
@@ -88,6 +89,8 @@ describe('FileField', () => {
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(onSubmit).toHaveBeenLastCalledWith({ photos: [png, jpg] }, expect.anything())
     await user.click(screen.getByRole('button', { name: 'Remove a.png' }))
+    // The consumer hears the delete too, with the reduced array.
+    expect(onChange).toHaveBeenLastCalledWith(expect.anything(), [jpg])
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(onSubmit).toHaveBeenLastCalledWith({ photos: [jpg] }, expect.anything())
   })

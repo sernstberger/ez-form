@@ -10,6 +10,9 @@ export interface FieldContractProps {
   disabled?: boolean
   helperText?: string
   required?: boolean
+  /** Slider's failing rule for `errorProps` (it has no `required`). */
+  min?: number
+  max?: number
   onChange?: (...args: any[]) => void
 }
 
@@ -21,11 +24,26 @@ export interface FieldContract<TIn extends FieldValues, TOut> {
   schema: z.ZodType<TOut, TIn>
   /** Values under which a submit with `required` fails (empty / unchecked). */
   defaultValues: DefaultValues<TIn>
+  /**
+   * Props that make a submit fail, for the error/a11y cases. Defaults to
+   * `{ required: true }`; a field without `required` (Slider) supplies another
+   * failing rule, plus the `errorMessage` it produces.
+   */
+  errorProps?: FieldContractProps
+  /** The message `errorProps` produces. Defaults to `` `${label} is required.` ``. */
+  errorMessage?: string
   render: (props: FieldContractProps) => ReactElement
   /** The element that carries `aria-describedby` / `aria-invalid` (input, combobox, radiogroup). */
   getControl: () => HTMLElement
   /** Defaults to `toBeDisabled()`. Select's combobox is `aria-disabled`; RadioGroup checks a radio. */
   expectDisabled?: (control: HTMLElement) => void
+  /**
+   * Set when the control cannot announce `required`: ARIA has no
+   * `aria-required` for `role="group"` (CheckboxGroup, ToggleButtonGroup, and
+   * the pickers' MUI X input group), so asserting it there would demand an
+   * attribute axe rejects. The legend asterisk and the error carry it instead.
+   */
+  requiredNotAnnounced?: boolean
   /** Changes the value exactly once (one consumer `onChange` call). */
   interact: (user: UserEvent) => Promise<void>
 }
@@ -36,6 +54,8 @@ export interface FieldContract<TIn extends FieldValues, TOut> {
  */
 export function describeFieldContract<TIn extends FieldValues, TOut>(c: FieldContract<TIn, TOut>) {
   const expectDisabled = c.expectDisabled ?? ((control) => expect(control).toBeDisabled())
+  const errorProps = c.errorProps ?? { required: true }
+  const errorMessage = c.errorMessage ?? `${c.label} is required.`
   const inForm = (child: ReactElement, disabled = false) => (
     <Form schema={c.schema} defaultValues={c.defaultValues} onSubmit={() => {}} disabled={disabled}>
       {child}
@@ -66,19 +86,22 @@ export function describeFieldContract<TIn extends FieldValues, TOut>(c: FieldCon
 
     it('describes the control with helperText, then replaces it with an announced error', async () => {
       const user = userEvent.setup()
-      render(inForm(c.render({ helperText: 'Some help', required: true })))
+      render(inForm(c.render({ helperText: 'Some help', ...errorProps })))
       expect(c.getControl()).toHaveAccessibleDescription('Some help')
+      // The control announces `required` to assistive tech, not only visually.
+      if (c.errorProps === undefined && !c.requiredNotAnnounced)
+        expect(c.getControl()).toBeRequired()
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
       await user.click(screen.getByRole('button', { name: 'Go' }))
-      expect(await screen.findByRole('alert')).toHaveTextContent(`${c.label} is required.`)
-      expect(c.getControl()).toHaveAccessibleDescription(`${c.label} is required.`)
+      expect(await screen.findByRole('alert')).toHaveTextContent(errorMessage)
+      expect(c.getControl()).toHaveAccessibleDescription(errorMessage)
       expect(c.getControl()).toHaveAttribute('aria-invalid', 'true')
       expect(screen.queryByText('Some help')).not.toBeInTheDocument()
     })
 
     it('has no accessibility violations in the error state', async () => {
       const user = userEvent.setup()
-      const { container } = render(inForm(c.render({ helperText: 'Some help', required: true })))
+      const { container } = render(inForm(c.render({ helperText: 'Some help', ...errorProps })))
       await user.click(screen.getByRole('button', { name: 'Go' }))
       await screen.findByRole('alert')
       await expectNoA11yViolations(container)

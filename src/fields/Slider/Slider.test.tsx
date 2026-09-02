@@ -15,7 +15,11 @@ describeFieldContract({
   componentName: 'Slider',
   label: 'Volume',
   schema,
-  defaultValues: {},
+  defaultValues: { volume: 10 },
+  // Slider has no `required` (HTML gives it no meaning on a range input), so
+  // the contract's error case uses a failing `max` instead.
+  errorProps: { max: 0 },
+  errorMessage: 'Volume must be at most 0.',
   render: (props) => <Slider name="volume" label="Volume" {...props} />,
   getControl: () => screen.getByRole('slider', { name: 'Volume' }),
   interact: async () => {
@@ -87,16 +91,43 @@ describe('Slider', () => {
     expect(onChange).toHaveBeenCalledWith(expect.anything(), 40, 0)
   })
 
-  it('focuses the slider after a failed submit', async () => {
+  it('validates min/max against a range value', async () => {
     const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const rangeSchema = z.object({ hours: z.tuple([z.number(), z.number()]) })
     render(
-      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
-        <Slider name="volume" label="Volume" required />
+      <Form schema={rangeSchema} defaultValues={{ hours: [-5, 99] }} onSubmit={onSubmit}>
+        <Slider name="hours" label="Hours" min={0} max={24} />
         <button type="submit">Go</button>
       </Form>,
     )
     await user.click(screen.getByRole('button', { name: 'Go' }))
-    expect(await screen.findByText('Volume is required.')).toBeInTheDocument()
+    expect(await screen.findByText('Hours must be at least 0.')).toBeInTheDocument()
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('runs a consumer validate alongside the built-in min/max', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{ volume: 30 }} onSubmit={() => {}}>
+        <Slider name="volume" label="Volume" max={100} validate={(v) => v !== 30 || 'Not 30'} />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByText('Not 30')).toBeInTheDocument()
+  })
+
+  it('focuses the slider after a failed submit', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{ volume: 150 }} onSubmit={() => {}}>
+        <Slider name="volume" label="Volume" max={100} />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByText('Volume must be at most 100.')).toBeInTheDocument()
     expect(screen.getByRole('slider', { name: 'Volume' })).toHaveFocus()
   })
 })

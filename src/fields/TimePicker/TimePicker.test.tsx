@@ -21,6 +21,7 @@ describeFieldContract({
   defaultValues: { at: null },
   render: (props) => withPickers(<TimePicker name="at" label="At" {...props} />),
   getControl: () => screen.getByRole('group', { name: 'At' }),
+  requiredNotAnnounced: true,
   expectDisabled: () => expect(hiddenInput('at')).toBeDisabled(),
   interact: async () => {
     typeTime('at', '09:30 AM')

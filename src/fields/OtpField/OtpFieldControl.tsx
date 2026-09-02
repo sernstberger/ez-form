@@ -84,7 +84,7 @@ export function OtpFieldControl({
   // once focus lands outside the group, so the form does not mark the field
   // touched (and validate it) after every character.
   const handleBlur = (event: FocusEvent<HTMLInputElement>) => {
-    const group = event.currentTarget.parentElement
+    const group = event.currentTarget.closest('[role="group"]')
     if (group?.contains(event.relatedTarget as Node | null)) return
     onBlur?.()
   }

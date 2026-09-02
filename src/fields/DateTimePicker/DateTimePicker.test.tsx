@@ -21,6 +21,7 @@ describeFieldContract({
   defaultValues: { when: null },
   render: (props) => withPickers(<DateTimePicker name="when" label="When" {...props} />),
   getControl: () => screen.getByRole('group', { name: 'When' }),
+  requiredNotAnnounced: true,
   expectDisabled: () => expect(hiddenInput('when')).toBeDisabled(),
   interact: async () => {
     typeDateTime('when', '01/15/2030 09:30 AM')

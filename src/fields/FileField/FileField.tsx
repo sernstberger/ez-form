@@ -1,4 +1,4 @@
-import { useId, type ChangeEvent, type ReactNode } from 'react'
+import { useId, type ReactNode, type SyntheticEvent } from 'react'
 import Button, { type ButtonProps } from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
 import FormControl from '@mui/material/FormControl'
@@ -49,8 +49,11 @@ export type FileFieldProps = {
   multiple?: boolean
   /** Props for the MUI Button (`variant`, `color`, `size`, `startIcon`, …). */
   buttonProps?: Omit<ButtonProps<'label'>, 'component' | 'htmlFor' | 'children' | 'role'>
-  /** Runs after the form's handler, only when the user picked at least one file. */
-  onChange?: (event: ChangeEvent<HTMLInputElement>, value: FileFieldValue) => void
+  /**
+   * Runs after the form's handler on every value change: a pick of at least
+   * one file (a cancelled dialog changes nothing), or a chip's delete click.
+   */
+  onChange?: (event: SyntheticEvent, value: FileFieldValue) => void
 } & Pick<FieldRules<FileFieldValue>, 'required' | 'validate'>
 
 /**
@@ -77,7 +80,11 @@ export function FileField({
   const files: File[] = Array.isArray(value) ? value : value ? [value] : []
   const isDisabled = mergeDisabled(disabled, f.field.disabled)
 
-  const store = (next: File[]) => f.field.onChange(multiple ? next : (next[0] ?? null))
+  const store = (event: SyntheticEvent, next: File[]) => {
+    const value = multiple ? next : (next[0] ?? null)
+    f.field.onChange(value)
+    onChange?.(event, value)
+  }
 
   return (
     <FormControl error={f.invalid} disabled={isDisabled} required={f.required}>
@@ -102,14 +109,14 @@ export function FileField({
           ref={f.field.ref}
           accept={accept}
           multiple={multiple}
+          required={f.required}
           disabled={isDisabled}
           {...f.inputA11y(text)}
           onBlur={() => f.field.onBlur()}
           onChange={(e) => {
             const picked = Array.from(e.target.files ?? [])
             if (picked.length === 0) return // cancelled dialog: keep what we have
-            store(picked)
-            onChange?.(e, multiple ? picked : picked[0]!)
+            store(e, picked)
             // jsdom doesn't fully implement resetting a file input's value; browsers allow it
             // so the same file can be picked again and still fire change.
             try {
@@ -127,7 +134,12 @@ export function FileField({
               key={`${file.name}-${file.size}-${file.lastModified}`}
               label={file.name}
               disabled={isDisabled}
-              onDelete={() => store(files.filter((other) => other !== file))}
+              onDelete={(event: SyntheticEvent) =>
+                store(
+                  event,
+                  files.filter((other) => other !== file),
+                )
+              }
               // Chip clones this element with its own onClick; the default icon has no accessible
               // name, and SvgIcon defaults aria-hidden to true unless overridden here.
               deleteIcon={

@@ -53,6 +53,8 @@ export function ToggleButtonGroup({
         <MuiToggleButtonGroup
           {...rest}
           {...inputA11y}
+          // No `aria-required`: ARIA does not support it on this element's
+          // `role="group"` (unlike RadioGroup's `radiogroup`), and axe flags it.
           aria-labelledby={labelId}
           exclusive={exclusive}
           // FormControl's disabled context does not reach ToggleButton (not a form control).

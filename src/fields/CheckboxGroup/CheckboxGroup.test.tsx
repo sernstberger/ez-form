@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { Form } from '../../Form'
 import { CheckboxGroup } from './CheckboxGroup'
 import { describeFieldContract } from '../../test/describeFieldContract'
+import { getInnerGroup } from '../../test/getInnerGroup'
 
 const schema = z.object({ toppings: z.array(z.number()) })
 const toppings = [
@@ -20,11 +21,10 @@ describeFieldContract({
   render: (props) => (
     <CheckboxGroup name="toppings" label="Toppings" options={toppings} {...props} />
   ),
-  // The enclosing <fieldset> also matches role "group" named "Toppings" (native
-  // legend association), so disambiguate to the inner MUI FormGroup, the element
-  // that actually carries aria-describedby/aria-invalid.
-  getControl: () =>
-    screen.getAllByRole('group', { name: 'Toppings' }).find((el) => el.tagName !== 'FIELDSET')!,
+  // The inner MUI FormGroup, not the enclosing <fieldset>: that is the element
+  // carrying aria-describedby/aria-invalid.
+  getControl: () => getInnerGroup('Toppings'),
+  requiredNotAnnounced: true,
   expectDisabled: () => expect(screen.getByRole('checkbox', { name: 'Cheese' })).toBeDisabled(),
   interact: (user) => user.click(screen.getByRole('checkbox', { name: 'Ham' })),
 })
@@ -99,9 +99,6 @@ describe('CheckboxGroup', () => {
         <CheckboxGroup name="toppings" label="Toppings" options={toppings} row />
       </Form>,
     )
-    const group = screen
-      .getAllByRole('group', { name: 'Toppings' })
-      .find((el) => el.tagName !== 'FIELDSET')!
-    expect(group).toHaveClass('MuiFormGroup-row')
+    expect(getInnerGroup('Toppings')).toHaveClass('MuiFormGroup-row')
   })
 })

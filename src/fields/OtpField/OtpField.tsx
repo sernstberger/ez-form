@@ -55,10 +55,11 @@ export function OtpField({
     label,
     rules: {
       required,
+      // Consumer entries first: a built-in key must not be silently replaced.
       validate: {
+        ...consumer,
         complete: (v) =>
           v === '' || v == null || v.length === length || `${l} must be ${length} characters.`,
-        ...consumer,
       },
     },
   })
