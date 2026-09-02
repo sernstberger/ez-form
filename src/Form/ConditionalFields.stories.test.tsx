@@ -58,6 +58,9 @@ describe('ConditionalFields story (#82)', () => {
       await user.click(within(section).getByRole('combobox', { name: /how did you hear/i }))
       await user.click(await screen.findByRole('option', { name: 'Search engine' }))
       expect(within(section).queryByLabelText(/please specify/i)).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: /submit/i }))
+      await waitFor(() => expect(within(section).queryByRole('alert')).not.toBeInTheDocument())
     })
   })
 
@@ -95,9 +98,15 @@ describe('ConditionalFields story (#82)', () => {
     })
 
     it('submits fine with income at or above the threshold, note hidden', async () => {
+      const user = userEvent.setup()
       render(<Default />)
       const section = screen.getByRole('group', { name: /4\. threshold reveals/i })
       expect(within(section).queryByLabelText(/co-signer note/i)).not.toBeInTheDocument()
+
+      // Default monthlyIncome (5000) is already at/above the threshold: submitting
+      // must not raise the co-signer-note error, proving "submits fine" for real.
+      await user.click(screen.getByRole('button', { name: /submit/i }))
+      await waitFor(() => expect(within(section).queryByRole('alert')).not.toBeInTheDocument())
     })
   })
 
@@ -128,11 +137,29 @@ describe('ConditionalFields story (#82)', () => {
       ).not.toBeInTheDocument()
     })
 
-    it('requires the region field on submit', async () => {
+    it('requires the region field only when the country has a region list (US/CA)', async () => {
       const user = userEvent.setup()
       render(<Default />)
+      const section = screen.getByRole('group', { name: /5\. cascading selects/i })
+      // Default country is US (see defaultValues), so an empty region blocks submit.
+      expect(within(section).getByRole('combobox', { name: /^country/i })).toHaveTextContent(
+        'United States',
+      )
       await user.click(screen.getByRole('button', { name: /submit/i }))
       await screen.findByText(/region is required/i)
+    })
+
+    it('does not require the region field for a country with no region list', async () => {
+      const user = userEvent.setup()
+      render(<Default />)
+      const section = screen.getByRole('group', { name: /5\. cascading selects/i })
+      await user.click(within(section).getByRole('combobox', { name: /^country/i }))
+      await user.click(await screen.findByRole('option', { name: 'France' }))
+      // Region is now a free-text field, left empty on purpose.
+      expect(within(section).getByLabelText(/^region$/i)).toHaveValue('')
+
+      await user.click(screen.getByRole('button', { name: /submit/i }))
+      await waitFor(() => expect(screen.queryByText(/region is required/i)).not.toBeInTheDocument())
     })
   })
 

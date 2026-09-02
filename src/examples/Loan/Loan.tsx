@@ -4,7 +4,7 @@ import Paper from '@mui/material/Paper'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import { z } from 'zod'
-import { useWatch } from 'react-hook-form'
+import { useFormState, useWatch } from 'react-hook-form'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
 import { Form } from '../../Form'
@@ -249,14 +249,23 @@ function Totals() {
  * row's own path (`employment.<index>.status`) rather than the whole array.
  */
 function EmploymentOtherField({ row }: { row: FieldArrayRow }) {
-  const status = useWatch({ name: row.name('status') }) as string | undefined
+  const status = useWatch<Input, `employment.${number}.status`>({
+    name: `employment.${row.index}.status`,
+  })
   if (status !== 'other') return null
   return <TextField name={row.name('statusOther')} label="Please specify" />
 }
 
-/** Pattern 4 (#82): income below the threshold reveals a note + a required field. */
+/**
+ * Pattern 4 (#82): income below the threshold reveals a note + a required field.
+ * Gated on `dirtyFields.applicantIncome` as well as the threshold itself, so a
+ * pristine form (whose `applicantIncome` default happens to be `0`, itself below
+ * the threshold) doesn't show the note before the user has entered anything.
+ */
 function LowIncomeCoSignerNote() {
   const applicantIncome = useWatch<Input, 'applicantIncome'>({ name: 'applicantIncome' })
+  const { dirtyFields } = useFormState<Input>({ name: 'applicantIncome' })
+  if (!dirtyFields.applicantIncome) return null
   if (typeof applicantIncome !== 'number' || applicantIncome >= LOW_INCOME_THRESHOLD) return null
   return (
     <>

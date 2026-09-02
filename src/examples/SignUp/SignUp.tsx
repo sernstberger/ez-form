@@ -47,6 +47,12 @@ const schema = z
   .refine((data) => data.password === data.confirmPassword, {
     error: 'Passwords do not match',
     path: ['confirmPassword'],
+    // Zod skips a `.refine`/`.superRefine` once any other issue in the object is
+    // "non-continuable" (an enum's or literal's mismatch, among others) — `terms`
+    // (a `z.literal(true)`, starting `false`) would otherwise silently swallow this
+    // message until the checkbox is checked. `when: () => true` forces it to run
+    // regardless of what else in the object failed.
+    when: () => true,
   })
   .superRefine(
     (data, ctx) => {

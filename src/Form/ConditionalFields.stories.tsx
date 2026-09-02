@@ -110,14 +110,12 @@ const contactByEmail = z.object({
   contactBy: z.literal('email'),
   email: z.email('Enter a valid email address'),
 })
-const contactByBaseSchema = z.discriminatedUnion('contactBy', [contactByPhone, contactByEmail])
-// Widened for `defaultValues`/typing convenience below: the discriminated union above
-// is what actually validates on submit (see the top-level `.superRefine` no-op comment).
-const contactByLooseSchema = z.object({
-  contactBy: z.enum(['phone', 'email']),
-  phone: z.string(),
-  email: z.string(),
-})
+// A real nested discriminated union (not a manually-revalidated loose object): zod
+// validates whichever branch is active as part of the normal object parse, and
+// react-hook-form's `Path<Input>` widens across both branches, so `contactBy.phone`
+// and `contactBy.email` both typecheck as field names regardless of which branch the
+// live value is currently in.
+const contactBySchema = z.discriminatedUnion('contactBy', [contactByPhone, contactByEmail])
 
 const schema = z
   .object({
@@ -126,7 +124,7 @@ const schema = z
     coSigner: coSignerSchema,
     income: incomeSchema,
     address: addressSchema,
-    contactBy: contactByLooseSchema,
+    contactBy: contactBySchema,
   })
   .superRefine(
     (data, ctx) => {
@@ -180,27 +178,28 @@ const schema = z
           path: ['income', 'coSignerNote'],
         })
       }
-      // Pattern 5
-      if (!data.address.region) {
+      // Pattern 5: required only when the country has a real region list (US/CA) --
+      // a country with no list (the free-text fallback) leaves region optional, so the
+      // test proves conditional requirement rather than an unconditional one.
+      if (
+        (data.address.country === 'US' || data.address.country === 'CA') &&
+        !data.address.region
+      ) {
         ctx.addIssue({
           code: 'custom',
           message: 'Region is required',
           path: ['address', 'region'],
         })
       }
-      // Pattern 6: re-validate the discriminated union so the phone/email branch reports
-      // through this shared schema's own error paths (`contactBy.phone` / `contactBy.email`).
-      const result = contactByBaseSchema.safeParse(data.contactBy)
-      if (!result.success) {
-        for (const issue of result.error.issues) {
-          ctx.addIssue({ ...issue, path: ['contactBy', ...issue.path] })
-        }
-      }
+      // Pattern 6 needs no check here: `contactBy` is a real `z.discriminatedUnion`
+      // nested field (see below), so zod validates its own phone/email branch as part
+      // of the normal object parse -- no manual re-validation required.
     },
     // Zod skips a `superRefine` once any other issue in the object is "non-continuable"
-    // (an enum's `invalid_value`, among others) — `contactBy.contactBy` is itself a
-    // `z.enum`, so an invalid value there would otherwise silently swallow every check
-    // above. `when: () => true` forces this refinement to always run regardless.
+    // (an enum's/discriminated union's `invalid_value`, among others) --
+    // `contactBy.contactBy` is a discriminated union tag, so an invalid value there
+    // would otherwise silently swallow every check above. `when: () => true` forces
+    // this refinement to always run regardless.
     { when: () => true },
   )
 
@@ -212,7 +211,7 @@ const defaultValues: Input = {
   coSigner: { addCoSigner: false, coSignerName: '', coSignerEmail: '' },
   income: { monthlyIncome: 5000, coSignerNote: '' },
   address: { country: 'US', region: '' },
-  contactBy: { contactBy: 'email', phone: '', email: '' },
+  contactBy: { contactBy: 'email', email: '' },
 }
 
 const onSubmit = fn()

@@ -194,13 +194,21 @@ describe('Loan', () => {
     expect(screen.queryByRole('group', { name: 'Debt 1' })).not.toBeInTheDocument()
   })
 
-  it('reveals a co-signer note once monthly income drops below the threshold, required only then', async () => {
+  it('does not show the co-signer note on a pristine applicant step, even though the default income (0) is below the threshold', async () => {
     const user = userEvent.setup()
     render(<Loan />)
     await fillLoanStep(user)
     await next(user)
-    // Default applicantIncome (0) is already below the threshold, so the note starts revealed.
-    expect(screen.getByLabelText(/co-signer note/i)).toBeInTheDocument()
+    // Untouched: applicantIncome defaults to 0 (below the threshold), but the note
+    // only reveals once the user has actually entered an income (dirtyFields).
+    expect(screen.queryByLabelText(/co-signer note/i)).not.toBeInTheDocument()
+  })
+
+  it('reveals a co-signer note once the user enters an income below the threshold, required only then', async () => {
+    const user = userEvent.setup()
+    render(<Loan />)
+    await fillLoanStep(user)
+    await next(user)
 
     await user.type(screen.getByLabelText(/full name/i), 'Ada Lovelace')
     await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
@@ -222,8 +230,12 @@ describe('Loan', () => {
     render(<Loan />)
     await fillLoanStep(user)
     await next(user)
-    expect(screen.getByLabelText(/co-signer note/i)).toBeInTheDocument()
     const incomeInput = screen.getByLabelText(/monthly income/i)
+    await user.clear(incomeInput)
+    await user.type(incomeInput, '500')
+    await user.tab()
+    expect(screen.getByLabelText(/co-signer note/i)).toBeInTheDocument()
+
     await user.clear(incomeInput)
     await user.type(incomeInput, '8000')
     await user.tab()

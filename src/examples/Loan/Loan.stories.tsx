@@ -28,6 +28,9 @@ async function fillLoanStep({ canvas, userEvent }: PlayContext) {
   await userEvent.click(await screen.findByRole('option', { name: 'Home purchase' }))
 }
 
+/** Below Loan's LOW_INCOME_THRESHOLD (see Loan.tsx): the co-signer note becomes required. */
+const LOW_INCOME_THRESHOLD = 3000
+
 async function fillApplicantStep({ canvas, userEvent }: PlayContext, income = '8000') {
   await userEvent.type(canvas.getByLabelText(/full name/i), 'Ada Lovelace')
   await userEvent.type(canvas.getByLabelText(/^email/i), 'ada@example.com')
@@ -35,6 +38,9 @@ async function fillApplicantStep({ canvas, userEvent }: PlayContext, income = '8
   const incomeInput = canvas.getByLabelText(/monthly income/i)
   await userEvent.clear(incomeInput)
   await userEvent.type(incomeInput, income)
+  if (Number(income.replace(/,/g, '')) < LOW_INCOME_THRESHOLD) {
+    await userEvent.type(canvas.getByLabelText(/co-signer note/i), 'Applying with a co-signer')
+  }
 }
 
 async function fillEmploymentStep({ canvas, userEvent }: PlayContext, income = '8000') {

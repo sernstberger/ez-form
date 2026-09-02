@@ -85,6 +85,22 @@ describe('SignUp', () => {
     await waitFor(() => expect(confirmField).toHaveAccessibleDescription(/do not match|match/i))
   })
 
+  it('shows the mismatch message even when the terms checkbox is left unchecked', async () => {
+    // Regression: zod skips a `.refine` once any other field has a "non-continuable"
+    // issue -- `terms` is a `z.literal(true)` starting `false`, which would otherwise
+    // silently swallow the "Passwords do not match" message until terms is checked.
+    const user = userEvent.setup()
+    render(<SignUp />)
+    await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
+    await user.type(screen.getByLabelText(/^password(?! strength)/i), 'correct-horse-1')
+    await user.type(screen.getByLabelText(/confirm password/i), 'different-1')
+    await user.type(screen.getByLabelText(/display name/i), 'Ada Lovelace')
+    // terms left unchecked on purpose
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    const confirmField = screen.getByLabelText(/confirm password/i)
+    await waitFor(() => expect(confirmField).toHaveAccessibleDescription(/do not match|match/i))
+  })
+
   it('blocks Next when the terms checkbox is unchecked', async () => {
     const user = userEvent.setup()
     render(<SignUp />)
