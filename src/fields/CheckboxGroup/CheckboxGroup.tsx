@@ -57,7 +57,10 @@ export function CheckboxGroup({
       rules={{ required, validate }}
       optionalText={optionalText}
       labelAs="legend"
-      // Read, not destructured: both still reach the control through `rest`.
+      // For the dev-mode "no accessible name" check only — read, not destructured, so
+      // `aria-label` still reaches the control through `rest`. (This field's own
+      // `aria-labelledby={labelId}` below deliberately wins over a consumer's: the
+      // frame's legend is what names the group.)
       aria-label={rest['aria-label']}
       aria-labelledby={rest['aria-labelledby']}
       renderControl={({ field, inputA11y, labelId }) => {
