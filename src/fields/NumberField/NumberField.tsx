@@ -4,7 +4,7 @@ import type { ValidationRule } from 'react-hook-form'
 import { NumberFieldControl, type NumberFieldInputProps } from './NumberFieldControl'
 import { useEzField } from '../useEzField'
 import { mergeDisabled } from '../mergeDisabled'
-import type { FieldRules } from '../../rules'
+import { defaultMessages, FALLBACK_LABEL, type FieldRules } from '../../rules'
 
 export type NumberFieldProps = Omit<
   BaseNumberField.Root.Props,
@@ -59,10 +59,64 @@ export type NumberFieldProps = Omit<
    */
   min?: ValidationRule<number>
   max?: ValidationRule<number>
+  /**
+   * Internal. A pair of inverse functions applied to the value as it crosses
+   * the binding boundary, for the fields whose stored value and displayed
+   * value deliberately differ in scale: `PercentField` under
+   * `scale="fraction"` stores `0.125` and shows `12.5%`. `toDisplay` runs on
+   * the value read from the form, `toStored` on the value the control
+   * produces; `min`/`max`/`step` and everything else stay in display units.
+   * The binding is otherwise unchanged — the form value, validation and
+   * `aria-*` wiring all still come from `name`. This is `TextField`'s
+   * `displayValue`, for a numeric field.
+   *
+   * Left `undefined` (the default, and every plain `<NumberField>`), the bound
+   * value is displayed as-is.
+   *
+   * @internal
+   */
+  valueScale?: { toDisplay: (stored: number) => number; toStored: (display: number) => number }
 } & Pick<FieldRules<number | null>, 'required' | 'validate'>
 
 const bound = (rule: ValidationRule<number> | undefined): number | undefined =>
   rule === undefined ? undefined : typeof rule === 'number' ? rule : rule.value
+
+type ValueScale = NonNullable<NumberFieldProps['valueScale']>
+
+const scaleToDisplay = (value: number | null, scale: ValueScale | undefined) =>
+  value === null || scale === undefined ? value : scale.toDisplay(value)
+
+const scaleToStored = (value: number | null, scale: ValueScale | undefined) =>
+  value === null || scale === undefined ? value : scale.toStored(value)
+
+/**
+ * A `min`/`max` rule restated in stored units so it compares against the value
+ * the form actually holds, while its message keeps the number the consumer
+ * wrote: `max={100}` on a `scale="fraction"` PercentField compares as `1` but
+ * still reads "must be at most 100." A bare number carries no message of its
+ * own, so the display-unit default is materialised here before the value is
+ * scaled — otherwise `normalizeRules` would derive it from the scaled number.
+ * Untouched without a `valueScale`.
+ */
+function scaleRule(
+  rule: ValidationRule<number> | undefined,
+  scale: ValueScale | undefined,
+  message: (label: string, value: number) => string,
+  label: string,
+): ValidationRule<number> | undefined {
+  if (rule === undefined || scale === undefined) return rule
+  if (typeof rule === 'number') {
+    return { value: scale.toStored(rule), message: message(label, rule) }
+  }
+  // `ValidationValueMessage` types `value` as possibly `undefined` (a rule
+  // switched off); `normalizeRules` drops such a rule, so pass it straight on.
+  if (rule.value === undefined) return rule
+  return {
+    ...rule,
+    value: scale.toStored(rule.value),
+    message: rule.message || message(label, rule.value),
+  }
+}
 
 // `numeric` for an integer-only field (no fractional `step`, and no `format` that allows
 // fraction digits), `decimal` otherwise — Base UI's own default is always `numeric` (#6, #7).
@@ -96,11 +150,24 @@ export function NumberField({
   step,
   format,
   inputMode = isIntegerOnly(step, format) ? 'numeric' : 'decimal',
+  valueScale,
   ...rest
 }: NumberFieldProps) {
+  // The same label `useEzField` would use for a default rule message.
+  const ruleLabel = typeof label === 'string' ? label : FALLBACK_LABEL
   const f = useEzField<number | null>(name, 'NumberField', {
     label,
-    rules: { required, min, max, validate },
+    // `min`/`max` are written in display units (they are also the stepper
+    // bounds), but the rule runs against the *stored* value, so under a
+    // `valueScale` the bounds cross into stored units with it. The message
+    // keeps the number the consumer wrote — `max={100}` still reads "at most
+    // 100" even when it is compared as `1`.
+    rules: {
+      required,
+      min: scaleRule(min, valueScale, defaultMessages.min, ruleLabel),
+      max: scaleRule(max, valueScale, defaultMessages.max, ruleLabel),
+      validate,
+    },
     optionalText,
     // Read, not destructured: both still reach the control through `rest`.
     'aria-label': rest['aria-label'],
@@ -115,10 +182,13 @@ export function NumberField({
       format={format}
       name={f.field.name}
       label={f.displayLabel}
-      value={f.field.value ?? null}
+      value={scaleToDisplay(f.field.value ?? null, valueScale)}
       onValueChange={(value, details) => {
-        f.field.onChange(value)
-        onValueChange?.(value, details)
+        const stored = scaleToStored(value, valueScale)
+        f.field.onChange(stored)
+        // The consumer's handler sees the value in *stored* units, matching
+        // what the form holds and what `onSubmit` will receive.
+        onValueChange?.(stored, details)
       }}
       min={bound(min)}
       max={bound(max)}

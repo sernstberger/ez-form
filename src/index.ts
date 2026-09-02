@@ -20,6 +20,7 @@ export {
   type TextareaFieldProps,
 } from './fields/TextareaField'
 export { MoneyField, type MoneyFieldProps } from './fields/MoneyField'
+export { PercentField, type PercentFieldProps } from './fields/PercentField'
 export { ZipField, type ZipFieldProps } from './fields/ZipField'
 export {
   AddressField,
@@ -40,6 +41,8 @@ export { PhoneField, PHONE_FORMAT, type PhoneFieldProps } from './fields/PhoneFi
 // a stored value the way the field does — on a review screen, in a table, in an
 // email — instead of re-implementing the template walk.
 export { formatTemplate, type FormatTemplate } from './fields/formatTemplate'
+export { EmailField, type EmailFieldProps } from './fields/EmailField'
+export { FeinField, type FeinFieldProps } from './fields/FeinField'
 export { SsnField, ssnFieldClasses, type SsnFieldProps } from './fields/SsnField'
 export type { FieldRules, BooleanFieldRules } from './rules'
 export {

@@ -1,7 +1,11 @@
 import { useEzFormContext } from '../../useEzFormContext'
 import { NumberField, type NumberFieldProps } from '../NumberField'
 
-export type MoneyFieldProps = Omit<NumberFieldProps, 'format' | 'locale'>
+// `valueScale` is `NumberField`'s internal display/stored transform (see its
+// JSDoc). Money is always stored in the units it displays, so the prop is
+// omitted rather than exposed: `@internal` keeps it out of the emitted `.d.ts`
+// but not out of this type, and an un-omitted prop is a public prop in source.
+export type MoneyFieldProps = Omit<NumberFieldProps, 'format' | 'locale' | 'valueScale'>
 
 // `maximumFractionDigits: 2` also rounds the committed value, so `19.999` submits as `20`
 // rather than displaying `$20.00` over a sub-cent value. Hoisted so the identity is stable
