@@ -80,6 +80,19 @@ describe('FieldArray', () => {
     await waitFor(() => expect(within(second).getByRole('textbox', { name: 'Name' })).toHaveFocus())
   })
 
+  it('focuses the appended row even when two Adds land in one batch', async () => {
+    const user = userEvent.setup()
+    render(<Applicants defaultValues={{ applicants: [] }} />)
+    const add = screen.getByRole('button', { name: 'Add' })
+    await user.click(add)
+    await user.click(add)
+    expect(rows()).toHaveLength(2)
+    // Focus follows the row that was actually appended last, not an index read
+    // from a stale render closure.
+    const second = screen.getByRole('group', { name: 'Applicant 2' })
+    await waitFor(() => expect(within(second).getByRole('textbox', { name: 'Name' })).toHaveFocus())
+  })
+
   it('Remove drops the row and focuses the previous row first field', async () => {
     const user = userEvent.setup()
     render(
@@ -163,14 +176,70 @@ describe('FieldArray', () => {
   it('announces add, remove and move in a status region', async () => {
     const user = userEvent.setup()
     render(<Applicants reorder />)
-    const status = screen.getByRole('status')
-    expect(status).toBeEmptyDOMElement()
+    // Re-queried each time on purpose: each announcement mounts a fresh status
+    // node (see the repeat test below), so a held reference would go stale.
+    const status = () => screen.getByRole('status')
+    expect(status()).toBeEmptyDOMElement()
     await user.click(screen.getByRole('button', { name: 'Add' }))
-    await waitFor(() => expect(status).toHaveTextContent('Row 2 added'))
+    await waitFor(() => expect(status()).toHaveTextContent('Row 2 added'))
     await user.click(screen.getByRole('button', { name: 'Move Applicant 2 up' }))
-    await waitFor(() => expect(status).toHaveTextContent('Row 1 moved up'))
+    await waitFor(() => expect(status()).toHaveTextContent('Row 1 moved up'))
     await user.click(screen.getByRole('button', { name: 'Remove Applicant 2' }))
-    await waitFor(() => expect(status).toHaveTextContent('Row 2 removed'))
+    await waitFor(() => expect(status()).toHaveTextContent('Row 2 removed'))
+  })
+
+  it('re-announces an identical repeated action (the status node is replaced)', async () => {
+    const user = userEvent.setup()
+    render(
+      <Applicants
+        defaultValues={{
+          applicants: [
+            { name: 'A', email: '' },
+            { name: 'B', email: '' },
+            { name: 'C', email: '' },
+          ],
+        }}
+      />,
+    )
+    // Removing "row 2" twice produces the same message both times. A live region
+    // only re-announces if its content actually changes, so the component must
+    // mount a fresh status node rather than re-render the same one with the same
+    // text — otherwise the second removal is silent to assistive tech.
+    const announcements: string[] = []
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          if (node instanceof HTMLElement && node.getAttribute('role') === 'status') {
+            announcements.push(node.textContent ?? '')
+          }
+        }
+      }
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+
+    await user.click(screen.getByRole('button', { name: 'Remove Applicant 2' }))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Row 2 removed'))
+    const first = screen.getByRole('status')
+    await user.click(screen.getByRole('button', { name: 'Remove Applicant 2' }))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Row 2 removed'))
+    const second = screen.getByRole('status')
+    observer.disconnect()
+
+    expect(second).not.toBe(first)
+    expect(announcements.filter((text) => text === 'Row 2 removed')).toHaveLength(2)
+  })
+
+  it('re-announces a repeated Add', async () => {
+    const user = userEvent.setup()
+    render(<Applicants defaultValues={{ applicants: [] }} />)
+    const add = screen.getByRole('button', { name: 'Add' })
+    await user.click(add)
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Row 1 added'))
+    const first = screen.getByRole('status')
+    // A different message, but the node must still be a new one each time.
+    await user.click(add)
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Row 2 added'))
+    expect(screen.getByRole('status')).not.toBe(first)
   })
 
   it('minRows disables Remove at the floor; maxRows disables Add at the ceiling', async () => {

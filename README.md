@@ -173,6 +173,15 @@ in the middle does not shuffle typed values between the rows that remain.
 `emptyRow` is the value a new row starts from. Pass a function (called per Add) so
 object rows are never shared by reference between rows.
 
+Row names come from `singular`, which defaults to `label` with one trailing `s`
+stripped. That guess is deliberately naive — `Applicants` gives `Applicant`, but
+`Addresses` would give `Addresse` and `People` stays `People` — which is exactly
+why `singular` exists; set it whenever the guess is wrong. A `label` that is an
+element rather than a string cannot be stripped at all and falls back to `Row`, so
+pass `singular` alongside a non-string `label`. `rowLabel={(index) => ...}` replaces
+the whole name (legend and every button's accessible name) when numbering is not
+what you want.
+
 Accessibility is the component's job: Add moves focus into the new row's first
 field, Remove moves it to the previous row (or the Add button when the first row
 went), Move keeps focus on the button that was pressed as it travels with its row,

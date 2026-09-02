@@ -52,8 +52,15 @@ export interface FieldArrayProps<TRow = Record<string, unknown>> extends Pick<
   /** Name of the array group, rendered as the outer `FormSection`'s legend. */
   label: ReactNode
   /**
-   * Base name for a row's legend, numbered per row (`Applicant 1`). Defaults to
-   * `label` with a trailing `s` removed, so `Applicants` gives `Applicant 1`.
+   * Base name for a row's legend, numbered per row (`Applicant 1`), and the
+   * name every row button announces (`Remove Applicant 1`).
+   *
+   * The default is derived from `label` by stripping one trailing `s`, which is
+   * deliberately naive — it gives `Applicants` → `Applicant`, but also
+   * `Addresses` → `Addresse` and `People` → `People`. Set `singular` whenever
+   * that guess is wrong. A non-string `label` (a `ReactNode`) cannot be
+   * stripped at all and falls back to `Row`, so a `label` that is an element
+   * should always pass `singular` too. For full control use `rowLabel`.
    */
   singular?: string
   /** Full control over a row's name, used in its legend and in every button's `aria-label`. */
@@ -112,6 +119,8 @@ const cx = (base: string, extra?: string) => (extra ? `${base} ${extra}` : base)
 
 /** Where focus should land once React has rendered the new row list. */
 type PendingFocus =
+  /** The row that was just appended, identified at commit time (see `handleAdd`). */
+  | { kind: 'appended' }
   | { kind: 'row'; index: number }
   | { kind: 'move'; index: number; direction: 'up' | 'down' }
   | { kind: 'add' }
@@ -158,7 +167,14 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
   const { fields, append, remove, move } = useFieldArray({ name, rules, shouldUnregister })
   const { errors } = useFormState()
 
-  const [status, setStatus] = useState('')
+  // `seq` is not decoration: it keys the status element, so every announcement
+  // mounts a *fresh* node. Clearing then setting the text in one handler (the
+  // `ResendCodeButton` shape) does not work here — React batches both updates
+  // into a single render, so the region never empties and repeating an action
+  // with an identical message (removing row 2 twice) would be silent.
+  // `ResendCodeButton` gets away with it only because an `await` separates its
+  // two `setState` calls into different renders.
+  const [status, setStatus] = useState({ text: '', seq: 0 })
   const [pendingFocus, setPendingFocus] = useState<PendingFocus | null>(null)
   const rowRefs = useRef(new Map<string, HTMLFieldSetElement>())
   const addRef = useRef<HTMLButtonElement>(null)
@@ -180,7 +196,10 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
       addRef.current?.focus()
       return
     }
-    const field = fields[pendingFocus.index]
+    // `appended` resolves against the *committed* `fields`, where the new row is
+    // last, instead of an index captured from the render that queued it.
+    const field =
+      pendingFocus.kind === 'appended' ? fields[fields.length - 1] : fields[pendingFocus.index]
     const row = field && rowRefs.current.get(field.id)
     // The target row is gone (every row removed, or an external `replace`):
     // focus must land somewhere, and Add is the only control left.
@@ -206,7 +225,7 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
     }
     row
       .querySelector<HTMLElement>(
-        'input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])',
+        'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
       )
       ?.focus()
   }, [pendingFocus, fields])
@@ -216,19 +235,17 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
       ? rowLabel(index)
       : `${singular ?? (typeof label === 'string' ? label.replace(/s$/, '') : 'Row')} ${index + 1}`
 
-  // Announce through a cleared-then-set status so the same action twice in a
-  // row is announced twice, the same rule as `ResendCodeButton`.
-  const announce = (message: string) => {
-    setStatus('')
-    setStatus(message)
-  }
+  const announce = (text: string) => setStatus((prev) => ({ text, seq: prev.seq + 1 }))
 
   const handleAdd = () => {
     const row = typeof emptyRow === 'function' ? (emptyRow as () => TRow)() : emptyRow
     // hookform focuses the input it registered for the new row; this component
     // focuses the row's first focusable control itself, in the effect above.
     append(row as never, { shouldFocus: false })
-    setPendingFocus({ kind: 'row', index: fields.length })
+    // Resolve the target at commit time rather than storing `fields.length`
+    // from this render's closure: a double invoke would read the same stale
+    // length twice and aim at a row that is no longer the appended one.
+    setPendingFocus({ kind: 'appended' })
     announce(`Row ${fields.length + 1} added`)
   }
 
@@ -345,11 +362,12 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
         </FieldArrayError>
       )}
       <FieldArrayStatus
+        key={status.seq}
         role="status"
         {...statusSlotProps}
         className={cx(fieldArrayClasses.status, statusSlotProps?.className)}
       >
-        {status}
+        {status.text}
       </FieldArrayStatus>
     </FieldArrayRoot>
   )
