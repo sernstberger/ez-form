@@ -1,4 +1,5 @@
 export { Wizard, type WizardProps, type WizardStepDef, type WizardStepStatus } from './Wizard'
 export { WizardStep, type WizardStepProps } from './WizardStep'
+export { WizardStepper, type WizardStepperProps } from './WizardStepper'
 export { useWizard, useOptionalWizard } from './useWizard'
 export type { WizardContextValue } from './WizardContext'

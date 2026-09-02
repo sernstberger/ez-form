@@ -4,8 +4,10 @@ import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../Form'
 import { TextField } from '../fields/TextField'
+import { expectNoA11yViolations } from '../test/axe'
 import { Wizard, type WizardStepDef } from './Wizard'
 import { WizardStep } from './WizardStep'
+import { WizardStepper } from './WizardStepper'
 import { useWizard } from './useWizard'
 
 const schema = z.object({
@@ -308,4 +310,69 @@ describe('Wizard', () => {
       ),
     ).toThrow('ez-form: <Controls> must be rendered inside <Wizard>')
   })
+})
+
+describe('WizardStepper', () => {
+  function Inline({ orientation }: { orientation?: 'horizontal' | 'vertical' }) {
+    return (
+      <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+        <Wizard steps={steps} orientation={orientation}>
+          <WizardStepper />
+          <Steps />
+        </Wizard>
+      </Form>
+    )
+  }
+
+  // MUI 9.4's Stepper renders a `StepButton` step as `role="tab"` inside a
+  // `role="tablist"` (roving-tabindex APG tabs pattern), not `role="button"` —
+  // see https://mui.com/material-ui/migration/upgrade-to-v9/. These tests use
+  // the default (horizontal) orientation, where `WizardStepper` uses
+  // `StepButton`, so step queries target `tab`; `button` still targets the
+  // plain <button>s (next/prev/go). Vertical doesn't use `StepButton` (a
+  // tablist can't contain `StepContent`) and its own test below queries
+  // `button` for steps.
+  it('shows every step; visited steps are buttons, upcoming steps are not', async () => {
+    const user = userEvent.setup()
+    render(<Inline />)
+    expect(screen.getByText('Account')).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: /Plan/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'next' }))
+    await waitFor(() => expect(screen.getByRole('tab', { name: /Account/ })).toBeInTheDocument())
+    expect(screen.getByRole('tab', { name: /Plan/ })).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: /Review/ })).not.toBeInTheDocument()
+  })
+
+  it('clicking a visited step goes there', async () => {
+    const user = userEvent.setup()
+    render(<Inline />)
+    await user.click(screen.getByRole('button', { name: 'next' }))
+    await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+    await user.click(screen.getByRole('tab', { name: /Account/ }))
+    expect(screen.getByTestId('current')).toHaveTextContent('account')
+    expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument()
+  })
+
+  it('vertical: the current step content renders inside the stepper and is still bound to the form', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<Inline orientation="vertical" />)
+    const stepper = container.querySelector('.MuiStepper-vertical')!
+    await waitFor(() => expect(stepper.querySelector('input[name="name"]')).not.toBeNull())
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), '!')
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Ada!')
+    await user.click(screen.getByRole('button', { name: 'next' }))
+    await waitFor(() => expect(stepper.querySelector('input[name="plan"]')).not.toBeNull())
+    expect(stepper.querySelector('input[name="name"]')).toBeNull()
+  })
+
+  it.each(['horizontal', 'vertical'] as const)(
+    '%s has no accessibility violations',
+    async (orientation) => {
+      const user = userEvent.setup()
+      const { container } = render(<Inline orientation={orientation} />)
+      await user.click(screen.getByRole('button', { name: 'next' }))
+      await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+      await expectNoA11yViolations(container)
+    },
+  )
 })
