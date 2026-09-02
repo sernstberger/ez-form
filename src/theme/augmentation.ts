@@ -12,6 +12,7 @@ import type { FormErrorProps } from '../FormError'
 import type { FormErrorSummaryProps } from '../Form/FormErrorSummary'
 import type { FormSectionProps } from '../FormSection'
 import type { FieldArrayProps } from '../FieldArray'
+import type { AddressFieldProps } from '../fields/AddressField'
 import type { PasswordFieldProps } from '../fields/PasswordField'
 import type { PasswordStrengthProps } from '../fields/PasswordStrength'
 import type { OtpFieldControlProps } from '../fields/OtpField/OtpFieldControl'
@@ -37,6 +38,7 @@ declare module '@mui/material/styles' {
     EzFormSection: Partial<FormSectionProps>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     EzFieldArray: Partial<FieldArrayProps<any>>
+    EzAddressField: Partial<AddressFieldProps>
     EzPasswordField: Partial<PasswordFieldProps>
     EzPasswordStrength: Partial<PasswordStrengthProps>
     EzOtpField: Partial<OtpFieldControlProps>
@@ -58,6 +60,7 @@ declare module '@mui/material/styles' {
     EzFormErrorSummary: 'root' | 'heading' | 'list' | 'item' | 'link'
     EzFormSection: 'root' | 'legend' | 'description' | 'content'
     EzFieldArray: 'root' | 'row' | 'actions' | 'add' | 'remove' | 'move' | 'status' | 'error'
+    EzAddressField: 'root' | 'street' | 'street2' | 'city' | 'state' | 'zip'
     EzPasswordField: 'root' | 'toggle'
     EzPasswordStrength: 'root' | 'bar' | 'label'
     EzOtpField: 'root' | 'helperText'
@@ -117,6 +120,10 @@ declare module '@mui/material/styles' {
     EzFieldArray?: {
       defaultProps?: ComponentsProps['EzFieldArray']
       styleOverrides?: ComponentsOverrides<Theme>['EzFieldArray']
+    }
+    EzAddressField?: {
+      defaultProps?: ComponentsProps['EzAddressField']
+      styleOverrides?: ComponentsOverrides<Theme>['EzAddressField']
     }
     EzPasswordField?: {
       defaultProps?: ComponentsProps['EzPasswordField']
