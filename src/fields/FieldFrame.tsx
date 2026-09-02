@@ -27,6 +27,11 @@ export interface FieldFrameProps<TValue> {
   disabled?: boolean
   rules: FieldRules<TValue>
   /**
+   * Overrides `Form`'s `optionalText` for this field when the form's
+   * `requiredIndicator` is `"optional"`; `false` hides it on this field.
+   */
+  optionalText?: ReactNode | false
+  /**
    * `control`: label beside the control (FormControlLabel) — Checkbox, Switch.
    * `legend`: label above a group of controls (fieldset + legend) — RadioGroup.
    * A `legend` frame renders a fieldset whose implicit role is `group` named by the
@@ -50,10 +55,11 @@ export function FieldFrame<TValue>({
   helperText,
   disabled,
   rules,
+  optionalText,
   labelAs,
   renderControl,
 }: FieldFrameProps<TValue>) {
-  const f = useEzField<TValue>(name, componentName, { label, rules })
+  const f = useEzField<TValue>(name, componentName, { label, rules, optionalText })
   const labelId = useId()
   const text = f.helperText(helperText)
   const bound: BoundField = {
@@ -63,6 +69,12 @@ export function FieldFrame<TValue>({
     inputA11y: f.inputA11y(text),
     labelId,
   }
+  // FormControlLabel/FormLabel read `required` from FormControl context only when
+  // their own prop is undefined; passing `f.labelRequired` (`false` in `optional`
+  // mode for a required field) wins over that context and suppresses the asterisk
+  // while FormControl's own `required` (and so the input's `aria-required`) is
+  // untouched.
+  const labelRequired = f.labelRequired ?? f.required
 
   return (
     <FormControl
@@ -72,12 +84,15 @@ export function FieldFrame<TValue>({
       required={f.required}
     >
       {labelAs === 'control' ? (
-        // FormControlLabel does not read `required` from FormControl context; pass it explicitly.
-        <FormControlLabel label={label} required={f.required} control={renderControl(bound)} />
+        <FormControlLabel
+          label={f.displayLabel}
+          required={labelRequired}
+          control={renderControl(bound)}
+        />
       ) : (
         <>
-          <FormLabel component="legend" id={labelId}>
-            {label}
+          <FormLabel component="legend" id={labelId} required={labelRequired}>
+            {f.displayLabel}
           </FormLabel>
           {renderControl(bound)}
         </>

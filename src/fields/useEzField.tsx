@@ -1,12 +1,19 @@
-import { useId, type ReactNode } from 'react'
+import { Fragment, useId, type ReactNode } from 'react'
 import { useController, type UseControllerReturn } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
+import { useRequiredIndicator } from '../Form/RequiredIndicatorContext'
 import { isRequired, normalizeRules, type FieldRules } from '../rules'
 
 export interface UseEzFieldOptions<TValue = unknown> {
   /** The field's label; when it is a string it names the field in default rule messages. */
   label?: ReactNode
   rules?: FieldRules<TValue>
+  /**
+   * Overrides `Form`'s `optionalText` for this one field when
+   * `requiredIndicator="optional"`; `false` hides the suffix on this field.
+   * Ignored (and never appended) for a required field or in `asterisk` mode.
+   */
+  optionalText?: ReactNode | false
 }
 
 /** For the real `<input>` (or the radiogroup). `aria-invalid` is omitted when valid. */
@@ -22,7 +29,7 @@ export interface HelperTextA11y {
 }
 
 export type UseEzFieldReturn = UseControllerReturn & {
-  /** Derived from the `required` rule; drives MUI's asterisk. */
+  /** Derived from the `required` rule; drives `required`/`aria-required` on the input. */
   required: boolean
   invalid: boolean
   errorMessage: string | undefined
@@ -32,6 +39,19 @@ export type UseEzFieldReturn = UseControllerReturn & {
   /** a11y attributes for the control, linked to the helper text only when there is some. */
   inputA11y: (text: ReactNode) => InputA11y
   helperTextA11y: HelperTextA11y
+  /**
+   * The label to render: unchanged in `asterisk` mode; in `optional` mode, an
+   * optional field's label gets `optionalText` appended (unless suppressed).
+   * The input keeps `required`/`aria-required` either way.
+   */
+  displayLabel: ReactNode
+  /**
+   * `required={false}` in `optional` mode when the field is required (so the
+   * label element renders no asterisk while the input keeps `required`);
+   * `undefined` otherwise, so a label picks up `FormControl`'s own `required`
+   * (asterisk mode, today's behavior) or MUI's own default.
+   */
+  labelRequired: false | undefined
 }
 
 /**
@@ -46,18 +66,30 @@ export type UseEzFieldReturn = UseControllerReturn & {
 export function useEzField<TValue = unknown>(
   name: string,
   componentName: string,
-  { label, rules = {} }: UseEzFieldOptions<TValue> = {},
+  { label, rules = {}, optionalText: optionalTextOverride }: UseEzFieldOptions<TValue> = {},
 ): UseEzFieldReturn {
   // Guard only: inside <Form>'s FormProvider, useController reads control from context.
   useEzFormContext(componentName)
+  const { requiredIndicator, optionalText: formOptionalText } = useRequiredIndicator()
   const normalized = normalizeRules(rules, typeof label === 'string' ? label : undefined)
   const controller = useController({ name, rules: normalized })
   const helperTextId = useId()
   const invalid = controller.fieldState.invalid
   const errorMessage = controller.fieldState.error?.message
+  const required = isRequired(normalized)
+  const optional = requiredIndicator === 'optional'
+  const optionalText = optionalTextOverride === undefined ? formOptionalText : optionalTextOverride
+  const displayLabel =
+    optional && !required && optionalText !== false ? (
+      <Fragment>
+        {label} {optionalText}
+      </Fragment>
+    ) : (
+      label
+    )
   return {
     ...controller,
-    required: isRequired(normalized),
+    required,
     invalid,
     errorMessage,
     helperTextId,
@@ -67,5 +99,7 @@ export function useEzField<TValue = unknown>(
       'aria-describedby': text ? helperTextId : undefined,
     }),
     helperTextA11y: { id: helperTextId, role: invalid ? 'alert' : undefined },
+    displayLabel,
+    labelRequired: optional && required ? false : undefined,
   }
 }

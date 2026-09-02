@@ -213,4 +213,37 @@ describe('DatePicker', () => {
     )
     expect(onError).toHaveBeenCalledWith('minDate', expect.any(Date))
   })
+
+  it('Form requiredIndicator="optional": required stays required with no label asterisk', () => {
+    const { container } = render(
+      withPickers(
+        <Form
+          schema={schema}
+          defaultValues={{ start: null }}
+          onSubmit={() => {}}
+          requiredIndicator="optional"
+        >
+          <DatePicker name="start" label="Start" required />
+        </Form>,
+      ),
+    )
+    expect(hiddenInput('start')).toBeRequired()
+    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
+  })
+
+  it('Form requiredIndicator="optional": not-required gets the optional suffix in its label', () => {
+    render(
+      withPickers(
+        <Form
+          schema={schema}
+          defaultValues={{ start: null }}
+          onSubmit={() => {}}
+          requiredIndicator="optional"
+        >
+          <DatePicker name="start" label="Start" />
+        </Form>,
+      ),
+    )
+    expect(screen.getByRole('group', { name: 'Start (optional)' })).toBeInTheDocument()
+  })
 })

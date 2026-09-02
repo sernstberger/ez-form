@@ -500,4 +500,23 @@ describe('NumberField', () => {
     await user.type(input(), '7')
     expect(onValueChange).toHaveBeenCalledWith(7, expect.anything())
   })
+
+  it('Form requiredIndicator="optional": required stays required with no asterisk', () => {
+    const { container } = render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}} requiredIndicator="optional">
+        <NumberField name="age" label="Age" required />
+      </Form>,
+    )
+    expect(input()).toBeRequired()
+    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
+  })
+
+  it('Form requiredIndicator="optional": not-required gets the optional suffix in its label', () => {
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}} requiredIndicator="optional">
+        <NumberField name="age" label="Age" />
+      </Form>,
+    )
+    expect(screen.getByLabelText('Age (optional)')).toBeInTheDocument()
+  })
 })

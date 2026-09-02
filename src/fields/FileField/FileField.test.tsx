@@ -211,4 +211,33 @@ describe('FileField', () => {
     expect(fileList).not.toBeNull()
     expect(getComputedStyle(fileList as Element).marginTop).toBe('9px')
   })
+
+  it('Form requiredIndicator="optional": required stays required with no asterisk in the label', () => {
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ resume: null }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <FileField name="resume" label="Resume" required />
+      </Form>,
+    )
+    const input = screen.getByLabelText('Resume') as HTMLInputElement
+    expect(input).toBeRequired()
+  })
+
+  it('Form requiredIndicator="optional": not-required gets the optional suffix in its label', () => {
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ resume: null }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <FileField name="resume" label="Resume" />
+      </Form>,
+    )
+    expect(screen.getByLabelText('Resume (optional)')).toBeInTheDocument()
+  })
 })

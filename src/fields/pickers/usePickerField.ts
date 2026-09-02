@@ -17,6 +17,11 @@ export interface PickerFieldProps<TValue, TError extends string | null> {
   errorMessages?: PickerErrorMessages<TError>
   required?: FieldRules<TValue>['required']
   validate?: FieldRules<TValue>['validate']
+  /**
+   * Overrides `Form`'s `optionalText` for this field when the form's
+   * `requiredIndicator` is `"optional"`; `false` hides it on this field.
+   */
+  optionalText?: ReactNode | false
 }
 
 /**
@@ -48,7 +53,10 @@ interface PickerHandlers<
  */
 interface ConsumerTextFieldSlotProps {
   onBlur?: (event: FocusEvent<HTMLDivElement>) => void
-  slotProps?: Record<string, unknown> & { formHelperText?: object }
+  slotProps?: Record<string, unknown> & {
+    formHelperText?: object
+    inputLabel?: { required?: boolean }
+  }
 }
 
 const toRecord = <TValue>(
@@ -90,6 +98,7 @@ export function usePickerField<
     errorMessages,
     required,
     validate,
+    optionalText,
     onChange,
     onError,
     slotProps,
@@ -113,13 +122,14 @@ export function usePickerField<
             : true,
       },
     },
+    optionalText,
   })
   const text = f.helperText(helperText)
   const consumerTextField = slotProps?.textField as ConsumerTextFieldSlotProps | undefined
 
   return {
     name: f.field.name,
-    label,
+    label: f.displayLabel,
     value: (f.field.value as TValue | undefined) ?? null,
     inputRef: f.field.ref,
     disabled: mergeDisabled(disabled, f.field.disabled),
@@ -155,6 +165,14 @@ export function usePickerField<
           ...consumerTextField?.slotProps,
           formHelperText: mergeSlotProps(consumerTextField?.slotProps?.formHelperText, {
             role: f.helperTextA11y.role,
+          }),
+          // PickersTextField spreads `slotProps.inputLabel` straight onto the real MUI
+          // `InputLabel` (see PickersTextField.js), the same shape TextField's own
+          // `slotProps.inputLabel` uses; an explicit `required` there wins over the
+          // ownerState-derived default while the root/native input keeps the `required`
+          // set above, exactly like plain TextField's own asterisk suppression.
+          inputLabel: mergeSlotProps(consumerTextField?.slotProps?.inputLabel, {
+            required: f.labelRequired,
           }),
         },
       },

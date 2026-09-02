@@ -4,6 +4,7 @@ import MuiAutocomplete, {
   type AutocompleteValue,
 } from '@mui/material/Autocomplete'
 import MuiTextField, { type TextFieldProps as MuiTextFieldProps } from '@mui/material/TextField'
+import { mergeSlotProps } from '@mui/material/utils'
 import { useEzField } from '../useEzField'
 import { mergeDisabled } from '../mergeDisabled'
 import type { Option } from '../Option'
@@ -50,6 +51,11 @@ export type AutocompleteProps<
       MuiTextFieldProps,
       'name' | 'value' | 'error' | 'inputRef' | 'required' | 'label' | 'helperText' | 'slotProps'
     >
+    /**
+     * Overrides `Form`'s `optionalText` for this field when the form's
+     * `requiredIndicator` is `"optional"`; `false` hides it on this field.
+     */
+    optionalText?: ReactNode | false
   }
 
 const isOptionShaped = (v: unknown): v is Option =>
@@ -86,6 +92,7 @@ export function Autocomplete<
   maxLength,
   pattern,
   validate,
+  optionalText,
   ...rest
 }: AutocompleteProps<TOption, TValue, Multiple, FreeSolo>) {
   type FormValue = AutocompleteFormValue<TValue, Multiple, FreeSolo>
@@ -94,6 +101,7 @@ export function Autocomplete<
   const f = useEzField<FormValue>(name, 'Autocomplete', {
     label,
     rules: { required, min, max, minLength, maxLength, pattern, validate },
+    optionalText,
   })
 
   // form → MUI: find the option for a stored value. When it is not in the
@@ -149,13 +157,17 @@ export function Autocomplete<
         <MuiTextField
           {...params}
           {...textFieldProps}
-          label={label}
+          label={f.displayLabel}
           required={f.required}
           error={f.invalid}
           helperText={f.helperText(helperText)}
           inputRef={f.field.ref}
           onBlur={() => f.field.onBlur()}
-          slotProps={{ ...params.slotProps, formHelperText: { role: f.helperTextA11y.role } }}
+          slotProps={{
+            ...params.slotProps,
+            formHelperText: { role: f.helperTextA11y.role },
+            inputLabel: mergeSlotProps(params.slotProps?.inputLabel, { required: f.labelRequired }),
+          }}
         />
       )}
     />

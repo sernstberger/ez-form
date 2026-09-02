@@ -77,7 +77,7 @@ export function SignUp({ onSuccess }: SignUpProps) {
           schema={schema}
           defaultValues={defaultValues}
           title="Create your account"
-          description="Fields marked with * are required; everything else is optional."
+          requiredIndicator="optional"
           guard
           onSubmit={async ({ code }, form) => {
             try {
@@ -122,7 +122,11 @@ export function SignUp({ onSuccess }: SignUpProps) {
                         autoComplete="nickname"
                         required
                       />
-                      <Checkbox name="terms" label="I accept the terms of service" />
+                      <Checkbox
+                        name="terms"
+                        label="I accept the terms of service"
+                        required="You must accept the terms to continue"
+                      />
                     </Stack>
                   </FormSection>
                 </Stack>

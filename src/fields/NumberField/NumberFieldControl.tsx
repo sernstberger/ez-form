@@ -47,6 +47,13 @@ export interface NumberFieldControlProps extends Omit<
   /** Forked with Base UI's own ref on the visible input (Root's `inputRef` is its hidden input). */
   inputRef?: Ref<HTMLInputElement>
   inputProps?: NumberFieldInputProps
+  /**
+   * `false` renders the label with no asterisk while the input keeps
+   * `required` (ez-form's `optional` requiredIndicator mode); `undefined`
+   * lets the label's own `required` (this component's `required` prop) drive
+   * it, today's behavior.
+   */
+  labelRequired?: false
 }
 
 export const numberFieldClasses = generateUtilityClasses('EzNumberField', [
@@ -107,6 +114,7 @@ interface NumberInputProps {
   helperTextProps: { id: string; role?: 'alert' } | undefined
   disabled: boolean
   required: boolean
+  labelRequired: false | undefined
   className: string | undefined
   inputRef: Ref<HTMLInputElement> | undefined
   inputProps: NumberFieldInputProps | undefined
@@ -125,6 +133,7 @@ function NumberInput({
   helperTextProps,
   disabled,
   required,
+  labelRequired,
   className,
   inputRef,
   inputProps,
@@ -158,6 +167,7 @@ function NumberInput({
       required={required}
       slotProps={{
         formHelperText: helperTextProps,
+        inputLabel: { required: labelRequired },
         // `htmlInput` is the native <input> InputBase renders; `slots.input` /
         // `inputComponent` is InputBase's own wrapper and would give Base UI and
         // InputBase two owners of one controlled input (see #26).
@@ -260,6 +270,7 @@ export function NumberFieldControl(inProps: NumberFieldControlProps) {
     inputRef,
     inputProps,
     className,
+    labelRequired,
     ...rootProps
   } = props
   const generatedId = useId()
@@ -284,6 +295,7 @@ export function NumberFieldControl(inProps: NumberFieldControlProps) {
             helperTextProps={helperTextProps}
             disabled={state.disabled}
             required={state.required}
+            labelRequired={labelRequired}
             className={className}
             inputRef={inputRef}
             inputProps={inputProps}

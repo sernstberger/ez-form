@@ -1,5 +1,6 @@
 import {
   useCallback,
+  Fragment,
   useEffect,
   useId,
   useImperativeHandle,
@@ -29,6 +30,7 @@ import type { z } from 'zod'
 import { ezResolver } from './ezResolver'
 import { useConfirm, type ConfirmOptions } from '../ConfirmDialog'
 import { ErrorSummaryContext } from './ErrorSummaryContext'
+import { RequiredIndicatorContext } from './RequiredIndicatorContext'
 
 /**
  * The hookform methods for this form. It is the same object `useFormContext()`
@@ -112,6 +114,22 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
   title?: ReactNode
   /** Instructions under the title, wired through `aria-describedby`. */
   description?: ReactNode
+  /**
+   * How fields mark required/optional. `'asterisk'` (default): every field's
+   * own `required` drives MUI's usual asterisk, nothing else changes.
+   * `'optional'`: required fields keep `required`/`aria-required` but render
+   * no asterisk; fields that are not required get `optionalText` appended to
+   * their label. Theme-defaultable via `theme.components.EzForm.defaultProps`.
+   */
+  requiredIndicator?: 'asterisk' | 'optional'
+  /** Appended to a not-required field's label when `requiredIndicator="optional"`. */
+  optionalText?: ReactNode
+  /**
+   * States the `requiredIndicator="optional"` convention once, in the form's
+   * `description` (appended as a second sentence when `description` is also
+   * set). `false` suppresses it. Ignored in `'asterisk'` mode.
+   */
+  requiredIndicatorText?: ReactNode | false
   slotProps?: {
     title?: FormTextSlotProps
     description?: FormTextSlotProps
@@ -134,6 +152,9 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
     guard = false,
     title,
     description,
+    requiredIndicator = 'asterisk',
+    optionalText = '(optional)',
+    requiredIndicatorText = 'All fields are required unless marked optional.',
     slotProps,
     className,
     children,
@@ -146,6 +167,23 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
   const descriptionId = `${baseId}-description`
   const titleProps = { component: 'h2', variant: 'h5', ...slotProps?.title } as const
   const descriptionProps = { component: 'p', variant: 'body2', ...slotProps?.description } as const
+  // The "required unless marked optional" convention is stated once, in the same
+  // slot as `description`: appended as a second sentence when both are set, or
+  // rendered alone when `description` is unset. Only relevant in `optional` mode;
+  // `requiredIndicatorText={false}` (or `asterisk` mode) suppresses it.
+  const showRequiredIndicatorText =
+    requiredIndicator === 'optional' && requiredIndicatorText !== false
+  const effectiveDescription = showRequiredIndicatorText ? (
+    description != null ? (
+      <Fragment>
+        {description} {requiredIndicatorText}
+      </Fragment>
+    ) : (
+      requiredIndicatorText
+    )
+  ) : (
+    description
+  )
   // Local flags rather than formState: useForm hands this component a React-state
   // snapshot of formState, so the new value is not readable before the useForm
   // call on the render where it changes. hookform applies the `disabled` option
@@ -344,6 +382,55 @@ export function Form<TIn extends FieldValues, TOut>(inProps: FormProps<TIn, TOut
           {dialog}
         </FormRoot>
       </ErrorSummaryContext.Provider>
+      <FormRoot
+        noValidate
+        {...formProps}
+        className={`${formClasses.root}${className ? ` ${className}` : ''}`}
+        aria-labelledby={ariaLabelledBy ?? (title != null ? titleId : undefined)}
+        aria-describedby={
+          ariaDescribedBy ?? (effectiveDescription != null ? descriptionId : undefined)
+        }
+        onSubmit={
+          confirmOptions
+            ? async (event) => {
+                event.preventDefault()
+                // Validate first (focusing the first error like handleSubmit does) so an
+                // invalid form never asks; handleSubmit re-validates on Confirm, which is
+                // cheap and keeps hookform's isSubmitting confined to the real submit.
+                // No try/catch: a rejecting resolver here (e.g. a throwing `validate` rule)
+                // propagates like the non-confirm path's handleSubmit does. Nothing is
+                // stranded either way — `submitting` and the dialog only ever get set after
+                // this awaits successfully (`ask` itself never rejects, see useConfirm).
+                const valid = await methods.trigger(undefined, { shouldFocus: true })
+                if (!valid) return
+                if (await ask(confirmOptions)) await submit(event)
+              }
+            : submit
+        }
+      >
+        {title != null && (
+          <FormTitle
+            {...titleProps}
+            id={titleId}
+            className={`${formClasses.title}${titleProps.className ? ` ${titleProps.className}` : ''}`}
+          >
+            {title}
+          </FormTitle>
+        )}
+        {effectiveDescription != null && (
+          <FormDescription
+            {...descriptionProps}
+            id={descriptionId}
+            className={`${formClasses.description}${descriptionProps.className ? ` ${descriptionProps.className}` : ''}`}
+          >
+            {effectiveDescription}
+          </FormDescription>
+        )}
+        <RequiredIndicatorContext.Provider value={{ requiredIndicator, optionalText }}>
+          {children}
+        </RequiredIndicatorContext.Provider>
+        {dialog}
+      </FormRoot>
     </FormProvider>
   )
 }

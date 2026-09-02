@@ -20,6 +20,11 @@ export type SliderProps = Omit<
   /** One prop for both: the slider's bound and the validation message. */
   min?: ValidationRule<number>
   max?: ValidationRule<number>
+  /**
+   * Overrides `Form`'s `optionalText` for this field when the form's
+   * `requiredIndicator` is `"optional"`; `false` hides it on this field.
+   */
+  optionalText?: ReactNode | false
 } & Pick<FieldRules<SliderValue>, 'validate'>
 
 const bound = (rule: ValidationRule<number> | undefined): number | undefined =>
@@ -67,6 +72,7 @@ export function Slider({
   min,
   max,
   validate,
+  optionalText,
   onChange,
   onBlur,
   slotProps,
@@ -81,6 +87,7 @@ export function Slider({
       label={label}
       helperText={helperText}
       disabled={disabled}
+      optionalText={optionalText}
       rules={{
         // Consumer entries first: a built-in key must not be silently replaced.
         validate: {

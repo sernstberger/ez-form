@@ -82,4 +82,14 @@ describe('MoneyField', () => {
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(await screen.findByText('Price must be at least 0.')).toBeInTheDocument()
   })
+
+  it('Form requiredIndicator="optional": required stays required with no asterisk', () => {
+    const { container } = render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}} requiredIndicator="optional">
+        <MoneyField name="price" label="Price" required />
+      </Form>,
+    )
+    expect(input()).toBeRequired()
+    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
+  })
 })

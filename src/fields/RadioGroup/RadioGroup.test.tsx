@@ -106,4 +106,26 @@ describe('RadioGroup', () => {
     )
     expect(screen.getByRole('radiogroup', { name: 'Plan' })).toHaveClass('MuiFormGroup-row')
   })
+
+  it('Form requiredIndicator="optional": required keeps aria-required with no legend asterisk', () => {
+    const { container } = render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}} requiredIndicator="optional">
+        <RadioGroup name="plan" label="Plan" options={plans} required />
+      </Form>,
+    )
+    expect(screen.getByRole('radiogroup', { name: 'Plan' })).toHaveAttribute(
+      'aria-required',
+      'true',
+    )
+    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
+  })
+
+  it('Form requiredIndicator="optional": not-required gets the optional suffix on the legend', () => {
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}} requiredIndicator="optional">
+        <RadioGroup name="plan" label="Plan" options={plans} />
+      </Form>,
+    )
+    expect(screen.getByRole('radiogroup', { name: 'Plan (optional)' })).toBeInTheDocument()
+  })
 })

@@ -1,5 +1,6 @@
 import MuiTextField, { type TextFieldProps as MuiTextFieldProps } from '@mui/material/TextField'
 import { mergeSlotProps } from '@mui/material/utils'
+import type { ReactNode } from 'react'
 import { useEzField } from '../useEzField'
 import { mergeDisabled } from '../mergeDisabled'
 import type { FieldRules } from '../../rules'
@@ -15,6 +16,11 @@ export type TextFieldProps = Omit<
   'name' | 'value' | 'error' | 'inputRef' | 'required'
 > & {
   name: string
+  /**
+   * Overrides `Form`'s `optionalText` for this field when the form's
+   * `requiredIndicator` is `"optional"`; `false` hides it on this field.
+   */
+  optionalText?: ReactNode | false
 } & FieldRules<string>
 
 export function TextField({
@@ -32,11 +38,13 @@ export function TextField({
   maxLength,
   pattern,
   validate,
+  optionalText,
   ...rest
 }: TextFieldProps) {
   const f = useEzField<string>(name, 'TextField', {
     label,
     rules: { required, min, max, minLength, maxLength, pattern, validate },
+    optionalText,
   })
   const {
     ref,
@@ -51,7 +59,7 @@ export function TextField({
   return (
     <MuiTextField
       {...fieldProps}
-      label={label}
+      label={f.displayLabel}
       value={value ?? ''}
       onChange={(e) => {
         fieldOnChange(e)
@@ -69,6 +77,7 @@ export function TextField({
       slotProps={{
         ...slotProps,
         formHelperText: mergeSlotProps(slotProps?.formHelperText, { role: f.helperTextA11y.role }),
+        inputLabel: mergeSlotProps(slotProps?.inputLabel, { required: f.labelRequired }),
       }}
       {...rest}
     />

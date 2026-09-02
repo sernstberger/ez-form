@@ -33,6 +33,11 @@ export type NumberFieldProps = Omit<
   helperText?: ReactNode
   size?: 'small' | 'medium'
   disabled?: boolean
+  /**
+   * Overrides `Form`'s `optionalText` for this field when the form's
+   * `requiredIndicator` is `"optional"`; `false` hides it on this field.
+   */
+  optionalText?: ReactNode | false
   /** Runs after the form's own handler. */
   onValueChange?: BaseNumberField.Root.Props['onValueChange']
   /** Runs after the form's own handler. On the visible input, not Root's div. */
@@ -63,6 +68,7 @@ export function NumberField({
   min,
   max,
   validate,
+  optionalText,
   onValueChange,
   onBlur,
   onFocus,
@@ -72,6 +78,7 @@ export function NumberField({
   const f = useEzField<number | null>(name, 'NumberField', {
     label,
     rules: { required, min, max, validate },
+    optionalText,
   })
   const text = f.helperText(helperText)
 
@@ -79,7 +86,7 @@ export function NumberField({
     <NumberFieldControl
       {...rest}
       name={f.field.name}
-      label={label}
+      label={f.displayLabel}
       value={f.field.value ?? null}
       onValueChange={(value, details) => {
         f.field.onChange(value)
@@ -89,6 +96,7 @@ export function NumberField({
       max={bound(max)}
       allowOutOfRange={allowOutOfRange}
       required={f.required}
+      labelRequired={f.labelRequired}
       disabled={mergeDisabled(disabled, f.field.disabled)}
       error={f.invalid}
       helperText={text}

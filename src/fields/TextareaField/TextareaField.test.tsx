@@ -168,4 +168,19 @@ describe('TextareaField', () => {
     expect(getComputedStyle(counter).fontWeight).toBe('700')
     expect(container.querySelector(`.${textareaFieldClasses.root}`)).toBeInTheDocument()
   })
+
+  it('Form requiredIndicator="optional": required stays required with no asterisk', () => {
+    const { container } = render(
+      <Form
+        schema={schema}
+        defaultValues={{ bio: '' }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <TextareaField name="bio" label="Bio" required />
+      </Form>,
+    )
+    expect(textbox()).toBeRequired()
+    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
+  })
 })

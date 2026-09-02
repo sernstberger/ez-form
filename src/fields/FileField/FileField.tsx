@@ -63,6 +63,11 @@ export type FileFieldProps = {
   label: ReactNode
   helperText?: ReactNode
   disabled?: boolean
+  /**
+   * Overrides `Form`'s `optionalText` for this field when the form's
+   * `requiredIndicator` is `"optional"`; `false` hides it on this field.
+   */
+  optionalText?: ReactNode | false
   /** Native `accept` (`".pdf,image/*"`). */
   accept?: string
   /** Store `File[]` instead of `File | null`. */
@@ -104,8 +109,13 @@ export function FileField(inProps: FileFieldProps) {
     onChange,
     required,
     validate,
+    optionalText,
   } = useDefaultProps({ props: inProps, name: 'EzFileField' })
-  const f = useEzField<FileFieldValue>(name, 'FileField', { label, rules: { required, validate } })
+  const f = useEzField<FileFieldValue>(name, 'FileField', {
+    label,
+    rules: { required, validate },
+    optionalText,
+  })
   const id = useId()
   const text = f.helperText(helperText)
   const value = f.field.value as FileFieldValue | undefined
@@ -145,8 +155,11 @@ export function FileField(inProps: FileFieldProps) {
         // axe's nested-interactive rule flags. Drop the redundant role, not the native label.
         role={undefined}
       >
-        {label}
-        {f.required ? <span aria-hidden="true">&thinsp;*</span> : null}
+        {f.displayLabel}
+        {/* `labelRequired === false` is `requiredIndicator="optional"` suppressing the
+            asterisk (the field is still required, just not marked with `*`); `undefined`
+            leaves this exactly as before ("asterisk" mode, or no requiredIndicator at all). */}
+        {f.required && f.labelRequired !== false ? <span aria-hidden="true">&thinsp;*</span> : null}
         <VisuallyHiddenInput
           id={id}
           type="file"

@@ -134,4 +134,52 @@ describe('TextField', () => {
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(onSubmit).toHaveBeenCalledWith({ email: 'a@b.co' }, expect.anything())
   })
+
+  it('Form requiredIndicator="optional": required stays required with no asterisk', () => {
+    const { container } = render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: '' }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <TextField name="email" label="Email" required />
+      </Form>,
+    )
+    expect(screen.getByRole('textbox', { name: 'Email' })).toBeRequired()
+    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
+  })
+
+  it('Form requiredIndicator="optional": not-required gets the optional suffix in its label', () => {
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: '' }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    expect(screen.getByLabelText('Email (optional)')).toBeInTheDocument()
+  })
+
+  it('a consumer slotProps.inputLabel.required still wins over the label suppression', () => {
+    const { container } = render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: '' }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <TextField
+          name="email"
+          label="Email"
+          required
+          slotProps={{ inputLabel: { required: true } }}
+        />
+      </Form>,
+    )
+    expect(container.querySelector('[class*="asterisk"]')).not.toBeNull()
+  })
 })

@@ -59,4 +59,37 @@ describe('DateTimePicker', () => {
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('When must be in the past.')
   })
+
+  it('Form requiredIndicator="optional": required stays required with no label asterisk', () => {
+    const { container } = render(
+      withPickers(
+        <Form
+          schema={schema}
+          defaultValues={{ when: null }}
+          onSubmit={() => {}}
+          requiredIndicator="optional"
+        >
+          <DateTimePicker name="when" label="When" required />
+        </Form>,
+      ),
+    )
+    expect(hiddenInput('when')).toBeRequired()
+    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
+  })
+
+  it('Form requiredIndicator="optional": not-required gets the optional suffix in its label', () => {
+    render(
+      withPickers(
+        <Form
+          schema={schema}
+          defaultValues={{ when: null }}
+          onSubmit={() => {}}
+          requiredIndicator="optional"
+        >
+          <DateTimePicker name="when" label="When" />
+        </Form>,
+      ),
+    )
+    expect(screen.getByRole('group', { name: 'When (optional)' })).toBeInTheDocument()
+  })
 })

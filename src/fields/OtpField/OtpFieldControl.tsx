@@ -22,6 +22,12 @@ export interface OtpFieldControlProps extends Omit<OTPField.Root.Props, 'render'
   /** Hookform's ref: the first slot, which is what a submit error focuses. */
   inputRef?: Ref<HTMLInputElement>
   inputProps?: OtpFieldInputProps
+  /**
+   * `false` renders the label with no asterisk while the group keeps
+   * `required` (ez-form's `optional` requiredIndicator mode); `undefined`
+   * lets the label pick up `FormControl`'s own `required`, today's behavior.
+   */
+  labelRequired?: false
 }
 
 export const otpFieldClasses = generateUtilityClasses('EzOtpField', ['root', 'helperText'])
@@ -91,6 +97,7 @@ export function OtpFieldControl(inProps: OtpFieldControlProps) {
     length,
     disabled,
     required,
+    labelRequired,
     ...rootProps
   } = props
   const generatedId = useId()
@@ -112,7 +119,11 @@ export function OtpFieldControl(inProps: OtpFieldControlProps) {
       required={required}
       className={otpFieldClasses.root}
     >
-      {label ? <FormLabel htmlFor={id}>{label}</FormLabel> : null}
+      {label ? (
+        <FormLabel htmlFor={id} required={labelRequired ?? required}>
+          {label}
+        </FormLabel>
+      ) : null}
       <OTPField.Root
         {...rootProps}
         id={id}
