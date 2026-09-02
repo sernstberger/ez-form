@@ -175,6 +175,37 @@ describe('NumberField', () => {
     expect(input()).toHaveValue('100')
   })
 
+  it('keeps the caret in place when backspace deletes a group separator', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <NumberField name="age" label="Age" />
+      </Form>,
+    )
+    await user.type(input(), '1000')
+    expect(input()).toHaveValue('1,000')
+    // 1,|000 — backspace removes the separator, which regrouping puts straight back.
+    ;(input() as HTMLInputElement).setSelectionRange(2, 2)
+    await user.keyboard('{Backspace}')
+    expect(input()).toHaveValue('1,000')
+    expect((input() as HTMLInputElement).selectionStart).toBe(1)
+  })
+
+  it('keeps the caret in place when delete removes a group separator', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <NumberField name="age" label="Age" />
+      </Form>,
+    )
+    await user.type(input(), '1000')
+    // 1|,000 — forward delete removes the separator, likewise restored.
+    ;(input() as HTMLInputElement).setSelectionRange(1, 1)
+    await user.keyboard('{Delete}')
+    expect(input()).toHaveValue('1,000')
+    expect((input() as HTMLInputElement).selectionStart).toBe(1)
+  })
+
   it('calls a consumer onValueChange after updating the form', async () => {
     const user = userEvent.setup()
     const onValueChange = vi.fn()

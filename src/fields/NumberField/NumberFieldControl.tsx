@@ -109,17 +109,27 @@ function NumberInput({
         onChange: (e) => {
           const event = e as ChangeEvent<HTMLInputElement>
           if (separators) {
-            const typed = event.target.value
+            const typed = event.currentTarget.value
             const { text, caret } = groupWhileTyping(
               typed,
-              event.target.selectionStart ?? typed.length,
+              event.currentTarget.selectionStart ?? typed.length,
               separators,
             )
             if (text !== typed) {
-              // Base UI reads event.target.value and parses grouped text fine; the caret it
-              // would otherwise leave behind is restored by the layout effect above.
-              event.target.value = text
-              pendingCaret.current = caret
+              // Base UI's onChange reads `currentTarget.value` and parses grouped text fine
+              // (its parser strips the group separator).
+              event.currentTarget.value = text
+              if (text === inputValue) {
+                // Base UI will call setInputValue(text) with the value it already holds, so
+                // React bails out and no commit follows — the layout effect below would never
+                // run. This happens whenever an edit deletes a separator we put straight back
+                // (backspace at `1,|000`). Nothing is re-rendering, so place the caret now.
+                event.currentTarget.setSelectionRange(caret, caret)
+              } else {
+                // Text changes, so a commit is coming and it will reset the caret to the end
+                // of the controlled value; the layout effect restores it afterwards.
+                pendingCaret.current = caret
+              }
             }
           }
           rest.onChange?.(event)
