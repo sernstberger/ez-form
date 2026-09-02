@@ -9,6 +9,7 @@ import type { NumberFieldControlProps } from '../fields/NumberField/NumberFieldC
 import type { FormProps } from '../Form'
 import type { FormErrorProps } from '../FormError'
 import type { FormSectionProps } from '../FormSection'
+import type { FieldArrayProps } from '../FieldArray'
 import type { PasswordFieldProps } from '../fields/PasswordField'
 import type { PasswordStrengthProps } from '../fields/PasswordStrength'
 import type { OtpFieldControlProps } from '../fields/OtpField/OtpFieldControl'
@@ -29,6 +30,8 @@ declare module '@mui/material/styles' {
     EzForm: Partial<FormProps<any, any>>
     EzFormError: Partial<FormErrorProps>
     EzFormSection: Partial<FormSectionProps>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    EzFieldArray: Partial<FieldArrayProps<any>>
     EzPasswordField: Partial<PasswordFieldProps>
     EzPasswordStrength: Partial<PasswordStrengthProps>
     EzOtpField: Partial<OtpFieldControlProps>
@@ -48,6 +51,7 @@ declare module '@mui/material/styles' {
     EzForm: 'root' | 'title' | 'description'
     EzFormError: 'root'
     EzFormSection: 'root' | 'legend' | 'description' | 'content'
+    EzFieldArray: 'root' | 'row' | 'actions' | 'add' | 'remove' | 'move' | 'status' | 'error'
     EzPasswordField: 'root' | 'toggle'
     EzPasswordStrength: 'root' | 'bar' | 'label'
     EzOtpField: 'root' | 'helperText'
@@ -96,6 +100,10 @@ declare module '@mui/material/styles' {
     EzFormSection?: {
       defaultProps?: ComponentsProps['EzFormSection']
       styleOverrides?: ComponentsOverrides<Theme>['EzFormSection']
+    }
+    EzFieldArray?: {
+      defaultProps?: ComponentsProps['EzFieldArray']
+      styleOverrides?: ComponentsOverrides<Theme>['EzFieldArray']
     }
     EzPasswordField?: {
       defaultProps?: ComponentsProps['EzPasswordField']

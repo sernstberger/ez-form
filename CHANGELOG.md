@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `FieldArray`: a repeating group of fields over hookform `useFieldArray`, rendered as
+  a `FormSection` per array and a nested `FormSection` per row. `name`, `label`,
+  `emptyRow` (a value or a per-Add factory), `singular?` / `rowLabel?`, `minRows?` /
+  `maxRows?`, `addLabel?` / `removeLabel?`, `reorder?`; `children` is a render prop
+  given `row.name('field')` for the array path. Rows are keyed by hookform's stable
+  `field.id`, so a middle remove never shuffles typed values. Add focuses the new
+  row's first field, Remove the previous row (or Add), Move keeps focus on the
+  pressed button as it travels with its row, and a `role="status"` region announces
+  each change. Array-level messages (zod `.min`/`.max` on the array, or
+  `setError('<name>.root')`) render under Add as a `role="alert"`. `EzFieldArray`
+  theme key (`defaultProps`, `styleOverrides` for `root` | `row` | `actions` | `add` |
+  `remove` | `move` | `status` | `error`) and the `fieldArrayClasses` export, whose
+  error slot is keyed `errorText` because MUI reserves `error` as a global state
+  class — #13.
+- `FormSection` accepts a `ref` to its `<fieldset>`, so a caller can measure a group
+  or move focus into it (`FieldArray` uses it to focus a row) — #13.
 - `FormError`: renders `formState.errors.root` (set via `form.setError('root.<key>',
 { message })`, e.g. a rejected async `onSubmit`) as an MUI `Alert`; renders nothing
   when there is no root error. `EzFormError` theme key (`defaultProps`,

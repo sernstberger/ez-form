@@ -111,6 +111,7 @@ Requires zod 4 (the types use zod 4's `ZodType<Output, Input>`) and TypeScript >
 | `DateField`                                    | MUI X `DateField`                             | Same shape as `DatePicker`, but no popup — a keyboard-only, sectioned date input. Better for birthdays and other far-away dates: typing beats paging a calendar back decades                                                                                                                                                                                                                                                                                                     |
 | `ResendCodeButton`                             | MUI `Button`                                  | `onResend` (awaited if a promise; disabled while pending), `cooldown?` (seconds, default 30) shown in the label (`Resend code (27s)`); a rejected `onResend` shows `errorText?` (default "Code could not be sent") in the status slot instead, starts no cooldown, and calls `onResendError?(error)`. `slotProps.status` for the `role="status"` region that announces "Code sent" (or the error) once per resend. Disabled while the form is disabled (which covers submitting) |
 | `FormError`                                    | MUI `Alert`                                   | Renders `formState.errors.root` (set via `form.setError('root.<key>', { message })`, e.g. a rejected async `onSubmit`); renders nothing when there is no root error                                                                                                                                                                                                                                                                                                              |
+| `FieldArray`                                   | hookform `useFieldArray`                      | `name`, `label` (array legend), `emptyRow`, `singular?`/`rowLabel?`, `minRows?`/`maxRows?`, `addLabel?`/`removeLabel?`, `reorder?`, `slotProps?`; children is a render prop `(row) => ...` given `row.name('field')` for the array path. Rows are keyed by hookform's `field.id`; Add/Remove/Move move focus and announce in a `role="status"` region                                                                                                                            |
 
 `Form`'s `title` / `description` give the form its accessible name and instructions (wired to the `<form>` via `aria-labelledby` / `aria-describedby`); `slotProps.title.component` sets the heading level (default `h2`). `FormSection` groups fields in a `<fieldset>` named by its `title` (`<legend>`, heading level configurable via `slotProps.legend.component`, default `h3`); `description` is helper text wired via `aria-describedby`.
 
@@ -133,6 +134,62 @@ Need `reset`, `setError`, `watch`? `onSubmit` receives the form methods as its s
 Inside child components use `useFormContext()` from `react-hook-form`.
 
 Numbers: NumberField stores `number | null`, so use `z.number()` (add `.nullable()` if empty is allowed). TextField hands zod the string from the input, so a numeric TextField needs `z.coerce.number()`.
+
+## Field arrays
+
+`FieldArray` repeats a group of fields over a hookform `useFieldArray`. The array
+is one `FormSection` named by `label`; each row is a nested `FormSection` named
+`<singular> <n>`, so rows sit at the right heading level automatically.
+`children` is a render prop: `row.name('email')` builds the full form path
+(`applicants.0.email`), so the fields inside are ordinary ez-form fields.
+
+```tsx
+const schema = z.object({
+  applicants: z
+    .array(z.object({ name: z.string().min(1, 'Name is required'), email: z.email() }))
+    .min(1, 'Add at least one applicant'),
+})
+
+<FieldArray
+  name="applicants"
+  label="Applicants"
+  emptyRow={() => ({ name: '', email: '' })}
+  minRows={1}
+  maxRows={5}
+  reorder
+>
+  {(row) => (
+    <>
+      <TextField name={row.name('name')} label="Name" />
+      <TextField name={row.name('email')} label="Email" />
+    </>
+  )}
+</FieldArray>
+```
+
+Rows are keyed by hookform's stable `field.id`, never by index, so removing a row
+in the middle does not shuffle typed values between the rows that remain.
+
+`emptyRow` is the value a new row starts from. Pass a function (called per Add) so
+object rows are never shared by reference between rows.
+
+Accessibility is the component's job: Add moves focus into the new row's first
+field, Remove moves it to the previous row (or the Add button when the first row
+went), Move keeps focus on the button that was pressed as it travels with its row,
+and a `role="status"` region announces `Row N added` / `removed` / `moved up`.
+Every button's accessible name includes the row (`Remove Applicant 2`).
+`minRows` disables Remove at the floor; `maxRows` disables Add at the ceiling.
+
+An **array-level** message renders under the Add button as a `role="alert"`: zod's
+`.min(1, msg)` / `.max(n, msg)` on the array itself lands there, as does
+`form.setError('applicants.root', { message })`. Per-row field errors stay on their
+own fields as normal helper text.
+
+Themeable under `EzFieldArray` (`defaultProps`, `styleOverrides` for `root` | `row`
+| `actions` | `add` | `remove` | `move` | `status` | `error`) and exported as
+`fieldArrayClasses`. Note the class for the error slot is `fieldArrayClasses.errorText`:
+MUI reserves `error` as a global state class (`Mui-error`), so only the `styleOverrides`
+key is `error`.
 
 ## Wizard
 
