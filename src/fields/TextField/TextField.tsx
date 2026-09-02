@@ -23,6 +23,20 @@ export type TextFieldProps = Omit<
   optionalText?: ReactNode | false
 } & FieldRules<string>
 
+// `type` → mobile keyboard (`inputMode`) and autofill (`autoComplete`) token. Only types
+// with one unambiguous token are covered; a wrong guess is worse than none (#6, #7).
+const INPUT_MODE_BY_TYPE: Partial<Record<string, string>> = {
+  email: 'email',
+  tel: 'tel',
+  url: 'url',
+  search: 'search',
+}
+const AUTO_COMPLETE_BY_TYPE: Partial<Record<string, string>> = {
+  email: 'email',
+  tel: 'tel',
+  url: 'url',
+}
+
 export function TextField({
   name,
   label,
@@ -39,6 +53,8 @@ export function TextField({
   pattern,
   validate,
   optionalText,
+  type,
+  autoComplete = type ? AUTO_COMPLETE_BY_TYPE[type] : undefined,
   ...rest
 }: TextFieldProps) {
   const f = useEzField<string>(name, 'TextField', {
@@ -74,10 +90,15 @@ export function TextField({
       inputRef={ref}
       error={f.invalid}
       helperText={f.helperText(helperText)}
+      type={type}
+      autoComplete={autoComplete}
       slotProps={{
         ...slotProps,
         formHelperText: mergeSlotProps(slotProps?.formHelperText, { role: f.helperTextA11y.role }),
         inputLabel: mergeSlotProps(slotProps?.inputLabel, { required: f.labelRequired }),
+        htmlInput: mergeSlotProps(slotProps?.htmlInput, {
+          inputMode: type ? INPUT_MODE_BY_TYPE[type] : undefined,
+        }),
       }}
       {...rest}
     />

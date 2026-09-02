@@ -31,6 +31,7 @@ import {
 export interface NumberFieldInputProps {
   'aria-invalid'?: true
   'aria-describedby'?: string
+  inputMode?: ComponentPropsWithRef<'input'>['inputMode']
   onBlur?: FocusEventHandler<HTMLInputElement>
   onFocus?: FocusEventHandler<HTMLInputElement>
 }

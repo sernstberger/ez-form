@@ -1,7 +1,7 @@
 import type { FocusEventHandler, ReactNode } from 'react'
 import type { NumberField as BaseNumberField } from '@base-ui/react/number-field'
 import type { ValidationRule } from 'react-hook-form'
-import { NumberFieldControl } from './NumberFieldControl'
+import { NumberFieldControl, type NumberFieldInputProps } from './NumberFieldControl'
 import { useEzField } from '../useEzField'
 import { mergeDisabled } from '../mergeDisabled'
 import type { FieldRules } from '../../rules'
@@ -26,6 +26,9 @@ export type NumberFieldProps = Omit<
   // Root renders no element of its own here (`TextField` is the root), so this is
   // MUI's plain `string`, not Base UI's `(state) => string` form.
   | 'className'
+  // Root's own div-level attribute, not the visible <input>'s: re-declared below,
+  // defaulted from `step`/`format` and always routed to the real input (#6, #7).
+  | 'inputMode'
 > & {
   name: string
   className?: string
@@ -33,6 +36,12 @@ export type NumberFieldProps = Omit<
   helperText?: ReactNode
   size?: 'small' | 'medium'
   disabled?: boolean
+  /**
+   * Mobile keyboard hint on the visible input. Defaults to `'decimal'`, or `'numeric'`
+   * when the field is integer-only (no fractional `step`, and no `format` with a
+   * nonzero `maximumFractionDigits`).
+   */
+  inputMode?: NumberFieldInputProps['inputMode']
   /**
    * Overrides `Form`'s `optionalText` for this field when the form's
    * `requiredIndicator` is `"optional"`; `false` hides it on this field.
@@ -55,6 +64,17 @@ export type NumberFieldProps = Omit<
 const bound = (rule: ValidationRule<number> | undefined): number | undefined =>
   rule === undefined ? undefined : typeof rule === 'number' ? rule : rule.value
 
+// `numeric` for an integer-only field (no fractional `step`, and no `format` that allows
+// fraction digits), `decimal` otherwise — Base UI's own default is always `numeric` (#6, #7).
+const isIntegerOnly = (
+  step: number | 'any' | undefined,
+  format: Intl.NumberFormatOptions | undefined,
+) => {
+  const fractionalStep = typeof step === 'number' && !Number.isInteger(step)
+  const formatAllowsFraction = (format?.maximumFractionDigits ?? 0) > 0
+  return !fractionalStep && !formatAllowsFraction
+}
+
 /**
  * Numeric input whose form value is `number | null` (empty is `null`), so
  * `z.number()` works and `min`/`max` compare as numbers.
@@ -73,6 +93,9 @@ export function NumberField({
   onBlur,
   onFocus,
   allowOutOfRange = true,
+  step,
+  format,
+  inputMode = isIntegerOnly(step, format) ? 'numeric' : 'decimal',
   ...rest
 }: NumberFieldProps) {
   const f = useEzField<number | null>(name, 'NumberField', {
@@ -85,6 +108,8 @@ export function NumberField({
   return (
     <NumberFieldControl
       {...rest}
+      step={step}
+      format={format}
       name={f.field.name}
       label={f.displayLabel}
       value={f.field.value ?? null}
@@ -104,6 +129,7 @@ export function NumberField({
       inputRef={f.field.ref}
       inputProps={{
         ...f.inputA11y(text),
+        inputMode,
         onBlur: (e) => {
           f.field.onBlur()
           onBlur?.(e)
