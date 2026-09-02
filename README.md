@@ -108,6 +108,7 @@ React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form
 | `Form` (v4 additions)                          | —                                             | `confirm?: true \| ConfirmOptions` asks after validation on every submit path; `guard?: boolean` warns on tab close while dirty; `submitPendingText?`/`submitSuccessText?`/`submitErrorText?` are the submit announcements (`false` suppresses one)                                                                                                                                                                                                                              |
 | `ClearButton`                                  | MUI `Button`                                  | `to?: 'defaults' \| 'empty'`, `confirm?`; disabled while pristine                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `ConfirmDialog`                                | MUI `Dialog`                                  | `open`, `title`, `message?`, `confirmLabel?`, `cancelLabel?`, `confirmColor?`, `onConfirm`, `onCancel`, `actionsOrder?: 'cancel-confirm' \| 'confirm-cancel'` (default `'cancel-confirm'`; Cancel keeps `autoFocus` either way); `useConfirm()` gives a promise API                                                                                                                                                                                                              |
+| `FormDialog`                                   | MUI `Dialog` + `Form`                         | `open`, `onClose(event, reason)`, `title`, `actions?`/`cancelLabel?`/`submitLabel?`, `exitConfirm?: ConfirmOptions \| false`, `closeOnSubmit?`; every `Form` prop (`schema`, `onSubmit`, `confirm`, …) and every `Dialog` prop (`maxWidth`, `fullScreen`, …). Closing while dirty asks first                                                                                                                                                                                     |
 | `Wizard`                                       | MUI `Stepper`                                 | `steps`, `step?`/`onStepChange?`, `visited?`/`onVisitedChange?`, `orientation?`, `layout?: 'steps' \| 'page'`; with `WizardStepper`, `WizardStep`, `WizardNav` (`actionsOrder?: 'back-next' \| 'next-back'`, default `'back-next'`), `useWizard`                                                                                                                                                                                                                                 |
 | `ReadOnlyField`                                | MUI `Typography`                              | `name`, `label?`, `options?`, `format?`, `empty?`, `editStep?` — or `value` (a caller-computed value, e.g. from its own `useWatch`) with `label` required and no `name`; never calls `useWatch` in that mode                                                                                                                                                                                                                                                                     |
 | `PasswordField`                                | ez-form `TextField`                           | `name`; same rules as TextField. `revealable?` (default `true`) shows a show/hide toggle in the end adornment; `autoComplete` defaults to `'current-password'`; `slotProps.toggle?` reaches the toggle `IconButton`                                                                                                                                                                                                                                                              |
@@ -446,6 +447,68 @@ Either way, the message shown to the user comes from the schema, not from a rule
 - `<ClearButton confirm>`: dialog before reset.
 - `<Form guard>`: browser prompt on tab close / reload while dirty.
 - `useFormGuard(useBlocker)`: in-app navigation; pass react-router's `useBlocker` and render a `ConfirmDialog` with the result.
+- `<FormDialog>`: a form in a dialog, which asks before closing with unsaved changes — see below.
+
+## Form in a dialog
+
+`FormDialog` is a `<Form>` inside a MUI `Dialog`, with the heading, the scrolling
+content area and the action buttons already wired. It takes every `Form` prop and
+every `Dialog` prop; you own `open` and `onClose`.
+
+```tsx
+const [open, setOpen] = useState(false)
+
+<FormDialog
+  open={open}
+  onClose={() => setOpen(false)}
+  title="Edit contact"
+  schema={contactSchema}
+  defaultValues={contact}
+  onSubmit={async (values) => save(values)}
+>
+  <Stack spacing={2}>
+    <TextField name="name" label="Name" />
+    <TextField name="email" label="Email" />
+  </Stack>
+</FormDialog>
+```
+
+**Closing asks first.** Escape, a backdrop click, and the Cancel button all go
+through the same gate: if the form is dirty, a `ConfirmDialog` appears
+(`Discard changes?` / `Discard` / `Keep editing`) and `onClose` is called only if
+it is confirmed — so `onClose` always means "it really is closing". A pristine
+form closes with no prompt, and neither does one that has just been submitted
+successfully (the same `isDirty && !isSubmitting && !isSubmitSuccessful` rule the
+other guards use). Pass `exitConfirm` to change the copy, or `exitConfirm={false}`
+to drop the prompt.
+
+**Submitting closes it.** A successful submit calls `onClose(event, 'submit')`
+after your `onSubmit` settles — so a save that rejects, or one that calls
+`form.setError`, leaves the dialog open with its values intact.
+`closeOnSubmit={false}` keeps it open for an "add another" flow.
+
+`onClose`'s `reason` is MUI's own (`'escapeKeyDown'`, `'backdropClick'`) plus
+`'cancelClick'` and `'submit'`.
+
+**Actions.** The default footer is a Cancel `Button` and a `SubmitButton`, in that
+DOM order; `cancelLabel` / `submitLabel` rename them and `slotProps.cancel` /
+`slotProps.submit` reach them. Pass `actions` to replace both with your own — a
+`type="submit"` button inside still submits the form. Cancel is disabled while a
+submit is pending, since cancelling then would abandon a save already in flight.
+A `slotProps.cancel.onClick` runs _before_ the close gate and does not replace it;
+call `event.preventDefault()` in it to veto the close and keep the dialog open.
+
+**Layout.** ARIA does not allow `role="dialog"` on a `<form>`, so the dialog's
+paper stays a `div` and the `<form>` sits just inside it, carrying the paper's
+flex layout through — long content still scrolls inside `DialogContent` while the
+title and actions stay put. `title` names the dialog (`aria-labelledby`) and
+whatever `Form` renders in its description slot describes it (`aria-describedby`) —
+that includes the required-fields convention `Form` states by default, so the
+dialog is described even when you pass no `description` of your own.
+
+Theme it through `theme.components.EzFormDialog` (`defaultProps`, and
+`styleOverrides` for the `root`, `form`, `title`, `content`, `actions`, `cancel`
+and `submit` slots).
 
 ## Timeouts (OTP codes, sessions)
 
