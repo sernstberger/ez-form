@@ -205,9 +205,7 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
    * theme default serves both modes.
    */
   requiredIndicatorText?:
-    | ReactNode
-    | false
-    | ((requiredIndicator: 'asterisk' | 'optional') => ReactNode)
+    ReactNode | false | ((requiredIndicator: 'asterisk' | 'optional') => ReactNode)
   /**
    * Announced when a submit starts. `false` suppresses just this one.
    * Default "Submitting…".
@@ -561,7 +559,9 @@ function FormImpl<TIn extends FieldValues, TOut>(
           )}
           <AssistedContext.Provider value={assisted}>
             <RequiredIndicatorContext.Provider value={{ requiredIndicator, optionalText }}>
-              <RuleMessagesContext.Provider value={ruleMessages}>{children}</RuleMessagesContext.Provider>
+              <RuleMessagesContext.Provider value={ruleMessages}>
+                {children}
+              </RuleMessagesContext.Provider>
             </RequiredIndicatorContext.Provider>
           </AssistedContext.Provider>
           {/*

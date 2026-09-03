@@ -54,8 +54,7 @@ export function ClearButton(inProps: ClearButtonProps) {
   const { reset } = useEzFormContext('ClearButton')
   const { isDirty, disabled: formDisabled, defaultValues } = useFormState()
   const { confirm: ask, dialog } = useConfirm()
-  const options: ConfirmOptions | undefined =
-    confirm === true ? { title: confirmTitle } : confirm
+  const options: ConfirmOptions | undefined = confirm === true ? { title: confirmTitle } : confirm
 
   return (
     <>

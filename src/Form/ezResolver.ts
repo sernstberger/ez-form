@@ -9,12 +9,7 @@ import {
   type Resolver,
 } from 'react-hook-form'
 import type { z } from 'zod'
-import {
-  defaultMessages,
-  normalizeRules,
-  type NormalizedRules,
-  type RuleMessages,
-} from '../rules'
+import { defaultMessages, normalizeRules, type NormalizedRules, type RuleMessages } from '../rules'
 
 type RuleError = Pick<FieldError, 'type' | 'message'>
 
