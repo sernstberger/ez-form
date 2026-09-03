@@ -61,12 +61,6 @@ const cases: {
   name: string
   role: string
   tag: string
-  /**
-   * Skips the axe pass for a field whose label-less ARIA-named form has a violation
-   * that is **not** this issue's and cannot be fixed at this altitude. Only
-   * `OtpField` sets it; the reason is on that row.
-   */
-  axeBlockedUpstream?: true
   ariaLabel: (props: { 'aria-label': string }) => ReactElement
   ariaLabelledBy: (props: { 'aria-labelledby': string }) => ReactElement
 }[] = [
@@ -161,15 +155,10 @@ const cases: {
     // asserted so the fix does not quietly move the name.
     tag: 'DIV',
     role: 'group',
-    // Slot 1 is deliberately left to inherit the visible `<label>` through
-    // `htmlFor`, so with no label it is the one input in the row without a name and
-    // axe's "form elements must have labels" fires. Naming it here is not possible:
-    // Base UI's `OTPField.Input` *ignores* `aria-label` on the first input by design
-    // and dev-warns when one is passed. Fixing it means rendering a real element for
-    // slot 1 to point `aria-labelledby` at — OtpField's own change, not #99's, whose
-    // scope is routing the consumer's name to the control (which the group already
-    // does correctly, as the two tests above assert).
-    axeBlockedUpstream: true,
+    // Slot 1 inherits the visible `<label>` through `htmlFor`, so with no label it
+    // used to be the one input in the row without a name and axe's "form elements
+    // must have labels" fired (#110). `OtpField` now renders hidden spans for slot 1
+    // to point `aria-labelledby` at — see its own test file for the DOM.
     ariaLabel: (p) => <OtpField name="f" {...p} />,
     ariaLabelledBy: (p) => <OtpField name="f" {...p} />,
   },
@@ -178,7 +167,7 @@ const cases: {
 describe('field accessible name from ARIA alone', () => {
   beforeEach(() => resetDevWarnings())
 
-  describe.each(cases)('$name', ({ role, tag, axeBlockedUpstream, ariaLabel, ariaLabelledBy }) => {
+  describe.each(cases)('$name', ({ role, tag, ariaLabel, ariaLabelledBy }) => {
     // `role: 'password'` is not a role: a `type="password"` input has none, so the
     // name is read through the label query — the same accname computation, a
     // different entry point. Everything else is queried by role and name.
@@ -209,13 +198,10 @@ describe('field accessible name from ARIA alone', () => {
     // axe cannot catch the bug this file exists for — a named wrapper satisfies it
     // while the control stays anonymous — but it does catch the fix going wrong the
     // other way: a dangling `aria-labelledby`, or a name on the wrong element type.
-    it.skipIf(axeBlockedUpstream)(
-      'has no accessibility violations when named through ARIA alone',
-      async () => {
-        const { container } = renderNamed(ariaLabel({ 'aria-label': 'Aye' }))
-        await expectNoA11yViolations(container)
-      },
-    )
+    it('has no accessibility violations when named through ARIA alone', async () => {
+      const { container } = renderNamed(ariaLabel({ 'aria-label': 'Aye' }))
+      await expectNoA11yViolations(container)
+    })
   })
 
   it('still warns when a field has no name at all', () => {

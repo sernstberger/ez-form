@@ -7,6 +7,8 @@ import { OtpField } from './OtpField'
 import { otpFieldClasses } from './OtpFieldControl'
 import { describeFieldContract } from '../../test/describeFieldContract'
 import { expectTargetSize } from '../../test/targetSize'
+import { expectNoA11yViolations } from '../../test/axe'
+import { expectConsole } from '../../test/expectConsole'
 
 const schema = z.object({ code: z.string() })
 // Widens HTMLElement to HTMLInputElement so `.value` is reachable; TS 7 needs it.
@@ -191,5 +193,96 @@ describe('OtpField autoComplete/inputMode defaults (#6, #7)', () => {
       expect(slot).toHaveAttribute('autoComplete', 'off')
       expect(slot).toHaveAttribute('inputMode', 'numeric')
     }
+  })
+})
+
+// #110. Base UI names slot 1 by whatever `<label>` points at the group and ignores
+// `aria-label` there by design (it dev-warns), so an ARIA-only name used to leave
+// slot 1 bare and axe flagged it. `OtpFieldControl` now renders hidden spans for
+// slot 1's `aria-labelledby` — the one channel `OTPField.Input` honours on slot 1.
+describe('OtpField slot 1 accessible name (#110)', () => {
+  const renderOtp = (props: Partial<Parameters<typeof OtpField>[0]> = {}) =>
+    render(
+      <Form schema={schema} defaultValues={{ code: '' }} onSubmit={() => {}}>
+        <span id="ext">External name</span>
+        <OtpField name="code" length={4} {...props} />
+      </Form>,
+    )
+
+  it('names slot 1 with the `aria-label` name and its position', () => {
+    renderOtp({ 'aria-label': 'One-time code' })
+    // Every slot is now named, slot 1 included, and each says which one it is.
+    // Computed names, not attributes: slot 1 is named by `aria-labelledby` while
+    // the rest carry `aria-label`, and only the accname makes them comparable.
+    expect(inputs()).toHaveLength(4)
+    for (const [index, slot] of inputs().entries()) {
+      expect(slot).toHaveAccessibleName(expect.stringContaining(`Character ${index + 1} of 4`))
+    }
+    const [first] = inputs()
+    expect(first).toHaveAccessibleName('One-time code Character 1 of 4')
+    // The group keeps the plain name — the position belongs to the slot, not the field.
+    expect(screen.getByRole('group')).toHaveAccessibleName('One-time code')
+  })
+
+  it('names slot 1 through the consumer’s `aria-labelledby` targets directly', () => {
+    renderOtp({ 'aria-labelledby': 'ext' })
+    expect(inputs()[0]).toHaveAccessibleName('External name Character 1 of 4')
+    expect(screen.getByRole('group')).toHaveAccessibleName('External name')
+  })
+
+  it('routes `characterLabel` through slot 1 too', () => {
+    renderOtp({
+      'aria-label': 'Code',
+      characterLabel: (index, count) => `Digit ${index}/${count}`,
+    })
+    expect(inputs()[0]).toHaveAccessibleName('Code Digit 1/4')
+    expect(inputs()[1]).toHaveAccessibleName('Digit 2/4')
+  })
+
+  it('leaves a visibly labelled field on Base UI’s own label inheritance', () => {
+    renderOtp({ label: 'Code' })
+    const [first] = inputs()
+    // No hidden spans, no ez-form `aria-labelledby`: the name comes from the
+    // `<label for>` Base UI discovers, exactly as before #110.
+    expect(first).toHaveAccessibleName('Code')
+    expect(document.querySelectorAll(`.${otpFieldClasses.slotLabel}`)).toHaveLength(0)
+  })
+
+  it('adds nothing when the field has neither a label nor an ARIA name', () => {
+    // The missing-name dev warning is `useEzField`'s job and is asserted there;
+    // what matters here is that no dangling `aria-labelledby` is invented.
+    expectConsole('warn', 'has no accessible name')
+    renderOtp()
+    expect(inputs()[0]).not.toHaveAttribute('aria-labelledby')
+    expect(document.querySelectorAll(`.${otpFieldClasses.slotLabel}`)).toHaveLength(0)
+  })
+
+  it('has no accessibility violations when named by ARIA alone', async () => {
+    const { container } = renderOtp({ 'aria-label': 'One-time code' })
+    await expectNoA11yViolations(container)
+  })
+
+  it('has no accessibility violations with a visible label', async () => {
+    const { container } = renderOtp({ label: 'Code' })
+    await expectNoA11yViolations(container)
+  })
+
+  // `displayLabel` in `optional` mode wraps a missing label with the "(optional)"
+  // suffix. Keying off it would both render a label reading "(optional)" alone and
+  // suppress slot 1's hidden name, so the control asks `hasLabel(label)` instead.
+  it('is unaffected by the `optional` indicator when named by ARIA alone', async () => {
+    const { container } = render(
+      <Form
+        schema={schema}
+        defaultValues={{ code: '' }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <OtpField name="code" length={4} aria-label="One-time code" />
+      </Form>,
+    )
+    expect(inputs()[0]).toHaveAccessibleName('One-time code Character 1 of 4')
+    expect(screen.getByRole('group')).toHaveAccessibleName('One-time code')
+    await expectNoA11yViolations(container)
   })
 })

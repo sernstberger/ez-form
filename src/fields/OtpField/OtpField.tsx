@@ -3,6 +3,7 @@ import type { OTPField } from '@base-ui/react/otp-field'
 import { OtpFieldControl, type OtpFieldControlProps } from './OtpFieldControl'
 import { useEzField } from '../useEzField'
 import { mergeDisabled } from '../mergeDisabled'
+import { hasLabel } from '../../devWarn'
 import { useRuleMessages } from '../../Form/RuleMessagesContext'
 import type { FieldRules } from '../../rules'
 
@@ -77,6 +78,11 @@ export function OtpField({
       {...rest}
       name={f.field.name}
       label={f.displayLabel}
+      // `label`, not `displayLabel`: in `optional` mode `displayLabel` wraps a
+      // missing label with the "(optional)" suffix, which is not a name. The
+      // control uses this to decide whether slot 1 still needs its own hidden
+      // label (#110), so it must ask the same question `warnMissingLabel` does.
+      labelled={hasLabel(label)}
       length={length}
       value={f.field.value ?? ''}
       onValueChange={(value, details) => {
