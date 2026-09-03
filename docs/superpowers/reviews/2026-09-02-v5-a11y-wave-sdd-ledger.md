@@ -66,7 +66,7 @@ Cross-task integration review on `main` (exports vs README vs augmentation, shar
 - Ruling: keep the complete `PasswordStrength` section and delete the orphan copy — the review's line range named the wrong one — cost if wrong: none, content-checked.
 - Ruling: `EzZipField`/`EzStateSelect` register `defaultProps` only, no class key — no styled slot, same as `EzEmailField`/`EzFeinField` — cost if wrong: add a key when a slot appears.
 
-Final state: main at the merge of `fix/v5-final-review`; seven gates green (lint, typecheck, 1425 tests, scripts, guardrails, build, build-storybook with zero warn lines); pushed.
+Final state: main at the merge of `fix/v5-final-review` plus two post-merge CI fixes — the strict lane's `pnpm-lock.yaml` change had not survived its merge (CI `--frozen-lockfile` failed; regenerated and committed), and the FormDialog exit-prompt axe test raced MUI's Fade on the slower runner (pinned with the theme's `motion.reducedMotion: 'always'` for that one test). Seven gates green locally (lint, typecheck, 1425 tests, scripts, guardrails, build, build-storybook with zero warn lines); CI green at b48cdee.
 
 ## Incidents (controller and lanes)
 
@@ -75,7 +75,8 @@ Final state: main at the merge of `fix/v5-final-review`; seven gates green (lint
 3. **One push with a load-flake failure**: the Task 13 verification chain piped vitest through `grep`, so a single Insurance timeout did not stop the push; the suite passed on rerun and the full suite (1412) was run and green before the next push. Fixed the chain afterwards.
 4. **A lane's `pkill -f vitest`** killed another lane's in-flight run once; no state lost.
 5. **Machine oversubscription**: load average 48–158 on 16 cores with 40–60 concurrent vitest processes made every 5 s-timeout example test flaky. #85 cut the example suites' work by ~45%; the residual is environmental.
-6. A stale Storybook from an earlier session held port 6006, so a restart silently landed on 6007 and Steve saw an old index; killed both, standing restart now kills listeners first.
+6. **Local gates masked by pipes twice** (`vitest | grep`, `pnpm install | tail`): a failing test and a stale lockfile both reached `main` and were caught by CI instead. Rule going forward: never pipe a gate command; check its exit code.
+7. A stale Storybook from an earlier session held port 6006, so a restart silently landed on 6007 and Steve saw an old index; killed both, standing restart now kills listeners first.
 
 ## Deferred minors (from task reviews, none blocking)
 
