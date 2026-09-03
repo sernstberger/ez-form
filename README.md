@@ -708,7 +708,7 @@ else deep-merges into the built theme through `createTheme(options, ...args)`. F
 control, spread the plain options yourself:
 `createTheme({ ...ezFormThemeOptions, defaultColorScheme: 'dark' })`.
 
-Storybook has an "ez-form theme" toolbar toggle — `preset`, `preset (dark)`, `bare` — so
+Storybook has a "Theme" toolbar toggle — `Modern`, `Modern (dark)`, `Stock MUI` — so
 every story can be checked with and without it.
 
 ## Loading values from a server

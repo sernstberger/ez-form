@@ -11,18 +11,18 @@ import { SubmitButton } from '../src/SubmitButton'
 import { createEzFormTheme } from '../src/theme/ezFormTheme'
 
 /**
- * The "ez-form theme" toolbar toggle. `preset` is `createEzFormTheme()` — the
- * opt-in taste in `src/theme/ezFormTheme.ts` / `DESIGN.md`; `presetDark` is the
- * same preset with its dark colour scheme as the default; `bare` is MUI's stock
+ * The "Theme" toolbar toggle. `modern` is `createEzFormTheme()` — the opt-in
+ * taste in `src/theme/ezFormTheme.ts` / `DESIGN.md`; `modernDark` is the same
+ * theme with its dark colour scheme as the default; `stockMui` is MUI's plain
  * `createTheme()`, which is what a consumer who never opts in sees. Built once
  * each: a theme is a big immutable object and the decorator runs per story.
  */
 const themes = {
-  // Each pinned to one scheme: a bare `createEzFormTheme()` follows the OS, and a
-  // toolbar item that changed with the machine's setting would be no toggle.
-  preset: createEzFormTheme({ defaultColorScheme: 'light' }),
-  presetDark: createEzFormTheme({ defaultColorScheme: 'dark' }),
-  bare: createTheme(),
+  // Each pinned to one scheme: an unpinned `createEzFormTheme()` follows the OS,
+  // and a toolbar item that changed with the machine's setting would be no toggle.
+  modern: createEzFormTheme({ defaultColorScheme: 'light' }),
+  modernDark: createEzFormTheme({ defaultColorScheme: 'dark' }),
+  stockMui: createTheme(),
 }
 type ThemeChoice = keyof typeof themes
 
@@ -85,7 +85,7 @@ const preview: Preview = {
     },
     (Story, { globals }) => {
       const choice = globals.theme as ThemeChoice | undefined
-      const theme = themes[choice ?? 'preset'] ?? themes.preset
+      const theme = themes[choice ?? 'modern'] ?? themes.modern
       return (
         <ThemeProvider theme={theme}>
           <CssBaseline />
@@ -98,20 +98,20 @@ const preview: Preview = {
   ],
   globalTypes: {
     theme: {
-      description: 'ez-form theme',
+      description: 'Theme',
       toolbar: {
-        title: 'ez-form theme',
+        title: 'Theme',
         icon: 'paintbrush',
         items: [
-          { value: 'preset', title: 'preset' },
-          { value: 'presetDark', title: 'preset (dark)' },
-          { value: 'bare', title: 'bare' },
+          { value: 'modern', title: 'Modern' },
+          { value: 'modernDark', title: 'Modern (dark)' },
+          { value: 'stockMui', title: 'Stock MUI' },
         ],
         dynamicTitle: true,
       },
     },
   },
-  initialGlobals: { theme: 'preset' },
+  initialGlobals: { theme: 'modern' },
   parameters: {
     controls: { expanded: true },
     options: {

@@ -318,9 +318,9 @@ describe('ezFormTheme', () => {
     ]
 
     describe.each([
-      ['preset', light],
-      ['preset (dark)', dark],
-      ['bare', createTheme()],
+      ['Modern', light],
+      ['Modern (dark)', dark],
+      ['Stock MUI', createTheme()],
     ])('under %s', (_name, theme) => {
       it.each(examples)('%s renders with no axe violations', async (_example, ui, settle) => {
         const { container } = renderUnder(theme, ui())
