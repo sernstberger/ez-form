@@ -397,6 +397,7 @@ describe.each(cases)('%s', (_, locale, c) => {
     expect(screen.getByRole('textbox', { name: p.cityLabel })).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: p.stateLabel })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: p.zipLabel })).toBeInTheDocument()
+    expect(p.lookupFilledText).toEqual(expect.any(String))
   })
 
   it('PasswordField: showLabel / hideLabel; PasswordStrength: labels and the meter name', async () => {

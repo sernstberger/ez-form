@@ -29,7 +29,21 @@ export {
   type AddressFieldProps,
   type AddressValue,
   type AddressSchemaOptions,
+  type AddressSuggestion,
+  type AddressLookupContext,
+  type AddressLookupProvider,
+  useAddressLookup,
+  type UseAddressLookupOptions,
+  type AddressLookupState,
 } from './fields/AddressField'
+// Address lookup providers for `<AddressField lookup>`. `googlePlaces` is a stateless REST
+// adapter with no dependencies; the consumer passes its own key.
+export {
+  googlePlaces,
+  googlePlacesAttributionClasses,
+  type GooglePlacesOptions,
+  type GooglePlacesAttributionProps,
+} from './address-lookup'
 export {
   PasswordField,
   passwordFieldClasses,
@@ -103,6 +117,9 @@ export {
 } from './FormDialog'
 export { ClearButton, clearButtonClasses, type ClearButtonProps } from './ClearButton'
 export type {} from './theme/augmentation'
+// The optional opinionated preset (#10). Components ship unstyled; this is the one
+// place that holds a taste, and DESIGN.md at the repo root is its prose form.
+export { ezFormThemeOptions, createEzFormTheme } from './theme/ezFormTheme'
 export { useFormGuard, type FormGuardBlocker, type UseFormGuardReturn } from './useFormGuard'
 export {
   Wizard,

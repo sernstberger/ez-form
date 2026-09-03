@@ -7,10 +7,10 @@ storybook-static
 .worktrees/
 .playwright-mcp/
 
+# Local secrets (the Storybook-only Google Places key); the example is the documentation.
+.env
+.env.*
+!.env.example
+
 # QA breaker scratch probes (never committed)
 src/__qa__/
-
-# local secrets (Storybook demo keys)
-.env
-.env.local
-.env.*.local

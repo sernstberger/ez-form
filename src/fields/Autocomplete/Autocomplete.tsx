@@ -20,6 +20,12 @@ import { warnDuplicateOptions } from '../../devWarn'
  * What the form stores: one value (or null), or an array under `multiple`;
  * typed text under `freeSolo`. MUI's own value type over `TValue` instead of
  * the option, with `disableClearable` pinned off (the form owns "empty").
+ *
+ * Empty is `null` for a single non-`freeSolo` field and `''` for a single
+ * `freeSolo` one: there the value is text, and the empty text is `''` — the
+ * same value a cleared `TextField` stores, so a `required` rule or a
+ * `z.string()` schema reads "cleared" and "never typed" alike. The type still
+ * admits `null` (MUI's), but the field never writes it under `freeSolo`.
  */
 export type AutocompleteFormValue<
   TValue,
@@ -148,14 +154,18 @@ export function Autocomplete<
         ? null
         : resolve(v)) as MuiValue
 
-  // MUI → form: a string is freeSolo text, anything else is an option.
+  // MUI → form: a string is freeSolo text, anything else is an option. MUI
+  // reports a cleared single field as `null` (the Clear button, or the text
+  // emptied by typing); under freeSolo that is empty *text*, stored as `''`.
   const toValue = (x: TOption | string): TValue | string =>
     typeof x === 'string' ? x : getOptionValue(x)
   const fromMui = (x: MuiValue): FormValue =>
     (Array.isArray(x)
       ? (x as (TOption | string)[]).map(toValue)
       : x == null
-        ? null
+        ? freeSolo
+          ? ''
+          : null
         : toValue(x as TOption | string)) as FormValue
 
   const optionLabel: NonNullable<MuiProps<TOption, Multiple, FreeSolo>['getOptionLabel']> =

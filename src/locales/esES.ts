@@ -95,6 +95,7 @@ export const esES = {
         cityLabel: 'Ciudad',
         stateLabel: 'Estado',
         zipLabel: 'Código postal',
+        lookupFilledText: 'Dirección completada',
       },
     },
     EzPasswordField: {

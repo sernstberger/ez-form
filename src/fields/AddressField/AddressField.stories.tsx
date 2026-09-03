@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { FormParameters } from '../../../.storybook/preview'
 import { AddressField } from './AddressField'
 import { addressSchema } from './addressSchema'
+import { mockAddressLookup } from '../../test/mockAddressLookup'
 
 const schema = z.object({ address: addressSchema() })
 const empty = { address: { street: '', street2: '', city: '', state: '', zip: '' } }
@@ -74,5 +75,22 @@ export const WithErrors: Story = {
     await userEvent.click(canvas.getByRole('button', { name: 'Submit' }))
     await canvas.findByText('Street address is required.')
     await canvas.findByText('Enter a 5-digit ZIP code')
+  },
+}
+
+export const WithLookup: Story = {
+  args: {
+    legend: 'Shipping address',
+    required: true,
+    // A little latency, so the loading state is visible; tests use 0.
+    lookup: mockAddressLookup({ delayMs: 400, attribution: 'Powered by Mock Places' }),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "`lookup` turns the street into an address search. Type `160`, `350` or `Infinite`: rows come from the provider's `search`, picking one runs `resolve` and fills every part, and text typed without a pick stays as the street. The `googlePlaces` provider is the real one; this story uses a deterministic mock.",
+      },
+    },
   },
 }

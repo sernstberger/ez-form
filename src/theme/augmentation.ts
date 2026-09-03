@@ -30,6 +30,7 @@ import type { SsnFieldProps } from '../fields/SsnField'
 import type { ZipFieldProps } from '../fields/ZipField'
 import type { StateSelectProps } from '../fields/StateSelect'
 import type { ChipDeleteIconProps } from '../fields/ChipDeleteIcon'
+import type { GooglePlacesAttributionProps } from '../address-lookup/GooglePlacesAttribution'
 
 declare module '@mui/material/styles' {
   interface ComponentsPropsList {
@@ -68,6 +69,7 @@ declare module '@mui/material/styles' {
     EzZipField: Partial<ZipFieldProps>
     EzStateSelect: Partial<StateSelectProps>
     EzChipDeleteIcon: Partial<ChipDeleteIconProps>
+    EzGooglePlacesAttribution: Partial<GooglePlacesAttributionProps>
   }
 
   interface ComponentNameToClassKey {
@@ -86,7 +88,8 @@ declare module '@mui/material/styles' {
     EzFormErrorSummary: 'root' | 'heading' | 'list' | 'item' | 'link'
     EzFormSection: 'root' | 'legend' | 'description' | 'content'
     EzFieldArray: 'root' | 'row' | 'actions' | 'add' | 'remove' | 'move' | 'status' | 'error'
-    EzAddressField: 'root' | 'street' | 'street2' | 'city' | 'state' | 'zip'
+    EzAddressField:
+      'root' | 'street' | 'street2' | 'city' | 'state' | 'zip' | 'attribution' | 'status'
     EzPasswordField: 'root' | 'toggle'
     EzSsnField: 'root' | 'toggle'
     EzPasswordStrength: 'root' | 'bar' | 'label'
@@ -99,6 +102,7 @@ declare module '@mui/material/styles' {
     // under `multiple`, EmailListField, FileField): named and 24×24. One slot
     // here rather than a `deleteIcon` key per field, so a theme sizes it once.
     EzChipDeleteIcon: 'root'
+    EzGooglePlacesAttribution: 'root'
   }
 
   interface Components<Theme = unknown> {
@@ -236,6 +240,12 @@ declare module '@mui/material/styles' {
     EzChipDeleteIcon?: {
       defaultProps?: ComponentsProps['EzChipDeleteIcon']
       styleOverrides?: ComponentsOverrides<Theme>['EzChipDeleteIcon']
+    }
+    // The line `googlePlaces()` renders under the suggestion list. `defaultProps.children` is
+    // where an app swaps the "Powered by Google" text for Google's logo image once, app-wide.
+    EzGooglePlacesAttribution?: {
+      defaultProps?: ComponentsProps['EzGooglePlacesAttribution']
+      styleOverrides?: ComponentsOverrides<Theme>['EzGooglePlacesAttribution']
     }
   }
 }

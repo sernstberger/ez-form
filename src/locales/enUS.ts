@@ -98,6 +98,7 @@ export const enUS = {
         cityLabel: 'City',
         stateLabel: 'State',
         zipLabel: 'ZIP code',
+        lookupFilledText: 'Address filled',
       },
     },
     EzPasswordField: {
