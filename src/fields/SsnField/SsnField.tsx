@@ -29,7 +29,7 @@ const SsnFieldToggle = styled(IconButton, { name: 'EzSsnField', slot: 'Toggle' }
  */
 export type SsnFieldProps = Omit<
   TextFieldProps,
-  'type' | 'inputMode' | 'autoComplete' | 'pattern' | 'displayValue' | 'componentName'
+  'type' | 'inputMode' | 'autoComplete' | 'pattern' | 'displayValue' | 'componentName' | 'inputRef'
 > & {
   /**
    * Shown when the value is non-empty but has fewer than nine digits. Default
@@ -114,17 +114,13 @@ export function SsnField(inProps: SsnFieldProps) {
     capacity: SSN_CAPACITY,
   })
 
-  // Three refs want this one input: the template hook's (caret restoration
-  // after a reformat), the reveal hook's (caret restoration after a `type`
-  // swap), and whatever the consumer passed. `useForkRef` is MUI's own
-  // composer, already used in `NumberFieldControl` and `WizardStep`.
+  // Two internal refs want this one input: the template hook's (caret
+  // restoration after a reformat) and the reveal hook's (caret restoration
+  // after a `type` swap). `useForkRef` is MUI's own composer. The fork goes
+  // through `inputRef`, which MUI forks again with any consumer
+  // `slotProps.htmlInput.ref` in either form; see `TemplateFieldBinding`.
   const { ref: templateInputRef, ...templateInputProps } = htmlInputProps
-  const inputRef = useForkRef(
-    useForkRef(templateInputRef, revealInputRef),
-    restSlotProps?.htmlInput && 'ref' in restSlotProps.htmlInput
-      ? (restSlotProps.htmlInput.ref as React.Ref<HTMLInputElement>)
-      : null,
-  )
+  const inputRef = useForkRef(templateInputRef, revealInputRef)
 
   const consumerValidate =
     validate === undefined ? {} : typeof validate === 'function' ? { validate } : validate
@@ -139,6 +135,7 @@ export function SsnField(inProps: SsnFieldProps) {
       // `123-45-6789`. Either way the stored value is the bare digits.
       type={revealed ? 'text' : 'password'}
       autoComplete="off"
+      inputRef={inputRef}
       disabled={disabled}
       displayValue={displayValue}
       className={cx(ssnFieldClasses.root, className)}
@@ -172,17 +169,10 @@ export function SsnField(inProps: SsnFieldProps) {
             />
           ) : undefined,
         },
-        htmlInput: {
-          ...mergeSlotProps(restSlotProps?.htmlInput, {
-            inputMode: 'numeric',
-            ...templateInputProps,
-          }),
-          // After the merge, deliberately: `mergeSlotProps` spreads the
-          // consumer's props last, so a consumer `ref` would replace the forked
-          // one and silently disable both caret restorations. `inputRef`
-          // already includes that consumer ref, so nothing is dropped.
-          ref: inputRef,
-        },
+        htmlInput: mergeSlotProps(restSlotProps?.htmlInput, {
+          inputMode: 'numeric',
+          ...templateInputProps,
+        }),
       }}
     />
   )

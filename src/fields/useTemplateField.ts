@@ -36,12 +36,15 @@ export interface TemplateFieldBinding {
   /** The formatted text to pass to `TextField`'s `displayValue`. */
   displayValue: string
   /**
-   * `onChange`/`onKeyDown`/`onSelect`/`ref` for `slotProps.htmlInput`.
+   * `onChange`/`onKeyDown`/`onSelect` for `slotProps.htmlInput`, and the `ref`
+   * that must reach the `<input>` for caret restoration to work at all.
    *
-   * `ref` must reach the `<input>` for caret restoration to work at all. Spread
-   * these *after* a consumer's `slotProps.htmlInput` and compose the two refs
-   * (`useForkRef`) rather than letting either replace the other — a consumer
-   * ref that silently won would disable caret restoration with no error.
+   * Merge the handlers under a consumer's `slotProps.htmlInput` with MUI's
+   * `mergeSlotProps`, which composes same-named handlers in both the object and
+   * the callback form. Pass `ref` to `TextField`'s `inputRef`, *not* into
+   * `slotProps.htmlInput`: MUI's `InputBase` forks `inputRef` with the consumer's
+   * `htmlInput.ref` whichever form it came in, whereas a fork done here could
+   * only see the object form and silently dropped a callback-form ref (#92).
    */
   htmlInputProps: {
     onChange: (event: ChangeEvent<HTMLInputElement>) => void

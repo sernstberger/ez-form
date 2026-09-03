@@ -528,4 +528,23 @@ describe('PhoneField consumer ref composition', () => {
     expect(input()).toHaveValue('555-192-3456')
     expect(input().selectionStart).toBe(6)
   })
+
+  it('honours a consumer ref from the callback form of slotProps.htmlInput (#92)', async () => {
+    const user = userEvent.setup()
+    const consumerRef = { current: null as HTMLInputElement | null }
+    // MUI also accepts `htmlInput: (ownerState) => props`. The ref (and every
+    // other prop the callback returns) must survive exactly as the object form's.
+    renderPhone({
+      slotProps: { htmlInput: () => ({ ref: consumerRef, 'data-consumer': 'yes' }) },
+    })
+
+    expect(consumerRef.current).toBe(input())
+    expect(input()).toHaveAttribute('data-consumer', 'yes')
+
+    await user.type(input(), '5551234567')
+    expect(input()).toHaveValue('555-123-4567')
+    await user.type(input(), '9', { initialSelectionStart: 5, initialSelectionEnd: 5 })
+    expect(input()).toHaveValue('555-192-3456')
+    expect(input().selectionStart).toBe(6)
+  })
 })
