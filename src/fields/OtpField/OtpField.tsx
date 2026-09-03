@@ -25,11 +25,6 @@ export type OtpFieldProps = Omit<
   disabled?: boolean
   /** Number of characters. */
   length?: number
-  /**
-   * Overrides `Form`'s `optionalText` for this field when the form's
-   * `requiredIndicator` is `"optional"`; `false` hides it on this field.
-   */
-  optionalText?: ReactNode | false
   /** Runs after the form's own handler. */
   onValueChange?: OTPField.Root.Props['onValueChange']
   /** Runs after the form's own handler, when focus leaves the group. */
@@ -51,7 +46,6 @@ export function OtpField({
   disabled,
   required,
   validate,
-  optionalText,
   length = 6,
   onValueChange,
   onBlur,
@@ -72,7 +66,6 @@ export function OtpField({
           v === '' || v == null || v.length === length || messages.exactLength(l, length),
       },
     },
-    optionalText,
     // Read, not destructured: both still reach the control through `rest`.
     'aria-label': rest['aria-label'],
     'aria-labelledby': rest['aria-labelledby'],

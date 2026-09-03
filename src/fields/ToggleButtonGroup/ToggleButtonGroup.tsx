@@ -21,11 +21,6 @@ export type ToggleButtonGroupProps = Omit<
   options: readonly Option[]
   helperText?: ReactNode
   disabled?: boolean
-  /**
-   * Overrides `Form`'s `optionalText` for this field when the form's
-   * `requiredIndicator` is `"optional"`; `false` hides it on this field.
-   */
-  optionalText?: ReactNode | false
 } & Pick<FieldRules<Value | null | Value[]>, 'required' | 'validate'>
 
 /**
@@ -41,7 +36,6 @@ export function ToggleButtonGroup({
   disabled,
   required,
   validate,
-  optionalText,
   exclusive,
   onChange,
   onBlur,
@@ -56,7 +50,6 @@ export function ToggleButtonGroup({
       helperText={helperText}
       disabled={disabled}
       rules={{ required, validate }}
-      optionalText={optionalText}
       labelAs="legend"
       // For the dev-mode "no accessible name" check only — read, not destructured, so
       // both still reach the control through `rest`.

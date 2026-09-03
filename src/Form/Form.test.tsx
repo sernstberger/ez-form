@@ -1024,36 +1024,6 @@ describe('requiredIndicator', () => {
     expect(screen.getByLabelText('Email (not required)')).toBeInTheDocument()
   })
 
-  it('a per-field optionalText overrides the Form-level one', () => {
-    render(
-      <Form
-        schema={schema}
-        defaultValues={{ email: '' }}
-        onSubmit={() => {}}
-        requiredIndicator="optional"
-        optionalText="(not required)"
-      >
-        <TextField name="email" label="Email" optionalText="(skip if unsure)" />
-      </Form>,
-    )
-    expect(screen.getByLabelText('Email (skip if unsure)')).toBeInTheDocument()
-  })
-
-  it('a per-field optionalText={false} hides the suffix on that field only', () => {
-    render(
-      <Form
-        schema={schema}
-        defaultValues={{ email: '' }}
-        onSubmit={() => {}}
-        requiredIndicator="optional"
-      >
-        <TextField name="email" label="Email" optionalText={false} />
-      </Form>,
-    )
-    expect(screen.getByLabelText('Email')).toBeInTheDocument()
-    expect(screen.queryByLabelText(/optional/i)).not.toBeInTheDocument()
-  })
-
   it('"asterisk" mode never appends optionalText', () => {
     render(
       <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>

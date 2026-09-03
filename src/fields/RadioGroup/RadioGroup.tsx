@@ -17,11 +17,6 @@ export type RadioGroupProps = Omit<
   options: readonly Option[]
   helperText?: ReactNode
   disabled?: boolean
-  /**
-   * Overrides `Form`'s `optionalText` for this field when the form's
-   * `requiredIndicator` is `"optional"`; `false` hides it on this field.
-   */
-  optionalText?: ReactNode | false
 } & Pick<FieldRules<Option['value']>, 'required' | 'validate'>
 
 /**
@@ -37,7 +32,6 @@ export function RadioGroup({
   disabled,
   required,
   validate,
-  optionalText,
   onChange,
   onBlur,
   ...rest
@@ -51,7 +45,6 @@ export function RadioGroup({
       helperText={helperText}
       disabled={disabled}
       rules={{ required, validate }}
-      optionalText={optionalText}
       labelAs="legend"
       // For the dev-mode "no accessible name" check only — read, not destructured, so
       // both still reach the control through `rest`.

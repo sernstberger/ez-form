@@ -35,11 +35,6 @@ export interface FieldFrameProps<TValue> {
   disabled?: boolean
   rules: FieldRules<TValue>
   /**
-   * Overrides `Form`'s `optionalText` for this field when the form's
-   * `requiredIndicator` is `"optional"`; `false` hides it on this field.
-   */
-  optionalText?: ReactNode | false
-  /**
    * `control`: label beside the control (FormControlLabel) — Checkbox, Switch.
    * `legend`: label above a group of controls (fieldset + legend) — RadioGroup.
    * A `legend` frame renders a fieldset whose implicit role is `group` named by the
@@ -79,7 +74,6 @@ export function FieldFrame<TValue>({
   helperText,
   disabled,
   rules,
-  optionalText,
   labelAs,
   'aria-label': ariaLabel,
   'aria-labelledby': ariaLabelledBy,
@@ -88,7 +82,6 @@ export function FieldFrame<TValue>({
   const f = useEzField<TValue>(name, componentName, {
     label,
     rules,
-    optionalText,
     'aria-label': ariaLabel,
     'aria-labelledby': ariaLabelledBy,
   })
