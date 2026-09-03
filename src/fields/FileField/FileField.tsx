@@ -17,23 +17,11 @@ import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import Stack from '@mui/material/Stack'
 import { styled } from '@mui/material/styles'
 import UploadFile from '@mui/icons-material/UploadFile'
-import Close from '@mui/icons-material/Close'
+import { ChipDeleteIcon } from '../ChipDeleteIcon'
 import { useEzField } from '../useEzField'
 import { useEzFormContext } from '../../useEzFormContext'
 import { mergeDisabled } from '../mergeDisabled'
 import type { FieldRules } from '../../rules'
-
-// MUI's Chip.deleteIcon renders at `fontSize: 22` with no hit-area padding —
-// under the 24×24 CSS px target (WCAG 2.5.8). `minWidth`/`minHeight: 24` here
-// is the functional minimum, still overridable via
-// `theme.components.EzFileField.styleOverrides.deleteIcon`; `boxSizing:
-// 'content-box'` keeps the 22px glyph itself unchanged; centering it in the
-// larger box needs no extra rule since Chip already centers the icon.
-const FileFieldDeleteIcon = styled(Close, { name: 'EzFileField', slot: 'DeleteIcon' })({
-  minWidth: 24,
-  minHeight: 24,
-  boxSizing: 'content-box',
-})
 
 // MUI's documented file-upload pattern: a visually hidden input inside a Button rendered as <label>.
 const VisuallyHiddenInput = styled('input')({
@@ -51,7 +39,6 @@ const VisuallyHiddenInput = styled('input')({
 export const fileFieldClasses = generateUtilityClasses('EzFileField', [
   'root',
   'fileList',
-  'deleteIcon',
   'dropZone',
   'dragActive',
   'dropText',
@@ -425,16 +412,7 @@ export function FileField(inProps: FileFieldProps) {
                     files.filter((other) => other !== file),
                   )
                 }
-                // Chip clones this element with its own onClick; the default icon has no accessible
-                // name, and SvgIcon defaults aria-hidden to true unless overridden here.
-                deleteIcon={
-                  <FileFieldDeleteIcon
-                    role="button"
-                    aria-label={`Remove ${file.name}`}
-                    aria-hidden={undefined}
-                    className={fileFieldClasses.deleteIcon}
-                  />
-                }
+                deleteIcon={<ChipDeleteIcon label={file.name} />}
               />
             ),
           )}

@@ -51,6 +51,11 @@ export {
   type AutocompleteFormValue,
 } from './fields/Autocomplete'
 export {
+  ChipDeleteIcon,
+  chipDeleteIconClasses,
+  type ChipDeleteIconProps,
+} from './fields/ChipDeleteIcon'
+export {
   EmailListField,
   emailListFieldClasses,
   type EmailListFieldProps,

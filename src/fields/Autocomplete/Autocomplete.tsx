@@ -1,10 +1,15 @@
 import type { ReactNode } from 'react'
 import MuiAutocomplete, {
+  type AutocompleteOwnerState,
   type AutocompleteProps as MuiAutocompleteProps,
+  type AutocompleteRenderValue,
+  type AutocompleteRenderValueGetItemProps,
   type AutocompleteValue,
 } from '@mui/material/Autocomplete'
 import MuiTextField, { type TextFieldProps as MuiTextFieldProps } from '@mui/material/TextField'
+import Chip, { type ChipProps } from '@mui/material/Chip'
 import { mergeSlotProps } from '@mui/material/utils'
+import { ChipDeleteIcon } from '../ChipDeleteIcon'
 import { useEzField } from '../useEzField'
 import { mergeDisabled } from '../mergeDisabled'
 import type { Option } from '../Option'
@@ -153,6 +158,43 @@ export function Autocomplete<
         ? null
         : toValue(x as TOption | string)) as FormValue
 
+  const optionLabel: NonNullable<MuiProps<TOption, Multiple, FreeSolo>['getOptionLabel']> =
+    getOptionLabel ?? ((o) => (typeof o === 'string' ? o : o.label))
+
+  // MUI's own chip rendering under `multiple` (label, size, item props, then
+  // `slotProps.chip`), plus a delete icon that is named and 24×24 — MUI's default
+  // icon is neither (#90). Only the fallback: a consumer's `renderValue` takes
+  // over entirely, and `slotProps.chip.deleteIcon`, spread last, still wins.
+  // Typed over `true` rather than `Multiple`: the getter's shape is conditional
+  // on it, and this only ever runs once `multiple` is set.
+  const renderChips = (
+    items: AutocompleteRenderValue<TOption, true, FreeSolo>,
+    getItemProps: AutocompleteRenderValueGetItemProps<true>,
+    ownerState: AutocompleteOwnerState<TOption, Multiple, false, FreeSolo>,
+  ) => {
+    // `slotProps.chip` may be a function of ownerState (MUI's `SlotProps` type);
+    // MUI's own chip path spreads it as-is, so this is the one place it is honoured.
+    // The cast narrows MUI's `SlotProps<ElementType<…>>` (a union over every
+    // element that could take chip props) back to the chip props it holds.
+    const chip = rest.slotProps?.chip
+    const chipProps = (typeof chip === 'function' ? chip(ownerState) : chip) as
+      Partial<ChipProps> | undefined
+    return items.map((item, index) => {
+      const { key, ...itemProps } = getItemProps({ index })
+      const chipLabel = optionLabel(item)
+      return (
+        <Chip
+          key={key}
+          label={chipLabel}
+          size={rest.size}
+          {...itemProps}
+          deleteIcon={<ChipDeleteIcon label={chipLabel} />}
+          {...chipProps}
+        />
+      )
+    })
+  }
+
   return (
     <MuiAutocomplete<TOption, Multiple, false, FreeSolo>
       {...rest}
@@ -171,7 +213,13 @@ export function Autocomplete<
         ((o, v) =>
           Object.is(getOptionValue(o), typeof v === 'string' ? v : getOptionValue(v as TOption)))
       }
-      getOptionLabel={getOptionLabel ?? ((o) => (typeof o === 'string' ? o : o.label))}
+      getOptionLabel={optionLabel}
+      renderValue={
+        rest.renderValue ??
+        (multiple
+          ? (renderChips as MuiProps<TOption, Multiple, FreeSolo>['renderValue'])
+          : undefined)
+      }
       renderInput={(params) => (
         // MUI TextField sets aria-invalid/aria-describedby itself; only `role` comes from the hook.
         // InputBase forks `inputRef` with the Autocomplete's own input ref and calls

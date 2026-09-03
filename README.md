@@ -94,6 +94,7 @@ React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form
 | `Slider`                                       | MUI `Slider`                                  | `name`, `label` (legend), `helperText?`; rules `min`, `max` (also the slider bounds), `validate` — no `required`, since a slider always reports a value. Value is a `number`, or `[number, number]` for a range                                                                                                                                                                                                                                                                                                               |
 | `Rating`                                       | MUI `Rating`                                  | `name`, `label` (legend), `helperText?`; rules `required`, `validate`. Value is `number \| null`                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `Autocomplete`                                 | MUI `Autocomplete`                            | `name`, `options`, `getOptionValue?` (default `o => o.value`; return `o` to store objects), `multiple`, `freeSolo`, `textFieldProps?`; all TextField rules. Options may carry extra fields (they reach `onChange`)                                                                                                                                                                                                                                                                                                            |
+| `ChipDeleteIcon`                               | MUI `SvgIcon` (`Cancel`)                      | `label`, `removeLabel?` (default `` `Remove ${label}` ``). The delete icon every chip in ez-form renders — `Autocomplete` under `multiple`, `EmailListField`, `FileField` — named and sized to a 24×24 target; themeable once under `EzChipDeleteIcon`. Use it in your own `renderValue`                                                                                                                                                                                                                                      |
 | `EmailListField`                               | ez-form `Autocomplete`                        | `name`; a `string[]` of addresses. `loadOptions?(query, signal)` for an async directory (debounced by `debounceMs?`, default 250, and aborted on the next keystroke), `allowNew?` (default `true`), `invalidMessage?`, `duplicateMessage?`, `addedMessage?`/`addedManyMessage?`/`removedMessage?`/`removedManyMessage?`, `autoComplete?` (default `'email'`, `'off'` under `assisted`), `slotProps?` (`chip`, `status`). Enter, comma, semicolon, space and blur commit; paste splits; duplicates collapse case-insensitively |
 | `NumberField`                                  | Base UI `NumberField` through MUI `TextField` | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max` (also the stepper bounds), `validate`. Value is `number \| null`; digits group while typing (new in v2.1), and `format={{ useGrouping: false }}` turns that off                                                                                                                                                                                                                                                                                      |
 | `MoneyField`                                   | `NumberField` pinned to USD                   | `name`, `label?`, `helperText?`, `size?`; rules `required`, `min`, `max`, `validate`. Value is a `number` in dollars, rounded to the cent; shows `$1,234.50` on blur                                                                                                                                                                                                                                                                                                                                                          |
@@ -812,6 +813,10 @@ Address lookup (Places-style): the options list is fed by an async lookup, and t
 
 The form stores the address string (`z.string()`); `placeId` reaches `onChange` but isn't stored. For objects in form state use `getOptionValue={(o) => o}` and a `z.object` schema.
 
+Under `multiple`, each chip's delete control is named `Remove <option label>` and sized to a
+24×24 target (MUI's default icon is neither) via the shared `ChipDeleteIcon`; `slotProps.chip`
+still merges over the chip, and a `renderValue` of your own takes over chip rendering entirely.
+
 ## EmailListField
 
 A "To:" line: many addresses, each one a chip, and the form value is a plain
@@ -888,15 +893,15 @@ Each chip's delete control carries an accessible name (`Remove <label>`) and a 2
 `slotProps.chip` is merged _under_ the props that make a chip removable, and its `onDelete`
 composes with the field's own — call `preventDefault()` in yours to veto a removal. The delete
 icon itself is the field's (that accessible name is not a consumer's to drop), so it is excluded
-from the slot's type; restyle it through
-`theme.components.EzEmailListField.styleOverrides.deleteIcon`.
+from the slot's type; it is the shared `ChipDeleteIcon`, restyled through
+`theme.components.EzChipDeleteIcon`.
 
 Under `<Form assisted>` the input's `autoComplete` becomes `'off'` (#65), since the person
 filling the form is not necessarily the person the addresses belong to; an explicit
 `autoComplete` still wins.
 
-Themeable under `EzEmailListField` (`defaultProps`, and `styleOverrides` for `chip`,
-`deleteIcon` and `status`, exported as `emailListFieldClasses`).
+Themeable under `EzEmailListField` (`defaultProps`, and `styleOverrides` for `chip` and
+`status`, exported as `emailListFieldClasses`).
 
 ## TextareaField
 
@@ -966,8 +971,8 @@ default chip so you can render your own progress:
 />
 ```
 
-Themeable under `EzFileField` (`root`, `fileList`, `deleteIcon`, `dropZone`, `dragActive`,
-`dropText`, exported as `fileFieldClasses`).
+Themeable under `EzFileField` (`root`, `fileList`, `dropZone`, `dragActive`, `dropText`,
+exported as `fileFieldClasses`); each chip's delete icon is the shared `ChipDeleteIcon`.
 
 ## Mobile keyboards & autofill
 
