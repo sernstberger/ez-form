@@ -29,6 +29,12 @@ export {
   type AddressFieldProps,
   type AddressValue,
   type AddressSchemaOptions,
+  type AddressSuggestion,
+  type AddressLookupContext,
+  type AddressLookupProvider,
+  useAddressLookup,
+  type UseAddressLookupOptions,
+  type AddressLookupState,
 } from './fields/AddressField'
 export {
   PasswordField,
