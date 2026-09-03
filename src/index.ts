@@ -44,7 +44,11 @@ export { formatTemplate, type FormatTemplate } from './fields/formatTemplate'
 export { EmailField, type EmailFieldProps } from './fields/EmailField'
 export { FeinField, type FeinFieldProps } from './fields/FeinField'
 export { SsnField, ssnFieldClasses, type SsnFieldProps } from './fields/SsnField'
-export type { FieldRules, BooleanFieldRules } from './rules'
+export type { FieldRules, BooleanFieldRules, RuleMessages } from './rules'
+// Locale objects (#23): `createTheme(theme, esES)`, the way MUI's own
+// `@mui/material/locale` objects are applied. Plain objects, so they
+// tree-shake; no `ez-form/locales` subpath before first publish (#43).
+export { enUS, esES, type EzLocalization } from './locales'
 export {
   Autocomplete,
   type AutocompleteProps,
