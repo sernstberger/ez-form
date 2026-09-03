@@ -24,11 +24,6 @@ export interface PickerFieldProps<TValue, TError extends string | null> {
   errorMessages?: PickerErrorMessages<TError>
   required?: FieldRules<TValue>['required']
   validate?: FieldRules<TValue>['validate']
-  /**
-   * Overrides `Form`'s `optionalText` for this field when the form's
-   * `requiredIndicator` is `"optional"`; `false` hides it on this field.
-   */
-  optionalText?: ReactNode | false
 }
 
 /**
@@ -126,7 +121,6 @@ export function usePickerField<
     errorMessages,
     required,
     validate,
-    optionalText,
     onChange,
     onError,
     onClear,
@@ -215,7 +209,6 @@ export function usePickerField<
             : true,
       },
     },
-    optionalText,
     // A label-less picker is named through the text field it renders, so that is
     // where the dev-mode "no accessible name" check has to look. Read, not
     // removed: `slotProps.textField` is still spread onto the field below.

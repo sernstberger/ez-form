@@ -83,11 +83,6 @@ export type FileFieldProps = {
   helperText?: ReactNode
   disabled?: boolean
   /**
-   * Overrides `Form`'s `optionalText` for this field when the form's
-   * `requiredIndicator` is `"optional"`; `false` hides it on this field.
-   */
-  optionalText?: ReactNode | false
-  /**
    * Native `accept` (`".pdf,image/*"`). Also a validation rule: a picked or
    * dropped file that does not match is rejected with `acceptMessage`.
    */
@@ -212,7 +207,6 @@ export function FileField(inProps: FileFieldProps) {
     onChange,
     required,
     validate,
-    optionalText,
   } = useDefaultProps({ props: inProps, name: 'EzFileField' })
   // The reason the last pick/drop rejected a file. Held here rather than pushed
   // through `setError` so it composes exactly like `required`: the built-in
@@ -242,7 +236,6 @@ export function FileField(inProps: FileFieldProps) {
           }
         : validate,
     },
-    optionalText,
   })
   const { trigger } = useEzFormContext('FileField')
   const id = useId()

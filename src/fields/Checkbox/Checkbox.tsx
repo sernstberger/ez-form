@@ -8,11 +8,6 @@ export type CheckboxProps = Omit<MuiCheckboxProps, 'name' | 'checked' | 'require
   name: string
   label: ReactNode
   helperText?: ReactNode
-  /**
-   * Overrides `Form`'s `optionalText` for this field when the form's
-   * `requiredIndicator` is `"optional"`; `false` hides it on this field.
-   */
-  optionalText?: ReactNode | false
 } & BooleanFieldRules
 
 /**
@@ -30,7 +25,6 @@ export function Checkbox({
   disabled,
   required,
   validate,
-  optionalText,
   onChange,
   onBlur,
   slotProps,
@@ -44,7 +38,6 @@ export function Checkbox({
       helperText={helperText}
       disabled={disabled}
       rules={{ required, validate }}
-      optionalText={optionalText}
       labelAs="control"
       // For the dev-mode "no accessible name" check only — read, not destructured, so
       // both still reach the control through `rest`.

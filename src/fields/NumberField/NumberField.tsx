@@ -43,11 +43,6 @@ export type NumberFieldProps = Omit<
    * nonzero `maximumFractionDigits`).
    */
   inputMode?: NumberFieldInputProps['inputMode']
-  /**
-   * Overrides `Form`'s `optionalText` for this field when the form's
-   * `requiredIndicator` is `"optional"`; `false` hides it on this field.
-   */
-  optionalText?: ReactNode | false
   /** Runs after the form's own handler. */
   onValueChange?: BaseNumberField.Root.Props['onValueChange']
   /** Runs after the form's own handler. On the visible input, not Root's div. */
@@ -143,7 +138,6 @@ export function NumberField({
   min,
   max,
   validate,
-  optionalText,
   onValueChange,
   onBlur,
   onFocus,
@@ -175,7 +169,6 @@ export function NumberField({
       max: scaleRule(max, valueScale, messages.max, ruleLabel),
       validate,
     },
-    optionalText,
     'aria-label': ariaLabel,
     'aria-labelledby': ariaLabelledBy,
   })

@@ -1,6 +1,5 @@
 import MuiTextField, { type TextFieldProps as MuiTextFieldProps } from '@mui/material/TextField'
 import { mergeSlotProps, useForkRef } from '@mui/material/utils'
-import type { ReactNode } from 'react'
 import { useEzField } from '../useEzField'
 import { mergeDisabled } from '../mergeDisabled'
 import { resolveAutoComplete } from '../resolveAutoComplete'
@@ -33,11 +32,6 @@ export type TextFieldProps = Omit<
    * @internal
    */
   inputRef?: MuiTextFieldProps['inputRef']
-  /**
-   * Overrides `Form`'s `optionalText` for this field when the form's
-   * `requiredIndicator` is `"optional"`; `false` hides it on this field.
-   */
-  optionalText?: ReactNode | false
   /**
    * Internal. The name a dev-mode warning should call this field: `Select`,
    * `PasswordField` and `TextareaField` all render *through* `TextField`, and a
@@ -91,7 +85,6 @@ export function TextField({
   maxLength,
   pattern,
   validate,
-  optionalText,
   displayValue,
   type,
   autoComplete: autoCompleteProp,
@@ -113,7 +106,6 @@ export function TextField({
   const f = useEzField<string>(name, componentName, {
     label,
     rules: { required, min, max, minLength, maxLength, pattern, validate },
-    optionalText,
     'aria-label': ariaLabel,
     'aria-labelledby': ariaLabelledBy,
   })

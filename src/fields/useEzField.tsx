@@ -11,12 +11,6 @@ export interface UseEzFieldOptions<TValue = unknown> {
   label?: ReactNode
   rules?: FieldRules<TValue>
   /**
-   * Overrides `Form`'s `optionalText` for this one field when
-   * `requiredIndicator="optional"`; `false` hides the suffix on this field.
-   * Ignored (and never appended) for a required field or in `asterisk` mode.
-   */
-  optionalText?: ReactNode | false
-  /**
    * The consumer's ARIA name for a field with no visible `label`. The hook owns
    * these: it decides whether the dev-mode "no accessible name" warning fires,
    * *and* hands them back on `nameA11y` for the field to put on its real control.
@@ -73,8 +67,8 @@ export type UseEzFieldReturn = UseControllerReturn & {
   helperTextA11y: HelperTextA11y
   /**
    * The label to render: unchanged in `asterisk` mode; in `optional` mode, an
-   * optional field's label gets `optionalText` appended (unless suppressed).
-   * The input keeps `required`/`aria-required` either way.
+   * optional field's label gets the form's `optionalText` appended (unless the
+   * form set it to `false`). The input keeps `required`/`aria-required` either way.
    */
   displayLabel: ReactNode
   /**
@@ -101,7 +95,6 @@ export function useEzField<TValue = unknown>(
   {
     label,
     rules = {},
-    optionalText: optionalTextOverride,
     'aria-label': ariaLabel,
     'aria-labelledby': ariaLabelledBy,
   }: UseEzFieldOptions<TValue> = {},
@@ -111,7 +104,7 @@ export function useEzField<TValue = unknown>(
   const { control } = useEzFormContext(componentName)
   warnMissingLabel(componentName, name, label, ariaLabel, ariaLabelledBy)
   warnUnknownFieldName(componentName, name, control)
-  const { requiredIndicator, optionalText: formOptionalText } = useRequiredIndicator()
+  const { requiredIndicator, optionalText } = useRequiredIndicator()
   const messages = useRuleMessages()
   const normalized = normalizeRules(rules, typeof label === 'string' ? label : undefined, messages)
   const controller = useController({ name, rules: normalized })
@@ -120,7 +113,6 @@ export function useEzField<TValue = unknown>(
   const errorMessage = controller.fieldState.error?.message
   const required = isRequired(normalized)
   const optional = requiredIndicator === 'optional'
-  const optionalText = optionalTextOverride === undefined ? formOptionalText : optionalTextOverride
   const displayLabel =
     optional && !required && optionalText !== false ? (
       <Fragment>

@@ -180,7 +180,7 @@ export interface AddressFieldProps extends PartRules {
    *
    * Under `lookup` the street is an `Autocomplete`, and `slotProps.street` is
    * mapped onto it: the rules, `label`, `helperText`, `disabled`, `className`,
-   * `optionalText`, `autoComplete` and `slotProps.htmlInput` reach the field
+   * `autoComplete` and `slotProps.htmlInput` reach the field
    * directly, `onChange` fires per keystroke as on a `TextField`, and the
    * other MUI TextField props reach the input via `textFieldProps` — except
    * `onBlur` (the Autocomplete's own blur wins), `inputRef`, `displayValue`,
@@ -350,7 +350,6 @@ export function AddressField(inProps: AddressFieldProps) {
       maxLength,
       pattern,
       validate,
-      optionalText,
       autoComplete: streetAutoComplete,
       onChange: streetOnChange,
       onBlur: _onBlur,
@@ -376,7 +375,6 @@ export function AddressField(inProps: AddressFieldProps) {
           // A TextField validator sees a string; so does this one — under
           // `freeSolo` the Autocomplete stores `''` for a clear, never `null`.
           validate={validate as AutocompleteProps<LookupOption, string, false, true>['validate']}
-          optionalText={optionalText}
           options={lookupOptions}
           loading={lookupState.loading}
           // Typed text is the value: a pick stores the row's label, and typing

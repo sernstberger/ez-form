@@ -75,11 +75,6 @@ export type AutocompleteProps<
      * override the keys it owns (Enter, Backspace, the arrows).
      */
     inputProps?: NonNullable<MuiTextFieldProps['slotProps']>['htmlInput']
-    /**
-     * Overrides `Form`'s `optionalText` for this field when the form's
-     * `requiredIndicator` is `"optional"`; `false` hides it on this field.
-     */
-    optionalText?: ReactNode | false
   }
 
 const isOptionShaped = (v: unknown): v is Option =>
@@ -117,7 +112,6 @@ export function Autocomplete<
   maxLength,
   pattern,
   validate,
-  optionalText,
   // Destructured out of `rest`: MUI spreads them onto the Autocomplete root, which
   // is the `FormControl` wrapper — a named `<div>` around an anonymous combobox
   // (#99). They are routed to `slotProps.htmlInput` on the rendered input below.
@@ -135,7 +129,6 @@ export function Autocomplete<
   const f = useEzField<FormValue>(name, 'Autocomplete', {
     label,
     rules: { required, min, max, minLength, maxLength, pattern, validate },
-    optionalText,
     // Either channel names the field: on Autocomplete itself, or on the TextField
     // it renders. Both land on a wrapper if left alone, so both are collected here
     // and re-emitted onto the `<input>` through `f.nameA11y`.
