@@ -9,3 +9,8 @@ storybook-static
 
 # QA breaker scratch probes (never committed)
 src/__qa__/
+
+# local secrets (Storybook demo keys)
+.env
+.env.local
+.env.*.local
