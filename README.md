@@ -1406,7 +1406,7 @@ Options: `regionCodes` (Google's `includedRegionCodes`, default `['us']`), `lang
 
 Google's Places policy requires attribution when results are shown without a Google map. The default `attribution` is the text "Powered by Google" in a plain block themeable under `EzGooglePlacesAttribution` (`styleOverrides.root`, class `googlePlacesAttributionClasses.root`); Google's current guideline asks for its logo image, which this package cannot ship, so supply the official asset either per provider (`googlePlaces({ apiKey, attribution: <img … /> })`) or once for the whole app through `theme.components.EzGooglePlacesAttribution.defaultProps.children`.
 
-Storybook's live story reads `VITE_GOOGLE_PLACES_API_KEY` from a `.env` file (see `.env.example`); without it the story runs against a mock provider.
+Storybook's **Fields/AddressField → WithGooglePlaces** story is the live one. Copy `.env.example` to `.env.local` at the repo root (both are gitignored), put a browser key restricted to the Places API (New) and to `http://localhost:6006/*` in `VITE_GOOGLE_PLACES_API_KEY`, and restart Storybook; the story hands the key to `googlePlaces({ apiKey })` and never renders or logs it. Without the variable the story falls back to the deterministic mock provider and says so in a note, which is how it runs in CI.
 
 ### Keyboards & autofill for these fields
 
