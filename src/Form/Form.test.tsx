@@ -504,6 +504,107 @@ describe('useEzFormContext', () => {
     })
   })
 
+  describe('submit re-entrancy', () => {
+    /** An `onSubmit` that stays pending until the test resolves it. */
+    const deferred = () => {
+      let resolve!: () => void
+      let reject!: (error: unknown) => void
+      const promise = new Promise<void>((res, rej) => {
+        resolve = res
+        reject = rej
+      })
+      return { promise, resolve, reject }
+    }
+
+    it('double-clicking a raw <button type="submit"> calls onSubmit once', async () => {
+      const user = userEvent.setup()
+      const pending = deferred()
+      const onSubmit = vi.fn(() => pending.promise)
+      render(
+        <Form schema={schema} defaultValues={{ email: 'a@b.co' }} onSubmit={onSubmit}>
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      await user.dblClick(screen.getByRole('button', { name: 'Go' }))
+      expect(onSubmit).toHaveBeenCalledTimes(1)
+      await act(async () => {
+        pending.resolve()
+        await pending.promise
+      })
+      expect(onSubmit).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not latch: two sequential submits call onSubmit twice', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={schema} defaultValues={{ email: 'a@b.co' }} onSubmit={onSubmit}>
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2))
+    })
+
+    it('releases the gate after a rejecting onSubmit, so the next submit still runs', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn().mockRejectedValue(new Error('boom'))
+      const unhandled: unknown[] = []
+      const onUnhandledRejection = (error: unknown) => unhandled.push(error)
+      process.on('unhandledRejection', onUnhandledRejection)
+      try {
+        render(
+          <Form schema={schema} defaultValues={{ email: 'a@b.co' }} onSubmit={onSubmit}>
+            <button type="submit">Go</button>
+          </Form>,
+        )
+        await user.click(screen.getByRole('button', { name: 'Go' }))
+        await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+        await user.click(screen.getByRole('button', { name: 'Go' }))
+        await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2))
+      } finally {
+        process.off('unhandledRejection', onUnhandledRejection)
+      }
+    })
+
+    it('double-clicking a raw submit button on the confirm path opens one dialog and submits once', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={schema} defaultValues={{ email: 'a@b.co' }} onSubmit={onSubmit} confirm>
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      await user.dblClick(screen.getByRole('button', { name: 'Go' }))
+      expect(await screen.findByRole('alertdialog', { name: 'Submit?' })).toBeInTheDocument()
+      expect(screen.getAllByRole('alertdialog')).toHaveLength(1)
+      expect(onSubmit).not.toHaveBeenCalled()
+      await user.click(screen.getByRole('button', { name: 'Confirm' }))
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+      expect(onSubmit).toHaveBeenCalledTimes(1)
+    })
+
+    it('Cancel on the confirm path releases the gate, so a second submit still asks', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={schema} defaultValues={{ email: 'a@b.co' }} onSubmit={onSubmit} confirm>
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      await user.click(await screen.findByRole('button', { name: 'Cancel' }))
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+      expect(onSubmit).not.toHaveBeenCalled()
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      expect(await screen.findByRole('alertdialog', { name: 'Submit?' })).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Confirm' }))
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+    })
+  })
+
   describe('guard', () => {
     const addSpy = () => vi.spyOn(window, 'addEventListener')
     const removeSpy = () => vi.spyOn(window, 'removeEventListener')

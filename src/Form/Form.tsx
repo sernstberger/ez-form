@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
   type ElementType,
+  type FormEvent,
   type FormHTMLAttributes,
   type ReactNode,
   type Ref,
@@ -502,6 +503,59 @@ function FormImpl<TIn extends FieldValues, TOut>(
     }
   })
 
+  // Ruling: re-entrancy is gated with a ref, not the existing `submitting` state — #101. The
+  // form already disables every field while `submitting` (see the `disabled` passed to
+  // useForm), but a state update is async: React batches it and the second event of a
+  // double-click lands in the same tick, before any re-render has disabled anything. A ref
+  // flips synchronously, so it is the only thing that can see the first submit from inside the
+  // second one. Cost if wrong: a raw <button type="submit"> — valid HTML, and what most of
+  // this file's own tests use — fires onSubmit twice per double-click, double-charging /
+  // double-posting anything not idempotent. `SubmitButton` guards itself, so consumers who
+  // used ours were already safe; gating here protects every submit path instead.
+  //
+  // Ruling: the gate wraps the whole onSubmit handler, not just `submit` — one gate covers
+  // both branches of the ternary below, so the confirm path's pre-submit trigger() and its
+  // open dialog are equally protected (a second click while the dialog is open would
+  // otherwise re-run trigger() and call `ask` again, which resolves the first request `false`;
+  // see useConfirm). Nothing is stranded: the `finally` releases on every exit — invalid
+  // form, Cancel, a rejecting resolver, or a throwing onSubmit — so the gate never latches.
+  // Cost if wrong: a latched gate would make the form permanently unsubmittable, which is
+  // strictly worse than the double-submit it fixes, hence the four cases pinned in the tests.
+  const inFlight = useRef(false)
+  const guardedSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    if (inFlight.current) {
+      event.preventDefault()
+      return
+    }
+    inFlight.current = true
+    try {
+      if (confirmOptions) {
+        event.preventDefault()
+        // Validate first (focusing the first error like handleSubmit does, unless a mounted
+        // summary is handling that instead) so an invalid form never asks; handleSubmit
+        // re-validates on Confirm, which is cheap and keeps hookform's isSubmitting confined
+        // to the real submit. No try/catch of its own: a rejecting resolver here (e.g. a
+        // throwing `validate` rule) propagates like the non-confirm path's handleSubmit does —
+        // the `finally` above only releases the gate, it does not swallow. Nothing is stranded
+        // either way — `submitting` and the dialog only ever get set after this awaits
+        // successfully (`ask` itself never rejects, see useConfirm).
+        const valid = await methods.trigger(undefined, { shouldFocus: errorSummaryCount === 0 })
+        if (!valid) {
+          // This path never reaches handleSubmit, so submitCount never increments — a plain
+          // form's <FormErrorSummary> (outside a Wizard) needs its own signal that an attempt
+          // just failed. See ErrorSummaryContext.failedConfirmAttempt.
+          setFailedConfirmAttempt((n) => n + 1)
+          return
+        }
+        if (await ask(confirmOptions)) await submit(event)
+      } else {
+        await submit(event)
+      }
+    } finally {
+      inFlight.current = false
+    }
+  }
+
   return (
     <FormProvider {...methods}>
       <ErrorSummaryContext.Provider value={errorSummaryContext}>
@@ -514,32 +568,7 @@ function FormImpl<TIn extends FieldValues, TOut>(
           aria-describedby={
             ariaDescribedBy ?? (effectiveDescription != null ? descriptionProps.id : undefined)
           }
-          onSubmit={
-            confirmOptions
-              ? async (event) => {
-                  event.preventDefault()
-                  // Validate first (focusing the first error like handleSubmit does, unless a
-                  // mounted summary is handling that instead) so an invalid form never asks;
-                  // handleSubmit re-validates on Confirm, which is cheap and keeps hookform's
-                  // isSubmitting confined to the real submit. No try/catch: a rejecting
-                  // resolver here (e.g. a throwing `validate` rule) propagates like the
-                  // non-confirm path's handleSubmit does. Nothing is stranded either way —
-                  // `submitting` and the dialog only ever get set after this awaits
-                  // successfully (`ask` itself never rejects, see useConfirm).
-                  const valid = await methods.trigger(undefined, {
-                    shouldFocus: errorSummaryCount === 0,
-                  })
-                  if (!valid) {
-                    // This path never reaches handleSubmit, so submitCount never increments —
-                    // a plain form's <FormErrorSummary> (outside a Wizard) needs its own signal
-                    // that an attempt just failed. See ErrorSummaryContext.failedConfirmAttempt.
-                    setFailedConfirmAttempt((n) => n + 1)
-                    return
-                  }
-                  if (await ask(confirmOptions)) await submit(event)
-                }
-              : submit
-          }
+          onSubmit={guardedSubmit}
         >
           {title != null && (
             <FormTitle
