@@ -166,7 +166,9 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
     children,
     slotProps,
   } = useDefaultProps({ props: inProps, name: 'EzFieldArray' })
-  useEzFormContext('FieldArray') // guard only; useFieldArray reads control from context
+  // The guard, plus `getValues` for the post-update row count; `useFieldArray`
+  // reads `control` from context itself.
+  const { getValues } = useEzFormContext('FieldArray')
   const { fields, append, remove, move } = useFieldArray({ name, rules, shouldUnregister })
   const { errors } = useFormState()
 
@@ -257,6 +259,9 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
 
   const announce = (text: string) => setStatus((prev) => ({ text, seq: prev.seq + 1 }))
 
+  /** Rows *now*, read after a hookform mutation has applied rather than from `fields`. */
+  const rowCount = () => (getValues(name) as unknown[] | undefined)?.length ?? 0
+
   const handleAdd = () => {
     const row = typeof emptyRow === 'function' ? (emptyRow as () => TRow)() : emptyRow
     // hookform focuses the input it registered for the new row; this component
@@ -266,7 +271,11 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
     // from this render's closure: a double invoke would read the same stale
     // length twice and aim at a row that is no longer the appended one.
     setPendingFocus({ kind: 'appended' })
-    announce(`Row ${fields.length + 1} added`)
+    // The count comes from the form's values, which `append` has already
+    // written, not from this render's `fields.length`: two Adds (or a Remove
+    // then an Add) landing in one batch run against the same stale closure and
+    // would both announce the length the previous render saw.
+    announce(`Row ${rowCount()} added`)
   }
 
   const handleRemove = (index: number) => {
