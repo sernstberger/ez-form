@@ -1,15 +1,22 @@
-import type { ReactNode } from 'react'
+import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
+import ListItemText from '@mui/material/ListItemText'
+import Paper, { type PaperProps } from '@mui/material/Paper'
 import { styled } from '@mui/material/styles'
+import { mergeSlotProps } from '@mui/material/utils'
 import { TextField, type TextFieldProps } from '../TextField'
+import { Autocomplete, type AutocompleteProps } from '../Autocomplete'
 import { StateSelect, type StateSelectProps } from '../StateSelect'
 import { ZipField, type ZipFieldProps } from '../ZipField'
 import { resolveAutoComplete } from '../resolveAutoComplete'
 import { FormSection, type FormSectionProps } from '../../FormSection'
+import { LiveRegion, type LiveRegionProps } from '../../Form/LiveRegion'
 import { useAssisted } from '../../Form/AssistedContext'
 import { useEzFormContext } from '../../useEzFormContext'
 import { cx } from '../../cx'
+import type { AddressLookupProvider, AddressSuggestion } from './addressLookup'
+import { useAddressLookup } from './useAddressLookup'
 
 /** The object an `AddressField` reads and writes at its `name`. */
 export interface AddressValue {
@@ -30,6 +37,8 @@ export const addressFieldClasses = generateUtilityClasses('EzAddressField', [
   'city',
   'state',
   'zip',
+  'attribution',
+  'status',
 ])
 
 /**
@@ -55,6 +64,12 @@ const AddressFieldRoot = styled('div', { name: 'EzAddressField', slot: 'Root' })
 const AddressFieldStreet = styled(TextField, { name: 'EzAddressField', slot: 'Street' })({
   gridArea: 'street',
 })
+// The same `Street` slot, so `styleOverrides.street` reaches the part whichever
+// component renders it. `styled` erases the generic; the cast restores it.
+const AddressFieldStreetLookup = styled(Autocomplete, {
+  name: 'EzAddressField',
+  slot: 'Street',
+})({ gridArea: 'street' }) as typeof Autocomplete
 const AddressFieldStreet2 = styled(TextField, { name: 'EzAddressField', slot: 'Street2' })({
   gridArea: 'street2',
 })
@@ -67,6 +82,51 @@ const AddressFieldState = styled(StateSelect, { name: 'EzAddressField', slot: 'S
 const AddressFieldZip = styled(ZipField, { name: 'EzAddressField', slot: 'Zip' })({
   gridArea: 'zip',
 })
+// The provider's attribution line under the listbox. The functional minimum
+// (the listbox's own text style, a little inset) so a "Powered by …" line does
+// not sit flush against the last option; `styleOverrides.attribution` restyles it.
+const AddressFieldAttribution = styled('div', { name: 'EzAddressField', slot: 'Attribution' })(
+  ({ theme }) => ({
+    ...theme.typography.caption,
+    color: (theme.vars ?? theme).palette.text.secondary,
+    padding: theme.spacing(1, 2),
+  }),
+)
+// Visually hidden (LiveRegion's default): the filled-in parts are the sighted
+// feedback for a pick, so a visible line would only repeat what is on screen.
+const AddressFieldStatus = styled(LiveRegion, { name: 'EzAddressField', slot: 'Status' })({})
+
+/**
+ * Reaches the listbox paper through context rather than a per-render slot
+ * component: a component created inside `AddressField`'s render would be a new
+ * type every render, remounting the open popup on every keystroke. The popup is
+ * portaled, and context crosses portals.
+ */
+const AttributionContext = createContext<ReactNode>(null)
+
+/**
+ * MUI's Autocomplete paper with the attribution appended after the listbox. MUI
+ * renders its own styled paper `as` this component, so its `MuiAutocomplete-paper`
+ * styles and overrides still apply; this only adds the footer.
+ */
+function AddressFieldLookupPaper({ children, ...props }: PaperProps) {
+  const attribution = useContext(AttributionContext)
+  return (
+    <Paper {...props}>
+      {children}
+      {attribution != null && attribution !== false && (
+        <AddressFieldAttribution
+          className={addressFieldClasses.attribution}
+          // As MUI's own "No options" row: a click on the footer (a link in it,
+          // say) must not blur the input and close the popup under the pointer.
+          onMouseDown={(event) => event.preventDefault()}
+        >
+          {attribution}
+        </AddressFieldAttribution>
+      )}
+    </Paper>
+  )
+}
 
 /** Rules the composite applies to each required part; the parts own the rest. */
 type PartRules = Pick<TextFieldProps, 'required' | 'disabled'>
@@ -95,6 +155,20 @@ export interface AddressFieldProps extends PartRules {
   cityLabel?: ReactNode
   stateLabel?: ReactNode
   zipLabel?: ReactNode
+  /**
+   * Turns the street part into an address search: rows from `lookup.search`
+   * appear under it as the user types, and picking one runs `lookup.resolve`
+   * and fills every part it returns. Text typed without a pick stays as the
+   * street, so manual entry is never blocked. Without it the street is a
+   * plain `TextField`.
+   */
+  lookup?: AddressLookupProvider
+  /** How long typing must pause before `lookup.search` runs. Default 300ms. */
+  lookupDebounceMs?: number
+  /** Shorter queries do not search. Default 3. */
+  lookupMinChars?: number
+  /** Announced (visually hidden) after a pick fills the parts. Default `'Address filled'`. */
+  lookupFilledText?: ReactNode
   className?: string
   /**
    * Per-part props. `name` is omitted from every part: the composite derives
@@ -103,6 +177,14 @@ export interface AddressFieldProps extends PartRules {
    * the value would land outside the address object while the part still
    * looked correct. Everything else (per-part `helperText`, an extra rule, a
    * `size`) passes through and wins over the composite's default.
+   *
+   * Under `lookup` the street is an `Autocomplete`, and `slotProps.street` is
+   * mapped onto it: the rules, `label`, `helperText`, `disabled`, `className`,
+   * `optionalText`, `autoComplete` and `slotProps.htmlInput` reach the field
+   * directly, `onChange` fires per keystroke as on a `TextField`, and the
+   * other MUI TextField props reach the input via `textFieldProps` — except
+   * `onBlur` (the Autocomplete's own blur wins), `inputRef`, `displayValue`,
+   * `componentName` and the other nested `slotProps.*`, which are dropped.
    */
   slotProps?: {
     section?: Omit<FormSectionProps, 'title' | 'description'>
@@ -111,6 +193,8 @@ export interface AddressFieldProps extends PartRules {
     city?: Omit<Partial<TextFieldProps>, 'name'>
     state?: Omit<Partial<StateSelectProps>, 'name'>
     zip?: Omit<Partial<ZipFieldProps>, 'name'>
+    /** The `lookup` status region. `message`/`announcementKey` are owned by the field. */
+    status?: Omit<LiveRegionProps, 'message' | 'announcementKey'>
   }
 }
 
@@ -122,6 +206,41 @@ export interface AddressFieldProps extends PartRules {
  */
 const token = (section: string | undefined, field: string, assisted: boolean) =>
   resolveAutoComplete(section ? `${section} ${field}` : field, assisted)
+
+/** What the lookup `Autocomplete` lists; the form stores `label`, never the id. */
+interface LookupOption {
+  value: string
+  label: string
+  suggestion: AddressSuggestion
+}
+
+/**
+ * Suggestions → options. Two rows with the same street ("100 Main St" in two
+ * towns) would store the same value, which `Autocomplete` rightly flags as a
+ * duplicate; those rows get their locality folded into the label so each stays
+ * distinct — and readable, since the label is what a screen reader hears.
+ */
+const toOptions = (suggestions: readonly AddressSuggestion[]): LookupOption[] => {
+  const counts = new Map<string, number>()
+  for (const s of suggestions) counts.set(s.label, (counts.get(s.label) ?? 0) + 1)
+  return suggestions.map((suggestion) => ({
+    value: suggestion.id,
+    label:
+      (counts.get(suggestion.label) ?? 0) > 1 && suggestion.secondary
+        ? `${suggestion.label}, ${suggestion.secondary}`
+        : suggestion.label,
+    suggestion,
+  }))
+}
+
+const PARTS = ['street', 'street2', 'city', 'state', 'zip'] as const
+
+/**
+ * The provider already searched; re-filtering client-side would hide rows
+ * whose label does not contain the typed text ("1600 penn" → "1600
+ * Pennsylvania Ave NW" does, but a fuzzy or locality match would not).
+ */
+const keepProviderOrder = <T,>(options: T[]) => options
 
 /**
  * A US street address as five bound parts under one nested object `name`:
@@ -135,6 +254,8 @@ const token = (section: string | undefined, field: string, assisted: boolean) =>
  * definition and never picks it up. `autoCompleteSection` prefixes every token
  * at once (`"shipping"` → `shipping street-address`, …), which is what makes a
  * browser fill a shipping and a billing address on the same page separately.
+ *
+ * With `lookup`, the street becomes an address search (see `AddressLookupProvider`).
  */
 export function AddressField(inProps: AddressFieldProps) {
   const {
@@ -148,6 +269,10 @@ export function AddressField(inProps: AddressFieldProps) {
     cityLabel = 'City',
     stateLabel = 'State',
     zipLabel = 'ZIP code',
+    lookup,
+    lookupDebounceMs,
+    lookupMinChars,
+    lookupFilledText = 'Address filled',
     required,
     disabled,
     className,
@@ -156,20 +281,152 @@ export function AddressField(inProps: AddressFieldProps) {
   } = useDefaultProps({ props: inProps, name: 'EzAddressField' })
   // Guard here as well as in each part, so the "outside <Form>" error names
   // <AddressField> rather than whichever part happened to render first.
-  useEzFormContext('AddressField')
+  const form = useEzFormContext('AddressField')
   const assisted = useAssisted()
+
+  const lookupState = useAddressLookup({
+    provider: lookup,
+    name,
+    ...(lookupDebounceMs !== undefined && { debounceMs: lookupDebounceMs }),
+    ...(lookupMinChars !== undefined && { minChars: lookupMinChars }),
+  })
+  const lookupOptions = useMemo(() => toOptions(lookupState.options), [lookupState.options])
+
+  // `seq` keys the live region, so a second pick with the identical message
+  // still mounts a fresh node and is heard again.
+  const [status, setStatus] = useState<{ text: ReactNode; seq: number }>({ text: '', seq: 0 })
+  const announce = (text: ReactNode) => setStatus((prev) => ({ text, seq: prev.seq + 1 }))
+
+  const fillFrom = async (suggestion: AddressSuggestion) => {
+    const parts = await lookupState.resolve(suggestion)
+    if (!parts) return
+    for (const part of PARTS) {
+      // A hidden second line has nothing to show a value in; writing it would
+      // put state in the form that no control reflects.
+      if (part === 'street2' && !street2) continue
+      // Every rendered part is written, a part the provider did not supply as
+      // `''`: a picked address is the whole address, and a unit number left
+      // over from the previous pick would be a wrong address, not a partial one.
+      // The street is the exception — the user just picked a visible row, and a
+      // provider with no street line (a POI, some rural places) must not make
+      // it vanish; the row's label stays.
+      const fallback = part === 'street' ? suggestion.label : ''
+      form.setValue(`${name}.${part}`, parts[part] ?? fallback, {
+        shouldDirty: true,
+        shouldValidate: true,
+      })
+    }
+    announce(lookupFilledText)
+  }
+
+  const renderStreet = () => {
+    if (!lookup) {
+      return (
+        <AddressFieldStreet
+          name={`${name}.street`}
+          label={streetLabel}
+          autoComplete={token(autoCompleteSection, 'street-address', assisted)}
+          required={required}
+          disabled={disabled}
+          {...slotProps?.street}
+          className={cx(addressFieldClasses.street, slotProps?.street?.className)}
+        />
+      )
+    }
+    // `slotProps.street` is a TextField's props; pulled apart into what the
+    // Autocomplete takes directly and what goes to the TextField it renders.
+    // `inputRef`, `displayValue` and `componentName` are TextField internals
+    // with no counterpart here; `onBlur` would be replaced by the Autocomplete's
+    // own rather than composed, so it is dropped rather than half-honoured.
+    const {
+      required: streetRequired = required,
+      disabled: streetDisabled = disabled,
+      label: streetLabelOverride,
+      helperText,
+      className: streetClassName,
+      min,
+      max,
+      minLength,
+      maxLength,
+      pattern,
+      validate,
+      optionalText,
+      autoComplete: streetAutoComplete,
+      onChange: streetOnChange,
+      onBlur: _onBlur,
+      slotProps: streetSlotProps,
+      inputRef: _inputRef,
+      displayValue: _displayValue,
+      componentName: _componentName,
+      ...streetTextFieldProps
+    } = slotProps?.street ?? {}
+    return (
+      <AttributionContext.Provider value={lookup.attribution}>
+        <AddressFieldStreetLookup<LookupOption, string, false, true>
+          name={`${name}.street`}
+          label={streetLabelOverride ?? streetLabel}
+          helperText={helperText}
+          required={streetRequired}
+          disabled={streetDisabled}
+          min={min}
+          max={max}
+          minLength={minLength}
+          maxLength={maxLength}
+          pattern={pattern}
+          // A TextField validator sees a string; so does this one — under
+          // `freeSolo` the Autocomplete stores `''` for a clear, never `null`.
+          validate={validate as AutocompleteProps<LookupOption, string, false, true>['validate']}
+          optionalText={optionalText}
+          options={lookupOptions}
+          loading={lookupState.loading}
+          // Typed text is the value: a pick stores the row's label, and typing
+          // commits on Enter, blur or Tab (`autoSelect`) so the street is never
+          // silently empty after typing without picking.
+          freeSolo
+          autoSelect
+          getOptionValue={(o) => o.label}
+          filterOptions={keepProviderOrder}
+          autoComplete
+          includeInputInList
+          renderOption={({ key, ...optionProps }, option) => (
+            <li key={key} {...optionProps}>
+              <ListItemText
+                primary={option.suggestion.label}
+                secondary={option.suggestion.secondary}
+              />
+            </li>
+          )}
+          slots={{ paper: AddressFieldLookupPaper }}
+          onInputChange={(event, text, reason) => {
+            if (reason === 'input') {
+              lookupState.search(text)
+              // The `input` reason carries the input's own change event; a
+              // TextField `onChange` handler sees the same thing it would there.
+              streetOnChange?.(event as React.ChangeEvent<HTMLInputElement>)
+            } else if (reason === 'clear') {
+              lookupState.clear()
+            }
+          }}
+          onChange={(_event, value) => {
+            // A string is typed text and `null` a clear, both already stored by
+            // `Autocomplete` (`''` for the clear) through the form's own
+            // mode-aware `onChange`; only a picked row needs anything more.
+            if (value !== null && typeof value !== 'string') void fillFrom(value.suggestion)
+          }}
+          textFieldProps={streetTextFieldProps}
+          inputProps={mergeSlotProps(streetSlotProps?.htmlInput, {
+            autoComplete:
+              streetAutoComplete ?? token(autoCompleteSection, 'street-address', assisted),
+          })}
+          className={cx(addressFieldClasses.street, streetClassName)}
+        />
+      </AttributionContext.Provider>
+    )
+  }
 
   const parts = (
     <AddressFieldRoot {...rest} className={cx(addressFieldClasses.root, className)}>
-      <AddressFieldStreet
-        name={`${name}.street`}
-        label={streetLabel}
-        autoComplete={token(autoCompleteSection, 'street-address', assisted)}
-        required={required}
-        disabled={disabled}
-        {...slotProps?.street}
-        className={cx(addressFieldClasses.street, slotProps?.street?.className)}
-      />
+      {renderStreet()}
       {street2 && (
         <AddressFieldStreet2
           name={`${name}.street2`}
@@ -210,10 +467,26 @@ export function AddressField(inProps: AddressFieldProps) {
     </AddressFieldRoot>
   )
 
-  if (legend == null && description == null) return parts
+  // The status region exists only under `lookup`, so a field without one
+  // renders exactly what it did before the prop existed.
+  const content = lookup ? (
+    <>
+      {parts}
+      <AddressFieldStatus
+        {...slotProps?.status}
+        message={status.text}
+        announcementKey={status.seq}
+        className={cx(addressFieldClasses.status, slotProps?.status?.className)}
+      />
+    </>
+  ) : (
+    parts
+  )
+
+  if (legend == null && description == null) return content
   return (
     <FormSection {...slotProps?.section} title={legend} description={description}>
-      {parts}
+      {content}
     </FormSection>
   )
 }

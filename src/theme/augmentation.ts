@@ -86,7 +86,8 @@ declare module '@mui/material/styles' {
     EzFormErrorSummary: 'root' | 'heading' | 'list' | 'item' | 'link'
     EzFormSection: 'root' | 'legend' | 'description' | 'content'
     EzFieldArray: 'root' | 'row' | 'actions' | 'add' | 'remove' | 'move' | 'status' | 'error'
-    EzAddressField: 'root' | 'street' | 'street2' | 'city' | 'state' | 'zip'
+    EzAddressField:
+      'root' | 'street' | 'street2' | 'city' | 'state' | 'zip' | 'attribution' | 'status'
     EzPasswordField: 'root' | 'toggle'
     EzSsnField: 'root' | 'toggle'
     EzPasswordStrength: 'root' | 'bar' | 'label'

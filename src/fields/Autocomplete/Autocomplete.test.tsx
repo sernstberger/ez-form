@@ -117,6 +117,40 @@ describe('Autocomplete', () => {
     expect(onSubmit).toHaveBeenCalledWith({ role: 'Owner' }, expect.anything())
   })
 
+  it('stores "" (not null) when a freeSolo field is cleared', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const free = z.object({ role: z.string() })
+    render(
+      <Form schema={free} defaultValues={{ role: 'Owner' }} onSubmit={onSubmit}>
+        <Autocomplete name="role" label="Role" options={roles} freeSolo />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    // MUI renders the Clear indicator only while the field is focused or hovered.
+    await user.click(combobox())
+    await user.click(screen.getByRole('button', { name: 'Clear' }))
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(onSubmit).toHaveBeenCalledWith({ role: '' }, expect.anything())
+  })
+
+  it('mode="onChange": emptying a required freeSolo field shows the error at once', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form
+        schema={z.object({ role: z.string().min(1, 'Role is required.') })}
+        defaultValues={{ role: '' }}
+        onSubmit={() => {}}
+        mode="onChange"
+      >
+        <Autocomplete name="role" label="Role" options={roles} freeSolo required />
+      </Form>,
+    )
+    await user.type(combobox(), 'Ow')
+    await user.clear(combobox())
+    expect(await screen.findByText('Role is required.')).toBeInTheDocument()
+  })
+
   it('stores the option object when getOptionValue returns it', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
