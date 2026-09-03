@@ -93,7 +93,7 @@ declare module '@mui/material/styles' {
     EzPasswordField: 'root' | 'toggle'
     EzSsnField: 'root' | 'toggle'
     EzPasswordStrength: 'root' | 'bar' | 'label'
-    EzOtpField: 'root' | 'helperText'
+    EzOtpField: 'root' | 'helperText' | 'slotLabel'
     EzFileField: 'root' | 'fileList' | 'dropZone' | 'dragActive' | 'dropText'
     EzTextareaField: 'root' | 'counter'
     EzResendCodeButton: 'root' | 'status'

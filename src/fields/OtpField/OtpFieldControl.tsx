@@ -20,8 +20,10 @@ export interface OtpFieldControlProps extends Omit<OTPField.Root.Props, 'render'
   helperText?: ReactNode
   helperTextProps?: { id: string; role?: 'alert' }
   /**
-   * Accessible name of every slot after the first (the first is named by the
-   * label). `index` is 1-based. Default `` `Character ${index} of ${length}` ``.
+   * Accessible name of every slot after the first. When the field is named by
+   * ARIA rather than a visible `label`, slot 1 also gets it, appended to the
+   * field's name. `index` is 1-based. Default
+   * `` `Character ${index} of ${length}` ``.
    */
   characterLabel?: (index: number, length: number) => string
   /** Hookform's ref: the first slot, which is what a submit error focuses. */
@@ -33,14 +35,47 @@ export interface OtpFieldControlProps extends Omit<OTPField.Root.Props, 'render'
    * lets the label pick up `FormControl`'s own `required`, today's behavior.
    */
   labelRequired?: false
+  /**
+   * Whether `label` is a real name rather than a bare "(optional)" suffix — the
+   * bound `OtpField` passes `hasLabel(label)` because its `label` prop here is
+   * already the decorated `displayLabel`. Unbound callers can leave it: it
+   * falls back to the truthiness of `label`.
+   */
+  labelled?: boolean
 }
 
-export const otpFieldClasses = generateUtilityClasses('EzOtpField', ['root', 'helperText'])
+export const otpFieldClasses = generateUtilityClasses('EzOtpField', [
+  'root',
+  'helperText',
+  'slotLabel',
+])
 
 const Slots = styled('div')(({ theme }) => ({
   display: 'flex',
   gap: theme.spacing(1),
 }))
+
+// Base UI names slot 1 by whatever `<label>` points at the group; with an
+// ARIA-only name there is no such element, so slot 1 is the one input in the
+// row without a name and axe's "form elements must have labels" fires (#110).
+// `OTPField.Input` ignores `aria-label` on slot 1 by design and dev-warns, but
+// honours an explicit `aria-labelledby` — so these spans are the elements it
+// points at. They are the same clip-rect recipe `LiveRegion` uses, on a styled
+// slot's default style block rather than `sx`, so
+// `theme.components.EzOtpField.styleOverrides.slotLabel` overrides any part of
+// it.
+const OtpFieldSlotLabel = styled('span', { name: 'EzOtpField', slot: 'SlotLabel' })({
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  clipPath: 'inset(50%)',
+  whiteSpace: 'nowrap',
+  borderWidth: 0,
+})
 
 // FormHelperText's own left margin lines up with a TextField's outline notch;
 // OTPField.Root has none, so the helper text would sit indented under the
@@ -103,12 +138,27 @@ export function OtpFieldControl(inProps: OtpFieldControlProps) {
     disabled,
     required,
     labelRequired,
+    labelled: labelledProp,
     characterLabel = (index: number, count: number) => `Character ${index} of ${count}`,
     ...rootProps
   } = props
   const generatedId = useId()
   const id = idProp ?? generatedId
   const { onBlur, ...a11y } = inputProps ?? {}
+  // Read, not destructured: both still reach `OTPField.Root` through `rootProps`,
+  // which is what names the group.
+  const ariaLabel = rootProps['aria-label']
+  const ariaLabelledBy = rootProps['aria-labelledby']
+  const labelled = labelledProp ?? Boolean(label)
+  // With a visible label, Base UI already hands slot 1 the label's id — leave
+  // that alone. Without one, slot 1 needs its own `aria-labelledby`: the field's
+  // name (the consumer's `aria-labelledby` targets directly, or a hidden span
+  // carrying their `aria-label`) followed by slot 1's position, so it reads like
+  // every other slot.
+  const named = !labelled && (ariaLabel != null || ariaLabelledBy != null)
+  const nameId = `${id}-name`
+  const positionId = `${id}-position`
+  const firstSlotLabelledBy = named ? `${ariaLabelledBy ?? nameId} ${positionId}` : undefined
   // Focus moving between slots is not leaving the field: only report a blur
   // once focus lands outside the group, so the form does not mark the field
   // touched (and validate it) after every character.
@@ -125,10 +175,26 @@ export function OtpFieldControl(inProps: OtpFieldControlProps) {
       required={required}
       className={otpFieldClasses.root}
     >
-      {label ? (
+      {/* No label element at all without a real name: in `optional` mode `label`
+          is already `displayLabel`, which wraps a missing label with the
+          "(optional)" suffix, and a label reading "(optional)" alone is worse
+          than none — it would name the group and slot 1 that. */}
+      {labelled ? (
         <FormLabel htmlFor={id} required={labelRequired ?? required}>
           {label}
         </FormLabel>
+      ) : null}
+      {named ? (
+        <>
+          {ariaLabelledBy == null ? (
+            <OtpFieldSlotLabel id={nameId} className={otpFieldClasses.slotLabel}>
+              {ariaLabel}
+            </OtpFieldSlotLabel>
+          ) : null}
+          <OtpFieldSlotLabel id={positionId} className={otpFieldClasses.slotLabel}>
+            {characterLabel(1, length)}
+          </OtpFieldSlotLabel>
+        </>
       ) : null}
       <OTPField.Root
         {...rootProps}
@@ -145,6 +211,7 @@ export function OtpFieldControl(inProps: OtpFieldControlProps) {
             {...a11y}
             ref={index === 0 ? inputRef : undefined}
             aria-label={index === 0 ? undefined : characterLabel(index + 1, length)}
+            aria-labelledby={index === 0 ? firstSlotLabelledBy : undefined}
             onBlur={handleBlur}
           />
         ))}
