@@ -27,6 +27,14 @@ call. Pass absolute paths instead, and use each tool's own directory flag:
 This matters most in worktree lanes, where every path sits under `.worktrees/<track>/`. Put the
 rule in each lane's dispatch prompt — subagents inherit no memory of it.
 
+**Never run the full suite while parallel lanes are running.** Four worktree lanes each
+running vitest put this machine at load average 103 with 41 vitest processes; timing-sensitive
+tests (`userEvent`, MUI `Transition`, axe) then fail in bulk — 53 failures across 12 files,
+with individual assertions reporting 5-7s where they normally take milliseconds. That looks
+exactly like a code regression and is not one. Lane agents verify their own worktree; the
+orchestrator verifies **after** lanes finish, on an idle machine. The same rule applies to any
+flakiness measurement: a "flaky on main" claim measured under load is worthless.
+
 Scratch test probes go in `src/__qa__/` (gitignored, excluded from tsconfig and eslint) because
 vitest's `include` is `src/**/*.test.{ts,tsx}` — a probe in `/tmp` will not run. Delete them when
 done; `git status` must stay clean.
