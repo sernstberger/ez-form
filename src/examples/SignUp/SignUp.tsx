@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { useWatch } from 'react-hook-form'
 import { Form } from '../../Form'
 import { FormError } from '../../FormError'
+import { LiveRegion } from '../../Form/LiveRegion'
 import { FormSection } from '../../FormSection'
 import { TextField } from '../../fields/TextField'
 import { EmailField } from '../../fields/EmailField'
@@ -195,11 +196,21 @@ export function SignUp({ onSuccess }: SignUpProps) {
                   <Button type="button" variant="text" onClick={() => setResendCount((n) => n + 1)}>
                     Resend code
                   </Button>
-                  {resendCount > 0 && (
-                    <span role="status">
-                      Code resent{resendCount > 1 ? ` (${resendCount} times)` : ''}.
-                    </span>
-                  )}
+                  {/*
+                    Rendered unconditionally with an empty message at rest (the
+                    LiveRegion idiom): a region mounted in the same commit as its
+                    text is unreliably announced. Visible, since the line is also
+                    the sighted confirmation. No `announcementKey`: each message
+                    is distinct (the count changes), so every resend is new content.
+                  */}
+                  <LiveRegion
+                    visuallyHidden={false}
+                    message={
+                      resendCount > 0
+                        ? `Code resent${resendCount > 1 ? ` (${resendCount} times)` : ''}.`
+                        : ''
+                    }
+                  />
                 </Stack>
               </WizardStep>
               <WizardNav />
