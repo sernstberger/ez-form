@@ -7,6 +7,7 @@ import type { ControllerRenderProps } from 'react-hook-form'
 import { useEzField, type InputA11y } from './useEzField'
 import { mergeDisabled } from './mergeDisabled'
 import type { FieldRules } from '../rules'
+import { hasLabel } from '../devWarn'
 
 /** What the frame hands to `renderControl`. The control composes its own handlers after `field.onChange`. */
 export interface BoundField {
@@ -15,8 +16,15 @@ export interface BoundField {
   required: boolean
   /** Resolved against the helper text: `aria-describedby` is set only when there is text. */
   inputA11y: InputA11y
-  /** Id of the legend when `labelAs="legend"`; put it in `aria-labelledby` on the group. */
-  labelId: string
+  /**
+   * Id of the legend when `labelAs="legend"`; put it in `aria-labelledby` on the group.
+   *
+   * `undefined` when there is no label to render, so the attribute is dropped rather
+   * than pointing at an empty legend. That matters because `aria-labelledby` outranks
+   * `aria-label` in the accname algorithm: an id resolving to `""` does not fall back
+   * to `aria-label`, it leaves the control with no accessible name at all.
+   */
+  labelId: string | undefined
 }
 
 export interface FieldFrameProps<TValue> {
@@ -42,13 +50,17 @@ export interface FieldFrameProps<TValue> {
   labelAs: 'control' | 'legend'
   /**
    * Not rendered here — reported only so the dev-mode "no accessible name" warning can
-   * see that a label-less field is named some other way (see `src/devWarn.ts`).
+   * see that a label-less field is named some other way (see `src/devWarn.ts`). Every
+   * field passes these; each one forwards its own copy to its control through `{...rest}`.
    *
-   * Only a `labelAs="control"` field (Checkbox, Switch) may pass these: its `{...rest}`
-   * genuinely reaches the rendered control, so a consumer's value lands in the DOM. A
-   * `labelAs="legend"` field must **not** — it sets its own `aria-labelledby={labelId}`
-   * after spreading `rest`, so a consumer's value never reaches the DOM and forwarding it
-   * here would suppress a warning about a group that really is unnamed.
+   * This used to say a `labelAs="legend"` field must *not* report them, on the reasoning
+   * that its `aria-labelledby={labelId}` is set after `rest` and so wins anyway. That was
+   * the bug (#100) written down as intent: the frame emitted `aria-labelledby` even with
+   * no legend content, and an `aria-labelledby` naming an empty element beats `aria-label`
+   * in the accname algorithm — so those fields ended up with **no** accessible name while
+   * the warning that would have said so was suppressed. `labelId` is now `undefined`
+   * without a label, which leaves a consumer's `aria-label` as the name, exactly as plain
+   * MUI does.
    */
   'aria-label'?: string
   'aria-labelledby'?: string
@@ -80,14 +92,19 @@ export function FieldFrame<TValue>({
     'aria-label': ariaLabel,
     'aria-labelledby': ariaLabelledBy,
   })
-  const labelId = useId()
+  const generatedLabelId = useId()
   const text = f.helperText(helperText)
+  // `label`, not `displayLabel`: in `optional` mode `displayLabel` wraps a missing label
+  // with the "(optional)" suffix, which is not a name — a legend reading "(optional)"
+  // alone would be worse than none. Shared with `warnMissingLabel`, so the same input
+  // that warns is exactly the input that gets no legend.
+  const labelled = hasLabel(label)
   const bound: BoundField = {
     field: f.field,
     invalid: f.invalid,
     required: f.required,
     inputA11y: f.inputA11y(text),
-    labelId,
+    labelId: labelled ? generatedLabelId : undefined,
   }
   // FormControlLabel/FormLabel read `required` from FormControl context only when
   // their own prop is undefined; passing `f.labelRequired` (`false` in `optional`
@@ -111,9 +128,13 @@ export function FieldFrame<TValue>({
         />
       ) : (
         <>
-          <FormLabel component="legend" id={labelId} required={labelRequired}>
-            {f.displayLabel}
-          </FormLabel>
+          {/* No legend at all without a label: an empty one is markup nothing can use,
+              and in `optional` mode `displayLabel` would render a bare "(optional)". */}
+          {labelled ? (
+            <FormLabel component="legend" id={bound.labelId} required={labelRequired}>
+              {f.displayLabel}
+            </FormLabel>
+          ) : null}
           {renderControl(bound)}
         </>
       )}

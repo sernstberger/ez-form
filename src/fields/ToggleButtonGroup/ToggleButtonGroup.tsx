@@ -58,13 +58,19 @@ export function ToggleButtonGroup({
       rules={{ required, validate }}
       optionalText={optionalText}
       labelAs="legend"
+      // For the dev-mode "no accessible name" check only — read, not destructured, so
+      // both still reach the control through `rest`.
+      aria-label={rest['aria-label']}
+      aria-labelledby={rest['aria-labelledby']}
       renderControl={({ field, inputA11y, labelId }) => (
         <MuiToggleButtonGroup
           {...rest}
           {...inputA11y}
           // No `aria-required`: ARIA does not support it on this element's
           // `role="group"` (unlike RadioGroup's `radiogroup`), and axe flags it.
-          aria-labelledby={labelId}
+          // `?? rest`: the legend's id wins when there is a legend, otherwise a
+          // consumer's own `aria-labelledby` survives the spread above it.
+          aria-labelledby={labelId ?? rest['aria-labelledby']}
           exclusive={exclusive}
           // FormControl's disabled context does not reach ToggleButton (not a form control).
           disabled={mergeDisabled(disabled, field.disabled)}

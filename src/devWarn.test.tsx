@@ -17,6 +17,7 @@ import { PasswordField } from './fields/PasswordField'
 import { TextareaField } from './fields/TextareaField'
 import { resetDevWarnings } from './devWarn'
 import { consoleMessages, expectConsole } from './test/expectConsole'
+import { getInnerGroup } from './test/getInnerGroup'
 
 /**
  * `devWarn` deduplicates by key for the life of the module, so every test starts by clearing
@@ -114,14 +115,21 @@ describe('dev warning: a field with no accessible name', () => {
   })
 
   /**
-   * A `labelAs="legend"` group sets its own `aria-labelledby={labelId}` after spreading
-   * `rest`, so a consumer's `aria-labelledby` never reaches the DOM — the group really is
-   * unnamed and must still warn. (An earlier revision forwarded it to `FieldFrame` and so
-   * silently accepted a name that was never rendered.)
+   * A `labelAs="legend"` group with no label renders no legend, so a consumer's
+   * `aria-labelledby` is the name and the warning must stay quiet.
+   *
+   * This block used to assert the opposite — that these four "never render" a consumer's
+   * `aria-labelledby`, because the frame set its own `aria-labelledby={labelId}` after
+   * spreading `rest`. That was #100: the frame emitted that attribute even with an empty
+   * legend, which outranks `aria-label` in the accname algorithm and left the control with
+   * no name at all. The warning firing here was correct *about that build*, and the test
+   * pinned the bug in place. The name is asserted alongside the silence so this cannot
+   * regress back into accepting a name nothing renders.
    */
   it.each([
     [
       'RadioGroup',
+      'radiogroup',
       <RadioGroup
         name="role"
         label=""
@@ -131,6 +139,7 @@ describe('dev warning: a field with no accessible name', () => {
     ],
     [
       'CheckboxGroup',
+      'group',
       <CheckboxGroup
         name="role"
         label=""
@@ -140,6 +149,7 @@ describe('dev warning: a field with no accessible name', () => {
     ],
     [
       'ToggleButtonGroup',
+      'group',
       <ToggleButtonGroup
         name="role"
         label=""
@@ -147,14 +157,22 @@ describe('dev warning: a field with no accessible name', () => {
         options={[{ value: 'a', label: 'A' }]}
       />,
     ],
-    ['Rating', <Rating name="role" label="" aria-labelledby="x" />],
-  ])(
-    '%s still warns when only aria-labelledby is given: the group never renders it',
-    (_name, element) => {
-      wrap(element)
-      expect(messagesMatching(/no accessible name/)).toHaveLength(1)
-    },
-  )
+    ['Rating', 'radiogroup', <Rating name="role" label="" aria-labelledby="x" />],
+  ])('%s accepts aria-labelledby, which now really names the group', (_name, role, element) => {
+    wrap(
+      <>
+        <span id="x">External name</span>
+        {element}
+      </>,
+    )
+    expect(messagesMatching(/no accessible name/)).toHaveLength(0)
+    // The silence is only correct because the name is real; assert it, not the attribute.
+    const named =
+      role === 'group'
+        ? getInnerGroup('External name')
+        : screen.getByRole(role, { name: 'External name' })
+    expect(named).toBeInTheDocument()
+  })
 
   // Checkbox/Switch are `labelAs="control"`: `{...rest}` really does reach the input, so a
   // consumer's aria attribute lands in the DOM and legitimately silences the warning.

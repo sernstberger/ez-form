@@ -51,8 +51,7 @@ export function resetDevWarnings(): void {
  * supplied some other way (a `slotProps.htmlInput['aria-label']`, say) is invisible here and
  * would warn falsely. That is why this is a warning and not an error.
  *
- * `label` is a `ReactNode`: `''`, `null`, `undefined` and `false` are all "no label", while
- * any element or non-empty string counts — an icon-only label element still names the field.
+ * What counts as a label is `hasLabel` below.
  */
 export function warnMissingLabel(
   componentName: string,
@@ -62,13 +61,27 @@ export function warnMissingLabel(
   ariaLabelledBy: string | undefined,
 ): void {
   if (!isDev) return
-  const hasLabel = label !== undefined && label !== null && label !== false && label !== ''
-  if (hasLabel || ariaLabel || ariaLabelledBy) return
+  if (hasLabel(label) || ariaLabel || ariaLabelledBy) return
   devWarn(
     `missing-label:${componentName}:${name}`,
     `ez-form: <${componentName} name="${name}"> has no accessible name. ` +
       'Pass `label`, or `aria-label` / `aria-labelledby` if the name is supplied elsewhere.',
   )
+}
+
+/**
+ * Does this `label` prop name anything? `ReactNode` has four empty forms — `undefined`,
+ * `null`, `false` and `''` — and any element or non-empty string counts, since an
+ * icon-only label element still names a field.
+ *
+ * Exported because `FieldFrame` has to ask the same question for a different reason: it
+ * renders a legend only when there is something to put in it, and emits the legend's id
+ * as `aria-labelledby` only then (#100). Sharing the predicate keeps the two in step —
+ * the input that warns is exactly the input that gets no legend. Unlike the warnings,
+ * this one runs in production too, so it carries no `isDev` guard.
+ */
+export function hasLabel(label: unknown): boolean {
+  return label !== undefined && label !== null && label !== false && label !== ''
 }
 
 /**
