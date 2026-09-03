@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react'
 import type { OTPField } from '@base-ui/react/otp-field'
-import { OtpFieldControl } from './OtpFieldControl'
+import { OtpFieldControl, type OtpFieldControlProps } from './OtpFieldControl'
 import { useEzField } from '../useEzField'
 import { mergeDisabled } from '../mergeDisabled'
-import { FALLBACK_LABEL, type FieldRules } from '../../rules'
+import { useRuleMessages } from '../../Form/RuleMessagesContext'
+import type { FieldRules } from '../../rules'
 
 export type OtpFieldProps = Omit<
   OTPField.Root.Props,
@@ -33,6 +34,8 @@ export type OtpFieldProps = Omit<
   onValueChange?: OTPField.Root.Props['onValueChange']
   /** Runs after the form's own handler, when focus leaves the group. */
   onBlur?: () => void
+  /** See `OtpFieldControlProps['characterLabel']`; theme-defaultable via `EzOtpField`. */
+  characterLabel?: OtpFieldControlProps['characterLabel']
 } & Pick<FieldRules<string>, 'required' | 'validate'>
 
 /**
@@ -54,7 +57,8 @@ export function OtpField({
   onBlur,
   ...rest
 }: OtpFieldProps) {
-  const l = typeof label === 'string' ? label : FALLBACK_LABEL
+  const messages = useRuleMessages()
+  const l = typeof label === 'string' ? label : messages.fallbackLabel
   const consumer =
     validate === undefined ? {} : typeof validate === 'function' ? { validate } : validate
   const f = useEzField<string>(name, 'OtpField', {
@@ -65,7 +69,7 @@ export function OtpField({
       validate: {
         ...consumer,
         complete: (v) =>
-          v === '' || v == null || v.length === length || `${l} must be ${length} characters.`,
+          v === '' || v == null || v.length === length || messages.exactLength(l, length),
       },
     },
     optionalText,

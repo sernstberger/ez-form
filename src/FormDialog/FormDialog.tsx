@@ -89,6 +89,11 @@ export interface FormDialogProps<TIn extends FieldValues, TOut>
    * Copy for the unsaved-changes prompt shown when a close is requested while
    * the form is dirty. Defaults to `Discard changes?` / `Discard` / `Keep
    * editing`; `false` closes immediately, dirty or not.
+   *
+   * A theme default (`EzFormDialog.defaultProps.exitConfirm`, as the locale
+   * objects set) is replaced whole by an explicit prop, MUI's own
+   * `defaultProps` rule for a non-slot key — so pass all three keys when you
+   * override one under a locale.
    */
   exitConfirm?: ConfirmOptions | false
   /** Close on a successful submit, with reason `'submit'`. Default `true`. */
@@ -130,6 +135,8 @@ const FORM_PROP_KEYS = {
   mode: true,
   disabled: true,
   confirm: true,
+  confirmTitle: true,
+  messages: true,
   guard: true,
   assisted: true,
   description: true,

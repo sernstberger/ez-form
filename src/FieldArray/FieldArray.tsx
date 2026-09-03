@@ -65,6 +65,14 @@ export interface FieldArrayProps<TRow = Record<string, unknown>> extends Pick<
    * should always pass `singular` too. For full control use `rowLabel`.
    */
   singular?: string
+  /**
+   * How `singular` is guessed from a string `label` when `singular` is not
+   * set: the naive English strip above. A locale object replaces it with its
+   * own rule (`esES` strips `-es`/`-s`). Default `(label) => label.replace(/s$/, '')`.
+   */
+  singularize?: (label: string) => string
+  /** The row name when neither `singular` nor a string `label` is available. Default `Row`. */
+  rowText?: string
   /** Full control over a row's name, used in its legend and in every button's `aria-label`. */
   rowLabel?: (index: number) => ReactNode
   /** Rows below which Remove is disabled. Default 0. */
@@ -75,9 +83,21 @@ export interface FieldArrayProps<TRow = Record<string, unknown>> extends Pick<
   addLabel?: ReactNode
   /**
    * Remove button text. The button's accessible name is always
-   * `Remove <row label>` so screen-reader users know which row it drops.
+   * `removeRowLabel(<row label>)` so screen-reader users know which row it drops.
    */
   removeLabel?: ReactNode
+  /** Accessible name of a row's Remove button. Default `` `Remove ${row}` ``. */
+  removeRowLabel?: (row: string) => string
+  /** Accessible name of a row's Move up button. Default `` `Move ${row} up` ``. */
+  moveUpLabel?: (row: string) => string
+  /** Accessible name of a row's Move down button. Default `` `Move ${row} down` ``. */
+  moveDownLabel?: (row: string) => string
+  /** Announced after Add; `row` is the new row's 1-based number. Default `` `Row ${row} added` ``. */
+  addedMessage?: (row: number) => string
+  /** Announced after Remove. Default `` `Row ${row} removed` ``. */
+  removedMessage?: (row: number) => string
+  /** Announced after Move; `row` is where the row landed. Default `` `Row ${row} moved ${direction}` ``. */
+  movedMessage?: (row: number, direction: 'up' | 'down') => string
   /** A new row's value. A function is called per Add, so object rows are never shared. */
   emptyRow: TRow | (() => TRow)
   /** Adds Move up / Move down buttons to each row. */
@@ -156,11 +176,19 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
     shouldUnregister,
     label,
     singular,
+    singularize = (l: string) => l.replace(/s$/, ''),
+    rowText = 'Row',
     rowLabel,
     minRows = 0,
     maxRows,
     addLabel = 'Add',
     removeLabel = 'Remove',
+    removeRowLabel = (row: string) => `Remove ${row}`,
+    moveUpLabel = (row: string) => `Move ${row} up`,
+    moveDownLabel = (row: string) => `Move ${row} down`,
+    addedMessage = (row: number) => `Row ${row} added`,
+    removedMessage = (row: number) => `Row ${row} removed`,
+    movedMessage = (row: number, direction: 'up' | 'down') => `Row ${row} moved ${direction}`,
     emptyRow,
     reorder,
     children,
@@ -239,7 +267,7 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
 
   /** The generated `<singular> <n>` name, always a string. */
   const defaultRowName = (index: number): string =>
-    `${singular ?? (typeof label === 'string' ? label.replace(/s$/, '') : 'Row')} ${index + 1}`
+    `${singular ?? (typeof label === 'string' ? singularize(label) : rowText)} ${index + 1}`
 
   const nameRow = (index: number): ReactNode => (rowLabel ? rowLabel(index) : defaultRowName(index))
 
@@ -275,20 +303,20 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
     // written, not from this render's `fields.length`: two Adds (or a Remove
     // then an Add) landing in one batch run against the same stale closure and
     // would both announce the length the previous render saw.
-    announce(`Row ${rowCount()} added`)
+    announce(addedMessage(rowCount()))
   }
 
   const handleRemove = (index: number) => {
     remove(index)
     setPendingFocus(index > 0 ? { kind: 'row', index: index - 1 } : { kind: 'add' })
-    announce(`Row ${index + 1} removed`)
+    announce(removedMessage(index + 1))
   }
 
   const handleMove = (index: number, direction: 'up' | 'down') => {
     const to = direction === 'up' ? index - 1 : index + 1
     move(index, to)
     setPendingFocus({ kind: 'move', index: to, direction })
-    announce(`Row ${to + 1} moved ${direction}`)
+    announce(movedMessage(to + 1, direction))
   }
 
   // zod's `.min` / `.max` on the array itself lands on `errors[name].message`,
@@ -335,7 +363,7 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
                 type="button"
                 {...removeProps}
                 disabled={atMin || removeProps.disabled}
-                aria-label={`Remove ${rowAriaName}`}
+                aria-label={removeRowLabel(rowAriaName)}
                 className={cx(fieldArrayClasses.remove, removeProps.className)}
                 onClick={() => handleRemove(index)}
               >
@@ -348,7 +376,7 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
                     {...moveProps}
                     data-direction="up"
                     disabled={index === 0 || moveProps.disabled}
-                    aria-label={`Move ${rowAriaName} up`}
+                    aria-label={moveUpLabel(rowAriaName)}
                     className={cx(fieldArrayClasses.move, moveProps.className)}
                     onClick={() => handleMove(index, 'up')}
                   >
@@ -359,7 +387,7 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
                     {...moveProps}
                     data-direction="down"
                     disabled={index === fields.length - 1 || moveProps.disabled}
-                    aria-label={`Move ${rowAriaName} down`}
+                    aria-label={moveDownLabel(rowAriaName)}
                     className={cx(fieldArrayClasses.move, moveProps.className)}
                     onClick={() => handleMove(index, 'down')}
                   >

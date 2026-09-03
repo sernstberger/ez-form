@@ -17,8 +17,21 @@ interface ReadOnlyFieldBaseProps {
   format?: (value: unknown) => ReactNode
   /** Shown for `'' | null | undefined | []`. Default `—`. */
   empty?: ReactNode
+  /** Shown for a `true` value (no `options`, no `format`). Default `Yes`. */
+  yesText?: ReactNode
+  /** Shown for a `false` value (no `options`, no `format`). Default `No`. */
+  noText?: ReactNode
   /** Inside a `Wizard`: renders an Edit button that goes to this step. Ignored outside one. */
   editStep?: string
+  /** The Edit button's text. Default `Edit`. */
+  editLabel?: ReactNode
+  /**
+   * The Edit button's accessible name, built from the field's label so a
+   * screen reader hears which row it edits. Default `` `Edit ${label}` ``.
+   * Only applied when the label is a string (or the field has a `name`);
+   * otherwise the visible `editLabel` names the button on its own.
+   */
+  editAriaLabel?: (label: string) => string
   slotProps?: {
     root?: React.ComponentProps<'div'>
     header?: React.ComponentProps<'div'>
@@ -49,7 +62,12 @@ export type ReadOnlyFieldProps = ReadOnlyFieldBaseProps &
 const isEmpty = (v: unknown) =>
   v === '' || v === null || v === undefined || (Array.isArray(v) && v.length === 0)
 
-function display(value: unknown, options?: readonly Option[]): ReactNode {
+function display(
+  value: unknown,
+  options: readonly Option[] | undefined,
+  yesText: ReactNode,
+  noText: ReactNode,
+): ReactNode {
   /*
    * Composed as React nodes rather than `Array.join(', ')`.
    *
@@ -63,7 +81,7 @@ function display(value: unknown, options?: readonly Option[]): ReactNode {
     return value.map((v, i) => (
       <Fragment key={i}>
         {i > 0 ? ', ' : null}
-        {display(v, options)}
+        {display(v, options, yesText, noText)}
       </Fragment>
     ))
   }
@@ -71,7 +89,7 @@ function display(value: unknown, options?: readonly Option[]): ReactNode {
     const match = options.find((o) => o.value === value)
     if (match) return match.label
   }
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  if (typeof value === 'boolean') return value ? yesText : noText
   if (value instanceof Date) return value.toLocaleString()
   if (typeof File !== 'undefined' && value instanceof File) return value.name
   return String(value)
@@ -122,12 +140,20 @@ function ReadOnlyFieldView({
   options,
   format,
   empty = '—',
+  yesText = 'Yes',
+  noText = 'No',
   editStep,
+  editLabel = 'Edit',
+  editAriaLabel = (l: string) => `Edit ${l}`,
   slotProps,
 }: ReadOnlyFieldViewProps) {
   const wizard = useOptionalWizard()
   const labelId = useId()
-  const content = format ? format(value) : isEmpty(value) ? empty : display(value, options)
+  const content = format
+    ? format(value)
+    : isEmpty(value)
+      ? empty
+      : display(value, options, yesText, noText)
   // In `page` layout every step (and so every field) is already on screen at once, so
   // `wizard.go()` has nothing to do there — it's a no-op that always resolves `false`. An
   // Edit button that clicks to nowhere is a focusable dead control (WCAG 2.1.1/4.1.2), so
@@ -137,7 +163,9 @@ function ReadOnlyFieldView({
 
   const labelProps = { variant: 'caption', color: 'text.secondary', ...slotProps?.label } as const
   const valueProps = { variant: 'body1', ...slotProps?.value } as const
-  const editableName = typeof text === 'string' ? text : (name ?? 'Edit')
+  // The name the Edit button announces. A non-string label with no `name` has
+  // nothing to build one from, so the button keeps its visible text as its name.
+  const editableName = typeof text === 'string' ? text : name
 
   return (
     <ReadOnlyFieldRoot
@@ -160,11 +188,11 @@ function ReadOnlyFieldView({
           <ReadOnlyFieldEdit
             type="button"
             onClick={() => void wizard.go(editStep)}
-            aria-label={`Edit ${editableName}`}
+            aria-label={editableName === undefined ? undefined : editAriaLabel(editableName)}
             {...slotProps?.edit}
             className={`${readOnlyFieldClasses.edit}${slotProps?.edit?.className ? ` ${slotProps.edit.className}` : ''}`}
           >
-            Edit
+            {editLabel}
           </ReadOnlyFieldEdit>
         )}
       </ReadOnlyFieldHeader>

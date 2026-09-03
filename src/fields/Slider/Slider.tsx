@@ -4,7 +4,8 @@ import { mergeSlotProps } from '@mui/material/utils'
 import type { FieldValues, Validate, ValidationRule } from 'react-hook-form'
 import { FieldFrame } from '../FieldFrame'
 import { mergeDisabled } from '../mergeDisabled'
-import { FALLBACK_LABEL, defaultMessages, type FieldRules } from '../../rules'
+import { useRuleMessages } from '../../Form/RuleMessagesContext'
+import type { FieldRules } from '../../rules'
 
 export type SliderValue = number | number[]
 
@@ -79,7 +80,8 @@ export function Slider({
   ...rest
 }: SliderProps) {
   const minBound = bound(min)
-  const l = typeof label === 'string' ? label : FALLBACK_LABEL
+  const messages = useRuleMessages()
+  const l = typeof label === 'string' ? label : messages.fallbackLabel
   return (
     <FieldFrame<SliderValue>
       componentName="Slider"
@@ -97,14 +99,14 @@ export function Slider({
             l,
             (v) => Math.min(...v),
             (e, m) => e >= m,
-            defaultMessages.min,
+            messages.min,
           ),
           max: boundCheck(
             max,
             l,
             (v) => Math.max(...v),
             (e, m) => e <= m,
-            defaultMessages.max,
+            messages.max,
           ),
         },
       }}

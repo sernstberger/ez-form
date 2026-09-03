@@ -34,6 +34,8 @@ import { AssistedContext } from './AssistedContext'
 import { ErrorSummaryContext } from './ErrorSummaryContext'
 import { LiveRegion, type LiveRegionProps } from './LiveRegion'
 import { RequiredIndicatorContext } from './RequiredIndicatorContext'
+import { RuleMessagesContext } from './RuleMessagesContext'
+import { defaultMessages, type RuleMessages } from '../rules'
 import { shouldBlockUnsavedChanges } from '../useFormGuard'
 
 /**
@@ -70,10 +72,16 @@ export type FormTextSlotProps = TypographyProps & { component?: ElementType }
  */
 export function willRenderFormDescription(props: {
   description?: ReactNode
-  requiredIndicatorText?: ReactNode | false
+  requiredIndicatorText?: FormProps<FieldValues, unknown>['requiredIndicatorText']
 }): boolean {
   return props.description != null || props.requiredIndicatorText !== false
 }
+
+/** The default `requiredIndicatorText`, by mode. A locale replaces it with a function of the mode. */
+const defaultRequiredIndicatorText = (requiredIndicator: 'asterisk' | 'optional'): string =>
+  requiredIndicator === 'optional'
+    ? 'All fields are required unless marked optional.'
+    : 'Required fields are marked with an asterisk (*).'
 
 const FormRoot = styled('form', { name: 'EzForm', slot: 'Root' })({})
 const FormTitle = styled(Typography, { name: 'EzForm', slot: 'Title' })({})
@@ -133,10 +141,25 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
   /**
    * Ask before submitting. Runs after validation inside the submit handler,
    * so an invalid form never asks, and every submit path (button, Enter in a
-   * field, `form.requestSubmit()`) asks. `true` uses the default copy
-   * (`Submit?`); pass `ConfirmOptions` for your own.
+   * field, `form.requestSubmit()`) asks. `true` uses `confirmTitle` as the
+   * title (the button labels are `ConfirmDialog`'s own defaults); pass
+   * `ConfirmOptions` for your own copy.
    */
   confirm?: true | ConfirmOptions
+  /**
+   * Title of the dialog `confirm={true}` opens. Default `Submit?`. Its own
+   * prop, rather than part of `confirm`, so a theme (a locale object) can
+   * translate it without switching the confirmation on for every form.
+   */
+  confirmTitle?: ReactNode
+  /**
+   * Replaces any of the label-derived default rule messages (`required`,
+   * `min`, …, the pickers' codes) — see `RuleMessages`. Partial: unlisted
+   * keys keep the library's English. Theme-defaultable via
+   * `theme.components.EzForm.defaultProps.messages`, which is how the
+   * `enUS`/`esES` locale objects translate every rule message at once.
+   */
+  messages?: Partial<RuleMessages>
   /**
    * Warn on tab close / reload while the form is dirty and not submitting
    * (a `beforeunload` listener). For in-app navigation use `useFormGuard`.
@@ -177,9 +200,14 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
    * set). Defaults to `'Required fields are marked with an asterisk (*).'`
    * in `'asterisk'` mode and `'All fields are required unless marked
    * optional.'` in `'optional'` mode; an explicit string is used verbatim in
-   * either mode. `false` suppresses it in either mode.
+   * either mode. `false` suppresses it in either mode. A function receives
+   * the mode and returns the text — the form a locale object uses, so one
+   * theme default serves both modes.
    */
-  requiredIndicatorText?: ReactNode | false
+  requiredIndicatorText?:
+    | ReactNode
+    | false
+    | ((requiredIndicator: 'asterisk' | 'optional') => ReactNode)
   /**
    * Announced when a submit starts. `false` suppresses just this one.
    * Default "Submitting…".
@@ -223,13 +251,15 @@ function FormImpl<TIn extends FieldValues, TOut>(
     mode = 'onSubmit',
     disabled = false,
     confirm,
+    confirmTitle = 'Submit?',
+    messages,
     guard = false,
     assisted = false,
     title,
     description,
     requiredIndicator = 'asterisk',
     optionalText = '(optional)',
-    requiredIndicatorText,
+    requiredIndicatorText = defaultRequiredIndicatorText,
     submitPendingText = 'Submitting…',
     submitSuccessText = 'Submitted.',
     submitErrorText = 'Submit failed.',
@@ -261,17 +291,24 @@ function FormImpl<TIn extends FieldValues, TOut>(
   } as const
   // The requiredIndicator convention is stated once, in the same slot as
   // `description`: appended as a second sentence when both are set, or rendered
-  // alone when `description` is unset. The default text is mode-dependent; an
-  // explicit `requiredIndicatorText` (including `false` to suppress it) is used
-  // verbatim in either mode. The `*` in the asterisk-mode default is spelled out
+  // alone when `description` is unset. The default text is mode-dependent (a
+  // function of the mode, so a locale's theme default is too); an explicit
+  // `requiredIndicatorText` (including `false` to suppress it) is used verbatim
+  // in either mode. The `*` in the asterisk-mode default is spelled out
   // ("asterisk (*)") rather than rendered as a bare glyph, so it reads sensibly
   // to assistive tech without needing an `aria-hidden` span — mirroring how
   // MUI's `FormLabel` asterisk is itself `aria-hidden`.
-  const defaultRequiredIndicatorText =
-    requiredIndicator === 'optional'
-      ? 'All fields are required unless marked optional.'
-      : 'Required fields are marked with an asterisk (*).'
-  const resolvedRequiredIndicatorText = requiredIndicatorText ?? defaultRequiredIndicatorText
+  const resolvedRequiredIndicatorText =
+    typeof requiredIndicatorText === 'function'
+      ? requiredIndicatorText(requiredIndicator)
+      : requiredIndicatorText
+  // The rule-message set every field in this form derives its default messages
+  // from. Memoised on the prop so the context value (and the resolver's
+  // closure) only changes when the consumer's `messages` does.
+  const ruleMessages = useMemo<RuleMessages>(
+    () => (messages ? { ...defaultMessages, ...messages } : defaultMessages),
+    [messages],
+  )
   const showRequiredIndicatorText = resolvedRequiredIndicatorText !== false
   const effectiveDescription = showRequiredIndicatorText ? (
     description != null ? (
@@ -365,7 +402,7 @@ function FormImpl<TIn extends FieldValues, TOut>(
     [registerErrorSummary, errorSummaryCount, failedConfirmAttempt],
   )
   const methods = useForm<TIn, unknown, TOut>({
-    resolver: ezResolver(schema),
+    resolver: ezResolver(schema, ruleMessages),
     defaultValues: wrappedDefaultValues,
     values,
     resetOptions,
@@ -410,7 +447,7 @@ function FormImpl<TIn extends FieldValues, TOut>(
 
   const { confirm: ask, dialog } = useConfirm()
   const confirmOptions: ConfirmOptions | undefined =
-    confirm === true ? { title: 'Submit?' } : confirm
+    confirm === true ? { title: confirmTitle } : confirm
 
   // Ruling: share shouldBlockUnsavedChanges with useFormGuard rather than repeating
   // the isDirty/isSubmitting/isSubmitSuccessful formula inline — #74. isDirty stays
@@ -524,7 +561,7 @@ function FormImpl<TIn extends FieldValues, TOut>(
           )}
           <AssistedContext.Provider value={assisted}>
             <RequiredIndicatorContext.Provider value={{ requiredIndicator, optionalText }}>
-              {children}
+              <RuleMessagesContext.Provider value={ruleMessages}>{children}</RuleMessagesContext.Provider>
             </RequiredIndicatorContext.Provider>
           </AssistedContext.Provider>
           {/*

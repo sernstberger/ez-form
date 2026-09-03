@@ -24,6 +24,8 @@ export interface ResendCodeButtonProps extends Omit<ButtonProps, 'type' | 'onCli
    * so the consumer can retry. Default "Code could not be sent".
    */
   errorText?: ReactNode
+  /** Announced in the `status` slot once `onResend` resolves. Default "Code sent". */
+  sentText?: ReactNode
   /**
    * Called with the rejection when `onResend` fails, for logging. The error
    * is otherwise swallowed — the `status` slot is what surfaces it to the
@@ -60,6 +62,7 @@ export function ResendCodeButton(inProps: ResendCodeButtonProps) {
     onResend,
     cooldown = 30,
     errorText = 'Code could not be sent',
+    sentText = 'Code sent',
     onResendError,
     disabled,
     children = 'Resend code',
@@ -99,7 +102,7 @@ export function ResendCodeButton(inProps: ResendCodeButtonProps) {
       return
     }
     setPending(false)
-    announce('Code sent')
+    announce(sentText)
     setRemaining(cooldown)
     clearInterval(intervalRef.current)
     intervalRef.current = setInterval(() => {

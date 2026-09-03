@@ -33,7 +33,9 @@ export type PhoneFieldProps = Omit<
   /**
    * Shown when the value is non-empty but has fewer digits than `format`
    * holds. Defaults to `Enter a <n>-digit phone number`, with `<n>` derived
-   * from the template so a custom `format` gets a matching default.
+   * from the template so a custom `format` gets a matching default. A
+   * function receives that digit count — the form a locale object uses, so
+   * its translation matches a custom `format` too.
    *
    * A `string`, not a `ReactNode`: this is a validation message, and
    * react-hook-form's `Message` is a string — it has to survive the trip
@@ -41,7 +43,7 @@ export type PhoneFieldProps = Omit<
    * like every message in `rules.ts`. Rich markup in an error belongs in a
    * `validate` of your own.
    */
-  invalidMessage?: string
+  invalidMessage?: string | ((digits: number) => string)
   autoComplete?: string
 }
 
@@ -80,7 +82,7 @@ export function PhoneField(inProps: PhoneFieldProps) {
   const {
     name,
     format = PHONE_FORMAT,
-    invalidMessage,
+    invalidMessage = (digits: number) => `Enter a ${digits}-digit phone number`,
     autoComplete: autoCompleteProp,
     validate,
     slotProps,
@@ -90,7 +92,7 @@ export function PhoneField(inProps: PhoneFieldProps) {
   const autoComplete = autoCompleteProp ?? resolveAutoComplete('tel', assisted)
 
   const capacity = templateDigitCount(format)
-  const message = invalidMessage ?? `Enter a ${capacity}-digit phone number`
+  const message = typeof invalidMessage === 'function' ? invalidMessage(capacity) : invalidMessage
 
   const { displayValue, htmlInputProps } = useTemplateField({
     name,
