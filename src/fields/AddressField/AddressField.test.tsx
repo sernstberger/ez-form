@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { autocompleteClasses } from '@mui/material/Autocomplete'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
@@ -420,13 +420,13 @@ function renderLookup(
   props: Partial<AddressFieldProps> = {},
   onSubmit = vi.fn(),
 ) {
-  render(
+  const result = render(
     <Form schema={looseSchema} defaultValues={defaultValues} onSubmit={onSubmit}>
       <AddressField name="address" lookup={lookup} lookupDebounceMs={0} {...props} />
       <button type="submit">Go</button>
     </Form>,
   )
-  return { onSubmit }
+  return { ...result, onSubmit }
 }
 
 /** Submits and returns the address the form handed `onSubmit`. */
@@ -753,6 +753,104 @@ describe('AddressField lookup', () => {
     )
     expect(streetBox()).toBeRequired()
     expect(streetBox()).toBeDisabled()
+  })
+
+  it('mode="onChange": emptying a required street shows the error at once', async () => {
+    const user = userEvent.setup({ delay: null })
+    render(
+      <Form schema={schema} defaultValues={defaultValues} onSubmit={() => {}} mode="onChange">
+        <AddressField name="address" lookup={mockAddressLookup()} lookupDebounceMs={0} required />
+      </Form>,
+    )
+    await user.type(streetBox(), '9 N')
+    await user.clear(streetBox())
+    expect(await screen.findByText('Street address is required.')).toBeInTheDocument()
+    expect(streetBox()).toHaveAccessibleDescription('Street address is required.')
+    expect(streetBox()).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('after a failed submit, emptying the street re-validates like the plain field', async () => {
+    const user = userEvent.setup({ delay: null })
+    render(
+      <Form schema={schema} defaultValues={defaultValues} onSubmit={() => {}}>
+        <AddressField name="address" lookup={mockAddressLookup()} lookupDebounceMs={0} required />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByText('Street address is required.')).toBeInTheDocument()
+    await user.type(streetBox(), '9 N')
+    await user.tab()
+    await waitFor(() => expect(screen.queryByText('Street address is required.')).toBeNull())
+    await user.clear(streetBox())
+    expect(await screen.findByText('Street address is required.')).toBeInTheDocument()
+    expect(streetBox()).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('a resolve without a street keeps the picked label as the street', async () => {
+    const user = userEvent.setup({ delay: null })
+    const provider: AddressLookupProvider = {
+      ...mockAddressLookup(),
+      resolve: () => Promise.resolve({ city: 'New York', state: 'NY', zip: '10118' }),
+    }
+    const { onSubmit } = renderLookup(provider)
+    await user.type(streetBox(), '350')
+    await user.click(await option(/350 5th Ave/))
+    await waitFor(() => expect(city()).toHaveValue('New York'))
+    expect(streetBox()).toHaveValue('350 5th Ave')
+    expect(await submitted(user, onSubmit)).toMatchObject({ street: '350 5th Ave', street2: '' })
+  })
+
+  it('debounces: a keystroke inside the window restarts it and never reaches the provider', async () => {
+    // Only the two the hook uses: faking `setImmediate` as well would stall
+    // React's scheduler under Node, and nothing here needs a fake Date.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const provider = mockAddressLookup()
+      renderLookup(provider, { lookupDebounceMs: 300 })
+      // `fireEvent`, not user-event: the keystrokes are synchronous here so the
+      // only clock in play is the hook's.
+      fireEvent.change(streetBox(), { target: { value: '160' } })
+      await act(() => vi.advanceTimersByTime(200))
+      expect(provider.calls).toHaveLength(0)
+      // Inside the window: the timer restarts from this keystroke.
+      fireEvent.change(streetBox(), { target: { value: '1600' } })
+      await act(() => vi.advanceTimersByTime(200))
+      expect(provider.calls).toHaveLength(0)
+      await act(() => vi.advanceTimersByTime(100))
+      expect(provider.calls.map((c) => c.query)).toEqual(['1600'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('unmounting mid-flight aborts the search and the resolve, and nothing lands afterwards', async () => {
+    const user = userEvent.setup({ delay: null })
+    const { provider, pending } = deferredLookup()
+    let settleResolve: ((parts: Partial<AddressValue>) => void) | undefined
+    let resolveCtx: AddressLookupContext | undefined
+    provider.resolve = (_suggestion, ctx) =>
+      new Promise((settle) => {
+        resolveCtx = ctx
+        settleResolve = settle
+      })
+    const { unmount } = renderLookup(provider)
+    await user.type(streetBox(), '350')
+    await waitFor(() => expect(pending).toHaveLength(1))
+    pending[0]?.settle([{ id: 'mock-2', label: '350 5th Ave' }])
+    await user.click(await option(/350 5th Ave/))
+    await waitFor(() => expect(resolveCtx).toBeDefined())
+    // A second search left in flight alongside the resolve.
+    await user.type(streetBox(), '1')
+    await waitFor(() => expect(pending).toHaveLength(2))
+    unmount()
+    expect(pending[1]?.ctx.signal.aborted).toBe(true)
+    expect(resolveCtx?.signal.aborted).toBe(true)
+    // Late answers: neither may set state on the unmounted field (the console
+    // guard fails this test on any React warning).
+    pending[1]?.settle([{ id: 'late', label: 'Late row' }])
+    settleResolve?.({ city: 'Late' })
+    await new Promise((r) => setTimeout(r, 0))
   })
 
   it('has no accessibility violations with the list open and attributed', async () => {

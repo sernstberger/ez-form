@@ -181,8 +181,10 @@ export interface AddressFieldProps extends PartRules {
    * Under `lookup` the street is an `Autocomplete`, and `slotProps.street` is
    * mapped onto it: the rules, `label`, `helperText`, `disabled`, `className`,
    * `optionalText`, `autoComplete` and `slotProps.htmlInput` reach the field
-   * directly, `onChange` fires per keystroke as on a `TextField`, and every
-   * other MUI TextField prop reaches the input via `textFieldProps`.
+   * directly, `onChange` fires per keystroke as on a `TextField`, and the
+   * other MUI TextField props reach the input via `textFieldProps` — except
+   * `onBlur` (the Autocomplete's own blur wins), `inputRef`, `displayValue`,
+   * `componentName` and the other nested `slotProps.*`, which are dropped.
    */
   slotProps?: {
     section?: Omit<FormSectionProps, 'title' | 'description'>
@@ -232,6 +234,13 @@ const toOptions = (suggestions: readonly AddressSuggestion[]): LookupOption[] =>
 }
 
 const PARTS = ['street', 'street2', 'city', 'state', 'zip'] as const
+
+/**
+ * The provider already searched; re-filtering client-side would hide rows
+ * whose label does not contain the typed text ("1600 penn" → "1600
+ * Pennsylvania Ave NW" does, but a fuzzy or locality match would not).
+ */
+const keepProviderOrder = <T,>(options: T[]) => options
 
 /**
  * A US street address as five bound parts under one nested object `name`:
@@ -298,7 +307,11 @@ export function AddressField(inProps: AddressFieldProps) {
       // Every rendered part is written, a part the provider did not supply as
       // `''`: a picked address is the whole address, and a unit number left
       // over from the previous pick would be a wrong address, not a partial one.
-      form.setValue(`${name}.${part}`, parts[part] ?? '', {
+      // The street is the exception — the user just picked a visible row, and a
+      // provider with no street line (a POI, some rural places) must not make
+      // it vanish; the row's label stays.
+      const fallback = part === 'street' ? suggestion.label : ''
+      form.setValue(`${name}.${part}`, parts[part] ?? fallback, {
         shouldDirty: true,
         shouldValidate: true,
       })
@@ -323,7 +336,8 @@ export function AddressField(inProps: AddressFieldProps) {
     // `slotProps.street` is a TextField's props; pulled apart into what the
     // Autocomplete takes directly and what goes to the TextField it renders.
     // `inputRef`, `displayValue` and `componentName` are TextField internals
-    // with no counterpart here.
+    // with no counterpart here; `onBlur` would be replaced by the Autocomplete's
+    // own rather than composed, so it is dropped rather than half-honoured.
     const {
       required: streetRequired = required,
       disabled: streetDisabled = disabled,
@@ -339,6 +353,7 @@ export function AddressField(inProps: AddressFieldProps) {
       optionalText,
       autoComplete: streetAutoComplete,
       onChange: streetOnChange,
+      onBlur: _onBlur,
       slotProps: streetSlotProps,
       inputRef: _inputRef,
       displayValue: _displayValue,
@@ -358,8 +373,8 @@ export function AddressField(inProps: AddressFieldProps) {
           minLength={minLength}
           maxLength={maxLength}
           pattern={pattern}
-          // A TextField validator sees a string; so does this one — `null`
-          // (the Clear button) is rewritten to `''` in `onChange` below.
+          // A TextField validator sees a string; so does this one — under
+          // `freeSolo` the Autocomplete stores `''` for a clear, never `null`.
           validate={validate as AutocompleteProps<LookupOption, string, false, true>['validate']}
           optionalText={optionalText}
           options={lookupOptions}
@@ -370,10 +385,7 @@ export function AddressField(inProps: AddressFieldProps) {
           freeSolo
           autoSelect
           getOptionValue={(o) => o.label}
-          // The provider already searched; re-filtering client-side would hide
-          // rows whose label does not contain the typed text ("1600 penn" → "1600
-          // Pennsylvania Ave NW" does, but a fuzzy or locality match would not).
-          filterOptions={(x) => x}
+          filterOptions={keepProviderOrder}
           autoComplete
           includeInputInList
           renderOption={({ key, ...optionProps }, option) => (
@@ -396,10 +408,10 @@ export function AddressField(inProps: AddressFieldProps) {
             }
           }}
           onChange={(_event, value) => {
-            // The Clear button hands the form `null`; the street is a string
-            // part and reads as empty, the way a cleared TextField does.
-            if (value === null) form.setValue(`${name}.street`, '', { shouldDirty: true })
-            else if (typeof value !== 'string') void fillFrom(value.suggestion)
+            // A string is typed text and `null` a clear, both already stored by
+            // `Autocomplete` (`''` for the clear) through the form's own
+            // mode-aware `onChange`; only a picked row needs anything more.
+            if (value !== null && typeof value !== 'string') void fillFrom(value.suggestion)
           }}
           textFieldProps={streetTextFieldProps}
           inputProps={mergeSlotProps(streetSlotProps?.htmlInput, {
