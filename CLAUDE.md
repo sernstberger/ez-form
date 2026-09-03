@@ -13,6 +13,10 @@ Read `docs/PHILOSOPHY.md` first; it is the authority. The non-negotiables:
 
 Commands: `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm build-storybook`, `pnpm format`. Storybook's script pins port 6006; a second instance is `pnpm exec storybook dev -p <port> --ci`.
 
+**The pre-push gate is six commands, not four.** CI also runs `pnpm lint` and
+`pnpm check:guardrails`, so a local gate that omits them can green-light a push CI rejects:
+`typecheck`, `lint`, `test`, `build`, `build-storybook`, `check:guardrails`.
+
 **Never `cd <dir> && <cmd> <relative-path>`.** A relative path after a `cd` cannot be resolved
 statically, so the permission checker falls back to a deny rule and prompts Steve for every
 call. Pass absolute paths instead, and use each tool's own directory flag:
