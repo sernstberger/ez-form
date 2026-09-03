@@ -1357,6 +1357,35 @@ pnpm test        # vitest + Testing Library, plus jest-axe accessibility checks 
 pnpm build
 ```
 
+### Field stories and the form decorator
+
+A field story does not render its own `<Form>`. `.storybook/preview.tsx` has a decorator
+that reads `parameters.form` — `{ schema, defaultValues }` — and wraps the story in a
+`<Form>` with a submit button, so the story is just the field. The meta sets it once; a
+story overrides only what differs, typed by `FormParameters`:
+
+```tsx
+const meta = {
+  component: PercentField,
+  parameters: { form: { schema, defaultValues: { rate: 12.5 } } } satisfies FormParameters,
+} satisfies Meta<typeof PercentField>
+
+export const Required: Story = {
+  parameters: { form: { defaultValues: { rate: null } } } satisfies FormParameters, // schema inherited
+}
+```
+
+The merge is [Storybook's own parameter inheritance](https://storybook.js.org/docs/api/parameters#parameter-inheritance):
+project → meta → story, plain objects deep-merged, everything else replaced by the more
+specific level. For `form` that means a story's `schema` (a zod instance) **replaces** the
+meta's, while its `defaultValues` (a plain object) are **deep-merged** — `{ rate: null }`
+changes `rate` and keeps the other meta defaults; a key cannot be unset from a story. A
+story with a different-shaped schema therefore still carries the meta's old defaults, which
+a non-strict `z.object` strips on submit. `FormParameters` extends Storybook's `Parameters`,
+so `docs.description.story` and `layout` sit next to `form` under one `satisfies`. A `form`
+without a `schema` after the merge fails the story with an explicit error.
+`src/fields/PercentField/PercentField.stories.test.tsx` pins the contract.
+
 ### The gates
 
 CI runs these in order, and all seven have to be green. Every one of them fails on a
