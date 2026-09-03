@@ -52,6 +52,23 @@ Measured, label-less + `aria-label` only, 17 fields:
 | named ✅ (2) | `OtpField`, `Checkbox` |
 | **UNNAMED ❌ (15)** | `TextField`, `TextareaField`, `EmailField`, `PasswordField`, `PhoneField`, `ZipField`, `FeinField`, `PercentField`, `Select`, `StateSelect`, `Autocomplete`, `NumberField`, `Switch`, `Slider`, `Rating`, + `RadioGroup`, `ToggleButtonGroup`, `CheckboxGroup` |
 
+> **Correction (2026-09-03, during the #99 fix).** The `Select` row above was wrong: I
+> baseline-tested a bare `<MuiSelect aria-label>`, which *is* named, but ez-form's `Select`
+> renders through `<MuiTextField select>`, which is **not**:
+>
+> ```
+> bare <MuiSelect aria-label="X">        → NAMED ✅   ← what I measured
+> <MuiTextField select aria-label="X">   → UNNAMED ❌  ← what ez Select actually wraps
+> ```
+>
+> So `Select` was never a regression — MUI drops the name the same way. Only `Slider` is a
+> true regression. After #99 ez-form is *better* than the baseline here, so the acceptance
+> bullet ("no longer worse than plain MUI") still holds.
+>
+> The lesson generalises and is worth more than the correction: **baseline-compare the
+> construction the component actually renders, not the one with the same name.** A baseline
+> against the wrong upstream widget is as misleading as no baseline at all.
+
 Two distinct mechanisms, and they need different fixes:
 
 **(a) `aria-label` never reaches the control** — the TextField family, `Select`,
@@ -77,7 +94,7 @@ ez-form loses the name:
 | | plain MUI | ez-form | verdict |
 |---|---|---|---|
 | `Slider` | NAMED ✅ | UNNAMED ❌ | **ez-form regression** (empty-legend `labelledby` wins) |
-| `Select` | NAMED ✅ | UNNAMED ❌ | **ez-form regression** (routed through TextField, which drops it) |
+| `Select` | ~~NAMED ✅~~ **UNNAMED ❌** | UNNAMED ❌ | ~~regression~~ **upstream — corrected, see below** |
 | `TextField` | UNNAMED ❌ | UNNAMED ❌ | upstream MUI; works via `slotProps.htmlInput` |
 | `Switch` | UNNAMED ❌ | UNNAMED ❌ | **suspected MUI bug** — see §5 |
 | `Autocomplete` | UNNAMED ❌ | UNNAMED ❌ | upstream MUI |

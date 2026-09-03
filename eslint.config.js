@@ -25,7 +25,13 @@ export default tseslint.config(
   {
     // Build outputs and vendored trees. `src/__qa__` is the gitignored scratch area for QA
     // probes, excluded from tsconfig too, so typed linting has no program for it.
-    ignores: ['dist', 'storybook-static', 'coverage', 'src/__qa__'],
+    //
+    // `.worktrees` holds the parallel lane checkouts the project workflow creates (see
+    // CLAUDE.md). Each is a complete copy of the repo with its own `node_modules`, so
+    // without this `eslint .` type-lints the whole tree N+1 times over and dies with
+    // "JavaScript heap out of memory" at Node's 4 GB default — a confusing failure that
+    // looks like a code problem and is really just the lanes being visible from the root.
+    ignores: ['dist', 'storybook-static', 'coverage', 'src/__qa__', '.worktrees'],
   },
 
   js.configs.recommended,
