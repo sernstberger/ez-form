@@ -1,9 +1,12 @@
+import type { ComponentProps } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../../Form'
 import { Autocomplete } from './Autocomplete'
 import { describeFieldContract } from '../../test/describeFieldContract'
+import { expectNoA11yViolations } from '../../test/axe'
+import { expectTargetSize } from '../../test/targetSize'
 
 const schema = z.object({ role: z.enum(['admin', 'user'], { error: 'Pick a role' }) })
 
@@ -173,6 +176,62 @@ describe('Autocomplete', () => {
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(await screen.findByText('Role is required.')).toBeInTheDocument()
     expect(combobox()).toHaveFocus()
+  })
+
+  describe('multiple: chip delete control (#90)', () => {
+    const multi = z.object({ roles: z.array(z.enum(['admin', 'user'])) })
+    const renderMulti = (props: Partial<ComponentProps<typeof Autocomplete>> = {}) =>
+      render(
+        <Form schema={multi} defaultValues={{ roles: ['admin', 'user'] }} onSubmit={() => {}}>
+          <Autocomplete name="roles" label="Role" options={roles} multiple {...props} />
+        </Form>,
+      )
+
+    it('names each delete control "Remove <label>" at a 24x24 target, with no axe violations', async () => {
+      const { container } = renderMulti()
+      const remove = screen.getByRole('button', { name: 'Remove Admin' })
+      expectTargetSize(remove)
+      expectTargetSize(screen.getByRole('button', { name: 'Remove User' }))
+      await expectNoA11yViolations(container)
+    })
+
+    it('removes the chip when its delete control is clicked', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={multi} defaultValues={{ roles: ['admin', 'user'] }} onSubmit={onSubmit}>
+          <Autocomplete name="roles" label="Role" options={roles} multiple />
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'Remove Admin' }))
+      expect(screen.queryByRole('button', { name: 'Remove Admin' })).not.toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      expect(onSubmit).toHaveBeenCalledWith({ roles: ['user'] }, expect.anything())
+    })
+
+    it('still merges slotProps.chip over the chip, and lets its deleteIcon win', () => {
+      renderMulti({ slotProps: { chip: { className: 'probe' } } })
+      const remove = screen.getByRole('button', { name: 'Remove Admin' })
+      expect(remove.closest('.probe')).not.toBeNull()
+    })
+
+    it('honours a consumer deleteIcon under slotProps.chip', () => {
+      renderMulti({
+        slotProps: { chip: { deleteIcon: <span role="button" aria-label="Drop it" /> } },
+      })
+      expect(screen.getAllByRole('button', { name: 'Drop it' })).toHaveLength(2)
+      expect(screen.queryByRole('button', { name: 'Remove Admin' })).not.toBeInTheDocument()
+    })
+
+    it('leaves chip rendering to a consumer renderValue', () => {
+      renderMulti({
+        renderValue: (items) =>
+          (items as { label: string }[]).map((o) => <em key={o.label}>{o.label}</em>),
+      })
+      expect(screen.queryByRole('button', { name: 'Remove Admin' })).not.toBeInTheDocument()
+      expect(screen.getByText('Admin').tagName).toBe('EM')
+    })
   })
 
   describe('default isOptionEqualToValue (#29)', () => {
