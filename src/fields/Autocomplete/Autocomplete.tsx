@@ -118,6 +118,11 @@ export function Autocomplete<
   pattern,
   validate,
   optionalText,
+  // Destructured out of `rest`: MUI spreads them onto the Autocomplete root, which
+  // is the `FormControl` wrapper — a named `<div>` around an anonymous combobox
+  // (#99). They are routed to `slotProps.htmlInput` on the rendered input below.
+  'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledBy,
   ...rest
 }: AutocompleteProps<TOption, TValue, Multiple, FreeSolo>) {
   // `getOptionValue` decides what this field stores, so that — not `option.value` — is the
@@ -131,10 +136,11 @@ export function Autocomplete<
     label,
     rules: { required, min, max, minLength, maxLength, pattern, validate },
     optionalText,
-    // The name may be on the rendered input rather than on Autocomplete itself.
-    // Read, not destructured: `rest` and `textFieldProps` still carry them onward.
-    'aria-label': rest['aria-label'] ?? textFieldProps?.['aria-label'],
-    'aria-labelledby': rest['aria-labelledby'] ?? textFieldProps?.['aria-labelledby'],
+    // Either channel names the field: on Autocomplete itself, or on the TextField
+    // it renders. Both land on a wrapper if left alone, so both are collected here
+    // and re-emitted onto the `<input>` through `f.nameA11y`.
+    'aria-label': ariaLabel ?? textFieldProps?.['aria-label'],
+    'aria-labelledby': ariaLabelledBy ?? textFieldProps?.['aria-labelledby'],
   })
 
   // form → MUI: find the option for a stored value. When it is not in the
@@ -237,6 +243,10 @@ export function Autocomplete<
         <MuiTextField
           {...params}
           {...textFieldProps}
+          // `textFieldProps` may carry them; on the TextField root they would name
+          // the `FormControl` wrapper. `f.nameA11y` re-emits them on the `<input>`.
+          aria-label={undefined}
+          aria-labelledby={undefined}
           label={f.displayLabel}
           required={f.required}
           error={f.invalid}
@@ -253,7 +263,14 @@ export function Autocomplete<
             // "first" only orders the input's own handlers: MUI's Autocomplete
             // binds its keydown on the *root*, which runs afterwards regardless,
             // so a caller cannot suppress Enter/Backspace by preventing default.
-            htmlInput: mergeSlotProps(inputProps, params.slotProps?.htmlInput),
+            // `f.nameA11y` last, and spread rather than merged: it is the field's
+            // own routing of a prop the consumer wrote, so it must beat whatever
+            // `getInputProps()` put there for the label-less case. Absent keys are
+            // omitted, so a labelled field keeps MUI's own `aria-labelledby`.
+            htmlInput: {
+              ...mergeSlotProps(inputProps, params.slotProps?.htmlInput),
+              ...f.nameA11y,
+            },
           }}
         />
       )}

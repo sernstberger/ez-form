@@ -31,6 +31,9 @@ import {
 export interface NumberFieldInputProps {
   'aria-invalid'?: true
   'aria-describedby'?: string
+  /** The consumer's ARIA name, on the visible input rather than Root's wrapper (#99). */
+  'aria-label'?: string
+  'aria-labelledby'?: string
   inputMode?: ComponentPropsWithRef<'input'>['inputMode']
   onBlur?: FocusEventHandler<HTMLInputElement>
   onFocus?: FocusEventHandler<HTMLInputElement>

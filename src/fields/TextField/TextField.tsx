@@ -97,6 +97,13 @@ export function TextField({
   autoComplete: autoCompleteProp,
   componentName = 'TextField',
   inputRef: inputRefProp,
+  // Destructured out of `rest` on purpose. Left in it they reach MUI's root, which
+  // puts a root `aria-label` on the `FormControl` **wrapper** — naming a `<div>`
+  // while the `<input>` stays anonymous (#99). They go to `slotProps.htmlInput`
+  // below instead, via the hook that also decides whether the missing-label
+  // warning fires, so one place owns the name.
+  'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledBy,
   ...rest
 }: TextFieldProps) {
   const assisted = useAssisted()
@@ -107,10 +114,8 @@ export function TextField({
     label,
     rules: { required, min, max, minLength, maxLength, pattern, validate },
     optionalText,
-    // Read, not destructured: both still reach MUI through `rest`. The hook only
-    // needs to know a label-less field is named some other way before it warns.
-    'aria-label': rest['aria-label'],
-    'aria-labelledby': rest['aria-labelledby'],
+    'aria-label': ariaLabel,
+    'aria-labelledby': ariaLabelledBy,
   })
   const {
     ref,
@@ -151,7 +156,25 @@ export function TextField({
         inputLabel: mergeSlotProps(slotProps?.inputLabel, { required: f.labelRequired }),
         htmlInput: mergeSlotProps(slotProps?.htmlInput, {
           inputMode: type ? INPUT_MODE_BY_TYPE[type] : undefined,
+          // The name goes on the element that carries the role. For a plain
+          // TextField that is this `<input>`; under `select` MUI moves the role to
+          // the trigger and takes its name from `slotProps.select` instead (below).
+          ...(rest.select ? null : f.nameA11y),
         }),
+        // A `select` TextField renders a hidden native input plus a separate
+        // `role="combobox"` trigger div; `htmlInput` reaches only the hidden one, so
+        // the name has to be routed to the trigger to be announced. `SelectDisplayProps`
+        // rather than a plain `aria-labelledby`, because `SelectInput` hard-codes the
+        // trigger's `aria-labelledby` to its own `labelId` (`undefined` with no label,
+        // which is how the name went missing) and only spreads `SelectDisplayProps`
+        // afterwards — that spread is the one channel that reaches the element.
+        ...(rest.select
+          ? {
+              select: mergeSlotProps(slotProps?.select, {
+                SelectDisplayProps: f.nameA11y,
+              }),
+            }
+          : null),
       }}
       {...rest}
     />

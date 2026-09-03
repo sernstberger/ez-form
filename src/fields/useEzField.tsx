@@ -17,10 +17,16 @@ export interface UseEzFieldOptions<TValue = unknown> {
    */
   optionalText?: ReactNode | false
   /**
-   * Not used for rendering — the field passes its own `aria-label` /
-   * `aria-labelledby` straight to the control. They are reported here only so the
-   * dev-mode "no accessible name" warning can see that a label-less field is named
-   * some other way. See `src/devWarn.ts`.
+   * The consumer's ARIA name for a field with no visible `label`. The hook owns
+   * these: it decides whether the dev-mode "no accessible name" warning fires,
+   * *and* hands them back on `nameA11y` for the field to put on its real control.
+   *
+   * Passing them on to the control is not optional. Left to the `{...rest}`
+   * spread they reach MUI's root, which parks a root `aria-label` on the
+   * `FormControl` **wrapper** — so the wrapper is named, the `<input>` is not,
+   * axe reports clean, and the warning is silenced by a name that names nothing
+   * (#99). A field must therefore route `nameA11y` to whichever element actually
+   * carries the role (`slotProps.htmlInput` for the TextField family).
    */
   'aria-label'?: string
   'aria-labelledby'?: string
@@ -31,6 +37,16 @@ export interface InputA11y {
   'aria-invalid': true | undefined
   'aria-describedby': string | undefined
 }
+
+/**
+ * The consumer's ARIA name, for the element that carries the role.
+ *
+ * A key the consumer did not pass is **absent**, not `undefined`: this object is
+ * spread over props MUI builds itself (`slotProps.htmlInput`, Autocomplete's
+ * `getInputProps()`), and an explicit `undefined` would erase the `aria-labelledby`
+ * those already set for a labelled field.
+ */
+export type NameA11y = Partial<Record<'aria-label' | 'aria-labelledby', string>>
 
 /** For the `FormHelperText`: its id, and `role="alert"` while it shows an error. */
 export interface HelperTextA11y {
@@ -48,6 +64,12 @@ export type UseEzFieldReturn = UseControllerReturn & {
   helperText: (consumerText: ReactNode) => ReactNode
   /** a11y attributes for the control, linked to the helper text only when there is some. */
   inputA11y: (text: ReactNode) => InputA11y
+  /**
+   * The consumer's `aria-label` / `aria-labelledby`, for the field to put on the
+   * element that carries the role. Spread it there; do not rely on `{...rest}`,
+   * which lands them on MUI's wrapper instead (#99).
+   */
+  nameA11y: NameA11y
   helperTextA11y: HelperTextA11y
   /**
    * The label to render: unchanged in `asterisk` mode; in `optional` mode, an
@@ -117,6 +139,10 @@ export function useEzField<TValue = unknown>(
       'aria-describedby': text ? helperTextId : undefined,
     }),
     helperTextA11y: { id: helperTextId, role: invalid ? 'alert' : undefined },
+    nameA11y: {
+      ...(ariaLabel === undefined ? null : { 'aria-label': ariaLabel }),
+      ...(ariaLabelledBy === undefined ? null : { 'aria-labelledby': ariaLabelledBy }),
+    },
     displayLabel,
     labelRequired: optional && required ? false : undefined,
   }

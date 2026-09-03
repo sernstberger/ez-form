@@ -152,6 +152,11 @@ export function NumberField({
   format,
   inputMode = isIntegerOnly(step, format) ? 'numeric' : 'decimal',
   valueScale,
+  // Destructured out of `rest`: Base UI's Root spreads unknown props onto its own
+  // wrapper element, which would name the wrapper and leave the visible `<input>`
+  // anonymous (#99). They go to `inputProps` below instead.
+  'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledBy,
   ...rest
 }: NumberFieldProps) {
   // The same label and message set `useEzField` would use for a default rule message.
@@ -171,9 +176,8 @@ export function NumberField({
       validate,
     },
     optionalText,
-    // Read, not destructured: both still reach the control through `rest`.
-    'aria-label': rest['aria-label'],
-    'aria-labelledby': rest['aria-labelledby'],
+    'aria-label': ariaLabel,
+    'aria-labelledby': ariaLabelledBy,
   })
   const text = f.helperText(helperText)
 
@@ -204,6 +208,7 @@ export function NumberField({
       inputRef={f.field.ref}
       inputProps={{
         ...f.inputA11y(text),
+        ...f.nameA11y,
         inputMode,
         onBlur: (e) => {
           f.field.onBlur()
