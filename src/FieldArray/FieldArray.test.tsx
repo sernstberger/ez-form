@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { z } from 'zod'
@@ -245,6 +245,51 @@ describe('FieldArray', () => {
     await user.click(add)
     await waitFor(() => expect(statusRegion()).toHaveTextContent('Row 2 added'))
     expect(statusRegion()).not.toBe(first)
+  })
+
+  // These three land two actions in a single React batch (`fireEvent` inside one
+  // `act`, no re-render between), so both handlers run against the *same*
+  // render closure. A count read from that closure's `fields.length` is stale
+  // for the second action; the announcement must come from the updated array.
+  it('announces the post-update count when two Adds land in one batch', async () => {
+    render(<Applicants />)
+    const add = screen.getByRole('button', { name: 'Add' })
+    act(() => {
+      fireEvent.click(add)
+      fireEvent.click(add)
+    })
+    expect(rows()).toHaveLength(3)
+    await waitFor(() => expect(statusRegion()).toHaveTextContent('Row 3 added'))
+  })
+
+  it('announces the post-update count for a Remove then an Add in one batch', async () => {
+    render(
+      <Applicants
+        defaultValues={{
+          applicants: [
+            { name: 'A', email: '' },
+            { name: 'B', email: '' },
+          ],
+        }}
+      />,
+    )
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'Remove Applicant 1' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    })
+    expect(rows()).toHaveLength(2)
+    // Two rows, so the appended one is row 2 — not "Row 3", the closure's `length + 1`.
+    await waitFor(() => expect(statusRegion()).toHaveTextContent('Row 2 added'))
+  })
+
+  it('announces the removed row for an Add then a Remove in one batch', async () => {
+    render(<Applicants />)
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Remove Applicant 1' }))
+    })
+    expect(rows()).toHaveLength(1)
+    await waitFor(() => expect(statusRegion()).toHaveTextContent('Row 1 removed'))
   })
 
   it('minRows disables Remove at the floor; maxRows disables Add at the ceiling', async () => {
