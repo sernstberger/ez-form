@@ -130,3 +130,7 @@ A ruling is a judgement call recorded during implementation: `Ruling: <what> —
 - Strict mode = React StrictMode + console-noise-fails-tests + stricter tsc + ESLint type-checked + builds fail on warnings; no test timeouts; TS 6 alias for the compiler-API tools while `tsc` runs TS 7 — cost if wrong: a rule relaxed with a comment.
 - Keep the complete `PasswordStrength` README section, delete the orphan copy (final-review fix) — cost if wrong: none.
 - `EzZipField`/`EzStateSelect` register `defaultProps` only, no class key — no styled slot — cost if wrong: add a key when a slot appears.
+- #90: one shared `ChipDeleteIcon` (`EzChipDeleteIcon`, slot `root`) is the delete icon for every chip — `Autocomplete` under `multiple`, `EmailListField`, `FileField` — and the per-field `deleteIcon` class keys on `EzEmailListField`/`EzFileField` are gone (nothing backs them; unpublished) — cost if wrong: re-add a per-field key.
+- #90: `FileField`'s `Close` glyph becomes MUI's chip default `Cancel` — the choice was incidental (75a4eb2 wrapped whatever was there) and one slot means one glyph — cost if wrong: an icon prop on the shared component.
+- #90: the base `Autocomplete` mirrors MUI — a consumer's `renderValue` takes over chips entirely and `slotProps.chip.deleteIcon` wins — while `EmailListField` keeps pinning the icon (its own a11y contract) — cost if wrong: a consumer drops the name knowingly.
+- #90: `removeLabel` is a theme-settable default prop on `EzChipDeleteIcon`, one place to translate "Remove" for #23 — cost if wrong: an unused prop.

@@ -29,6 +29,7 @@ import type { PercentFieldProps } from '../fields/PercentField'
 import type { SsnFieldProps } from '../fields/SsnField'
 import type { ZipFieldProps } from '../fields/ZipField'
 import type { StateSelectProps } from '../fields/StateSelect'
+import type { ChipDeleteIconProps } from '../fields/ChipDeleteIcon'
 
 declare module '@mui/material/styles' {
   interface ComponentsPropsList {
@@ -66,6 +67,7 @@ declare module '@mui/material/styles' {
     EzSsnField: Partial<SsnFieldProps>
     EzZipField: Partial<ZipFieldProps>
     EzStateSelect: Partial<StateSelectProps>
+    EzChipDeleteIcon: Partial<ChipDeleteIconProps>
   }
 
   interface ComponentNameToClassKey {
@@ -90,10 +92,14 @@ declare module '@mui/material/styles' {
     EzSsnField: 'root' | 'toggle'
     EzPasswordStrength: 'root' | 'bar' | 'label'
     EzOtpField: 'root' | 'helperText'
-    EzFileField: 'root' | 'fileList' | 'deleteIcon' | 'dropZone' | 'dragActive' | 'dropText'
+    EzFileField: 'root' | 'fileList' | 'dropZone' | 'dragActive' | 'dropText'
     EzTextareaField: 'root' | 'counter'
     EzResendCodeButton: 'root' | 'status'
-    EzEmailListField: 'chip' | 'deleteIcon' | 'status'
+    EzEmailListField: 'chip' | 'status'
+    // The one chip delete icon every chip-rendering field uses (Autocomplete
+    // under `multiple`, EmailListField, FileField): named and 24×24. One slot
+    // here rather than a `deleteIcon` key per field, so a theme sizes it once.
+    EzChipDeleteIcon: 'root'
   }
 
   interface Components<Theme = unknown> {
@@ -227,6 +233,10 @@ declare module '@mui/material/styles' {
     // which is what makes `territories` and `autoComplete` theme-settable.
     EzStateSelect?: {
       defaultProps?: ComponentsProps['EzStateSelect']
+    }
+    EzChipDeleteIcon?: {
+      defaultProps?: ComponentsProps['EzChipDeleteIcon']
+      styleOverrides?: ComponentsOverrides<Theme>['EzChipDeleteIcon']
     }
   }
 }

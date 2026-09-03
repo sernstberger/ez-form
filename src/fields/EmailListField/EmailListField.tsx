@@ -7,12 +7,12 @@ import {
   type KeyboardEvent,
 } from 'react'
 import Chip, { type ChipProps } from '@mui/material/Chip'
-import Cancel from '@mui/icons-material/Cancel'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import { styled } from '@mui/material/styles'
 import { useWatch } from 'react-hook-form'
 import { Autocomplete, type AutocompleteProps } from '../Autocomplete'
+import { ChipDeleteIcon } from '../ChipDeleteIcon'
 import { useEzFormContext } from '../../useEzFormContext'
 import { useAssisted } from '../../Form/AssistedContext'
 import { resolveAutoComplete } from '../resolveAutoComplete'
@@ -20,11 +20,7 @@ import { LiveRegion, type LiveRegionProps } from '../../Form/LiveRegion'
 import { cx } from '../../cx'
 import { isEmail } from '../emailPattern'
 
-export const emailListFieldClasses = generateUtilityClasses('EzEmailListField', [
-  'chip',
-  'deleteIcon',
-  'status',
-])
+export const emailListFieldClasses = generateUtilityClasses('EzEmailListField', ['chip', 'status'])
 
 /** One address the lookup returned. */
 export interface EmailOption {
@@ -108,7 +104,7 @@ export type EmailListFieldProps = Omit<
      * and keyboard-reachable. `onDelete` composes with the field's own (call
      * `preventDefault()` to veto a removal); `deleteIcon` is the field's, since
      * its accessible name is part of this field's a11y contract — restyle it via
-     * `styleOverrides.deleteIcon`.
+     * `theme.components.EzChipDeleteIcon`.
      */
     chip?: Omit<ChipProps, 'deleteIcon'>
     status?: Omit<LiveRegionProps, 'message' | 'announcementKey'>
@@ -116,19 +112,6 @@ export type EmailListFieldProps = Omit<
 }
 
 const EmailListFieldChip = styled(Chip, { name: 'EzEmailListField', slot: 'Chip' })({})
-// MUI's Chip delete icon renders at `fontSize: 22` with no hit-area padding —
-// under the 24×24 CSS px target (WCAG 2.5.8). This is the functional minimum,
-// still overridable via `theme.components.EzEmailListField.styleOverrides.deleteIcon`;
-// `boxSizing: 'content-box'` keeps the glyph itself unchanged, and Chip already
-// centers the icon.
-const EmailListFieldDeleteIcon = styled(Cancel, {
-  name: 'EzEmailListField',
-  slot: 'DeleteIcon',
-})({
-  minWidth: 24,
-  minHeight: 24,
-  boxSizing: 'content-box',
-})
 // Visually hidden (LiveRegion's default): the chips are the sighted feedback for
 // an add or a remove, so a second visible line would only repeat what is on screen.
 const EmailListFieldStatus = styled(LiveRegion, { name: 'EzEmailListField', slot: 'Status' })({})
@@ -456,20 +439,8 @@ export function EmailListField(inProps: EmailListFieldProps) {
                 {...chipProps}
                 {...itemProps}
                 // After both spreads, because the accessible name is part of this
-                // field's a11y contract and not a consumer's to drop. Chip clones
-                // this element with its own onClick; MUI's default icon has no
-                // name, and SvgIcon defaults aria-hidden to true unless overridden
-                // here. Without a name the only way to drop a chip by keyboard is
-                // Backspace, and a screen reader says nothing about what the icon
-                // would remove. Restyle it via `styleOverrides.deleteIcon`.
-                deleteIcon={
-                  <EmailListFieldDeleteIcon
-                    role="button"
-                    aria-label={`Remove ${labelFor(email)}`}
-                    aria-hidden={undefined}
-                    className={emailListFieldClasses.deleteIcon}
-                  />
-                }
+                // field's a11y contract and not a consumer's to drop.
+                deleteIcon={<ChipDeleteIcon label={labelFor(email)} />}
                 // …with `onDelete` composed rather than replaced, so a consumer
                 // can observe (or veto, via `preventDefault`) a removal without
                 // having to reimplement it.

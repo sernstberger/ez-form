@@ -154,6 +154,32 @@ describe('PasswordField', () => {
     expect(input().selectionStart).toBe(3)
   })
 
+  it('honours a consumer ref from the callback form of slotProps.htmlInput (#96)', async () => {
+    const user = userEvent.setup()
+    const consumerRef = { current: null as HTMLInputElement | null }
+    // MUI also accepts `htmlInput: (ownerState) => props`. The ref (and every
+    // other prop the callback returns) must survive exactly as the object form's,
+    // and the reveal toggle must still find the input to put the caret back.
+    render(
+      <Form schema={schema} defaultValues={{ password: '' }} onSubmit={() => {}}>
+        <PasswordField
+          name="password"
+          label="Password"
+          slotProps={{ htmlInput: () => ({ ref: consumerRef, 'data-consumer': 'x' }) }}
+        />
+      </Form>,
+    )
+    expect(consumerRef.current).toBe(input())
+    expect(input()).toHaveAttribute('data-consumer', 'x')
+
+    await user.type(input(), 'hunter2')
+    input().setSelectionRange(3, 3)
+    await user.click(screen.getByRole('button', { name: 'Show password' }))
+    expect(input()).toHaveAttribute('type', 'text')
+    expect(input()).toHaveFocus()
+    expect(input().selectionStart).toBe(3)
+  })
+
   it('takes custom toggle labels', async () => {
     const user = userEvent.setup()
     render(

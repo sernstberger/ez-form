@@ -3,7 +3,6 @@ import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import IconButton, { type IconButtonProps } from '@mui/material/IconButton'
 import { styled } from '@mui/material/styles'
-import { useForkRef } from '@mui/material/utils'
 import { TextField, type TextFieldProps } from '../TextField'
 import { mergeDisabled } from '../mergeDisabled'
 import { useAssisted } from '../../Form/AssistedContext'
@@ -20,9 +19,11 @@ const PasswordFieldToggle = styled(IconButton, { name: 'EzPasswordField', slot: 
 /**
  * `TextField` with `type` fixed to `password`/`text` by a local reveal toggle.
  * Omits `type` (the binding owns it, driven by the toggle) — everything else,
- * including validation rules, comes from `TextField`.
+ * including validation rules, comes from `TextField`. `inputRef` is the
+ * internal channel the reveal hook's caret ref takes; a consumer ref belongs in
+ * `slotProps.htmlInput`.
  */
-export type PasswordFieldProps = Omit<TextFieldProps, 'type' | 'componentName'> & {
+export type PasswordFieldProps = Omit<TextFieldProps, 'type' | 'componentName' | 'inputRef'> & {
   /** Renders the show/hide toggle. Default `true`. */
   revealable?: boolean
   /** Accessible name for the toggle while the password is hidden. Default `'Show password'`. */
@@ -65,16 +66,13 @@ export function PasswordField(inProps: PasswordFieldProps) {
   const autoComplete = autoCompleteProp ?? (assisted ? 'new-password' : 'current-password')
   // Local only: never reaches the form value, and resets on unmount since it starts false again.
   // The hook also owns the focus/caret restoration the `type` swap would otherwise destroy.
-  const { revealed, toggle, inputRef: revealInputRef, recordFocus } = useRevealState()
+  // The hook's ref must reach the `<input>` for caret restoration to work. It
+  // goes through `TextField`'s internal `inputRef`, which MUI's `InputBase`
+  // forks with any consumer `slotProps.htmlInput.ref` in either form — object
+  // or callback. Composing the two here could only see the object form and
+  // silently dropped a callback-form ref (#96, the same shape as #92).
+  const { revealed, toggle, inputRef, recordFocus } = useRevealState()
   const { toggle: toggleSlotProps, ...restSlotProps } = slotProps ?? {}
-  // The reveal hook needs the input to restore its caret; a consumer ref on the
-  // same slot still gets called. `useForkRef` is MUI's own composer.
-  const inputRef = useForkRef(
-    revealInputRef,
-    restSlotProps?.htmlInput && 'ref' in restSlotProps.htmlInput
-      ? (restSlotProps.htmlInput.ref as React.Ref<HTMLInputElement>)
-      : null,
-  )
   // No per-field disable registration exists in this codebase (see TextField/NumberField/etc,
   // all driven by `useController.field.disabled`), so the form-level flag `useFormState`
   // reports is the same value `<TextField>`'s own `useEzField` will derive for this field.
@@ -88,13 +86,12 @@ export function PasswordField(inProps: PasswordFieldProps) {
       type={revealed ? 'text' : 'password'}
       autoComplete={autoComplete}
       disabled={disabled}
+      inputRef={inputRef}
       className={cx(passwordFieldClasses.root, className)}
       slotProps={{
+        // `htmlInput` passes through untouched (`restSlotProps`): this field
+        // adds nothing to it, and its own ref went via `inputRef` above.
         ...restSlotProps,
-        // `ref` last, deliberately: a consumer `ref` here would otherwise
-        // replace the field's own and silently disable caret restoration.
-        // `inputRef` forks both, so the consumer's still fires.
-        htmlInput: { ...restSlotProps?.htmlInput, ref: inputRef },
         // The toggle owns the end adornment (like NumberField owns its steppers there);
         // other `input` slot props a consumer sets (readOnly, startAdornment, …) still pass
         // through — only `endAdornment` itself is not overridable through this prop.
