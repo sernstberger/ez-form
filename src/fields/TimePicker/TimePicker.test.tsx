@@ -4,7 +4,8 @@ import { z } from 'zod'
 import { Form } from '../../Form'
 import { TimePicker } from './TimePicker'
 import { describeFieldContract } from '../../test/describeFieldContract'
-import { withPickers, pasteAllText } from '../../test/pickers'
+import { withPickers, pasteAllText, clearButton } from '../../test/pickers'
+import { expectTargetSize } from '../../test/targetSize'
 
 const schema = z.object({ at: z.date().nullable() })
 
@@ -157,5 +158,32 @@ describe('TimePicker', () => {
       ),
     )
     expect(screen.getByRole('group', { name: 'At (optional)' })).toBeInTheDocument()
+  })
+
+  it.each(['medium', 'small'] as const)('%s: the clock button meets 24×24 target size', (size) => {
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ at: null }} onSubmit={() => {}}>
+          <TimePicker name="at" label="At" slotProps={{ textField: { size } }} />
+        </Form>,
+      ),
+    )
+    expectTargetSize(screen.getByRole('button', { name: 'Choose time' }))
+  })
+
+  /** Separate render: MUI X swaps the open button out for the clear button. */
+  it.each(['medium', 'small'] as const)('%s: the clear button meets 24×24 target size', (size) => {
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ at: new Date(2030, 5, 1, 9) }} onSubmit={() => {}}>
+          <TimePicker
+            name="at"
+            label="At"
+            slotProps={{ field: { clearable: true }, textField: { size } }}
+          />
+        </Form>,
+      ),
+    )
+    expectTargetSize(clearButton(screen.getByRole('group', { name: 'At' })))
   })
 })

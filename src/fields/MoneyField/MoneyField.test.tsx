@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { Form } from '../../Form'
 import { MoneyField, type MoneyFieldProps } from './MoneyField'
 import { describeFieldContract } from '../../test/describeFieldContract'
+import { expectTargetSize } from '../../test/targetSize'
 
 const schema = z.object({ price: z.number().nullable() })
 const input = () => screen.getByRole('textbox', { name: 'Price' })
@@ -141,6 +142,19 @@ describe('MoneyField inputMode default (#6, #7)', () => {
     )
     expect(input()).toHaveAttribute('inputMode', 'text')
   })
+
+  it.each(['medium', 'small'] as const)(
+    '%s: the inherited steppers meet 24×24 target size',
+    (size) => {
+      render(
+        <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+          <MoneyField name="price" label="Price" size={size} />
+        </Form>,
+      )
+      expectTargetSize(screen.getByRole('button', { name: 'Increase' }))
+      expectTargetSize(screen.getByRole('button', { name: 'Decrease' }))
+    },
+  )
 })
 
 describe('MoneyField type-level', () => {

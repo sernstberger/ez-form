@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { Form } from '../../Form'
 import { Rating } from './Rating'
 import { describeFieldContract } from '../../test/describeFieldContract'
+import { expectTargetSize } from '../../test/targetSize'
 
 const schema = z.object({ stars: z.number().nullable() })
 
@@ -106,5 +107,28 @@ describe('Rating', () => {
     )
     await user.click(screen.getByRole('radio', { name: '5 Stars' }))
     expect(onChange).toHaveBeenCalledWith(expect.anything(), 5)
+  })
+
+  /**
+   * Measured on `.MuiRating-icon`, not on the `role="radio"` element: MUI's
+   * `Rating` is a set of visually-hidden 1×1px radio inputs behind visible star
+   * icons, so the input's own box is not the target a pointer hits — the icon
+   * is. At the default size MUI sizes that icon with `font-size: 24px` and no
+   * padding, which is exactly the WCAG 2.5.8 minimum.
+   *
+   * Deliberately not run at `size="small"`: MUI drops the icon to 18px there,
+   * which is below 24×24. That is MUI's own sizing, not anything ez-form
+   * declares, and this lane is coverage only — recorded against #106 rather
+   * than fixed here.
+   */
+  it('the default-size star icons meet 24×24 target size', () => {
+    const { container } = render(
+      <Form schema={schema} defaultValues={{ stars: 3 }} onSubmit={() => {}}>
+        <Rating name="stars" label="Stars" />
+      </Form>,
+    )
+    const icons = container.querySelectorAll<HTMLElement>('.MuiRating-icon')
+    expect(icons.length).toBeGreaterThan(0)
+    icons.forEach(expectTargetSize)
   })
 })

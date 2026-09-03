@@ -5,6 +5,7 @@ import { Form, type FormMethods } from '../../Form'
 import { DatePicker } from './DatePicker'
 import { describeFieldContract } from '../../test/describeFieldContract'
 import { withPickers, pasteAllText, clearButton } from '../../test/pickers'
+import { expectTargetSize } from '../../test/targetSize'
 
 const schema = z.object({ start: z.date().nullable() })
 
@@ -358,5 +359,39 @@ describe('DatePicker', () => {
     await user.click(clearButton(root))
     expect(onClear).toHaveBeenCalledTimes(1)
     expect(hiddenInput('start')).toHaveValue('')
+  })
+
+  it.each(['medium', 'small'] as const)(
+    '%s: the calendar button meets 24×24 target size',
+    (size) => {
+      render(
+        withPickers(
+          <Form schema={schema} defaultValues={{ start: null }} onSubmit={() => {}}>
+            <DatePicker name="start" label="Start" slotProps={{ textField: { size } }} />
+          </Form>,
+        ),
+      )
+      expectTargetSize(screen.getByRole('button', { name: 'Choose date' }))
+    },
+  )
+
+  /**
+   * Separate render from the calendar button above: MUI X swaps the open button
+   * out for the clear button in the same adornment slot, so a `clearable` field
+   * holding a value shows only the latter.
+   */
+  it.each(['medium', 'small'] as const)('%s: the clear button meets 24×24 target size', (size) => {
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ start: new Date(2030, 5, 1) }} onSubmit={() => {}}>
+          <DatePicker
+            name="start"
+            label="Start"
+            slotProps={{ field: { clearable: true }, textField: { size } }}
+          />
+        </Form>,
+      ),
+    )
+    expectTargetSize(clearButton(screen.getByRole('group', { name: 'Start' })))
   })
 })

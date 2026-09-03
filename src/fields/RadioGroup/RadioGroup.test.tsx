@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { Form } from '../../Form'
 import { RadioGroup } from './RadioGroup'
 import { describeFieldContract } from '../../test/describeFieldContract'
+import { expectTargetSize } from '../../test/targetSize'
 
 const schema = z.object({ plan: z.number({ error: 'Pick a plan' }) })
 
@@ -127,5 +128,15 @@ describe('RadioGroup', () => {
       </Form>,
     )
     expect(screen.getByRole('radiogroup', { name: 'Plan (optional)' })).toBeInTheDocument()
+  })
+
+  // No `size` prop here, so the default is the only size to pin.
+  it('every radio meets 24×24 target size', () => {
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <RadioGroup name="plan" label="Plan" options={plans} />
+      </Form>,
+    )
+    for (const radio of screen.getAllByRole('radio')) expectTargetSize(radio)
   })
 })

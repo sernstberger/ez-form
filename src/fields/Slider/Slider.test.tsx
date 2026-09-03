@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { Form } from '../../Form'
 import { Slider } from './Slider'
 import { describeFieldContract } from '../../test/describeFieldContract'
+import { expectTargetSize } from '../../test/targetSize'
 
 const schema = z.object({ volume: z.number() })
 
@@ -129,5 +130,14 @@ describe('Slider', () => {
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(await screen.findByText('Volume must be at most 100.')).toBeInTheDocument()
     expect(screen.getByRole('slider', { name: 'Volume' })).toHaveFocus()
+  })
+
+  it.each(['medium', 'small'] as const)('%s: the thumb meets 24×24 target size', (size) => {
+    render(
+      <Form schema={schema} defaultValues={{ volume: 50 }} onSubmit={() => {}}>
+        <Slider name="volume" label="Volume" size={size} />
+      </Form>,
+    )
+    expectTargetSize(screen.getByRole('slider', { name: 'Volume' }))
   })
 })

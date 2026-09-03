@@ -6,6 +6,7 @@ import { Form } from '../../Form'
 import { PercentField, type PercentFieldProps } from './PercentField'
 import { describeFieldContract } from '../../test/describeFieldContract'
 import { expectNoA11yViolations } from '../../test/axe'
+import { expectTargetSize } from '../../test/targetSize'
 
 const schema = z.object({ rate: z.number().nullable() })
 // Widens HTMLElement to HTMLInputElement so `.value` / `.selectionStart` are reachable;
@@ -305,6 +306,19 @@ describe('PercentField theming', () => {
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(onSubmit).toHaveBeenCalledWith({ rate: 25 }, expect.anything())
   })
+
+  it.each(['medium', 'small'] as const)(
+    '%s: the inherited steppers meet 24×24 target size',
+    (size) => {
+      render(
+        <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+          <PercentField name="rate" label="Rate" size={size} />
+        </Form>,
+      )
+      expectTargetSize(screen.getByRole('button', { name: 'Increase' }))
+      expectTargetSize(screen.getByRole('button', { name: 'Decrease' }))
+    },
+  )
 })
 
 describe('PercentField type-level', () => {
