@@ -5,6 +5,7 @@ import { Form } from '../../Form'
 import { ToggleButtonGroup } from './ToggleButtonGroup'
 import { describeFieldContract } from '../../test/describeFieldContract'
 import { getInnerGroup } from '../../test/getInnerGroup'
+import { expectTargetSize } from '../../test/targetSize'
 
 const schema = z.object({ align: z.string().nullable() })
 const multiSchema = z.object({ format: z.array(z.number()) })
@@ -136,5 +137,20 @@ describe('ToggleButtonGroup', () => {
       </Form>,
     )
     expect(getInnerGroup('Align (optional)')).toBeInTheDocument()
+  })
+
+  /**
+   * A `ToggleButton` is the one control here whose label may be an icon
+   * (`options[].label` takes any node), so it is the icon-only case
+   * `expectTargetSize` is for — MUI's own `ToggleButton` padding guarantees the
+   * box either way, which is what this pins.
+   */
+  it.each(['medium', 'small'] as const)('%s: every button meets 24×24 target size', (size) => {
+    render(
+      <Form schema={schema} defaultValues={{ align: null }} onSubmit={() => {}}>
+        <ToggleButtonGroup name="align" label="Align" options={aligns} exclusive size={size} />
+      </Form>,
+    )
+    for (const button of screen.getAllByRole('button')) expectTargetSize(button)
   })
 })

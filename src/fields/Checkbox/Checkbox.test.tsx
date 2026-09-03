@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { Form } from '../../Form'
 import { Checkbox } from './Checkbox'
 import { describeFieldContract } from '../../test/describeFieldContract'
+import { expectTargetSize } from '../../test/targetSize'
 
 const schema = z.object({
   tos: z.boolean().refine(Boolean, { error: 'You must accept the terms' }),
@@ -135,5 +136,14 @@ describe('Checkbox', () => {
       </Form>,
     )
     expect(screen.getByRole('checkbox', { name: 'Accept terms (optional)' })).toBeInTheDocument()
+  })
+
+  it.each(['medium', 'small'] as const)('%s: meets 24×24 target size', (size) => {
+    render(
+      <Form schema={schema} defaultValues={{ tos: false }} onSubmit={() => {}}>
+        <Checkbox name="tos" label="Accept terms" size={size} />
+      </Form>,
+    )
+    expectTargetSize(screen.getByRole('checkbox', { name: 'Accept terms' }))
   })
 })

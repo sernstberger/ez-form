@@ -5,6 +5,7 @@ import { Form } from '../../Form'
 import { CheckboxGroup } from './CheckboxGroup'
 import { describeFieldContract } from '../../test/describeFieldContract'
 import { getInnerGroup } from '../../test/getInnerGroup'
+import { expectTargetSize } from '../../test/targetSize'
 
 const schema = z.object({ toppings: z.array(z.number()) })
 const toppings = [
@@ -128,5 +129,15 @@ describe('CheckboxGroup', () => {
       </Form>,
     )
     expect(getInnerGroup('Toppings (optional)')).toBeInTheDocument()
+  })
+
+  // No `size` prop here (unlike `Checkbox`), so the default is the only size to pin.
+  it('every box meets 24×24 target size', () => {
+    render(
+      <Form schema={schema} defaultValues={{ toppings: [] }} onSubmit={() => {}}>
+        <CheckboxGroup name="toppings" label="Toppings" options={toppings} />
+      </Form>,
+    )
+    for (const box of screen.getAllByRole('checkbox')) expectTargetSize(box)
   })
 })

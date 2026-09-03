@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { Form } from '../../Form'
 import { Switch } from './Switch'
 import { describeFieldContract } from '../../test/describeFieldContract'
+import { expectTargetSize } from '../../test/targetSize'
 
 const schema = z.object({ darkMode: z.boolean() })
 
@@ -115,5 +116,14 @@ describe('Switch', () => {
       </Form>,
     )
     expect(screen.getByRole('switch', { name: 'Dark mode (optional)' })).toBeInTheDocument()
+  })
+
+  it.each(['medium', 'small'] as const)('%s: meets 24×24 target size', (size) => {
+    render(
+      <Form schema={schema} defaultValues={{ darkMode: false }} onSubmit={() => {}}>
+        <Switch name="darkMode" label="Dark mode" size={size} />
+      </Form>,
+    )
+    expectTargetSize(screen.getByRole('switch', { name: 'Dark mode' }))
   })
 })
