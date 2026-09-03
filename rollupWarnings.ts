@@ -10,6 +10,14 @@
  *
  * The allow-list below is deliberately tiny and each entry carries its reason: the moment it
  * becomes a habit, the next real warning gets added to it instead of fixed.
+ *
+ * Vite's own reporter is the one exception that is forwarded rather than thrown. Its
+ * "(!) Some chunks are larger than 500 kB" advisory does arrive here (no `code`,
+ * `plugin: 'builtin:vite-reporter'`), but it is emitted after the bundle is written and a
+ * throw from that path is swallowed: the build exits 0 and the advisory disappears with it.
+ * It is also one aggregated message with no chunk names, so it cannot be allow-listed per
+ * chunk. Passing it to Vite's default handler keeps it visible; the Storybook build sets
+ * `build.chunkSizeWarningLimit` for the chunks it cannot shrink — see `.storybook/main.ts`.
  */
 
 /**
@@ -27,12 +35,29 @@ const ALLOWED_CODES = new Set(['PLUGIN_TIMINGS'])
  *  each export their own near-identical type, and this only reads two fields. */
 interface RollupWarning {
   code?: string
+  plugin?: string
   message?: string
   loc?: { file?: string; line?: number; column?: number }
 }
 
-export function failOnWarning(warning: RollupWarning): void {
+/**
+ * Vite's reporter plugin: its advisories are printed, not thrown — a throw on them cannot
+ * fail the build (see above), it can only hide them.
+ */
+const VITE_REPORTER = 'builtin:vite-reporter'
+
+// Generic so the default handler is typed with the bundler's own warning type: Vite's
+// `OnwarnFunction` hands over a handler that takes a `RolldownLog`, and a handler declared
+// against the looser structural type above would not be assignable to it.
+export function failOnWarning<W extends RollupWarning>(
+  warning: W,
+  defaultHandler: (warning: W) => void,
+): void {
   if (warning.code && ALLOWED_CODES.has(warning.code)) return
+  if (warning.plugin === VITE_REPORTER) {
+    defaultHandler(warning)
+    return
+  }
   const where = warning.loc?.file
     ? ` (${warning.loc.file}:${String(warning.loc.line ?? 0)}:${String(warning.loc.column ?? 0)})`
     : ''
