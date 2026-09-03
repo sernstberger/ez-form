@@ -13,7 +13,10 @@ prove it, and file it. You never fix anything.
 
 - **Target**: the component group (e.g. `Wizard + ReadOnlyField`) and its story ids.
 - **Storybook URL**: usually `http://localhost:6006` (already running; do not start one).
-- **Scratch dir**: where throwaway vitest probes go. Nothing you write is committed.
+- **Scratch dir**: `src/__qa__/` — vitest's `include` is `src/**/*.test.{ts,tsx}`, so a probe
+  anywhere else (a `/tmp` scratch dir included) is silently **not collected** and you will
+  think it passed. That directory is gitignored and excluded from tsconfig/eslint for exactly
+  this. Delete your probes when done; `git status` must end clean.
 - **Existing `qa` issues**: `gh issue list --label qa --state all --limit 200`; never file a
   duplicate — comment on the existing issue with the new repro instead.
 
@@ -25,7 +28,19 @@ prove it, and file it. You never fix anything.
 - Compare against the platform baseline: how does a plain MUI `TextField` in a plain
   `<form>` behave under the same abuse? If MUI does the same thing, note it as
   `upstream` in the issue and file at P3 unless data is lost.
-- Never touch `src/`. Probes live in the scratch dir and import from `src/` by path.
+- Never change a component. Probes are the one thing you write, and they live in `src/__qa__/`
+  (see above) and import from `src/` by relative path.
+- **Never `cd <dir> && <cmd> <relative-path>`** — a relative path after a `cd` cannot be resolved
+  statically, so the permission checker prompts the user for every call. Use absolute paths,
+  `pnpm --dir <root> …` and `git -C <root> …` instead.
+- **Assert accessible _names_, never attribute presence.** `getByRole(role, { name })`, not
+  `getAttribute('aria-label')`. A source audit once cleared 15 fields that a name query fails:
+  MUI drops a root `aria-label` onto the `FormControl` wrapper, and an `aria-labelledby`
+  pointing at an empty element outranks a correctly-forwarded `aria-label`. "The prop is
+  forwarded" is not the test; "the control has an accessible name" is.
+- **Baseline-compare before assigning blame.** Run the same abuse against plain MUI. It once
+  split 15 identical-looking failures into 2 ez-form regressions, 3 upstream quirks and 1
+  suspected MUI bug — three different owners and three different fixes.
 - Stay on target. A break in another group goes in your report's "Out of scope" list,
   not in an issue.
 - Budget: stop after the checklist is exhausted or 45 minutes, whichever first.
@@ -44,7 +59,14 @@ prove it, and file it. You never fix anything.
    - dates (DatePicker / DateField / DateTimePicker): `02/03/2024`, `2024-03-02`, `March 2, 2024`, `2.3.2024`, `2024-03-02T10:00:00Z`, `02032024`, a date outside `minDate`/`maxDate`, `31/02/2024`; check that the stored value (form state, via the story's submit `fn`) is the date the locale means, not a shifted day.
    - OTP: `123456`, `123 456`, `123-456`, `1234567`, `12`; codes with a leading zero.
    - phone / pattern fields: `+1 (555) 010-0000`, `555.010.0000`.
-     Paste via `browser_evaluate` dispatching a real `paste` ClipboardEvent, and separately via `browser_type` of the same string, since some components hook only one.
+     Paste and type the same string separately, since some components hook only one. Two
+     browser gotchas, both learned the hard way:
+     - A **synthetic `ClipboardEvent`** dispatched via `browser_evaluate` does **not** insert
+       text in Chromium — only a trusted OS paste does. Real paste = type into a scratch
+       field → `Ctrl+C` → focus the target → `Ctrl+V`.
+     - **`browser_type` on `type="number"`** calls Playwright's `.fill()`, which refuses
+       non-numeric characters outright and skips real keystroke filtering. Genuine abuse needs
+       `browser_press_key` one character at a time.
 2. IME-style composition (type via `browser_type` with `slowly`), autofill-like bulk `fill_form`, drag-drop text if the field allows.
 3. `Enter` in every field: does it submit, and only once? `Enter` in Autocomplete/Select open state.
 4. Double-click submit; submit while async `defaultValues` still pending; submit, then change a value while `onSubmit` is pending.
