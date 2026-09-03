@@ -53,11 +53,17 @@ export function RadioGroup({
       rules={{ required, validate }}
       optionalText={optionalText}
       labelAs="legend"
+      // For the dev-mode "no accessible name" check only — read, not destructured, so
+      // both still reach the control through `rest`.
+      aria-label={rest['aria-label']}
+      aria-labelledby={rest['aria-labelledby']}
       renderControl={({ field, required: isRequired, inputA11y, labelId }) => (
         <MuiRadioGroup
           {...rest}
           {...inputA11y}
-          aria-labelledby={labelId}
+          // `?? rest`: the legend's id wins when there is a legend, otherwise a
+          // consumer's own `aria-labelledby` survives the spread above it.
+          aria-labelledby={labelId ?? rest['aria-labelledby']}
           aria-required={isRequired || undefined}
           name={field.name}
           value={field.value == null ? '' : String(field.value)}

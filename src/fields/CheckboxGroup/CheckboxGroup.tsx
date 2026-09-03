@@ -57,13 +57,24 @@ export function CheckboxGroup({
       rules={{ required, validate }}
       optionalText={optionalText}
       labelAs="legend"
+      // For the dev-mode "no accessible name" check only — read, not destructured, so
+      // both still reach the control through `rest`.
+      aria-label={rest['aria-label']}
+      aria-labelledby={rest['aria-labelledby']}
       renderControl={({ field, inputA11y, labelId }) => {
         const selected: Value[] = Array.isArray(field.value) ? field.value : []
         return (
           // No `aria-required`: ARIA does not support it on `role="group"`
           // (unlike RadioGroup's `radiogroup`), and axe flags it. The legend's
           // asterisk and the required error carry that to the user.
-          <FormGroup {...rest} {...inputA11y} role="group" aria-labelledby={labelId}>
+          // `?? rest`: the legend's id wins when there is a legend, otherwise a
+          // consumer's own `aria-labelledby` survives the spread above it.
+          <FormGroup
+            {...rest}
+            {...inputA11y}
+            role="group"
+            aria-labelledby={labelId ?? rest['aria-labelledby']}
+          >
             {options.map((o, i) => (
               <FormControlLabel
                 key={String(o.value)}
