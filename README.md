@@ -1450,6 +1450,67 @@ the call sites _and_ the message strings — no runtime check, no bytes. This is
 mechanism React uses for its own development warnings, and it requires nothing of you beyond
 building for production the way you already do.
 
+## Lint rule
+
+The developer warnings above fire at runtime, when the form renders. One mistake is worth
+catching earlier than that, because it is a choice of component rather than a bug: reaching
+for `<TextField type="email">` when `<EmailField>` exists.
+
+That cannot be a type. `EmailField`, `PhoneField`, `SsnField` and `PasswordField` are all
+built _on_ `TextField` and pass `type` to it themselves, so a `TextFieldProps` that forbade
+`type="email"` would break the very components you are being pointed at. Telling the two
+apart means knowing who wrote the JSX, which a linter can see and a type cannot.
+
+So ez-form ships one ESLint rule, `prefer-specific-field`, as a subpath export:
+
+```js
+// eslint.config.js
+import ezForm from 'ez-form/eslint-plugin'
+
+export default [
+  // ...your other config
+  ...ezForm.configs.recommended,
+]
+```
+
+Or enable the rule yourself, if you want it as a warning rather than an error:
+
+```js
+import ezForm from 'ez-form/eslint-plugin'
+
+export default [
+  {
+    plugins: { 'ez-form': ezForm },
+    rules: { 'ez-form/prefer-specific-field': 'warn' },
+  },
+]
+```
+
+It is AST-only: no `parserOptions.project`, no type information, no measurable lint cost. It
+adds no dependency either — the rule imports nothing at runtime.
+
+### What it reports
+
+Four `type` values have a dedicated field, and the message names what that field actually
+adds rather than just asserting a preference:
+
+| You wrote                     | It suggests     | Because that field adds                                                                                                                                        |
+| ----------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<TextField type="password">` | `PasswordField` | a reveal toggle that keeps the caret, the right `autoComplete` token for sign-in vs. new-password, and an optional strength meter                              |
+| `<TextField type="number">`   | `NumberField`   | a real numeric value instead of a string, `min`/`max` as both stepper bound and rule, and paste handling — a raw `<input type="number">` reads `'1,5'` as `15` |
+| `<TextField type="email">`    | `EmailField`    | a format rule with its own message, and trim/lower-case on blur (`TextField` already gives you `inputMode` and `autoComplete` here)                            |
+| `<TextField type="tel">`      | `PhoneField`    | display formatting over a digits-only value, caret restoration, and a completeness rule (again, `inputMode`/`autoComplete` are already yours)                  |
+
+The bottom two are deliberately softer than the top two. `TextField` already derives the
+mobile keyboard and the autofill token from `type="email"` and `type="tel"`, so those
+messages claim only what is genuinely still missing. A rule that oversells its weak cases is
+a rule people turn off.
+
+**It stays quiet** for `type="url"` and `type="search"` — `TextField` handles both correctly
+and there is no dedicated field to move to — and for any `type` it cannot read statically
+(`type={kind}`, or a `{...props}` spread that might carry one). It also only fires on a
+`TextField` imported from `ez-form`, so MUI's `TextField` in the same file is left alone.
+
 ## Develop
 
 ```bash

@@ -52,6 +52,9 @@ export default defineConfig(({ mode }) => ({
     globals: true,
     restoreMocks: true,
     setupFiles: ['src/test/setup.ts'],
-    include: ['src/**/*.test.{ts,tsx}'],
+    // `eslint-plugin/` is outside `src` because it is not part of the library bundle: it
+    // ships as plain JS with no build step (see eslint-plugin/index.js), so its tests have
+    // to be named here rather than being picked up by the `src` glob.
+    include: ['src/**/*.test.{ts,tsx}', 'eslint-plugin/*.test.js'],
   },
 }))

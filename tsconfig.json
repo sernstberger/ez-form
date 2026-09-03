@@ -27,6 +27,17 @@
   // `.storybook` as a bare directory name silently missed `main.ts`, so the Storybook build
   // config was never typechecked (only `preview.tsx` was, because a `.tsx` under a dotted
   // directory does get picked up). Naming the extensions explicitly covers both files.
-  "include": ["src", ".storybook/*.ts", ".storybook/*.tsx", "vite.config.ts", "rollupWarnings.ts"],
+  // `eslint-plugin/index.d.ts` is hand-written (the plugin is plain JS with no build step), so
+  // it is included here to be typechecked rather than merely shipped: `pnpm typecheck` then
+  // catches a declaration that has drifted from the plugin it describes, and typed linting
+  // gets a program for it.
+  "include": [
+    "src",
+    ".storybook/*.ts",
+    ".storybook/*.tsx",
+    "vite.config.ts",
+    "rollupWarnings.ts",
+    "eslint-plugin/index.d.ts"
+  ],
   "exclude": ["src/__qa__"]
 }

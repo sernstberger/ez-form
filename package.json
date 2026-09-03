@@ -17,6 +17,9 @@
   "sideEffects": false,
   "files": [
     "dist",
+    "eslint-plugin/index.js",
+    "eslint-plugin/index.d.ts",
+    "eslint-plugin/prefer-specific-field.js",
     "CHANGELOG.md"
   ],
   "main": "./dist/index.js",
@@ -26,6 +29,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./eslint-plugin": {
+      "types": "./eslint-plugin/index.d.ts",
+      "default": "./eslint-plugin/index.js"
     },
     "./package.json": "./package.json"
   },
