@@ -671,6 +671,46 @@ const theme = createTheme({
 })
 ```
 
+### Theme preset
+
+Nothing above is applied unless you ask for it. `createEzFormTheme` is the one opt-in
+place that holds an opinion — stacked labels (the label sits above the input, no floating
+animation, no notch), flat bordered inputs with a small radius and a soft focus ring, a
+neutral contained button, light and dark colour schemes, and every transition collapsed
+under `prefers-reduced-motion: reduce` (WCAG 2.3.3). The primitives and most component
+customisations are adapted from MUI's own dashboard template (MIT). Styling taste lives in
+[`DESIGN.md`](./DESIGN.md); the preset in `src/theme/ezFormTheme.ts` is its code form, and
+a test keeps the two files' tokens equal.
+
+```tsx
+import { ThemeProvider, CssBaseline } from '@mui/material'
+import { createEzFormTheme } from 'ez-form'
+
+const theme = createEzFormTheme({
+  components: { EzSubmitButton: { defaultProps: { fullWidth: true } } },
+})
+
+;<ThemeProvider theme={theme}>
+  <CssBaseline /> {/* the reduced-motion rule lives in MuiCssBaseline */}
+  <App />
+</ThemeProvider>
+```
+
+With no scheme named, the theme carries both colour schemes and MUI's `ThemeProvider`
+follows the OS (`prefers-color-scheme`) and `useColorScheme`; pass `defaultMode="light"`
+to the provider to start light regardless. Naming a scheme — `defaultColorScheme: 'dark'`,
+or the `palette: { mode: 'dark' }` idiom — pins the theme to that scheme alone.
+
+`createEzFormTheme(options)` merges the palette-shaping keys (`colorSchemes`, `palette`,
+`defaultColorScheme`, `cssVariables`, `typography`, `shape`) into the preset before MUI
+builds the theme, so MUI derives shades and contrast text from _your_ colours; everything
+else deep-merges into the built theme through `createTheme(options, ...args)`. For full
+control, spread the plain options yourself:
+`createTheme({ ...ezFormThemeOptions, defaultColorScheme: 'dark' })`.
+
+Storybook has an "ez-form theme" toolbar toggle — `preset`, `preset (dark)`, `bare` — so
+every story can be checked with and without it.
+
 ## Loading values from a server
 
 ```tsx

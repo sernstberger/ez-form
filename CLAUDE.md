@@ -3,7 +3,7 @@
 Read `docs/PHILOSOPHY.md` first; it is the authority. The non-negotiables:
 
 - **Extend, don't re-implement.** Props/types come from MUI, Base UI, react-hook-form. Audit before changing; keep deliberate deviations, delete identical copies.
-- **No styling in `src/`.** No `sx`, ripple props, or literals a theme cannot override. Defaults go through `useDefaultProps` + `styled` slots + `<name>Classes` + `src/theme/augmentation.ts`. A slot default spread under `slotProps` is the pattern, not a violation. Stories may style.
+- **No styling in `src/`.** No `sx`, ripple props, or literals a theme cannot override. Defaults go through `useDefaultProps` + `styled` slots + `<name>Classes` + `src/theme/augmentation.ts`. A slot default spread under `slotProps` is the pattern, not a violation. Stories may style. Styling taste lives in `DESIGN.md`; the preset in `src/theme/ezFormTheme.ts` is its code form.
 - **a11y is verified, not assumed.** jest-axe in every component test; pristine test output.
 - **The form owns the lifecycle.** Submission, loading, disabling, confirm, guard live on `<Form>`; fields read from context.
 - **Backlog is GitHub Issues only.** Labels `area:*`, `priority:*`, `size:*`, `needs-design`, `follow-up`; milestones per version. Post the finalized plan on each issue before building; `needs-design` means brainstorm first.

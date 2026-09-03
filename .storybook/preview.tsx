@@ -8,8 +8,23 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
 import type { z } from 'zod'
 import { Form } from '../src/Form'
 import { SubmitButton } from '../src/SubmitButton'
+import { createEzFormTheme } from '../src/theme/ezFormTheme'
 
-const theme = createTheme()
+/**
+ * The "ez-form theme" toolbar toggle. `preset` is `createEzFormTheme()` — the
+ * opt-in taste in `src/theme/ezFormTheme.ts` / `DESIGN.md`; `presetDark` is the
+ * same preset with its dark colour scheme as the default; `bare` is MUI's stock
+ * `createTheme()`, which is what a consumer who never opts in sees. Built once
+ * each: a theme is a big immutable object and the decorator runs per story.
+ */
+const themes = {
+  // Each pinned to one scheme: a bare `createEzFormTheme()` follows the OS, and a
+  // toolbar item that changed with the machine's setting would be no toggle.
+  preset: createEzFormTheme({ defaultColorScheme: 'light' }),
+  presetDark: createEzFormTheme({ defaultColorScheme: 'dark' }),
+  bare: createTheme(),
+}
+type ThemeChoice = keyof typeof themes
 
 /**
  * Story parameters understood by the Form decorator below. Field stories set
@@ -45,15 +60,35 @@ const preview: Preview = {
         </Form>
       )
     },
-    (Story) => (
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <LocalizationProvider dateAdapter={AdapterDateFns}>
-          <Story />
-        </LocalizationProvider>
-      </ThemeProvider>
-    ),
+    (Story, { globals }) => {
+      const choice = globals.theme as ThemeChoice | undefined
+      const theme = themes[choice ?? 'preset'] ?? themes.preset
+      return (
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <LocalizationProvider dateAdapter={AdapterDateFns}>
+            <Story />
+          </LocalizationProvider>
+        </ThemeProvider>
+      )
+    },
   ],
+  globalTypes: {
+    theme: {
+      description: 'ez-form theme',
+      toolbar: {
+        title: 'ez-form theme',
+        icon: 'paintbrush',
+        items: [
+          { value: 'preset', title: 'preset' },
+          { value: 'presetDark', title: 'preset (dark)' },
+          { value: 'bare', title: 'bare' },
+        ],
+        dynamicTitle: true,
+      },
+    },
+  },
+  initialGlobals: { theme: 'preset' },
   parameters: {
     controls: { expanded: true },
     options: {
