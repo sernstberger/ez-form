@@ -22,6 +22,21 @@ declare module '*.md?raw' {
  */
 declare global {
   var process: { env: { NODE_ENV?: string } }
+
+  /**
+   * The env vars this repo's Storybook reads, typed so `import.meta.env.X` comes back as
+   * `string | undefined` rather than the `any` that `vite/client`'s index signature hands
+   * out. Storybook only: the library itself never reads an env var — a consumer passes their
+   * own key to `googlePlaces({ apiKey })`. See `.env.example`.
+   *
+   * Declared inside `declare global` because this file is a module (the `process` merge above
+   * needs it); a bare top-level `interface ImportMetaEnv` here would be file-local and merge
+   * with nothing.
+   */
+  interface ImportMetaEnv {
+    /** A browser key for Google's Places API (New); powers the AddressField live story. */
+    readonly VITE_GOOGLE_PLACES_API_KEY?: string
+  }
 }
 
 export {}
