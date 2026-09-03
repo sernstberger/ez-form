@@ -10,6 +10,11 @@
  *
  * The allow-list below is deliberately tiny and each entry carries its reason: the moment it
  * becomes a habit, the next real warning gets added to it instead of fixed.
+ *
+ * Not every message Vite prints is a rollup warning. The "(!) Some chunks are larger than
+ * 500 kB" advisory comes from Vite's reporter plugin through the logger, after the bundle is
+ * written; it never passes through `onwarn`, so it cannot be failed or allow-listed here.
+ * The Storybook build handles it with `build.chunkSizeWarningLimit` — see `.storybook/main.ts`.
  */
 
 /**
