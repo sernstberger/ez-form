@@ -4,7 +4,7 @@ import { useEzFormContext } from '../useEzFormContext'
 import { useRequiredIndicator } from '../Form/RequiredIndicatorContext'
 import { useRuleMessages } from '../Form/RuleMessagesContext'
 import { isRequired, normalizeRules, type FieldRules } from '../rules'
-import { warnMissingLabel } from '../devWarn'
+import { warnMissingLabel, warnUnknownFieldName } from '../devWarn'
 
 export interface UseEzFieldOptions<TValue = unknown> {
   /** The field's label; when it is a string it names the field in default rule messages. */
@@ -106,9 +106,11 @@ export function useEzField<TValue = unknown>(
     'aria-labelledby': ariaLabelledBy,
   }: UseEzFieldOptions<TValue> = {},
 ): UseEzFieldReturn {
-  // Guard only: inside <Form>'s FormProvider, useController reads control from context.
-  useEzFormContext(componentName)
+  // Guard, and — dev only — the one place that can see both the field's `name` and the
+  // form's own defaults: `useController` below reads `control` from the same context.
+  const { control } = useEzFormContext(componentName)
   warnMissingLabel(componentName, name, label, ariaLabel, ariaLabelledBy)
+  warnUnknownFieldName(componentName, name, control)
   const { requiredIndicator, optionalText: formOptionalText } = useRequiredIndicator()
   const messages = useRuleMessages()
   const normalized = normalizeRules(rules, typeof label === 'string' ? label : undefined, messages)

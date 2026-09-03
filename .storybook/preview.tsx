@@ -1,5 +1,10 @@
+import { useEffect } from 'react'
 import type { Parameters, Preview } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
+import { CacheProvider } from '@emotion/react'
+import createCache from '@emotion/cache'
+import { prefixer } from 'stylis'
+import rtlPlugin from '@mui/stylis-plugin-rtl'
 import CssBaseline from '@mui/material/CssBaseline'
 import Stack from '@mui/material/Stack'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
@@ -11,20 +16,86 @@ import { SubmitButton } from '../src/SubmitButton'
 import { createEzFormTheme } from '../src/theme/ezFormTheme'
 
 /**
- * The "Theme" toolbar toggle. `modern` is `createEzFormTheme()` — the opt-in
- * taste in `src/theme/ezFormTheme.ts` / `DESIGN.md`; `modernDark` is the same
- * theme with its dark colour scheme as the default; `stockMui` is MUI's plain
- * `createTheme()`, which is what a consumer who never opts in sees. Built once
- * each: a theme is a big immutable object and the decorator runs per story.
+ * The "Theme" toolbar toggle, built once per (theme, direction) pair. `modern` is
+ * `createEzFormTheme()` — the opt-in taste in `src/theme/ezFormTheme.ts` /
+ * `DESIGN.md`; `modernDark` is the same theme with its dark colour scheme as the
+ * default; `stockMui` is MUI's plain `createTheme()`, which is what a consumer who
+ * never opts in sees. Built eagerly: a theme is a big immutable object and the
+ * decorator runs per story.
+ *
+ * `direction` is baked into the theme rather than layered on top because MUI reads
+ * `theme.direction` in component styles (Drawer's anchor, Slide, the Select icon,
+ * `TextField`'s adornment spacing), and no provider can retrofit it — the second
+ * of MUI's three RTL steps (#108).
  */
-const themes = {
+const buildThemes = (direction: 'ltr' | 'rtl') => ({
   // Each pinned to one scheme: an unpinned `createEzFormTheme()` follows the OS,
   // and a toolbar item that changed with the machine's setting would be no toggle.
-  modern: createEzFormTheme({ defaultColorScheme: 'light' }),
-  modernDark: createEzFormTheme({ defaultColorScheme: 'dark' }),
-  stockMui: createTheme(),
+  modern: createEzFormTheme({ defaultColorScheme: 'light', direction }),
+  modernDark: createEzFormTheme({ defaultColorScheme: 'dark', direction }),
+  stockMui: createTheme({ direction }),
+})
+const themes = { ltr: buildThemes('ltr'), rtl: buildThemes('rtl') }
+type ThemeChoice = keyof (typeof themes)['ltr']
+type DirectionChoice = keyof typeof themes
+
+/**
+ * The RTL half of MUI's three-step setup (Context7, MUI v9 "Right-to-left support"):
+ * `dir` on the document, `direction` on the theme, and a stylis plugin that flips the
+ * physical CSS properties MUI still emits — v9 has not moved to logical properties
+ * (`marginInlineStart` appears in exactly one component), so without the plugin an RTL
+ * theme mirrors the layout while every `margin-left` stays put.
+ *
+ * Two caches, not one, and both created eagerly: emotion keys its `<style>` tags by
+ * `key`, so an LTR and an RTL cache under the same key would overwrite each other's
+ * rules. Swapping the `CacheProvider` value swaps which set of tags a story's styles
+ * come from.
+ *
+ * `prefixer` is included explicitly because passing `stylisPlugins` *replaces*
+ * emotion's default plugin list rather than extending it; drop it and vendor
+ * prefixing disappears along with it.
+ *
+ * **`stylis` is pinned to 4.2.0 in `package.json`, and must stay pinned.**
+ * `@emotion/cache` depends on exactly `stylis@4.2.0`, so a caret range here installs a
+ * *second* copy (4.4.0) — this `prefixer` then comes from one copy while the cache's
+ * serializer runs the other, and their element objects are not interchangeable. The
+ * symptom is not a subtle style bug: every RTL story fails to render with
+ * `TypeError: Cannot read properties of undefined (reading 'push')` from stylis's
+ * `append`. Verified in the browser, before and after the pin.
+ */
+const caches = {
+  ltr: createCache({ key: 'ez-ltr' }),
+  rtl: createCache({ key: 'ez-rtl', stylisPlugins: [prefixer, rtlPlugin] }),
 }
-type ThemeChoice = keyof typeof themes
+
+/**
+ * Step one: `dir` on `<html>`, not on a wrapper element.
+ *
+ * MUI's own docs call this out — a component rendered through a React portal (every
+ * `Select` menu, `Menu`, `Dialog`, `Tooltip` and date picker popper here) mounts into
+ * `document.body`, outside whatever the decorator wraps, so it inherits nothing from a
+ * `<div dir="rtl">`. Setting it on the document element is the only placement that
+ * reaches them. `lang` moves with it: an `<html>` whose text runs right-to-left but
+ * still claims `lang="en"` is the sort of mismatch the a11y panel is there to catch,
+ * and Arabic is the direction's honest stand-in.
+ */
+function useDocumentDirection(direction: DirectionChoice) {
+  useEffect(() => {
+    const root = document.documentElement
+    const previousDir = root.getAttribute('dir')
+    const previousLang = root.getAttribute('lang')
+    root.setAttribute('dir', direction)
+    root.setAttribute('lang', direction === 'rtl' ? 'ar' : 'en')
+    return () => {
+      // Restored rather than left set: the toolbar can switch back, and Storybook's own
+      // chrome shares this document in a docs page.
+      if (previousDir === null) root.removeAttribute('dir')
+      else root.setAttribute('dir', previousDir)
+      if (previousLang === null) root.removeAttribute('lang')
+      else root.setAttribute('lang', previousLang)
+    }
+  }, [direction])
+}
 
 /**
  * Story parameters understood by the Form decorator below. Field stories set
@@ -85,14 +156,20 @@ const preview: Preview = {
     },
     (Story, { globals }) => {
       const choice = globals.theme as ThemeChoice | undefined
-      const theme = themes[choice ?? 'modern'] ?? themes.modern
+      const direction = (globals.direction as DirectionChoice | undefined) ?? 'ltr'
+      const dir = themes[direction] ? direction : 'ltr'
+      const theme = themes[dir][choice ?? 'modern'] ?? themes[dir].modern
+      // A decorator is a component, so a hook is legal here.
+      useDocumentDirection(dir)
       return (
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
-          <LocalizationProvider dateAdapter={AdapterDateFns}>
-            <Story />
-          </LocalizationProvider>
-        </ThemeProvider>
+        <CacheProvider value={caches[dir]}>
+          <ThemeProvider theme={theme}>
+            <CssBaseline />
+            <LocalizationProvider dateAdapter={AdapterDateFns}>
+              <Story />
+            </LocalizationProvider>
+          </ThemeProvider>
+        </CacheProvider>
       )
     },
   ],
@@ -110,8 +187,25 @@ const preview: Preview = {
         dynamicTitle: true,
       },
     },
+    /**
+     * The "Direction" toggle (#108). RTL had no way to be exercised in the browser at
+     * all, so the QA sweep's `direction: 'rtl'` checklist line could only ever be
+     * skipped; this makes it one click for every story and every future sweep.
+     */
+    direction: {
+      description: 'Text direction',
+      toolbar: {
+        title: 'Direction',
+        icon: 'transfer',
+        items: [
+          { value: 'ltr', title: 'LTR' },
+          { value: 'rtl', title: 'RTL' },
+        ],
+        dynamicTitle: true,
+      },
+    },
   },
-  initialGlobals: { theme: 'modern' },
+  initialGlobals: { theme: 'modern', direction: 'ltr' },
   parameters: {
     controls: { expanded: true },
     options: {

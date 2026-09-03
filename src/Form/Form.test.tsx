@@ -1245,7 +1245,14 @@ describe('requiredIndicator', () => {
   it('has no accessibility violations in "optional" mode with a mix of required/optional fields', async () => {
     const { container } = render(
       <Form
-        schema={schema}
+        // Every rendered field is in the schema: a name the form does not have now warns
+        // (#108), and a fixture that renders one is testing a form that would drop it.
+        schema={z.object({
+          email: z.email(),
+          plan: z.number(),
+          tos: z.boolean(),
+          newsletter: z.boolean(),
+        })}
         defaultValues={{ email: '' }}
         onSubmit={() => {}}
         title="Sign up"
@@ -1268,8 +1275,8 @@ describe('requiredIndicator', () => {
   it('"optional": Checkbox keeps required with no asterisk, and a not-required Switch gets the suffix', () => {
     const { container } = render(
       <Form
-        schema={schema}
-        defaultValues={{ email: '' }}
+        schema={z.object({ tos: z.boolean(), newsletter: z.boolean() })}
+        defaultValues={{}}
         onSubmit={() => {}}
         requiredIndicator="optional"
       >

@@ -15,6 +15,9 @@ import { Switch } from './fields/Switch'
 import { Rating } from './fields/Rating'
 import { PasswordField } from './fields/PasswordField'
 import { TextareaField } from './fields/TextareaField'
+import { AddressField } from './fields/AddressField'
+import { addressSchema } from './fields/AddressField/addressSchema'
+import { FieldArray } from './FieldArray'
 import { resetDevWarnings } from './devWarn'
 import { consoleMessages, expectConsole } from './test/expectConsole'
 import { getInnerGroup } from './test/getInnerGroup'
@@ -436,6 +439,252 @@ describe('dev warning: a wizard step listing a field the form does not know', ()
 })
 
 /**
+ * The typo case (#108). Every test here asserts on `/the form has no/`, the phrase unique to
+ * this warning, so an unrelated warning firing in the same render cannot make one pass.
+ *
+ * The non-warning cases are the point of the exercise: this check runs on every field of
+ * every form, so one false positive trains consumers to ignore the console and takes the
+ * other three warnings down with it. Each `does not warn` test below is a shape this library
+ * itself produces.
+ */
+describe('dev warning: a field name the form does not have', () => {
+  const arraySchema = z.object({
+    email: z.string(),
+    items: z.array(z.object({ qty: z.string() })),
+  })
+
+  it('fires once, naming the component, the name, and the unknown root', () => {
+    wrap(<TextField name="emial" label="Email" />)
+    const hits = messagesMatching(/the form has no/)
+    expect(hits).toHaveLength(1)
+    expect(hits[0]).toContain('<TextField name="emial">')
+    expect(hits[0]).toContain('no "emial"')
+  })
+
+  it('does not warn for a name the form has', () => {
+    wrap(<TextField name="email" label="Email" />)
+    expect(messagesMatching(/the form has no/)).toHaveLength(0)
+  })
+
+  /**
+   * The whole reason the check reads only the root segment. hookform appends the new row to
+   * `_formValues` as `{}` and leaves `_defaultValues` on the seeded row, so both value trees
+   * say `items.1.qty` is absent — a full-path check warns on every Add.
+   */
+  it('does not warn for a FieldArray row, seeded or added', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form
+        schema={arraySchema}
+        defaultValues={{ email: '', items: [{ qty: '1' }] }}
+        onSubmit={() => {}}
+      >
+        <FieldArray name="items" label="Items" emptyRow={{ qty: '' }}>
+          {({ name }) => <TextField name={name('qty')} label="Qty" />}
+        </FieldArray>
+      </Form>,
+    )
+    expect(messagesMatching(/the form has no/)).toHaveLength(0)
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    expect(await screen.findAllByLabelText('Qty')).toHaveLength(2)
+    expect(messagesMatching(/the form has no/)).toHaveLength(0)
+  })
+
+  /** A row added to an array that started empty — no `items[0]` in the defaults at all. */
+  it('does not warn for the first row of an empty FieldArray', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={arraySchema} defaultValues={{ email: '', items: [] }} onSubmit={() => {}}>
+        <FieldArray name="items" label="Items" emptyRow={{ qty: '' }}>
+          {({ name }) => <TextField name={name('qty')} label="Qty" />}
+        </FieldArray>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    expect(await screen.findByLabelText('Qty')).toBeInTheDocument()
+    expect(messagesMatching(/the form has no/)).toHaveLength(0)
+  })
+
+  /** `AddressField` renders five nested names from one `name="address"`. */
+  it('does not warn for AddressField’s nested part names', () => {
+    render(
+      <Form
+        schema={z.object({ address: addressSchema })}
+        defaultValues={{ address: { street: '', street2: '', city: '', state: '', zip: '' } }}
+        onSubmit={() => {}}
+      >
+        <AddressField name="address" legend="Address" />
+      </Form>,
+    )
+    expect(messagesMatching(/the form has no/)).toHaveLength(0)
+  })
+
+  /** The bracket notation hookform also accepts, in case a consumer writes a path by hand. */
+  it('does not warn for a bracket-notation row path', () => {
+    render(
+      <Form
+        schema={arraySchema}
+        defaultValues={{ email: '', items: [{ qty: '1' }] }}
+        onSubmit={() => {}}
+      >
+        <TextField name="items[0].qty" label="Qty" />
+      </Form>,
+    )
+    expect(messagesMatching(/the form has no/)).toHaveLength(0)
+  })
+
+  /**
+   * Timing. The check runs during the field's render, when `_names.mount` is still empty —
+   * the field asking has not registered, and neither has anything below it. `_defaultValues`
+   * is what makes this answerable on the first pass; a `_names`-only check would warn about
+   * every field on a form's first paint.
+   */
+  it('does not warn on first render, before any field has registered', () => {
+    wrap(
+      <>
+        <TextField name="email" label="Email" />
+        <TextField name="role" label="Role" />
+      </>,
+    )
+    expect(messagesMatching(/the form has no/)).toHaveLength(0)
+  })
+
+  /**
+   * A form with no `defaultValues` at all. The schema still answers, so a real field is
+   * still silent and a typo is still caught — this is the case that makes the schema, not
+   * the value tree, the right authority.
+   */
+  it('judges by the schema on a form with no defaultValues at all', () => {
+    render(
+      <Form schema={schema} onSubmit={() => {}}>
+        <TextField name="email" label="Email" />
+        <TextField name="anything" label="Anything" />
+      </Form>,
+    )
+    const hits = messagesMatching(/the form has no/)
+    expect(hits).toHaveLength(1)
+    expect(hits[0]).toContain('name="anything"')
+  })
+
+  it('does not warn while async defaultValues are still loading, and not after', async () => {
+    render(
+      <Form
+        schema={schema}
+        defaultValues={() => Promise.resolve({ email: 'a', role: 'b' })}
+        onSubmit={() => {}}
+      >
+        <TextField name="email" label="Email" />
+      </Form>,
+    )
+    expect(await screen.findByDisplayValue('a')).toBeInTheDocument()
+    expect(messagesMatching(/the form has no/)).toHaveLength(0)
+  })
+
+  /** `values` lands in `_defaultValues` too, so a `values`-only form is still checkable. */
+  it('reads the `values` prop, and still catches a typo against it', () => {
+    render(
+      <Form schema={schema} values={{ email: 'a', role: 'b' }} onSubmit={() => {}}>
+        <TextField name="emial" label="Email" />
+      </Form>,
+    )
+    expect(messagesMatching(/the form has no/)).toHaveLength(1)
+  })
+
+  /**
+   * The regression that rewrote this check. `role` is in the schema and deliberately absent
+   * from `defaultValues` — a partial defaults object is a supported pattern, and this
+   * library's own `Wizard.stories.tsx` types its defaults `Partial<Input>`. A
+   * defaults-only check warned on five such fields across the existing suite.
+   */
+  it('does not warn for a schema field left out of defaultValues', () => {
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+        <TextField name="role" label="Role" />
+      </Form>,
+    )
+    expect(messagesMatching(/the form has no/)).toHaveLength(0)
+  })
+
+  it('still catches a typo on a form whose defaults are partial', () => {
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+        <TextField name="rol" label="Role" />
+      </Form>,
+    )
+    expect(messagesMatching(/the form has no/)).toHaveLength(1)
+  })
+
+  /**
+   * A schema this cannot enumerate. `.transform` makes the top level a `pipe`, with no
+   * `shape` to read, so the schema abstains and only `defaultValues` is left — which means
+   * a name absent from the defaults must NOT be treated as a typo.
+   */
+  it('stays silent when the schema is not a plain object it can read', () => {
+    render(
+      <Form
+        schema={z.object({ email: z.string(), role: z.string() }).transform((v) => v)}
+        defaultValues={{ email: '' }}
+        onSubmit={() => {}}
+      >
+        <TextField name="role" label="Role" />
+        <TextField name="rol" label="Typo" />
+      </Form>,
+    )
+    expect(messagesMatching(/the form has no/)).toHaveLength(0)
+  })
+
+  /** A `.superRefine` keeps `def.type === 'object'`, so the keys stay readable. */
+  it('reads through a refined object schema', () => {
+    render(
+      <Form
+        schema={z.object({ email: z.string(), role: z.string() }).superRefine(() => {})}
+        defaultValues={{ email: '' }}
+        onSubmit={() => {}}
+      >
+        <TextField name="role" label="Role" />
+        <TextField name="rol" label="Typo" />
+      </Form>,
+    )
+    const hits = messagesMatching(/the form has no/)
+    expect(hits).toHaveLength(1)
+    expect(hits[0]).toContain('name="rol"')
+  })
+
+  /**
+   * A root with no default but with registered fields under it. `_defaultValues` cannot
+   * answer, so `_names` — which has grown by the second render — does.
+   */
+  it('does not warn for a sibling of an already-registered nested field', () => {
+    render(
+      <Form schema={schema} defaultValues={defaults} onSubmit={() => {}}>
+        <TextField name="meta.a" label="A" />
+        <TextField name="meta.b" label="B" />
+      </Form>,
+    )
+    // `meta` is in neither the schema nor the defaults, so `meta.a` — which renders first,
+    // with nothing yet registered — is reported. `meta.b` is then vouched for by the sibling
+    // that registered before it: `_names` is the third source, and it grows as fields mount.
+    // The check is deliberately not retroactive, so the first of a pair still warns.
+    const hits = messagesMatching(/the form has no/)
+    expect(hits).toHaveLength(1)
+    expect(hits[0]).toContain('name="meta.a"')
+  })
+
+  // Same dedupe contract as the other warnings: once per field, not once per render.
+  it('warns once per field, not once per render', async () => {
+    const user = userEvent.setup()
+    wrap(
+      <>
+        <TextField name="emial" label="Email" />
+        <TextField name="rol" label="Role" />
+      </>,
+    )
+    await user.type(screen.getAllByRole('textbox')[0]!, 'abc')
+    expect(messagesMatching(/the form has no/)).toHaveLength(2)
+  })
+})
+
+/**
  * The production guard. `devWarn.ts` reads `process.env.NODE_ENV` into a module-level
  * `const`, so the value has to be in place *before* the module is first evaluated — hence
  * `vi.resetModules()` and a dynamic `import()` rather than the static one at the top of this
@@ -462,6 +711,15 @@ describe('production build', () => {
       { mount: new Set(['email']), array: new Set() },
       () => ({}),
     )
+    prod.warnUnknownFieldName('TextField', 'emial', {
+      // The schema key set is what the check judges against; `ezResolver` normally
+      // attaches it to the resolver under this symbol.
+      _options: {
+        resolver: Object.assign(() => ({ values: {}, errors: {} }), {
+          [prod.schemaKeys]: new Set(['email']),
+        }),
+      },
+    })
 
     expect(messages()).toEqual([])
   })
@@ -480,7 +738,16 @@ describe('production build', () => {
       { mount: new Set(['email']), array: new Set() },
       () => ({}),
     )
+    dev.warnUnknownFieldName('TextField', 'emial', {
+      // The schema key set is what the check judges against; `ezResolver` normally
+      // attaches it to the resolver under this symbol.
+      _options: {
+        resolver: Object.assign(() => ({ values: {}, errors: {} }), {
+          [dev.schemaKeys]: new Set(['email']),
+        }),
+      },
+    })
 
-    expect(messages()).toHaveLength(4)
+    expect(messages()).toHaveLength(5)
   })
 })
