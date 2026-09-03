@@ -10,6 +10,7 @@ import {
 } from 'react-hook-form'
 import type { z } from 'zod'
 import { defaultMessages, normalizeRules, type NormalizedRules, type RuleMessages } from '../rules'
+import { schemaKeys, topLevelSchemaKeys } from '../devWarn'
 
 type RuleError = Pick<FieldError, 'type' | 'message'>
 
@@ -112,7 +113,7 @@ export function ezResolver<TIn extends FieldValues, TOut>(
   messages: RuleMessages = defaultMessages,
 ): Resolver<TIn, unknown, TOut> {
   const zod = zodResolver(schema)
-  return async (values, context, options) => {
+  const resolver: Resolver<TIn, unknown, TOut> = async (values, context, options) => {
     const result = await zod(values, context, options)
     const errors: FieldErrors<TIn> = {}
     Object.assign(errors, result.errors)
@@ -134,4 +135,16 @@ export function ezResolver<TIn extends FieldValues, TOut>(
     }
     return failed ? { values: {}, errors } : result
   }
+  /*
+   * Dev only: hand the schema's top-level names to `warnUnknownFieldName` (#108). hookform
+   * keeps this function on `control._options.resolver`, so a field can reach it through the
+   * `control` it already has, and no context, provider or prop has to exist for a diagnostic.
+   *
+   * `topLevelSchemaKeys` returns `undefined` in production (its own `isDev` guard), leaving
+   * this a dead assignment of `undefined` that the minifier drops with the rest of the
+   * warning machinery.
+   */
+  const keys = topLevelSchemaKeys(schema)
+  if (keys) (resolver as { [schemaKeys]?: ReadonlySet<string> })[schemaKeys] = keys
+  return resolver
 }

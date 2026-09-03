@@ -184,6 +184,157 @@ export function warnUnmountedStepFields(
 }
 
 /**
+ * Where `ezResolver` leaves the schema's top-level key set for this check to find, and the
+ * only channel between them. A property on the resolver function, not a React context,
+ * because the resolver is already on `control._options.resolver` — reachable from the
+ * `control` every field already holds — so nothing new is provided, rendered, or shipped:
+ * in production `ezResolver` never assigns it and this module's every reader is stripped.
+ *
+ * A symbol rather than a string key so it cannot collide with anything hookform or a
+ * consumer's own resolver wrapper puts on that function.
+ */
+export const schemaKeys = Symbol.for('ez-form.schemaKeys')
+
+/** What a resolver carrying the marker looks like. */
+interface MarkedResolver {
+  [schemaKeys]?: ReadonlySet<string>
+}
+
+/**
+ * A field whose `name` names nothing the form has: the typo case (#108). `name` is a plain
+ * `string` — making it `Path<TIn>` needs a structural path from `<Form>`'s generic through
+ * `children: ReactNode` to the field, which does not exist — so a mistyped `name` compiles,
+ * renders, accepts typing, and submits the untouched default. Nothing throws and nothing is
+ * logged; this warning is the only signal.
+ *
+ * ### The schema is the authority, not `defaultValues`
+ *
+ * The first build of this check asked `_defaultValues` alone, and the test suite immediately
+ * caught it warning about `role`, `plan`, `seats`, `tos` and `newsletter` across
+ * `Form.test.tsx` and `Wizard.stories.tsx` — every one a real field, in the schema, simply
+ * left out of a partial `defaultValues` (`Wizard.stories.tsx` types its defaults
+ * `Partial<Input>` on purpose). Omitting a default is a supported pattern, so a
+ * defaults-only check is wrong by construction, and wrong on this library's own stories.
+ *
+ * `ezResolver` therefore hands over the schema's top-level keys (see `schemaKeys`), and those
+ * are what a name is judged against. `defaultValues` only ever *widens* the accepted set —
+ * a `z.looseObject` passes through keys the shape does not list, and a consumer may seed
+ * state under a name the schema strips — so a name has to be missing from both to be a typo.
+ * The schema is required, though: with no readable schema this warns about nothing at all,
+ * because defaults alone cannot tell a typo from a field the consumer chose not to seed.
+ *
+ * ### Why the *root segment*, and only the root segment
+ *
+ * A warning that cries wolf gets muted, so this checks the least it can while still catching
+ * the mistake: the first path segment. `emial` has an unknown root. Every dynamic name this
+ * library produces has a **known** root and an unpredictable tail, and the tail is where the
+ * rest of the false positives live:
+ *
+ * - `FieldArray` rows: `items.1.qty` after Add. `_defaultValues.items` still holds the one
+ *   seeded row and `_formValues.items[1]` is `{}` (hookform appends the row before the field
+ *   registers a value), so *both* value trees say `items.1.qty` is absent. Verified. A
+ *   full-path check warns on every added row. Root `items` is known, so this stays quiet.
+ * - `AddressField`: renders `address.street`, `address.city`, … from one `name="address"`.
+ *   Root `address` is known.
+ * - Any consumer's own nested or computed name, for the same reason.
+ *
+ * Trading depth for silence is the right trade: a typo in a *leaf* (`address.ctiy`) still
+ * lands outside the schema's shape and is caught on submit, while a typo in the root is the
+ * one that vanishes without a trace. Catching less, never falsely, is what makes the warning
+ * worth reading.
+ *
+ * ### Timing
+ *
+ * This runs during the field's render, so `_names.mount` is **empty on the first pass** — the
+ * field asking has not registered yet, and neither has anything after it. `_names` alone would
+ * warn about every field on a form's first paint. The schema keys are fixed when the resolver
+ * is built, before any field registers, which is what makes a first-render answer possible at
+ * all — and it is also why an async `defaultValues` needs no special case: the schema is
+ * already there while the values are still loading. `_names` is still consulted, because it
+ * grows on re-render and covers a root that has neither a schema key nor a default.
+ *
+ * ### The guard that keeps it silent when it cannot know
+ *
+ * No readable schema (see `topLevelSchemaKeys`) means no opinion — the check is skipped
+ * whole. That covers a schema wrapped in a `.transform`, a pipe or a union, and it is what
+ * keeps the warning from firing on a form it does not actually understand.
+ */
+export function warnUnknownFieldName(
+  componentName: string,
+  name: string,
+  control:
+    | {
+        _defaultValues?: unknown
+        _names?: { mount: ReadonlySet<string>; array: ReadonlySet<string> }
+        _options?: { resolver?: unknown }
+      }
+    | undefined,
+): void {
+  if (!isDev) return
+  if (!name) return
+  const resolver = control?._options?.resolver
+  const fromSchema =
+    typeof resolver === 'function' ? (resolver as MarkedResolver)[schemaKeys] : undefined
+  // No readable schema, no opinion. `defaultValues` alone cannot tell a typo from a field
+  // the consumer chose not to seed, so without the schema there is nothing to warn about.
+  if (!fromSchema?.size) return
+  const root = rootSegment(name)
+  if (fromSchema.has(root)) return
+  const defaults = control?._defaultValues
+  if (typeof defaults === 'object' && defaults !== null && !Array.isArray(defaults)) {
+    // A key the schema does not list but the form was seeded with: a `z.looseObject` passes
+    // it through, and a consumer may park state under a name the schema strips. Not a typo.
+    if (Object.keys(defaults).includes(root)) return
+  }
+  const names = control?._names
+  if (names) {
+    for (const registered of [...names.mount, ...names.array]) {
+      if (registered === root || rootSegment(registered) === root) return
+    }
+  }
+  devWarn(
+    `unknown-field-name:${componentName}:${name}`,
+    `ez-form: <${componentName} name="${name}"> — the form has no "${root}". ` +
+      'The field renders and accepts input, but its value is dropped on submit. ' +
+      'Check for a typo against the schema and `defaultValues`.',
+  )
+}
+
+/**
+ * The schema's top-level keys, or `undefined` when they cannot be read — which is the
+ * difference between "the form has no `emial`" and "cannot tell", and the check stays silent
+ * on the second.
+ *
+ * Only a plain `z.object` (including `strictObject`, and one carrying a `.refine` /
+ * `.superRefine`, which keep `def.type === 'object'`) answers. A schema wrapped in a union,
+ * a pipe, a `.transform` or an `.optional()` reports its own `def.type` with no `shape`
+ * (verified against zod 4), and every one of those is a shape this cannot enumerate — so it
+ * declines rather than guessing, and the check falls back to `defaultValues` alone.
+ *
+ * `_zod.def` is zod 4's internal def object. It is read defensively and behind two `typeof`
+ * checks: a future zod that moves it makes this return `undefined`, which costs the warning
+ * and nothing else.
+ */
+export function topLevelSchemaKeys(schema: unknown): ReadonlySet<string> | undefined {
+  if (!isDev) return undefined
+  const def = (schema as { _zod?: { def?: { type?: unknown; shape?: unknown } } } | null)?._zod?.def
+  if (def?.type !== 'object') return undefined
+  const shape = def.shape
+  if (typeof shape !== 'object' || shape === null) return undefined
+  return new Set(Object.keys(shape))
+}
+
+/**
+ * The first path segment of a hookform name. Both notations reach a field:
+ * `items.0.qty` from `FieldArray`'s `name()` helper, `items[0].qty` if a consumer writes it
+ * by hand (hookform accepts both), so `[` ends the segment as surely as `.` does.
+ */
+function rootSegment(name: string): string {
+  const end = name.search(/[.[]/)
+  return end === -1 ? name : name.slice(0, end)
+}
+
+/**
  * Does the form's value tree have this dotted path? Walks rather than indexing so
  * `address.city` resolves, and treats a present-but-`undefined` key as absent — an
  * unmounted conditional field still has its `defaultValues` entry, which is the whole
