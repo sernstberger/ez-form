@@ -29,6 +29,7 @@ import type { PercentFieldProps } from '../fields/PercentField'
 import type { SsnFieldProps } from '../fields/SsnField'
 import type { ZipFieldProps } from '../fields/ZipField'
 import type { StateSelectProps } from '../fields/StateSelect'
+import type { GooglePlacesAttributionProps } from '../address-lookup/GooglePlacesAttribution'
 
 declare module '@mui/material/styles' {
   interface ComponentsPropsList {
@@ -66,6 +67,7 @@ declare module '@mui/material/styles' {
     EzSsnField: Partial<SsnFieldProps>
     EzZipField: Partial<ZipFieldProps>
     EzStateSelect: Partial<StateSelectProps>
+    EzGooglePlacesAttribution: Partial<GooglePlacesAttributionProps>
   }
 
   interface ComponentNameToClassKey {
@@ -93,6 +95,7 @@ declare module '@mui/material/styles' {
     EzTextareaField: 'root' | 'counter'
     EzResendCodeButton: 'root' | 'status'
     EzEmailListField: 'chip' | 'deleteIcon' | 'status'
+    EzGooglePlacesAttribution: 'root'
   }
 
   interface Components<Theme = unknown> {
@@ -226,6 +229,12 @@ declare module '@mui/material/styles' {
     // which is what makes `territories` and `autoComplete` theme-settable.
     EzStateSelect?: {
       defaultProps?: ComponentsProps['EzStateSelect']
+    }
+    // The line `googlePlaces()` renders under the suggestion list. `defaultProps.children` is
+    // where an app swaps the "Powered by Google" text for Google's logo image once, app-wide.
+    EzGooglePlacesAttribution?: {
+      defaultProps?: ComponentsProps['EzGooglePlacesAttribution']
+      styleOverrides?: ComponentsOverrides<Theme>['EzGooglePlacesAttribution']
     }
   }
 }

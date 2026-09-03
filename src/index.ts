@@ -30,6 +30,14 @@ export {
   type AddressValue,
   type AddressSchemaOptions,
 } from './fields/AddressField'
+// Address lookup providers for `<AddressField lookup>`. `googlePlaces` is a stateless REST
+// adapter with no dependencies; the consumer passes its own key.
+export {
+  googlePlaces,
+  googlePlacesAttributionClasses,
+  type GooglePlacesOptions,
+  type GooglePlacesAttributionProps,
+} from './address-lookup'
 export {
   PasswordField,
   passwordFieldClasses,

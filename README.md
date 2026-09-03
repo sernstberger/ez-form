@@ -1301,6 +1301,24 @@ Every label is a prop with a default (`streetLabel` `'Street address'`, `street2
 
 Themeable under `EzAddressField` (`defaultProps`, `styleOverrides` for `root` | `street` | `street2` | `city` | `state` | `zip`), exported as `addressFieldClasses`. The root is a CSS grid with named areas (`street` / `street2` / `city state zip`, one column below `sm`); re-order or re-span any part by overriding `gridTemplateAreas` on `root`.
 
+### Google Places
+
+`googlePlaces(options)` is an address-lookup provider for `AddressField`'s `lookup` prop, over Google's Places API (New) REST endpoints — Autocomplete (New) for the suggestions as the user types the street line, then Place Details (New), field-masked to `addressComponents`, when they pick one. The pick fills street (`street_number` + `route`), `street2` (`subpremise`), city (`locality`, falling back to `sublocality_level_1` or `postal_town`), state (the `administrative_area_level_1` abbreviation) and ZIP (`postal_code`). It adds no dependency and holds no state; you pass the key.
+
+```tsx
+import { AddressField, googlePlaces } from 'ez-form'
+
+;<AddressField name="shipping" lookup={googlePlaces({ apiKey })} />
+```
+
+The key travels in the `X-Goog-Api-Key` header of requests the user's browser makes, so it is visible to anyone who opens devtools. Treat it as a **browser key**: in the Google Cloud console restrict it to the Places API (New) and to your site's HTTP referrers (`https://example.com/*`), and keep any unrestricted or server-side key out of the bundle. The adapter never writes the key to an error message or a log.
+
+Options: `regionCodes` (Google's `includedRegionCodes`, default `['us']`), `languageCode` (BCP-47, for both requests), `includedPrimaryTypes` (restrict the predictions, unset by default), `attribution` (a node rendered under the listbox) and `fetch` (injectable; tests and non-browser runtimes). The field owns the billing session: it creates a session token on the first keystroke, sends it with every search and the final details request, then discards it, which is what makes Google bill the whole exchange as one Autocomplete session rather than per request.
+
+Google's Places policy requires attribution when results are shown without a Google map. The default `attribution` is the text "Powered by Google" in a plain block themeable under `EzGooglePlacesAttribution` (`styleOverrides.root`, class `googlePlacesAttributionClasses.root`); Google's current guideline asks for its logo image, which this package cannot ship, so supply the official asset either per provider (`googlePlaces({ apiKey, attribution: <img … /> })`) or once for the whole app through `theme.components.EzGooglePlacesAttribution.defaultProps.children`.
+
+Storybook's live story reads `VITE_GOOGLE_PLACES_API_KEY` from a `.env` file (see `.env.example`); without it the story runs against a mock provider.
+
 ### Keyboards & autofill for these fields
 
 Every default is listed in the [Mobile keyboards & autofill](#mobile-keyboards--autofill) table above, and each is overridable by your own `autoComplete` prop. Two details specific to these fields:
