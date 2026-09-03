@@ -671,6 +671,38 @@ const theme = createTheme({
 })
 ```
 
+## Localization
+
+Every default string in the library — button labels, the required-fields note, announcements, the rule messages, the pickers' messages — is a `defaultProps` key on its `Ez*` component, so a locale is a theme, the way MUI ships `@mui/material/locale`'s `esES`. v1 ships `enUS` and `esES`; both are plain objects and tree-shake.
+
+```tsx
+import { createTheme, ThemeProvider } from '@mui/material/styles'
+import { esES as muiEsES } from '@mui/material/locale'
+import { esES as pickersEsES } from '@mui/x-date-pickers/locales'
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
+import { es } from 'date-fns/locale/es'
+import { esES } from 'ez-form'
+
+// ez-form's strings, MUI's own (Autocomplete, Alert, …), and MUI X's picker chrome, in one theme.
+const theme = createTheme(baseTheme, muiEsES, pickersEsES, esES)
+
+;<ThemeProvider theme={theme}>
+  <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
+    <App />
+  </LocalizationProvider>
+</ThemeProvider>
+```
+
+What is and is not covered:
+
+- **Library strings** — `esES` translates them all: `Submit`/`Clear`/`Back`/`Next`, `Confirm`/`Cancel`, the `Discard changes?` prompts, `(optional)` and the required-fields note, `Submitting…`/`Submitted.`/`Submit failed.`, `There is a problem`, the wizard's `Step 2 of 5, …`, `FieldArray`'s `Add`/`Remove`/`Row 2 added`, `AddressField`'s part labels, the password/SSN reveal toggles, `PasswordStrength`'s tiers, `FileField`'s rejections, every US field's `invalidMessage`, `EmailListField`'s announcements, `ReadOnlyField`'s `Yes`/`No`/`Edit`, and the chip delete icon's `Remove …`.
+- **Rule messages** — `<label> is required.`, `must be at least …`, the pickers' `is too early.` and friends come from one set, `EzForm.defaultProps.messages` (the `RuleMessages` type). Every entry is a function of the label, so a translation can put the label wherever its grammar wants it; `fallbackLabel` (`This field`) stands in when a field has no string label. Pass `<Form messages={{ required: (l) => … }}>` to change one without a theme.
+- **Interpolated strings are functions** — `stepAnnouncement`, `PhoneField`'s `invalidMessage(digits)`, `FieldArray`'s `addedMessage(row)`, `ChipDeleteIcon`'s `removeLabel(label)`, and `Form`'s `requiredIndicatorText(mode)` (one theme default serves both `requiredIndicator` modes).
+- **Your copy stays yours** — field labels, `title`/`description`, zod messages, `addressSchema({ messages })`, and `ConfirmOptions` you pass explicitly. A prop you pass replaces the theme default whole (MUI's own `defaultProps` rule for a non-slot key), so under a locale, pass all three keys of `FormDialog`'s `exitConfirm` when you override one.
+- **Dates and numbers are MUI X's and `Intl`'s job** — the locale objects translate ez-form's _messages_ only. Date _format_ comes from `LocalizationProvider`'s `adapterLocale`; the pickers' own chrome (`Clear`, the toolbar) from MUI X's `esES`; `MoneyField`/`PercentField` format through `Intl.NumberFormat` (`locale`/`format` props).
+- **Another language** — copy `src/locales/enUS.ts`, translate the values, and apply it the same way. `enUS` is the shipped defaults restated (a test pins every key to the component's own default), so its keys are the complete list; the two objects have identical key sets by type and by test. Other locales are yours to supply; the library ships English and Spanish.
+
 ## Loading values from a server
 
 ```tsx

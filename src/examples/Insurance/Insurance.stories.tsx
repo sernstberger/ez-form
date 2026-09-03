@@ -1,6 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
+import { createTheme, ThemeProvider, useTheme } from '@mui/material/styles'
+import { esES as muiEsES } from '@mui/material/locale'
+import { esES as pickersEsES } from '@mui/x-date-pickers/locales'
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
+import { es } from 'date-fns/locale/es'
 import {
   Outlet,
   RouterProvider,
@@ -10,6 +16,7 @@ import {
   useParams,
 } from 'react-router'
 import { useWatch } from 'react-hook-form'
+import { esES } from '../../locales'
 import { Form } from '../../Form'
 import { Wizard } from '../../Wizard'
 import { WizardStepper } from '../../Wizard/WizardStepper'
@@ -81,6 +88,42 @@ export const Agent: Story = {
       description: {
         story:
           'assisted: autoComplete="off" throughout, no confirm dialog, no unsaved-changes guard, one page, every error shown at once.',
+      },
+    },
+  },
+}
+
+/**
+ * The same wizard under `createTheme(theme, esES)` (#23): the way MUI ships
+ * `@mui/material/locale`'s `esES`, ez-form's `esES` is a locale object that
+ * sets every `Ez*` component's string default props — Back/Next/Submit, the
+ * required-fields note, the step-change and field-array announcements, the
+ * rule messages (`… es obligatorio.`), the Review step's Edit buttons, the
+ * confirm and unsaved-changes dialogs. Stacked with MUI's own `esES` and MUI
+ * X's, plus date-fns's `es` on the `LocalizationProvider` so the pickers
+ * *format* in Spanish too (formatting stays MUI X's job; ez-form only
+ * translates its own messages). The example's own copy — the title, the
+ * field labels, the schema's messages — is the consumer's and stays English
+ * here, which is exactly the split a real app sees.
+ */
+export const Español: Story = {
+  decorators: [
+    (Story) => {
+      const outer = useTheme()
+      return (
+        <ThemeProvider theme={createTheme(outer, muiEsES, pickersEsES, esES)}>
+          <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
+            <Story />
+          </LocalizationProvider>
+        </ThemeProvider>
+      )
+    },
+  ],
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "ez-form's `esES` + MUI's `esES` + MUI X's `esES` + date-fns `es`: every library string in Spanish; the example's own labels stay the consumer's.",
       },
     },
   },
