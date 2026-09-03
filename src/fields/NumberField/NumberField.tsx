@@ -4,7 +4,8 @@ import type { ValidationRule } from 'react-hook-form'
 import { NumberFieldControl, type NumberFieldInputProps } from './NumberFieldControl'
 import { useEzField } from '../useEzField'
 import { mergeDisabled } from '../mergeDisabled'
-import { defaultMessages, FALLBACK_LABEL, type FieldRules } from '../../rules'
+import { useRuleMessages } from '../../Form/RuleMessagesContext'
+import type { FieldRules } from '../../rules'
 
 export type NumberFieldProps = Omit<
   BaseNumberField.Root.Props,
@@ -153,8 +154,9 @@ export function NumberField({
   valueScale,
   ...rest
 }: NumberFieldProps) {
-  // The same label `useEzField` would use for a default rule message.
-  const ruleLabel = typeof label === 'string' ? label : FALLBACK_LABEL
+  // The same label and message set `useEzField` would use for a default rule message.
+  const messages = useRuleMessages()
+  const ruleLabel = typeof label === 'string' ? label : messages.fallbackLabel
   const f = useEzField<number | null>(name, 'NumberField', {
     label,
     // `min`/`max` are written in display units (they are also the stepper
@@ -164,8 +166,8 @@ export function NumberField({
     // 100" even when it is compared as `1`.
     rules: {
       required,
-      min: scaleRule(min, valueScale, defaultMessages.min, ruleLabel),
-      max: scaleRule(max, valueScale, defaultMessages.max, ruleLabel),
+      min: scaleRule(min, valueScale, messages.min, ruleLabel),
+      max: scaleRule(max, valueScale, messages.max, ruleLabel),
       validate,
     },
     optionalText,

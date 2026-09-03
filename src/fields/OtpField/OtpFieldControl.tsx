@@ -19,6 +19,11 @@ export interface OtpFieldControlProps extends Omit<OTPField.Root.Props, 'render'
   error?: boolean
   helperText?: ReactNode
   helperTextProps?: { id: string; role?: 'alert' }
+  /**
+   * Accessible name of every slot after the first (the first is named by the
+   * label). `index` is 1-based. Default `` `Character ${index} of ${length}` ``.
+   */
+  characterLabel?: (index: number, length: number) => string
   /** Hookform's ref: the first slot, which is what a submit error focuses. */
   inputRef?: Ref<HTMLInputElement>
   inputProps?: OtpFieldInputProps
@@ -98,6 +103,7 @@ export function OtpFieldControl(inProps: OtpFieldControlProps) {
     disabled,
     required,
     labelRequired,
+    characterLabel = (index: number, count: number) => `Character ${index} of ${count}`,
     ...rootProps
   } = props
   const generatedId = useId()
@@ -138,7 +144,7 @@ export function OtpFieldControl(inProps: OtpFieldControlProps) {
             small={size === 'small'}
             {...a11y}
             ref={index === 0 ? inputRef : undefined}
-            aria-label={index === 0 ? undefined : `Character ${index + 1} of ${length}`}
+            aria-label={index === 0 ? undefined : characterLabel(index + 1, length)}
             onBlur={handleBlur}
           />
         ))}

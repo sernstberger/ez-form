@@ -9,7 +9,12 @@ import {
   type Resolver,
 } from 'react-hook-form'
 import type { z } from 'zod'
-import { FALLBACK_LABEL, defaultMessages, normalizeRules, type NormalizedRules } from '../rules'
+import {
+  defaultMessages,
+  normalizeRules,
+  type NormalizedRules,
+  type RuleMessages,
+} from '../rules'
 
 type RuleError = Pick<FieldError, 'type' | 'message'>
 
@@ -50,6 +55,7 @@ export async function validateRules(
   rules: NormalizedRules,
   value: unknown,
   values: FieldValues,
+  messages: RuleMessages = defaultMessages,
 ): Promise<RuleError | undefined> {
   if (rules.required?.value && (isEmpty(value) || value === false)) {
     return { type: 'required', message: rules.required.message }
@@ -87,9 +93,9 @@ export async function validateRules(
         typeof result === 'string'
           ? result
           : Array.isArray(result) && result.every((r) => typeof r === 'string')
-            ? (result[0] ?? defaultMessages.validate(FALLBACK_LABEL))
+            ? (result[0] ?? messages.validate(messages.fallbackLabel))
             : result === false
-              ? defaultMessages.validate(FALLBACK_LABEL)
+              ? messages.validate(messages.fallbackLabel)
               : undefined
       if (message !== undefined) return { type, message }
     }
@@ -101,9 +107,14 @@ export async function validateRules(
  * zod first, then the field-level rules hookform stored on each mounted field
  * (`useController({ rules })`). A rule error replaces zod's error for that field;
  * zod still validates everything else and still types `onSubmit`.
+ *
+ * `messages` is the form's resolved rule-message set. The stored rules already
+ * carry their messages (`useEzField` normalised them with the same set), so it
+ * only speaks here for a `validate` result with no message of its own.
  */
 export function ezResolver<TIn extends FieldValues, TOut>(
   schema: z.ZodType<TOut, TIn>,
+  messages: RuleMessages = defaultMessages,
 ): Resolver<TIn, unknown, TOut> {
   const zod = zodResolver(schema)
   return async (values, context, options) => {
@@ -115,7 +126,12 @@ export function ezResolver<TIn extends FieldValues, TOut>(
       // options.fields is nested by path (hookform's getResolverOptions uses set), hence get.
       const field: Field['_f'] | undefined = get(options.fields, name)
       if (!field || field.mount === false) continue
-      const error = await validateRules(normalizeRules(field), get(values, name), values)
+      const error = await validateRules(
+        normalizeRules(field, undefined, messages),
+        get(values, name),
+        values,
+        messages,
+      )
       if (error) {
         set(errors, name, error)
         failed = true

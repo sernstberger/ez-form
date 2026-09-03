@@ -2,6 +2,7 @@ import { Fragment, useId, type ReactNode } from 'react'
 import { useController, type UseControllerReturn } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
 import { useRequiredIndicator } from '../Form/RequiredIndicatorContext'
+import { useRuleMessages } from '../Form/RuleMessagesContext'
 import { isRequired, normalizeRules, type FieldRules } from '../rules'
 import { warnMissingLabel } from '../devWarn'
 
@@ -87,7 +88,8 @@ export function useEzField<TValue = unknown>(
   useEzFormContext(componentName)
   warnMissingLabel(componentName, name, label, ariaLabel, ariaLabelledBy)
   const { requiredIndicator, optionalText: formOptionalText } = useRequiredIndicator()
-  const normalized = normalizeRules(rules, typeof label === 'string' ? label : undefined)
+  const messages = useRuleMessages()
+  const normalized = normalizeRules(rules, typeof label === 'string' ? label : undefined, messages)
   const controller = useController({ name, rules: normalized })
   const helperTextId = useId()
   const invalid = controller.fieldState.invalid

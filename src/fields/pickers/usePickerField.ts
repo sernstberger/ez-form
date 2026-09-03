@@ -10,6 +10,7 @@ import type { PickerChangeHandlerContext } from '@mui/x-date-pickers/models'
 import type { FieldValues, Validate } from 'react-hook-form'
 import { useEzField } from '../useEzField'
 import { mergeDisabled } from '../mergeDisabled'
+import { useRuleMessages } from '../../Form/RuleMessagesContext'
 import type { FieldRules } from '../../rules'
 import { pickerMessage, type PickerErrorMessages } from './pickerMessages'
 
@@ -201,6 +202,7 @@ export function usePickerField<
   }
   const labelText = typeof label === 'string' ? label : undefined
   const consumerTextField = slotProps?.textField as ConsumerTextFieldSlotProps | undefined
+  const ruleMessages = useRuleMessages()
   const f = useEzField<TValue>(name, componentName, {
     label,
     rules: {
@@ -208,7 +210,9 @@ export function usePickerField<
       validate: {
         ...toRecord<TValue>(validate),
         picker: () =>
-          pickerError.current ? pickerMessage(pickerError.current, labelText, errorMessages) : true,
+          pickerError.current
+            ? pickerMessage(pickerError.current, labelText, errorMessages, ruleMessages)
+            : true,
       },
     },
     optionalText,
