@@ -432,6 +432,31 @@ describe('SsnField input attributes', () => {
     expect(input()).toHaveFocus()
     expect(input().selectionStart).toBe(4)
   })
+
+  it('honours a consumer ref from the callback form of slotProps.htmlInput (#92)', async () => {
+    const user = userEvent.setup()
+    const consumerRef = vi.fn()
+    // MUI also accepts `htmlInput: (ownerState) => props`. The ref (and every
+    // other prop the callback returns) must survive exactly as the object form's.
+    renderSsn({
+      slotProps: { htmlInput: () => ({ ref: consumerRef, 'data-consumer': 'yes' }) },
+    })
+
+    expect(consumerRef).toHaveBeenCalledWith(input())
+    expect(input()).toHaveAttribute('data-consumer', 'yes')
+
+    // Both internal refs still do their jobs: reformat-caret …
+    await user.type(input(), '123456789')
+    await user.type(input(), '{Backspace}', { initialSelectionStart: 7, initialSelectionEnd: 7 })
+    expect(input()).toHaveValue('123-46-789')
+    expect(input().selectionStart).toBe(5)
+
+    // … and reveal-caret.
+    input().setSelectionRange(4, 4)
+    await user.click(showToggle())
+    expect(input()).toHaveFocus()
+    expect(input().selectionStart).toBe(4)
+  })
 })
 
 describe('SsnField a11y', () => {

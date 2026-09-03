@@ -1,5 +1,5 @@
 import MuiTextField, { type TextFieldProps as MuiTextFieldProps } from '@mui/material/TextField'
-import { mergeSlotProps } from '@mui/material/utils'
+import { mergeSlotProps, useForkRef } from '@mui/material/utils'
 import type { ReactNode } from 'react'
 import { useEzField } from '../useEzField'
 import { mergeDisabled } from '../mergeDisabled'
@@ -18,6 +18,21 @@ export type TextFieldProps = Omit<
   'name' | 'value' | 'error' | 'inputRef' | 'required'
 > & {
   name: string
+  /**
+   * Internal. A second ref to the `<input>`, forked with hookform's, for the
+   * fields built on `TextField` that need the element themselves (`PhoneField`,
+   * `SsnField`, `FeinField` restore the caret after a reformat).
+   *
+   * This is the *only* channel a field's own ref takes: it goes to MUI's
+   * `inputRef`, and `InputBase` forks that with whatever the consumer put in
+   * `slotProps.htmlInput.ref` — object or callback form alike, since MUI
+   * resolves the callback itself. Composing the two in the field instead can
+   * only see the object form and silently drops a callback-form ref (#92).
+   * Every field using this `Omit`s it from its own public props.
+   *
+   * @internal
+   */
+  inputRef?: MuiTextFieldProps['inputRef']
   /**
    * Overrides `Form`'s `optionalText` for this field when the form's
    * `requiredIndicator` is `"optional"`; `false` hides it on this field.
@@ -81,6 +96,7 @@ export function TextField({
   type,
   autoComplete: autoCompleteProp,
   componentName = 'TextField',
+  inputRef: inputRefProp,
   ...rest
 }: TextFieldProps) {
   const assisted = useAssisted()
@@ -104,6 +120,9 @@ export function TextField({
     onBlur: fieldOnBlur,
     ...fieldProps
   } = f.field
+  // `useForkRef` is MUI's own composer; `InputBase` already wraps hookform's ref in the same hook,
+  // so this extra layer changes nothing for a plain `TextField` without a consumer `inputRef`.
+  const inputRef = useForkRef(ref, inputRefProp)
 
   // MUI TextField sets aria-invalid and aria-describedby itself; only `role` comes from the hook.
   return (
@@ -121,7 +140,7 @@ export function TextField({
       }}
       disabled={mergeDisabled(disabled, fieldDisabled)}
       required={f.required}
-      inputRef={ref}
+      inputRef={inputRef}
       error={f.invalid}
       helperText={f.helperText(helperText)}
       type={type}

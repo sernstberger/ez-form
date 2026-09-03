@@ -450,4 +450,23 @@ describe('FeinField consumer ref composition', () => {
     expect(input()).toHaveValue('12-3945678')
     expect(input().selectionStart).toBe(5)
   })
+
+  it('honours a consumer ref from the callback form of slotProps.htmlInput (#92)', async () => {
+    const user = userEvent.setup()
+    const consumerRef = { current: null as HTMLInputElement | null }
+    // MUI also accepts `htmlInput: (ownerState) => props`. The ref (and every
+    // other prop the callback returns) must survive exactly as the object form's.
+    renderFein({
+      slotProps: { htmlInput: () => ({ ref: consumerRef, 'data-consumer': 'yes' }) },
+    })
+
+    expect(consumerRef.current).toBe(input())
+    expect(input()).toHaveAttribute('data-consumer', 'yes')
+
+    await user.type(input(), '123456789')
+    expect(input()).toHaveValue('12-3456789')
+    await user.type(input(), '9', { initialSelectionStart: 4, initialSelectionEnd: 4 })
+    expect(input()).toHaveValue('12-3945678')
+    expect(input().selectionStart).toBe(5)
+  })
 })

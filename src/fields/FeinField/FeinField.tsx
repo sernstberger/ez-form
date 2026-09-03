@@ -1,5 +1,5 @@
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
-import { mergeSlotProps, useForkRef } from '@mui/material/utils'
+import { mergeSlotProps } from '@mui/material/utils'
 import { TextField, type TextFieldProps } from '../TextField'
 import { resolveAutoComplete } from '../resolveAutoComplete'
 import { useAssisted } from '../../Form/AssistedContext'
@@ -18,7 +18,7 @@ import { useTemplateField } from '../useTemplateField'
  */
 export type FeinFieldProps = Omit<
   TextFieldProps,
-  'type' | 'inputMode' | 'autoComplete' | 'pattern' | 'displayValue'
+  'type' | 'inputMode' | 'autoComplete' | 'pattern' | 'displayValue' | 'inputRef'
 > & {
   /**
    * Display template: each `#` is one digit slot, every other character is a
@@ -77,16 +77,10 @@ export function FeinField(inProps: FeinFieldProps) {
 
   const { displayValue, htmlInputProps } = useTemplateField({ name, format, capacity })
 
-  // The hook's ref must reach the `<input>` for caret restoration to work, and a
-  // consumer may have passed one of their own. `useForkRef` (MUI's own composer)
-  // keeps both rather than letting either replace the other.
-  const { ref: templateInputRef, ...templateInputProps } = htmlInputProps
-  const inputRef = useForkRef(
-    templateInputRef,
-    slotProps?.htmlInput && 'ref' in slotProps.htmlInput
-      ? (slotProps.htmlInput.ref as React.Ref<HTMLInputElement>)
-      : null,
-  )
+  // The hook's ref must reach the `<input>` for caret restoration to work. It
+  // goes through `inputRef`, which MUI forks with any consumer
+  // `slotProps.htmlInput.ref` in either form; see `TemplateFieldBinding`.
+  const { ref: inputRef, ...templateInputProps } = htmlInputProps
 
   const consumerValidate =
     validate === undefined ? {} : typeof validate === 'function' ? { validate } : validate
@@ -96,6 +90,7 @@ export function FeinField(inProps: FeinFieldProps) {
       {...rest}
       name={name}
       autoComplete={autoComplete}
+      inputRef={inputRef}
       displayValue={displayValue}
       validate={{
         // Consumer entries first: a built-in key must not be silently replaced.
@@ -107,17 +102,10 @@ export function FeinField(inProps: FeinFieldProps) {
       }}
       slotProps={{
         ...slotProps,
-        htmlInput: {
-          ...mergeSlotProps(slotProps?.htmlInput, {
-            inputMode: 'numeric',
-            ...templateInputProps,
-          }),
-          // After the merge, deliberately: `mergeSlotProps` spreads the
-          // consumer's props last, so a consumer `ref` would replace the hook's
-          // and silently disable caret restoration. `inputRef` already includes
-          // that consumer ref, so nothing is dropped.
-          ref: inputRef,
-        },
+        htmlInput: mergeSlotProps(slotProps?.htmlInput, {
+          inputMode: 'numeric',
+          ...templateInputProps,
+        }),
       }}
     />
   )
