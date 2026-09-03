@@ -120,7 +120,8 @@ export function TextField({
     onBlur: fieldOnBlur,
     ...fieldProps
   } = f.field
-  // `useForkRef` is MUI's own composer; with no second ref it hands back hookform's as-is.
+  // `useForkRef` is MUI's own composer; `InputBase` already wraps hookform's ref in the same hook,
+  // so this extra layer changes nothing for a plain `TextField` without a consumer `inputRef`.
   const inputRef = useForkRef(ref, inputRefProp)
 
   // MUI TextField sets aria-invalid and aria-describedby itself; only `role` comes from the hook.
