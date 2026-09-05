@@ -23,18 +23,22 @@ describeFieldContract({
   label: 'Resume',
   schema,
   defaultValues: { resume: null },
-  renderNamed: (name) => <FileField name="resume" label={name} />,
+  // Label-less and named by `aria-label` alone, which is the shape row 1 is about — and
+  // which only became expressible once #118 made `label` optional. It used to pass a visible
+  // `label`, where the name would have been answered by the label element whether or not the
+  // ARIA attribute reached the control.
+  renderNamed: (name) => <FileField name="resume" aria-label={name} />,
   render: (props) => <FileField name="resume" label="Resume" {...props} />,
-  // `<input type="file">` has no role, so the name is read through the label query.
-  findNamed: (name) => screen.getByLabelText(new RegExp(`^${name}`)),
-  exempt: {
-    // #118: `FileFieldProps` is a closed object literal with no `...rest` and no
-    // `aria-*` keys, so a consumer cannot pass `aria-describedby` at all — there is
-    // nothing for the line to preserve. That is an API gap, not a dropped
-    // description: unlike the eleven fields row 8 fixed, this one never receives the
-    // attribute. Delete this entry when #118 widens the props type.
-    consumerDescribedBy: '#118 — FileFieldProps admits no aria-describedby to preserve',
-  },
+  // `<input type="file">` has no role, so the name is read through the label query. Narrowed
+  // to the input by `selector`: under an ARIA-only name the picker Button carries the same
+  // name (it is the visible affordance and would otherwise be an unnamed control — see
+  // `pickerNameA11y`), so an unqualified query matches two elements. The input is the one
+  // this line is about.
+  findNamed: (name) =>
+    screen.getByLabelText(new RegExp(`^${name}`), { selector: 'input[type="file"]' }),
+  renderDescribed: (id, props) => (
+    <FileField name="resume" label="Resume" aria-describedby={id} {...props} />
+  ),
   getControl: () => fileInput('Resume'),
   expectSubmitted: { resume: pdf },
   themeDefault: {
@@ -183,6 +187,79 @@ describe('FileField', () => {
     expect(onChange).toHaveBeenCalledTimes(2)
   })
 
+  // #118. `FileFieldProps` used to be a closed object literal, so none of these compiled at
+  // all; it now extends `FormControlProps`, and the naming/describing attributes are routed
+  // to the `<input type="file">` rather than left on the `FormControl` wrapper.
+  describe('consumer ARIA (#118)', () => {
+    it('joins a consumer aria-describedby with the error on the file input', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+          <span id="hint">PDF only, under 5 MB</span>
+          <FileField name="resume" label="Resume" aria-describedby="hint" required />
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      // Present from the first render, not only after an error.
+      expect(fileInput('Resume')).toHaveAccessibleDescription('PDF only, under 5 MB')
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      await screen.findByRole('alert')
+      // Both, in that order: the consumer wrote theirs first.
+      expect(fileInput('Resume')).toHaveAccessibleDescription(
+        'PDF only, under 5 MB Resume is required.',
+      )
+    })
+
+    it('aria-label names the file input with no visible label', () => {
+      render(
+        <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+          <FileField name="resume" aria-label="Resume" />
+        </Form>,
+      )
+      const input = screen.getByLabelText('Resume', { selector: 'input[type="file"]' })
+      expect(input).toHaveAttribute('type', 'file')
+      // The picker is the visible affordance and the input's <label>; with no text of its
+      // own it would be an unnamed control, so it carries the name too.
+      expect(screen.getByLabelText('Resume', { selector: 'label' })).toBeInTheDocument()
+    })
+
+    it('aria-labelledby names the file input with no visible label', () => {
+      render(
+        <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+          <span id="cv-label">Curriculum vitae</span>
+          <FileField name="resume" aria-labelledby="cv-label" />
+        </Form>,
+      )
+      expect(
+        screen.getByLabelText('Curriculum vitae', { selector: 'input[type="file"]' }),
+      ).toBeInTheDocument()
+    })
+
+    it('has no axe violations named by ARIA alone', async () => {
+      const { container } = render(
+        <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+          <FileField name="resume" aria-label="Resume" dropzone />
+        </Form>,
+      )
+      await expectNoA11yViolations(container)
+    })
+
+    // The widened type is `FormControlProps`, so the root now takes the FormControl props it
+    // always rendered but could never be given — and a consumer `className` composes with
+    // the slot class rather than replacing it.
+    it('forwards FormControl props and a className to the root', () => {
+      const { container } = render(
+        <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+          <FileField name="resume" label="Resume" fullWidth className="mine" id="resume-field" />
+        </Form>,
+      )
+      const root = container.querySelector(`.${fileFieldClasses.root}`)!
+      expect(root).toHaveClass('mine')
+      expect(root).toHaveClass('MuiFormControl-fullWidth')
+      expect(root).toHaveAttribute('id', 'resume-field')
+    })
+  })
+
   it('is themeable: defaultProps.slotProps.button applies to the picker Button', () => {
     const theme = createTheme({
       components: {
@@ -257,6 +334,25 @@ describe('FileField', () => {
     const fileList = chip.closest(`.${fileFieldClasses.fileList}`)
     expect(fileList).not.toBeNull()
     expect(getComputedStyle(fileList!).marginTop).toBe('9px')
+  })
+
+  // The root renders through `styled(FormControl, { name: 'EzFileField', slot: 'Root' })`,
+  // not a bare `FormControl` carrying the class — a class name alone generates no
+  // `styleOverrides` CSS at all, so `getComputedStyle` is the assertion that matters (#121).
+  it('is themeable: styleOverrides.root applies to the field root', () => {
+    const theme = createTheme({
+      components: { EzFileField: { styleOverrides: { root: { letterSpacing: '5px' } } } },
+    })
+    const { container } = render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+          <FileField name="resume" label="Resume" />
+        </Form>
+      </ThemeProvider>,
+    )
+    const root = container.querySelector(`.${fileFieldClasses.root}`)!
+    expect(root).toBeInTheDocument()
+    expect(getComputedStyle(root).letterSpacing).toBe('5px')
   })
 
   it('Form requiredIndicator="optional": required stays required with no asterisk in the label', () => {
@@ -424,6 +520,49 @@ describe('FileField dropzone', () => {
       </ThemeProvider>,
     )
     expect(getComputedStyle(dropZone()).padding).toBe('7px')
+  })
+
+  // `paddingTop`, deliberately not `letterSpacing`: the drop text sits inside the drop zone,
+  // so an *inheriting* property set anywhere above it shows up here whether or not this slot
+  // generates any CSS of its own — which is how the inert slot passed as working before #121.
+  // A non-inheriting property can only arrive from this element's own rule.
+  it('is themeable: styleOverrides.dropText applies to the drop-zone instruction', () => {
+    const theme = createTheme({
+      components: { EzFileField: { styleOverrides: { dropText: { paddingTop: '7px' } } } },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+          <FileField name="resume" label="Resume" dropzone />
+        </Form>
+      </ThemeProvider>,
+    )
+    const text = screen.getByText('Drag files here, or')
+    expect(text).toHaveClass(fileFieldClasses.dropText)
+    expect(getComputedStyle(text).paddingTop).toBe('7px')
+  })
+
+  // `dragActive` is the one `EzFileField` key with no `styled()` slot of its own: it names a
+  // *state* of the drop zone, not a second element, so it rides `DropZone`'s
+  // `overridesResolver` instead. #121's audit listed it as a pass, but that was measured with
+  // `borderColor`/`backgroundColor` — the two properties `DropZone`'s own hard-coded
+  // `&.dragActive` nesting already sets, so the measurement could not tell a theme override
+  // from the component's own default. Measured with a property the component never sets, it
+  // produced no CSS at all until the resolver was added. Hence `letterSpacing` here.
+  it('is themeable: styleOverrides.dragActive applies while a drag is over the zone', () => {
+    const theme = createTheme({
+      components: { EzFileField: { styleOverrides: { dragActive: { letterSpacing: '3px' } } } },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+          <FileField name="resume" label="Resume" dropzone />
+        </Form>
+      </ThemeProvider>,
+    )
+    expect(getComputedStyle(dropZone()).letterSpacing).not.toBe('3px')
+    fireEvent.dragOver(dropZone())
+    expect(getComputedStyle(dropZone()).letterSpacing).toBe('3px')
   })
 
   it('has no axe violations with the zone rendered', async () => {

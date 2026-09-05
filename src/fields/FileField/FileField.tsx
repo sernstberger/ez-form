@@ -11,13 +11,14 @@ import {
 import Button, { type ButtonProps } from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
-import FormControl from '@mui/material/FormControl'
+import FormControl, { type FormControlProps } from '@mui/material/FormControl'
 import FormHelperText from '@mui/material/FormHelperText'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import Stack from '@mui/material/Stack'
 import { styled } from '@mui/material/styles'
 import UploadFile from '@mui/icons-material/UploadFile'
 import { ChipDeleteIcon } from '../ChipDeleteIcon'
+import { hasLabel } from '../../devWarn'
 import { useEzField } from '../useEzField'
 import { useEzFormContext } from '../../useEzFormContext'
 import { mergeDisabled } from '../mergeDisabled'
@@ -44,6 +45,12 @@ export const fileFieldClasses = generateUtilityClasses('EzFileField', [
   'dropText',
 ])
 
+/** The `FormControl` itself, so `theme.components.EzFileField.styleOverrides.root`
+ * generates CSS — a bare `className={fileFieldClasses.root}` on a plain `FormControl`
+ * never does, which is the whole of #121. Empty default style block: the wrapper
+ * exists to give the typed key a real element, not to add a look. */
+const FileFieldRoot = styled(FormControl, { name: 'EzFileField', slot: 'Root' })({})
+
 // Chips wrap onto further rows once the row is full, with a gap above the
 // button — the component's minimum layout so the list doesn't collide with
 // it — so it lives on the styled slot's default style block, still
@@ -55,10 +62,28 @@ const FileFieldList = styled(Stack, { name: 'EzFileField', slot: 'FileList' })((
 
 // The dashed outline is the affordance that says "drop here" — the component's
 // minimum look for the mode, so it lives on the slot's default style block and
-// every value is themeable via
-// `theme.components.EzFileField.styleOverrides.dropZone` (and `.dragActive`,
-// which the class-selector nesting below picks up).
-const FileFieldDropZone = styled('div', { name: 'EzFileField', slot: 'DropZone' })(({ theme }) => ({
+// every value is themeable via `theme.components.EzFileField.styleOverrides.dropZone`.
+//
+// `dragActive` names a *state* of this element rather than a second element, so it gets no
+// `styled()` slot of its own; it needs the `overridesResolver` below instead. The default
+// resolver emits only `styles.dropZone` for this slot, so before #121 a
+// `styleOverrides.dragActive` generated **no CSS at all** — the only `.dragActive` rule in
+// the sheet was the hard-coded nesting further down. That is why the key looked like it
+// worked when probed with `borderColor`/`backgroundColor`: those are exactly the two
+// properties the nesting already sets, so any measurement of them reads as "applied"
+// whether or not the theme reached the element. Measure it with a property the component
+// does not set itself.
+const FileFieldDropZone = styled('div', {
+  name: 'EzFileField',
+  slot: 'DropZone',
+  // Append the `dragActive` overrides under the state class, after the slot's own, so a
+  // theme can style the dragging state and the more specific selector wins while dragging.
+  // No `ownerState` needed: the state is already carried as a class on this element.
+  overridesResolver: (_props, styles) => [
+    styles.dropZone,
+    { [`&.${fileFieldClasses.dragActive}`]: styles.dragActive },
+  ],
+})(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
@@ -72,14 +97,44 @@ const FileFieldDropZone = styled('div', { name: 'EzFileField', slot: 'DropZone' 
   },
 }))
 
+/** Same story as `FileFieldRoot`: the drop zone's instruction line needs a real
+ * `styled()` slot for `theme.components.EzFileField.styleOverrides.dropText` to
+ * generate any CSS. A bare `<span>` with the class looked like it worked only
+ * because an inherited property set on `dropZone` reaches it — #121 measures a
+ * non-inheriting one (`paddingTop`) for exactly that reason. */
+const FileFieldDropText = styled('span', { name: 'EzFileField', slot: 'DropText' })({})
+
 export type FileFieldValue = File | null | File[]
 
 type PickerButtonProps = Omit<ButtonProps<'label'>, 'component' | 'htmlFor' | 'children' | 'role'>
 
-export type FileFieldProps = {
+/**
+ * Extends the MUI props type the field is actually built on: the root element is a
+ * `FormControl`, and `FormControlProps` resolves to `FormControlOwnProps &
+ * React.HTMLAttributes<HTMLDivElement>` — so the whole `aria-*` surface, `className`, `id`
+ * and `style` come from MUI rather than being re-declared here (#118, PHILOSOPHY rule 1).
+ * Before this the type was a closed object literal, and a consumer could not pass
+ * `aria-describedby` / `aria-label` / `aria-labelledby` at all.
+ *
+ * Omitted because the binding owns them: `error` (`f.invalid`), `children` (the picker, drop
+ * zone and chip list), `component` (the root is a `div`), `required` (re-supplied by
+ * `FieldRules` as a validation rule, like every sibling) and `onChange` (re-declared below
+ * with the field's `(event, value)` signature).
+ */
+export type FileFieldProps = Omit<
+  FormControlProps,
+  'error' | 'children' | 'component' | 'required' | 'onChange'
+> & {
   name: string
-  /** The button text, and the input's accessible name. */
-  label: ReactNode
+  /**
+   * The button text, and the input's accessible name.
+   *
+   * Optional since #118: a field named by `aria-label` / `aria-labelledby` alone is the
+   * family's other naming path, and it only became expressible here once the props type
+   * admitted those attributes. With no label and no ARIA name, `useEzField` dev-warns —
+   * the same check every other field gets.
+   */
+  label?: ReactNode
   helperText?: ReactNode
   disabled?: boolean
   /**
@@ -207,6 +262,15 @@ export function FileField(inProps: FileFieldProps) {
     onChange,
     required,
     validate,
+    // Destructured out of `rest` on purpose. Left in it they reach the `FormControl`
+    // root, which names or describes the wrapper `div` while the `<input type="file">`
+    // — the element that actually carries the role — stays anonymous (#99, #104). They
+    // go onto the input below instead, through the hook that also owns the missing-label
+    // warning, so one place decides what names this field.
+    'aria-label': ariaLabel,
+    'aria-labelledby': ariaLabelledBy,
+    'aria-describedby': ariaDescribedBy,
+    ...rest
   } = useDefaultProps({ props: inProps, name: 'EzFileField' })
   // The reason the last pick/drop rejected a file. Held here rather than pushed
   // through `setError` so it composes exactly like `required`: the built-in
@@ -236,6 +300,8 @@ export function FileField(inProps: FileFieldProps) {
           }
         : validate,
     },
+    'aria-label': ariaLabel,
+    'aria-labelledby': ariaLabelledBy,
   })
   const { trigger } = useEzFormContext('FileField')
   const id = useId()
@@ -307,10 +373,17 @@ export function FileField(inProps: FileFieldProps) {
   // supplies — see #62.
   const pickerButtonProps = { variant: 'outlined' as const, ...buttonProps, ...slotProps?.button }
 
+  // With no visible `label` the picker renders no text of its own, so the consumer's ARIA
+  // name has to reach it too: this element is both the visible affordance and the `<label>`
+  // for the input, and an empty one would be an unnamed control on screen even though the
+  // input beneath it is named. With a label there is nothing to add — the text is the name.
+  const pickerNameA11y = hasLabel(label) ? null : f.nameA11y
+
   const picker = (
     <Button
       startIcon={<UploadFile />}
       {...pickerButtonProps}
+      {...pickerNameA11y}
       component="label"
       htmlFor={id}
       disabled={isDisabled}
@@ -334,6 +407,16 @@ export function FileField(inProps: FileFieldProps) {
         required={f.required}
         disabled={isDisabled}
         {...f.inputA11y(text)}
+        // The consumer's own name, on the element that carries the role. Without a visible
+        // `label` the wrapping `<label>` Button has no text, so this is the only thing
+        // naming the input; with one, `aria-labelledby`/`aria-label` here outranks the
+        // label element, which is what a consumer passing them is asking for.
+        {...f.nameA11y}
+        // After `inputA11y`, which sets the description to the helper-text id alone. An
+        // accessible description is a list: the consumer's text and the error message are
+        // both meant to be read, so they are joined rather than one replacing the other
+        // (#104, #118).
+        aria-describedby={f.describedBy(ariaDescribedBy, text)}
         onBlur={() => f.field.onBlur()}
         onChange={(e) => {
           add(e, Array.from(e.target.files ?? []))
@@ -350,11 +433,17 @@ export function FileField(inProps: FileFieldProps) {
   )
 
   return (
-    <FormControl
+    <FileFieldRoot
+      // `{...rest}` first, before every binding-owned prop, so a consumer prop that collides
+      // with one cannot displace it — the order `TextField`, `Autocomplete` and `NumberField`
+      // already use. This is what makes the widened props type mean something: the
+      // `FormControl` props the type now admits (`fullWidth`, `margin`, `size`, `className`,
+      // `id`, `style`, the non-naming `aria-*`) actually reach the root.
+      {...rest}
       error={f.invalid}
       disabled={isDisabled}
       required={f.required}
-      className={fileFieldClasses.root}
+      className={`${fileFieldClasses.root}${rest.className ? ` ${rest.className}` : ''}`}
     >
       {dropzone ? (
         // Not focusable and given no role on purpose: the Button inside is the
@@ -381,7 +470,7 @@ export function FileField(inProps: FileFieldProps) {
             add(event, multiple ? dropped : dropped.slice(0, 1))
           }}
         >
-          <span className={fileFieldClasses.dropText}>{dropText}</span>
+          <FileFieldDropText className={fileFieldClasses.dropText}>{dropText}</FileFieldDropText>
           {picker}
         </FileFieldDropZone>
       ) : (
@@ -412,6 +501,6 @@ export function FileField(inProps: FileFieldProps) {
         </FileFieldList>
       ) : null}
       {text ? <FormHelperText {...f.helperTextA11y}>{text}</FormHelperText> : null}
-    </FormControl>
+    </FileFieldRoot>
   )
 }

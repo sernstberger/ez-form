@@ -165,6 +165,12 @@ const FormDialogForm = styled(Form, { name: 'EzFormDialog', slot: 'Form' })({
 const FormDialogTitle = styled(DialogTitle, { name: 'EzFormDialog', slot: 'Title' })({})
 const FormDialogContent = styled(DialogContent, { name: 'EzFormDialog', slot: 'Content' })({})
 const FormDialogActions = styled(DialogActions, { name: 'EzFormDialog', slot: 'Actions' })({})
+// The two action buttons, so `theme.components.EzFormDialog.styleOverrides.cancel` and
+// `.submit` generate CSS. Both keys were typed but inert until #121: the class name was
+// applied by hand to a plain `Button`/`SubmitButton`, and a bare class name never makes
+// MUI emit `styleOverrides` CSS — the same defect shape the issue found in the field slots.
+const FormDialogCancel = styled(Button, { name: 'EzFormDialog', slot: 'Cancel' })({})
+const FormDialogSubmit = styled(SubmitButton, { name: 'EzFormDialog', slot: 'Submit' })({})
 
 /**
  * Publishes the enclosing form's "has unsaved changes" state into a ref the
@@ -207,7 +213,7 @@ function CancelButton({
 }: ComponentProps<typeof Button> & { onCancel: (event: object) => void }) {
   const { disabled: formDisabled } = useFormState()
   return (
-    <Button
+    <FormDialogCancel
       {...rest}
       type="button"
       onClick={(event) => {
@@ -226,7 +232,7 @@ function CancelButton({
       className={`${formDialogClasses.cancel}${className ? ` ${className}` : ''}`}
     >
       {children}
-    </Button>
+    </FormDialogCancel>
   )
 }
 
@@ -385,12 +391,12 @@ export function FormDialog<TIn extends FieldValues, TOut>(inProps: FormDialogPro
                 >
                   {cancelLabel}
                 </CancelButton>
-                <SubmitButton
+                <FormDialogSubmit
                   {...submitSlot}
                   className={`${formDialogClasses.submit}${submitSlot?.className ? ` ${submitSlot.className}` : ''}`}
                 >
                   {submitLabel ?? submitSlot?.children}
-                </SubmitButton>
+                </FormDialogSubmit>
               </>
             )}
           </FormDialogActions>
