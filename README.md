@@ -194,10 +194,17 @@ nothing fights the heading for focus. This holds even while the summary itself i
 a `WizardStep` renders only when it is the current step, so a summary in an earlier step must
 still count when you submit from a later one.
 
+That hand-over is one-way and lasts for the life of the `<Form>`: once a `<FormErrorSummary />`
+has rendered inside a form, react-hook-form's own first-invalid-field focus stays suppressed
+there even if you later remove the summary for good (behind a prop or a flag, say), so a failed
+submit then moves focus nowhere. Leaving the summary mounted is the fix — it already renders
+nothing until an attempt has failed — or remount the `<Form>`.
+
 Inside a `Wizard`, place one `<FormErrorSummary />` per `WizardStep`: each shows only that step's
 own `fields` from its last failed `Next`, not the whole form's errors. A failed final submit
 navigates back to the first errored step, and the summary that mounts there takes focus and
-says why.
+says why — including when that step is one the user had not reached yet, so the summary is
+mounting for the very first time.
 
 ## Announcements
 

@@ -4,7 +4,11 @@ import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import { styled } from '@mui/material/styles'
 import { useFormState, useWatch, type FieldValues, type Path } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
-import { useHasErrorSummary, useReportFailedValidationAttempt } from '../Form/ErrorSummaryContext'
+import {
+  useHasErrorSummary,
+  useHasErrorSummaryRef,
+  useReportFailedValidationAttempt,
+} from '../Form/ErrorSummaryContext'
 import { warnUnmountedStepFields } from '../devWarn'
 import { LiveRegion } from '../Form/LiveRegion'
 import {
@@ -232,7 +236,13 @@ function WizardBody<TIn extends FieldValues>({
   // being asked: a wizard's summary lives inside a step, and <WizardStep> unmounts every step
   // but the current one, so a mount check answers `false` for the whole time the user is
   // anywhere else — including the submit that triggers the jump (#123). See ErrorSummaryStore.
+  //
+  // Two readers, deliberately: the snapshot for `validateCurrent`, whose `trigger()` runs from
+  // an event handler where the render-time value is current, and the live read for the
+  // failed-submit jump effect below, which can fire in the same commit that first mounts the
+  // summary and would otherwise close over a stale `false`. See `useHasErrorSummaryRef`.
   const hasErrorSummary = useHasErrorSummary()
+  const hasErrorSummaryNow = useHasErrorSummaryRef()
   // A failed Next raises errors through `trigger()`, which never sets hookform's
   // `isSubmitted` — so without telling `<Form>`, hookform's own change-time re-validation
   // stays disengaged and the errors this step just raised could not clear until the next
@@ -512,8 +522,15 @@ function WizardBody<TIn extends FieldValues>({
     // (see its source), so this call landed a whole macrotask *after* the summary's heading
     // effect and took focus back for good. The summary heading won the commit and lost the
     // tick; a test sampling in between saw the right answer and a user never did.
-    if (!hasErrorSummary) setFocus(focusTarget.path)
-  }, [focusTarget, current.id, setFocus, hasErrorSummary])
+    //
+    // Read live (`hasErrorSummaryNow()`), not from the render-time `hasErrorSummary` snapshot:
+    // this jump can be the very thing that mounts the target step's summary for the first time
+    // — a summary living only in a step the user never visited before submitting. React runs
+    // that summary's `register()` (a child effect) before this one, but this effect was
+    // scheduled from a render where the snapshot was still `false`, and the closure keeps that
+    // stale value. See `useHasErrorSummaryRef`.
+    if (!hasErrorSummaryNow()) setFocus(focusTarget.path)
+  }, [focusTarget, current.id, setFocus, hasErrorSummaryNow])
 
   // Memoized separately from `stepChange` so the context object below keeps its identity on a
   // render where only the announcement `text` changed.

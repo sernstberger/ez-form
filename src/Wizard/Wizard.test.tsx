@@ -2449,7 +2449,6 @@ describe('Enter on a non-last step advances it (#116)', () => {
   })
 })
 
-
 /**
  * #123. The failed-submit jump used to hand focus to the first invalid field even though a
  * `<FormErrorSummary>` was there to own the arrival, because two separate things focused it:
@@ -2598,6 +2597,64 @@ describe('failed-submit focus ownership (#123)', () => {
     await drainMacrotasks()
     expect(heading).toHaveFocus()
     expect(screen.getByRole('textbox', { name: 'Name' })).not.toHaveFocus()
+    await expectNoA11yViolations(container)
+  })
+
+  /**
+   * The harder ordering, missed by the first round of this fix. Every test above starts on the
+   * step that holds the summary, so the summary has already mounted (and declared itself) long
+   * before the submit. Here the *only* summary lives in a step the user never visits before
+   * submitting, so the failed-submit jump is what mounts it for the first time.
+   *
+   * That inverts the timing. React runs child effects before parent effects, so the summary's
+   * `register()` flips the store before `<Wizard>`'s jump effect fires — but that effect was
+   * scheduled from a render where the snapshot was still `false`, and a closure keeps the
+   * value it captured. Reading the snapshot there focused the field a macrotask after the
+   * summary had taken focus, exactly the symptom this whole issue is about. The wizard reads
+   * the store live at fire time instead; this pins that.
+   */
+  it('a summary first mounted BY the jump still owns it (never-visited step)', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const { container } = render(
+      // `plan` is invalid from the start and `name`/`email` are fine, so the first failure is
+      // on a step the user has not reached — the jump goes forward into unvisited territory.
+      <Form
+        schema={schema}
+        defaultValues={{ name: 'Ada', email: 'ada@x.io', plan: '' }}
+        onSubmit={onSubmit}
+      >
+        <Wizard steps={steps}>
+          <WizardStep id="account">
+            <TextField name="name" label="Name" />
+            <TextField name="email" label="Email" />
+          </WizardStep>
+          <WizardStep id="plan">
+            <FormErrorSummary />
+            <TextField name="plan" label="Plan" />
+          </WizardStep>
+          <WizardStep id="review">
+            <p>Review</p>
+          </WizardStep>
+          <Controls />
+          <SubmitButton />
+        </Wizard>
+      </Form>,
+    )
+    // Never left `account`: the summary has never rendered, so nothing has declared it yet.
+    expect(screen.getByTestId('current')).toHaveTextContent('account')
+    expect(screen.queryByRole('heading', { name: 'There is a problem' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+
+    const heading = await screen.findByRole('heading', { name: 'There is a problem' })
+    const plan = screen.getByRole('textbox', { name: 'Plan' })
+    expect(heading).toHaveFocus()
+    await drainMacrotasks()
+    expect(heading).toHaveFocus()
+    expect(plan).not.toHaveFocus()
+    expect(onSubmit).not.toHaveBeenCalled()
     await expectNoA11yViolations(container)
   })
 })

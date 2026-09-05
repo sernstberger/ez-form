@@ -20,6 +20,15 @@ import { createContext, useContext, useSyncExternalStore } from 'react'
  * unexpected is told why. Nothing un-declares, so nothing can hand focus back to a field
  * afterwards.
  *
+ * **The latch is one-way, for the life of the `<Form>` instance.** Stated plainly because it is
+ * observable outside a `Wizard` too: a form that renders a `<FormErrorSummary>` once and then
+ * removes it permanently — behind a prop or a feature flag, say — keeps hookform's own
+ * first-invalid-field focus suppressed from then on, and a later failed submit moves focus
+ * nowhere rather than to the first invalid field. This is the intended trade (the alternative
+ * is the #123 bug: unmounting a summary silently re-arms a competing focus call), and it is
+ * cheap to avoid — remount the `<Form>`, or leave the summary mounted and let it render null
+ * on its own, which is what it already does when there is nothing to show.
+ *
  * Ruling: a subscription store rather than `useState` on `<Form>` — a summary mounting must
  * not re-render every field of the form (the same reason `FieldFocusContext` is a store; its
  * own ruling records that publishing such a map as form state "disturbed the Wizard's
@@ -127,11 +136,37 @@ export function useRegisterErrorSummary(): () => () => void {
  *   `Next`, and skips the `setFocus()` that would otherwise follow its failed-submit jump.
  *
  * …leaving `<FormErrorSummary>`'s own heading effect as the only remaining mover.
+ *
+ * This is a render-time snapshot, so it is the right hook for anything that *renders* from the
+ * answer or passes it to a call made during an event. A decision made inside an effect that can
+ * run in the very commit a summary first mounts must use `useHasErrorSummaryRef` instead — see
+ * its doc.
  */
 export function useHasErrorSummary(): boolean {
   const ctx = useContext(ErrorSummaryContext)
   const getDeclared = ctx?.store.getDeclared ?? never
   return useSyncExternalStore(ctx?.store.subscribe ?? noopSubscribe, getDeclared, getDeclared)
+}
+
+/**
+ * The same answer as `useHasErrorSummary`, read *at the moment it is called* rather than
+ * captured when the component rendered.
+ *
+ * A parent effect cannot use the render-time snapshot to decide whether a child that mounts in
+ * the same commit has declared a summary. React runs child effects before parent effects, so
+ * the summary's `register()` has already flipped the store by the time the parent effect
+ * fires — but that effect was scheduled from a render where the snapshot was still `false`, and
+ * closures do not update. `<Wizard>`'s failed-submit jump hits this exactly: the jump can be
+ * what mounts a step's summary for the first time (a summary living only in a step the user
+ * never visited before submitting), and reading the stale `false` there put focus back on the
+ * field a macrotask after the summary had taken it.
+ *
+ * Reading live keeps the whole library at one decision point — the store — instead of adding a
+ * second mechanism to paper over the timing.
+ */
+export function useHasErrorSummaryRef(): () => boolean {
+  const ctx = useContext(ErrorSummaryContext)
+  return ctx?.store.getDeclared ?? never
 }
 
 /** 0 outside `<Form>` or before any confirm-path validation has failed. */
