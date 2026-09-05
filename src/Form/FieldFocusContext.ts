@@ -50,10 +50,16 @@ export function createFieldFocusStore(idPrefix: string): FieldFocusStore {
       if (element === null) {
         // A ref callback runs *during* commit, and React detaches (`null`) then immediately
         // re-attaches any ref whose prop is not referentially stable across renders — `Rating`
-        // passes an inline arrow, so it does that on every render. The generated id below is
-        // derived from the field name, so the re-attach restores the identical entry; the
-        // equality check below then finds nothing changed and notifies nobody. Without that,
-        // each detach/attach pair would notify, re-render, and detach again — an infinite loop.
+        // passes an inline arrow, so it does that on every render. Such a pair does notify
+        // twice: the detach deletes the entry and notifies, and the re-attach then compares
+        // against the entry it just deleted, so it re-adds and notifies again. That is
+        // deliberate and safe, because what prevents a cycle here is structural rather than
+        // arithmetic: the only subscriber is `<FormErrorSummary>`, which is not upstream of
+        // the field whose ref is churning, so re-rendering it cannot re-render that field and
+        // cannot trigger another detach. The equality checks below are an optimisation for
+        // the steady state (a field re-registering the same element notifies nobody), not the
+        // loop-breaker. Publishing this map as state on `<Form>` *would* close the cycle,
+        // which is one of the two reasons it is a store — see FieldFocusContext's ruling.
         if (!(name in ids)) return
         const { [name]: _removed, ...rest } = ids
         ids = rest

@@ -17,6 +17,7 @@ import { CheckboxGroup } from '../fields/CheckboxGroup'
 import { ToggleButtonGroup } from '../fields/ToggleButtonGroup'
 import { Rating } from '../fields/Rating'
 import { Autocomplete } from '../fields/Autocomplete'
+import { EmailListField } from '../fields/EmailListField'
 import { AddressField } from '../fields/AddressField'
 import { Wizard, type WizardStepDef } from '../Wizard/Wizard'
 import { WizardStep } from '../Wizard/WizardStep'
@@ -290,6 +291,14 @@ describe('FormErrorSummary items are real links for every field shape', () => {
     {
       name: 'Autocomplete (name on the hidden value input)',
       element: <Autocomplete name="v" label="V" options={options} />,
+      focused: () => screen.getByRole('combobox'),
+    },
+    {
+      // Composes Autocomplete, so it registers through that field's own `useEzField`;
+      // listed separately because it is one of the shapes that carried no `name` in the
+      // DOM at all, which is what made its summary item unreachable.
+      name: 'EmailListField (no element carries name)',
+      element: <EmailListField name="v" label="V" />,
       focused: () => screen.getByRole('combobox'),
     },
   ]
