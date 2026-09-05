@@ -56,6 +56,10 @@ export const Disabled: Story = {
 // set a Form-level title, and this story is specifically about two sections
 // living inside a titled form.
 export const TwoSections: Story = {
+  // Opt out of the FormParameters decorator: this story renders its own <Form>,
+  // and the decorator's would nest <form> inside <form> (#120). Same pattern as
+  // Switch.stories.tsx ImmediateEffect.
+  parameters: { form: undefined },
   render: () => (
     <Form
       schema={schema}
