@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useFormContext } from 'react-hook-form'
 import { z } from 'zod'
@@ -2445,6 +2445,216 @@ describe('Enter on a non-last step advances it (#116)', () => {
 
   it('has no accessibility violations with the Enter handler installed', async () => {
     const { container } = renderEnterWizard()
+    await expectNoA11yViolations(container)
+  })
+})
+
+/**
+ * #123. The failed-submit jump used to hand focus to the first invalid field even though a
+ * `<FormErrorSummary>` was there to own the arrival, because two separate things focused it:
+ *
+ * 1. hookform's own `shouldFocusError` inside `handleSubmit`. `<Form>` suppresses that while a
+ *    summary exists — but the check used to be "is one *mounted*", and `<WizardStep>` unmounts
+ *    every step but the current one, so a summary living in an earlier step answered `false`
+ *    for the whole time the user was on a later one. The suppression was never in effect.
+ * 2. The wizard's own `setFocus(path)` after the jump, which had no summary guard at all.
+ *    hookform defers `setFocus` inside a bare `setTimeout`, so it landed a macrotask *after*
+ *    the summary's heading effect and took focus back for good.
+ *
+ * (1) made the wrong element focused; (2) made it stay that way. The existing test above was
+ * flaky at ~1-in-12 rather than always red only because its `waitFor` could sample in the gap
+ * between the heading effect and that deferred timer. These assert the settled state instead:
+ * every one of them drains the macrotask queue before looking, so none of them can pass on a
+ * lucky sample.
+ */
+describe('failed-submit focus ownership (#123)', () => {
+  /** Lets hookform's `setFocus` timer — a bare `setTimeout` — run before we look at focus. */
+  const drainMacrotasks = () => act(() => new Promise((resolve) => setTimeout(resolve, 0)))
+
+  it('a summary in a non-current step still owns the failed-submit arrival, and keeps it', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      <Form schema={schema} defaultValues={filled} onSubmit={onSubmit}>
+        <Wizard steps={steps}>
+          <WizardStep id="account">
+            <FormErrorSummary />
+            <TextField name="name" label="Name" />
+            <TextField name="email" label="Email" />
+          </WizardStep>
+          <WizardStep id="plan">
+            <TextField name="plan" label="Plan" />
+          </WizardStep>
+          <WizardStep id="review">
+            <p>Review</p>
+          </WizardStep>
+          <Controls />
+          <ClearEmail />
+          <SubmitButton />
+        </Wizard>
+      </Form>,
+    )
+    // Walk to the last step. The summary lives in `account` and is unmounted from here on —
+    // that unmount is the whole point: the old "is a summary mounted" check saw nothing.
+    await user.click(screen.getByRole('button', { name: 'next' }))
+    await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+    await user.click(screen.getByRole('button', { name: 'next' }))
+    await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('review'))
+    expect(screen.queryByRole('heading', { name: 'There is a problem' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'clear email' }))
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('account'))
+
+    const heading = await screen.findByRole('heading', { name: 'There is a problem' })
+    const email = screen.getByRole('textbox', { name: 'Email' })
+    expect(heading).toHaveFocus()
+
+    // The assertion the flaky test was missing. Before the fix focus was already back on the
+    // email input by this point — hookform's deferred `setFocus` from the wizard's jump.
+    await drainMacrotasks()
+    expect(heading).toHaveFocus()
+    expect(email).not.toHaveFocus()
+    expect(onSubmit).not.toHaveBeenCalled()
+
+    // And it is still the summary's after everything has settled, not just one tick later.
+    await waitFor(() => expect(heading).toHaveFocus())
+    expect(email).not.toHaveFocus()
+  })
+
+  it('without a summary, hookform still focuses the first invalid field after the jump', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={filled} onSubmit={() => {}}>
+        <Wizard steps={steps}>
+          <WizardStep id="account">
+            <TextField name="name" label="Name" />
+            <TextField name="email" label="Email" />
+          </WizardStep>
+          <WizardStep id="plan">
+            <TextField name="plan" label="Plan" />
+          </WizardStep>
+          <WizardStep id="review">
+            <p>Review</p>
+          </WizardStep>
+          <Controls />
+          <ClearEmail />
+          <SubmitButton />
+        </Wizard>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'next' }))
+    await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+    await user.click(screen.getByRole('button', { name: 'next' }))
+    await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('review'))
+    await user.click(screen.getByRole('button', { name: 'clear email' }))
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('account'))
+
+    // Nothing suppressed here: the wizard's own post-jump `setFocus` puts the user on the
+    // field that failed, which is the behaviour a form without a summary has always had.
+    await drainMacrotasks()
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Email' })).toHaveFocus())
+  })
+
+  it('a plain Form with no summary keeps hookform’s own first-invalid-field focus', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ name: '', email: '', plan: 'pro' }}
+        onSubmit={() => {}}
+      >
+        <TextField name="name" label="Name" />
+        <TextField name="email" label="Email" />
+        <SubmitButton />
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    // `shouldFocusError` is hookform's default and `<Form>` must leave it alone when no
+    // summary exists — the first invalid field in schema order takes focus.
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Name' })).toHaveFocus())
+    await drainMacrotasks()
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveFocus()
+  })
+
+  it('a plain Form with a summary gives it focus and hookform does not take it back', async () => {
+    const user = userEvent.setup()
+    const { container } = render(
+      <Form
+        schema={schema}
+        defaultValues={{ name: '', email: '', plan: 'pro' }}
+        onSubmit={() => {}}
+      >
+        <FormErrorSummary />
+        <TextField name="name" label="Name" />
+        <TextField name="email" label="Email" />
+        <SubmitButton />
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    const heading = await screen.findByRole('heading', { name: 'There is a problem' })
+    await drainMacrotasks()
+    expect(heading).toHaveFocus()
+    expect(screen.getByRole('textbox', { name: 'Name' })).not.toHaveFocus()
+    await expectNoA11yViolations(container)
+  })
+
+  /**
+   * The harder ordering, missed by the first round of this fix. Every test above starts on the
+   * step that holds the summary, so the summary has already mounted (and declared itself) long
+   * before the submit. Here the *only* summary lives in a step the user never visits before
+   * submitting, so the failed-submit jump is what mounts it for the first time.
+   *
+   * That inverts the timing. React runs child effects before parent effects, so the summary's
+   * `register()` flips the store before `<Wizard>`'s jump effect fires — but that effect was
+   * scheduled from a render where the snapshot was still `false`, and a closure keeps the
+   * value it captured. Reading the snapshot there focused the field a macrotask after the
+   * summary had taken focus, exactly the symptom this whole issue is about. The wizard reads
+   * the store live at fire time instead; this pins that.
+   */
+  it('a summary first mounted BY the jump still owns it (never-visited step)', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const { container } = render(
+      // `plan` is invalid from the start and `name`/`email` are fine, so the first failure is
+      // on a step the user has not reached — the jump goes forward into unvisited territory.
+      <Form
+        schema={schema}
+        defaultValues={{ name: 'Ada', email: 'ada@x.io', plan: '' }}
+        onSubmit={onSubmit}
+      >
+        <Wizard steps={steps}>
+          <WizardStep id="account">
+            <TextField name="name" label="Name" />
+            <TextField name="email" label="Email" />
+          </WizardStep>
+          <WizardStep id="plan">
+            <FormErrorSummary />
+            <TextField name="plan" label="Plan" />
+          </WizardStep>
+          <WizardStep id="review">
+            <p>Review</p>
+          </WizardStep>
+          <Controls />
+          <SubmitButton />
+        </Wizard>
+      </Form>,
+    )
+    // Never left `account`: the summary has never rendered, so nothing has declared it yet.
+    expect(screen.getByTestId('current')).toHaveTextContent('account')
+    expect(screen.queryByRole('heading', { name: 'There is a problem' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+
+    const heading = await screen.findByRole('heading', { name: 'There is a problem' })
+    const plan = screen.getByRole('textbox', { name: 'Plan' })
+    expect(heading).toHaveFocus()
+    await drainMacrotasks()
+    expect(heading).toHaveFocus()
+    expect(plan).not.toHaveFocus()
+    expect(onSubmit).not.toHaveBeenCalled()
     await expectNoA11yViolations(container)
   })
 })

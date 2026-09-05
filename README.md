@@ -187,12 +187,24 @@ own pattern deliberately omits `role="alert"` here so a screen reader doesn't an
 alongside each field's own `role="alert"` helper text — and one link per invalid field showing
 its message. Activating a link (click or Enter) focuses that field via `setFocus`, so it works
 even without a native `href` target. Items disappear as their fields become valid, and the whole
-summary disappears once none are left. While a summary is mounted, `<Form>` (and, inside a
-`Wizard`, `Next`'s own step validation) suppresses react-hook-form's own "focus the first invalid
-field" behavior so the two don't fight over focus.
+summary disappears once none are left. Once a form contains a summary, that form's post-submit
+focus belongs to it: `<Form>` suppresses react-hook-form's own "focus the first invalid field"
+behavior, and inside a `Wizard` so do `Next`'s step validation and the failed-submit jump, so
+nothing fights the heading for focus. This holds even while the summary itself is unmounted —
+a `WizardStep` renders only when it is the current step, so a summary in an earlier step must
+still count when you submit from a later one.
+
+That hand-over is one-way and lasts for the life of the `<Form>`: once a `<FormErrorSummary />`
+has rendered inside a form, react-hook-form's own first-invalid-field focus stays suppressed
+there even if you later remove the summary for good (behind a prop or a flag, say), so a failed
+submit then moves focus nowhere. Leaving the summary mounted is the fix — it already renders
+nothing until an attempt has failed — or remount the `<Form>`.
 
 Inside a `Wizard`, place one `<FormErrorSummary />` per `WizardStep`: each shows only that step's
-own `fields` from its last failed `Next`, not the whole form's errors.
+own `fields` from its last failed `Next`, not the whole form's errors. A failed final submit
+navigates back to the first errored step, and the summary that mounts there takes focus and
+says why — including when that step is one the user had not reached yet, so the summary is
+mounting for the very first time.
 
 ## Announcements
 
