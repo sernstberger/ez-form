@@ -87,6 +87,14 @@ describeFieldContract({
   renderNamed: (name) => (
     <AddressField name="address" slotProps={{ street: { 'aria-label': name } }} />
   ),
+  // Same reasoning as `renderNamed`: the contract runs against the `street` part, so
+  // the consumer description goes to that part's slot, which is a TextField's props.
+  renderDescribed: (id, { helperText, onChange, required }) => (
+    <AddressField
+      name="address"
+      slotProps={{ street: { 'aria-describedby': id, helperText, onChange, required } }}
+    />
+  ),
   getControl: street,
   interact: (user) => user.type(street(), '1'),
 })

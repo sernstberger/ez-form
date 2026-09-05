@@ -17,6 +17,9 @@ describeFieldContract({
   defaultValues: {},
   renderNamed: (name) => <StateSelect name="state" aria-label={name} />,
   render: (props) => <StateSelect name="state" label="State" {...props} />,
+  renderDescribed: (id, props) => (
+    <StateSelect name="state" label="State" aria-describedby={id} {...props} />
+  ),
   getControl: combobox,
   expectDisabled: (control) => expect(control).toHaveAttribute('aria-disabled', 'true'),
   interact: async (user) => {

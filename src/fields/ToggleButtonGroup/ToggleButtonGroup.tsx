@@ -55,6 +55,10 @@ export function ToggleButtonGroup({
       // both still reach the control through `rest`.
       aria-label={rest['aria-label']}
       aria-labelledby={rest['aria-labelledby']}
+      // The consumer's own description, merged with the helper text's id on the
+      // control rather than replaced by it — read, not destructured, so the
+      // (inert) copy on MUI's root through `rest` is unchanged (#102).
+      aria-describedby={rest['aria-describedby']}
       renderControl={({ field, inputA11y, labelId }) => (
         <MuiToggleButtonGroup
           {...rest}

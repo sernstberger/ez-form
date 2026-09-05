@@ -17,6 +17,9 @@ describeFieldContract({
   defaultValues: { zip: '' },
   renderNamed: (name) => <ZipField name="zip" aria-label={name} />,
   render: (props) => <ZipField name="zip" label="Zip" {...props} />,
+  renderDescribed: (id, props) => (
+    <ZipField name="zip" label="Zip" aria-describedby={id} {...props} />
+  ),
   getControl: input,
   interact: (user) => user.type(input(), '9'),
 })

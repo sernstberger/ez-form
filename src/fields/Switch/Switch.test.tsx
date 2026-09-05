@@ -16,6 +16,9 @@ describeFieldContract({
   defaultValues: { darkMode: false },
   renderNamed: (name) => <Switch name="darkMode" label="" aria-label={name} />,
   render: (props) => <Switch name="darkMode" label="Dark mode" {...props} />,
+  renderDescribed: (id, props) => (
+    <Switch name="darkMode" label="Dark mode" aria-describedby={id} {...props} />
+  ),
   getControl: () => screen.getByRole('switch', { name: 'Dark mode' }),
   interact: (user) => user.click(screen.getByRole('switch', { name: 'Dark mode' })),
 })

@@ -102,6 +102,11 @@ export function OtpField({
       inputRef={f.field.ref}
       inputProps={{
         ...f.inputA11y(text),
+        // Merged with the helper text's id rather than replaced by it: an accessible
+        // description is a list (#102 row 8). Read from `rest`, not destructured out
+        // of it — `rootProps` still carries it to `OTPField.Root`, which is the group
+        // the field is named as, and the slots need their own copy.
+        'aria-describedby': f.describedBy(rest['aria-describedby'], text),
         onBlur: () => {
           f.field.onBlur()
           onBlur?.()

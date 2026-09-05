@@ -28,6 +28,15 @@ describeFieldContract({
   renderNamed: (name) =>
     withPickers(<DatePicker name="start" slotProps={{ textField: { 'aria-label': name } }} />),
   render: (props) => withPickers(<DatePicker name="start" label="Start" {...props} />),
+  renderDescribed: (id, props) =>
+    withPickers(
+      <DatePicker
+        name="start"
+        label="Start"
+        slotProps={{ textField: { 'aria-describedby': id } }}
+        {...props}
+      />,
+    ),
   getControl: () => screen.getByRole('group', { name: 'Start' }),
   requiredNotAnnounced: true,
   expectDisabled: () => expect(hiddenInput('start')).toBeDisabled(),

@@ -21,6 +21,9 @@ describeFieldContract({
   defaultValues: { email: '' },
   renderNamed: (name) => <EmailField name="email" aria-label={name} />,
   render: (props) => <EmailField name="email" label="Email" {...props} />,
+  renderDescribed: (id, props) => (
+    <EmailField name="email" label="Email" aria-describedby={id} {...props} />
+  ),
   getControl: () => screen.getByRole('textbox', { name: /Email/ }),
   interact: (user) => user.type(screen.getByRole('textbox', { name: /Email/ }), 'a'),
 })

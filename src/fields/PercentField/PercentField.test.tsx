@@ -24,6 +24,9 @@ describeFieldContract({
   render: ({ onChange, ...props }) => (
     <PercentField name="rate" label="Rate" onValueChange={onChange} {...props} />
   ),
+  renderDescribed: (id, props) => (
+    <PercentField name="rate" label="Rate" aria-describedby={id} {...props} />
+  ),
   getControl: () => screen.getByRole('textbox', { name: /Rate/ }),
   interact: (user) => user.type(screen.getByRole('textbox', { name: /Rate/ }), '1'),
 })

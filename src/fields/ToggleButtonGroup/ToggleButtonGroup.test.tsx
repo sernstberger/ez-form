@@ -34,6 +34,16 @@ describeFieldContract({
   ),
   // The inner MUI group, not the enclosing <fieldset>: that is the element
   // carrying aria-describedby/aria-invalid.
+  renderDescribed: (id, props) => (
+    <ToggleButtonGroup
+      name="align"
+      label="Align"
+      options={aligns}
+      exclusive
+      aria-describedby={id}
+      {...props}
+    />
+  ),
   getControl: () => getInnerGroup('Align'),
   requiredNotAnnounced: true,
   expectDisabled: () => expect(screen.getByRole('button', { name: 'Left' })).toBeDisabled(),

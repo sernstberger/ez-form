@@ -29,6 +29,9 @@ describeFieldContract({
   // role at all — same as `PasswordField`. The accessible name is read through
   // the label query instead: the same accname computation, a different entry point.
   findNamed: (name) => screen.getByLabelText(name),
+  renderDescribed: (id, props) => (
+    <SsnField name="ssn" label="SSN" aria-describedby={id} {...props} />
+  ),
   getControl: input,
   interact: (user) => user.type(input(), '1'),
 })

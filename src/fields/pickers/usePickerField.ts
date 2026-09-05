@@ -73,6 +73,8 @@ interface ConsumerTextFieldSlotProps {
   /** A label-less picker is named here, not on the picker itself. */
   'aria-label'?: string
   'aria-labelledby'?: string
+  /** The consumer's own description, for the same reason and by the same route. */
+  'aria-describedby'?: string
   onBlur?: (event: FocusEvent<HTMLDivElement>) => void
   slotProps?: Record<string, unknown> & {
     formHelperText?: object
@@ -223,6 +225,23 @@ export function usePickerField<
   })
   const text = f.helperText(helperText)
   /**
+   * The field id `PickersTextField` would otherwise generate for itself, pinned so the
+   * helper-text id it derives (`${id}-helper-text`, PickersTextField.js) is knowable
+   * here. A consumer's own `id` wins, and is used for the derivation too, so the two
+   * cannot disagree.
+   */
+  const fieldId = (consumerTextField as { id?: string } | undefined)?.id ?? f.helperTextId
+  /**
+   * The group's full description: the consumer's ids first, then MUI X's helper-text
+   * id — which it only creates when there *is* helper text, so the same condition
+   * decides whether to include it. `undefined` when neither side has anything, which
+   * leaves MUI X's own attribute alone rather than blanking it.
+   */
+  const describedBy =
+    [consumerTextField?.['aria-describedby'], text ? `${fieldId}-helper-text` : undefined]
+      .filter(Boolean)
+      .join(' ') || undefined
+  /**
    * A consumer's own clear handler, from wherever MUI X types it for the component in
    * hand: a flat `onClear` on `DateField` (which *is* the text field), or
    * `slotProps.field.onClear` on the popup pickers — `BaseSingleInputPickersTextFieldProps`
@@ -278,17 +297,21 @@ export function usePickerField<
       // `required`/`error`/`helperText`, so those are spread after the
       // consumer's — the same precedence TextField uses.
       textField: {
+        // Before the consumer's spread, so a consumer `id` still wins; see `fieldId`.
+        id: fieldId,
         ...consumerTextField,
         // Same wrapper bug as #99, one component over. On the `textField` root these
         // land on `MuiPickersTextField-root`, which is a `FormControl` **div** with no
         // role at all — so the name describes a `<div>` nothing reads while the
         // `role="group"` element the user operates stays anonymous, and the
-        // missing-label warning above is silenced by a name that names nothing. They
-        // are re-emitted onto that group through `slotProps.input` below; absent (not
-        // `undefined`) keys are used here so a labelled picker keeps MUI X's own
-        // `aria-labelledby`.
+        // missing-label warning above is silenced by a name that names nothing. The
+        // same is true of `aria-describedby`: MUI X puts the helper-text id on the
+        // group itself, so a consumer's description on the root reached nothing at
+        // all (#102 rows 1 and 8). All three are re-emitted onto that group through
+        // `slotProps.input` below.
         'aria-label': undefined,
         'aria-labelledby': undefined,
+        'aria-describedby': undefined,
         required: f.required,
         error: f.invalid,
         helperText: text,
@@ -368,7 +391,22 @@ export function usePickerField<
           // wrote, so it must beat what MUI X put there for the label-less case. Keys
           // the consumer did not pass are absent, not `undefined`, so a labelled picker
           // keeps MUI X's `aria-labelledby`.
-          input: { ...consumerTextField?.slotProps?.input, ...f.nameA11y },
+          //
+          // `aria-describedby` is the same routing plus a merge, because unlike the
+          // name it has an existing value worth keeping: MUI X sets the group's
+          // description to the helper text's id, and that id is *its* — derived as
+          // `${id}-helper-text` from the field id it generates. So the field id is
+          // pinned here (`id` below) and the same derivation is repeated, giving the
+          // consumer's ids **and** the helper text's, space-joined — a description is
+          // a list, so replacing one with the other drops half of what the control
+          // says (#102 row 8). Omitted entirely when neither side has anything, so
+          // MUI X's own value is left untouched on a picker with no helper text and
+          // no consumer description.
+          input: {
+            ...consumerTextField?.slotProps?.input,
+            ...f.nameA11y,
+            ...(describedBy === undefined ? null : { 'aria-describedby': describedBy }),
+          },
         },
       },
     } as TSlotProps,

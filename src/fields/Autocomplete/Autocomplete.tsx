@@ -117,6 +117,12 @@ export function Autocomplete<
   // (#99). They are routed to `slotProps.htmlInput` on the rendered input below.
   'aria-label': ariaLabel,
   'aria-labelledby': ariaLabelledBy,
+  // Same wrapper problem, and the same fix. On the Autocomplete root this describes
+  // the `FormControl` div, which nothing reads, while the `<input>` keeps only the
+  // helper-text id — so a consumer's description never reached the combobox at all
+  // (#102 row 8). It is merged with that id onto `slotProps.htmlInput` below,
+  // because an accessible description is a list.
+  'aria-describedby': ariaDescribedBy,
   ...rest
 }: AutocompleteProps<TOption, TValue, Multiple, FreeSolo>) {
   // `getOptionValue` decides what this field stores, so that — not `option.value` — is the
@@ -166,6 +172,11 @@ export function Autocomplete<
           ? ''
           : null
         : toValue(x as TOption | string)) as FormValue
+
+  // Either channel describes the field — on Autocomplete itself, or on the TextField
+  // it renders — exactly as with the name above. Both land on a wrapper if left alone.
+  const consumerDescribedBy = ariaDescribedBy ?? textFieldProps?.['aria-describedby']
+  const text = f.helperText(helperText)
 
   const optionLabel: NonNullable<MuiProps<TOption, Multiple, FreeSolo>['getOptionLabel']> =
     getOptionLabel ?? ((o) => (typeof o === 'string' ? o : o.label))
@@ -236,14 +247,16 @@ export function Autocomplete<
         <MuiTextField
           {...params}
           {...textFieldProps}
-          // `textFieldProps` may carry them; on the TextField root they would name
-          // the `FormControl` wrapper. `f.nameA11y` re-emits them on the `<input>`.
+          // `textFieldProps` may carry them; on the TextField root they would name and
+          // describe the `FormControl` wrapper. `f.nameA11y` and `f.describedBy`
+          // re-emit them on the `<input>` through `slotProps.htmlInput` below.
           aria-label={undefined}
           aria-labelledby={undefined}
+          aria-describedby={undefined}
           label={f.displayLabel}
           required={f.required}
           error={f.invalid}
-          helperText={f.helperText(helperText)}
+          helperText={text}
           inputRef={f.field.ref}
           onBlur={() => f.field.onBlur()}
           slotProps={{
@@ -256,11 +269,14 @@ export function Autocomplete<
             // no consumer channel here today. Routing it through the hook is what
             // keeps the binding the owner if one is ever added.
             //
-            // `pinId: false`: unlike the other fields this one leaves the
-            // `aria-describedby` wiring to MUI, which links the input to an id it
-            // generates. Pinning the hook's id here would orphan that link and leave
-            // the combobox with no accessible description at all.
-            formHelperText: f.helperTextSlotProps(undefined, { pinId: false }),
+            // This field used to opt out of pinning the hook's `helperTextId` here
+            // (`pinId: false`), because it left the `aria-describedby` wiring to MUI,
+            // which generates its own id. That is exactly why a consumer's own
+            // description could never reach the combobox: MUI overwrites the
+            // attribute wholesale. The input's description is owned below now, the
+            // same way `TextField` owns it, so the helper text carries the hook's id
+            // like everywhere else and `pinId` is gone (#102 row 8).
+            formHelperText: f.helperTextSlotProps(undefined),
             inputLabel: mergeSlotProps(params.slotProps?.inputLabel, { required: f.labelRequired }),
             // `inputProps` first: `mergeSlotProps` lets the *external* value win
             // for plain props (so a caller's `autoComplete` beats the `'off'`
@@ -275,6 +291,13 @@ export function Autocomplete<
             htmlInput: {
               ...mergeSlotProps(inputProps, params.slotProps?.htmlInput),
               ...f.nameA11y,
+              // Last, so it beats the `aria-describedby` MUI's `getInputProps()` set
+              // pointing at its own generated helper-text id. That id is the reason a
+              // consumer's description used to vanish: MUI writes the whole attribute,
+              // so anything else there was lost. Owned here instead, exactly as
+              // `TextField` does it — the consumer's ids **and** the helper text's,
+              // space-joined, because a description is a list (#102 row 8).
+              'aria-describedby': f.describedBy(consumerDescribedBy, text),
             },
           }}
         />

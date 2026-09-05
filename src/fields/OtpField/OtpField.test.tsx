@@ -28,6 +28,9 @@ describeFieldContract({
   render: ({ onChange, ...props }) => (
     <OtpField name="code" label="Code" length={4} onValueChange={onChange} {...props} />
   ),
+  renderDescribed: (id, props) => (
+    <OtpField name="code" label="Code" length={4} aria-describedby={id} {...props} />
+  ),
   getControl: () => screen.getByRole('textbox', { name: 'Code' }),
   interact: async (user) => {
     await user.type(screen.getByRole('textbox', { name: 'Code' }), '1')

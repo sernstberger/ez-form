@@ -40,6 +40,9 @@ describeFieldContract({
   defaultValues: { bio: '' },
   renderNamed: (name) => <TextareaField name="bio" aria-label={name} />,
   render: (props) => <TextareaField name="bio" label="Bio" {...props} />,
+  renderDescribed: (id, props) => (
+    <TextareaField name="bio" label="Bio" aria-describedby={id} {...props} />
+  ),
   getControl: textbox,
   interact: (user) => user.type(textbox(), 'a'),
 })

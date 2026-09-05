@@ -48,6 +48,9 @@ describeFieldContract({
   errorMessage: 'To is required.',
   renderNamed: (name) => <EmailListField name="to" aria-label={name} />,
   render: (props) => <EmailListField name="to" label="To" {...props} />,
+  renderDescribed: (id, props) => (
+    <EmailListField name="to" label="To" aria-describedby={id} {...props} />
+  ),
   getControl: combobox,
   interact: async (user) => {
     await user.type(combobox(), 'ada@example.com{Enter}')

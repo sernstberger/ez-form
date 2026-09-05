@@ -21,6 +21,9 @@ describeFieldContract({
   defaultValues: { phone: '' },
   renderNamed: (name) => <PhoneField name="phone" aria-label={name} />,
   render: (props) => <PhoneField name="phone" label="Phone" {...props} />,
+  renderDescribed: (id, props) => (
+    <PhoneField name="phone" label="Phone" aria-describedby={id} {...props} />
+  ),
   getControl: () => screen.getByRole('textbox', { name: /Phone/ }),
   interact: (user) => user.type(screen.getByRole('textbox', { name: /Phone/ }), '5'),
 })

@@ -151,6 +151,12 @@ export function NumberField({
   // anonymous (#99). They go to `inputProps` below instead.
   'aria-label': ariaLabel,
   'aria-labelledby': ariaLabelledBy,
+  // Same wrapper problem, and the same fix: on Root's div this describes an element
+  // nothing reads, while the visible `<input>` keeps only the helper-text id. It is
+  // merged with that id onto `inputProps` below, because an accessible description
+  // is a list — the consumer's extra description and the error are both meant to be
+  // read (#102 row 8, the family-wide half of #104).
+  'aria-describedby': ariaDescribedBy,
   ...rest
 }: NumberFieldProps) {
   // The same label and message set `useEzField` would use for a default rule message.
@@ -205,6 +211,7 @@ export function NumberField({
       inputRef={f.field.ref}
       inputProps={{
         ...f.inputA11y(text),
+        'aria-describedby': f.describedBy(ariaDescribedBy, text),
         ...f.nameA11y,
         inputMode,
         onBlur: (e) => {

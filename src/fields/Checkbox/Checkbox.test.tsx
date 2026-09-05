@@ -18,6 +18,9 @@ describeFieldContract({
   defaultValues: { tos: false },
   renderNamed: (name) => <Checkbox name="tos" label="" aria-label={name} />,
   render: (props) => <Checkbox name="tos" label="Accept terms" {...props} />,
+  renderDescribed: (id, props) => (
+    <Checkbox name="tos" label="Accept terms" aria-describedby={id} {...props} />
+  ),
   getControl: () => screen.getByRole('checkbox', { name: 'Accept terms' }),
   interact: (user) => user.click(screen.getByRole('checkbox', { name: 'Accept terms' })),
 })

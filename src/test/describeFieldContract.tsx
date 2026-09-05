@@ -12,7 +12,7 @@ import { expectNoA11yViolations } from './axe'
  * the original five. The union exists so a typo in an `exempt` key is a
  * compile error rather than an opt-out that silently never applies.
  */
-export type ContractLine = 'ariaLabelNames'
+export type ContractLine = 'ariaLabelNames' | 'consumerDescribedBy'
 
 export interface FieldContractProps {
   disabled?: boolean
@@ -91,6 +91,18 @@ export interface FieldContract<TIn extends FieldValues, TOut> {
    * (`type="password"`) reads the name through a different query.
    */
   findNamed?: (name: string) => HTMLElement
+  /**
+   * Renders the field with the consumer's own `aria-describedby` pointing at `id`,
+   * plus this contract's `errorProps` so a failed submit produces an error. Like
+   * `renderNamed`, it cannot be derived from `render`: the attribute has to reach
+   * whichever prop or slot the field routes descriptions through, and for several
+   * fields (`AddressField`'s parts, the pickers' `slotProps.textField`) that is not
+   * a top-level prop at all.
+   *
+   * Omit it only alongside `exempt.consumerDescribedBy` — a field whose props admit
+   * no `aria-describedby` has nothing for the line to preserve.
+   */
+  renderDescribed?: (id: string, props: FieldContractProps) => ReactElement
   /** Changes the value exactly once (one consumer `onChange` call). */
   interact: (user: UserEvent) => Promise<void>
 }
@@ -171,6 +183,44 @@ export function describeFieldContract<TIn extends FieldValues, TOut>(c: FieldCon
       render(inForm(c.renderNamed('Contract ARIA name')))
       expect(findNamed('Contract ARIA name')).toBeInTheDocument()
     })
+
+    /*
+     * Row 8 of #102, the family-wide half of #104. An accessible description is a
+     * *list*: the consumer's own text and the error message are both meant to be
+     * read, so the binding joins them rather than one replacing the other.
+     *
+     * Measured before the fix: every field except `TextField` dropped the consumer's
+     * ids outright — not just after a failed submit, but from the first render, since
+     * the attribute was overwritten wholesale with the helper-text id.
+     */
+    const describedExemption = c.exempt?.consumerDescribedBy
+    it.skipIf(describedExemption)(
+      'keeps a consumer aria-describedby, and adds the error to it',
+      async () => {
+        const user = userEvent.setup()
+        const renderDescribed = c.renderDescribed
+        if (!renderDescribed)
+          throw new Error(
+            `describeFieldContract(${c.componentName}): row 8 needs \`renderDescribed\`, ` +
+              'or an `exempt.consumerDescribedBy` reason naming the issue.',
+          )
+        render(
+          inForm(
+            <>
+              <span id="ez-contract-desc">Consumer description</span>
+              {renderDescribed('ez-contract-desc', errorProps)}
+            </>,
+          ),
+        )
+        expect(c.getControl()).toHaveAccessibleDescription(/Consumer description/)
+        await user.click(screen.getByRole('button', { name: 'Go' }))
+        await screen.findByRole('alert')
+        // Both, and in that order: the consumer wrote theirs first.
+        expect(c.getControl()).toHaveAccessibleDescription(
+          `Consumer description ${errorMessage}`.trim(),
+        )
+      },
+    )
 
     it('has no accessibility violations in the error state', async () => {
       const user = userEvent.setup()

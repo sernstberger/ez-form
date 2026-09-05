@@ -21,6 +21,9 @@ describeFieldContract({
   defaultValues: { ein: '' },
   renderNamed: (name) => <FeinField name="ein" aria-label={name} />,
   render: (props) => <FeinField name="ein" label="EIN" {...props} />,
+  renderDescribed: (id, props) => (
+    <FeinField name="ein" label="EIN" aria-describedby={id} {...props} />
+  ),
   getControl: () => screen.getByRole('textbox', { name: /EIN/ }),
   interact: (user) => user.type(screen.getByRole('textbox', { name: /EIN/ }), '1'),
 })

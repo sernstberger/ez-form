@@ -574,6 +574,28 @@ describe('usePickerField', () => {
       expect('aria-labelledby' in input).toBe(false)
     })
 
+    // #102 row 8. MUI X puts the helper text's id on the group and derives it from the
+    // field id, so the merge has to repeat that derivation rather than use the hook's
+    // own `helperTextId` — the two are different ids, and only MUI X's is on the
+    // rendered `<p>`.
+    it('joins a consumer aria-describedby with MUI X’s own helper-text id', () => {
+      const { result } = renderPicker({
+        helperText: 'Some help',
+        slotProps: { textField: { 'aria-describedby': 'mine' } },
+      })
+      const textField = textFieldOf(result.current)
+      // Off the root, where it described a `FormControl` div nothing reads…
+      expect(textField['aria-describedby']).toBeUndefined()
+      // …and onto the group, alongside the helper text's id rather than replacing it.
+      const described = textField.slotProps.input['aria-describedby']
+      expect(described).toMatch(/^mine \S+-helper-text$/)
+    })
+
+    it('leaves MUI X’s description alone when there is nothing to add', () => {
+      const { result } = renderPicker({})
+      expect('aria-describedby' in textFieldOf(result.current).slotProps.input).toBe(false)
+    })
+
     it('keeps a consumer’s own `slotProps.input` alongside the name', () => {
       const onClick = () => {}
       const { result } = renderPicker({

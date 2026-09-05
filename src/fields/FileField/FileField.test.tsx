@@ -27,6 +27,14 @@ describeFieldContract({
   render: (props) => <FileField name="resume" label="Resume" {...props} />,
   // `<input type="file">` has no role, so the name is read through the label query.
   findNamed: (name) => screen.getByLabelText(new RegExp(`^${name}`)),
+  exempt: {
+    // #118: `FileFieldProps` is a closed object literal with no `...rest` and no
+    // `aria-*` keys, so a consumer cannot pass `aria-describedby` at all — there is
+    // nothing for the line to preserve. That is an API gap, not a dropped
+    // description: unlike the eleven fields row 8 fixed, this one never receives the
+    // attribute. Delete this entry when #118 widens the props type.
+    consumerDescribedBy: '#118 — FileFieldProps admits no aria-describedby to preserve',
+  },
   getControl: () => fileInput('Resume'),
   interact: (user) => user.upload(fileInput('Resume'), pdf),
 })

@@ -30,6 +30,9 @@ describeFieldContract({
   defaultValues: {},
   renderNamed: (name) => <Autocomplete name="role" options={roles} aria-label={name} />,
   render: (props) => <Autocomplete name="role" label="Role" options={roles} {...props} />,
+  renderDescribed: (id, props) => (
+    <Autocomplete name="role" label="Role" options={roles} aria-describedby={id} {...props} />
+  ),
   getControl: combobox,
   interact: (user) => pick(user, 'User'),
 })

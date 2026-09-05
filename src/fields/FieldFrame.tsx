@@ -59,6 +59,21 @@ export interface FieldFrameProps<TValue> {
    */
   'aria-label'?: string
   'aria-labelledby'?: string
+  /**
+   * The consumer's own `aria-describedby`, merged with the helper text's id into
+   * `bound.inputA11y` rather than replaced by it (#102 row 8, the family-wide half
+   * of #104).
+   *
+   * Every field in this family passes it through `{...rest}` as well, where it
+   * reaches MUI's root and describes the `FormControl` **wrapper** — a `<div>` no
+   * assistive tech reads. `bound.inputA11y` is applied to the real control after
+   * that, so the merged value wins there and the wrapper copy is inert. Measured
+   * before the fix: with `aria-describedby="mine"`, every one of Checkbox, Switch,
+   * RadioGroup, Rating, Slider, CheckboxGroup and ToggleButtonGroup put only the
+   * helper-text id on the control — the consumer's description never arrived at
+   * all, before *or* after a failed submit.
+   */
+  'aria-describedby'?: string
   renderControl: (bound: BoundField) => ReactElement
 }
 
@@ -77,6 +92,7 @@ export function FieldFrame<TValue>({
   labelAs,
   'aria-label': ariaLabel,
   'aria-labelledby': ariaLabelledBy,
+  'aria-describedby': ariaDescribedBy,
   renderControl,
 }: FieldFrameProps<TValue>) {
   const f = useEzField<TValue>(name, componentName, {
@@ -96,7 +112,13 @@ export function FieldFrame<TValue>({
     field: f.field,
     invalid: f.invalid,
     required: f.required,
-    inputA11y: f.inputA11y(text),
+    // `describedBy`, not `inputA11y`: an accessible description is a *list*, so the
+    // consumer's ids and the helper text's are joined rather than one replacing the
+    // other. `inputA11y` supplies `aria-invalid` unchanged (#102 row 8).
+    inputA11y: {
+      ...f.inputA11y(text),
+      'aria-describedby': f.describedBy(ariaDescribedBy, text),
+    },
     labelId: labelled ? generatedLabelId : undefined,
   }
   // FormControlLabel/FormLabel read `required` from FormControl context only when

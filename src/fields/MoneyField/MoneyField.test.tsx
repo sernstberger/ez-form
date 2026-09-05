@@ -19,6 +19,9 @@ describeFieldContract({
   render: ({ onChange, ...props }) => (
     <MoneyField name="price" label="Price" onValueChange={onChange} {...props} />
   ),
+  renderDescribed: (id, props) => (
+    <MoneyField name="price" label="Price" aria-describedby={id} {...props} />
+  ),
   getControl: input,
   interact: (user) => user.type(input(), '1'),
 })

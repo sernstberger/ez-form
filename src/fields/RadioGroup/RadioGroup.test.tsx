@@ -22,6 +22,9 @@ describeFieldContract({
   defaultValues: {},
   renderNamed: (name) => <RadioGroup name="plan" label="" options={plans} aria-label={name} />,
   render: (props) => <RadioGroup name="plan" label="Plan" options={plans} {...props} />,
+  renderDescribed: (id, props) => (
+    <RadioGroup name="plan" label="Plan" options={plans} aria-describedby={id} {...props} />
+  ),
   getControl: () => screen.getByRole('radiogroup', { name: 'Plan' }),
   expectDisabled: () => expect(screen.getByRole('radio', { name: 'Basic' })).toBeDisabled(),
   interact: (user) => user.click(screen.getByRole('radio', { name: 'Pro' })),

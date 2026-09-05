@@ -24,6 +24,9 @@ describeFieldContract({
   errorMessage: 'Volume must be at most 0.',
   renderNamed: (name) => <Slider name="volume" label="" aria-label={name} />,
   render: (props) => <Slider name="volume" label="Volume" {...props} />,
+  renderDescribed: (id, props) => (
+    <Slider name="volume" label="Volume" aria-describedby={id} {...props} />
+  ),
   getControl: () => screen.getByRole('slider', { name: 'Volume' }),
   interact: async () => {
     setSlider(screen.getByRole('slider', { name: 'Volume' }), 30)

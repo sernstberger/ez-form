@@ -23,6 +23,9 @@ describeFieldContract({
   render: ({ onChange, ...props }) => (
     <NumberField name="age" label="Age" onValueChange={onChange} {...props} />
   ),
+  renderDescribed: (id, props) => (
+    <NumberField name="age" label="Age" aria-describedby={id} {...props} />
+  ),
   getControl: input,
   interact: (user) => user.type(input(), '4'),
 })
