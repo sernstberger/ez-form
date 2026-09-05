@@ -378,6 +378,26 @@ Because a form can hold several `role="status"` regions at once, query this one 
 document.querySelector(`.${wizardClasses.status}`) // the wizard's, not the form's
 ```
 
+### Enter advances the step
+
+Pressing Enter in a field on a non-last step does exactly what clicking `Next` does: it validates that step's `fields`, then either advances or shows the step's errors and focuses the first invalid field. Nothing to wire — it is on by default, so the most natural "I'm done with this screen" gesture on the web is not a dead end for a keyboard or screen reader user.
+
+This is a `keydown` on the step's own `<fieldset>` rather than a `type="submit"` Next button, because `Next` must not submit the form early — and `<Form>` stays the only thing that submits.
+
+Enter is left alone wherever a control already means something by it:
+
+| Where                                                         | What Enter does instead                               |
+| ------------------------------------------------------------- | ----------------------------------------------------- |
+| A `TextareaField` (or any `contenteditable`)                  | Inserts a newline                                     |
+| An open `Select` / `Autocomplete` listbox, or a picker popper | Picks the highlighted option                          |
+| A closed `Select`                                             | Opens the menu                                        |
+| `EmailListField`                                              | Commits the typed address as a chip                   |
+| A button or link (`Back`, `ReadOnlyField`'s Edit)             | Activates that control                                |
+| Enter with Shift / Ctrl / Cmd / Alt held                      | Whatever that gesture means to the field              |
+| The **last** step                                             | Submits, via `WizardNav`'s `SubmitButton` — unchanged |
+
+The rule underneath the table is one line: a field that handles Enter itself calls `preventDefault()`, and the wizard defers to that — the same signal the browser's own implicit submission respects. A custom field of your own gets the same treatment for free by doing the same thing. `layout="page"` installs no handler at all, since it never navigates.
+
 ### Same steps, one page
 
 `layout="page"` renders every `WizardStep` at once, in document order (steps order is by convention the order the `WizardStep`s appear as children, matching `steps`), each as its own named section — the same markup a horizontal step already uses. `WizardStepper` and `WizardNav` render nothing in this layout; wire a plain `<SubmitButton>` instead, which validates the whole schema in one pass, same as the last step of a `steps` wizard. `useWizard()` still works: `current` reports the first step and `layout` reports `'page'`, but `next`/`prev`/`go` are no-ops. It is entirely driven by `steps`/`WizardStep`, so the same array and step markup used for a `steps` wizard can render either layout by only changing the `layout` prop.

@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { composeStories } from '@storybook/react-vite'
+import { runStoryPlay } from '../test/runStoryPlay'
 import { wizardClasses } from './Wizard'
 import * as wizardStories from './Wizard.stories'
 import * as wizardRouterStories from './WizardRouter.stories'
@@ -11,7 +12,7 @@ import * as wizardRouterStories from './WizardRouter.stories'
  * (→ h4 for nested sections) with no skip. `Vertical` renders no legend by design (steps
  * are already labelled by the stepper via `aria-labelledby`) and is asserted separately.
  */
-const { Horizontal, Vertical, PageLayout, PageLayoutNestedSections, Resume } =
+const { Horizontal, Vertical, PageLayout, PageLayoutNestedSections, Resume, EnterAdvances } =
   composeStories(wizardStories)
 const { OneRoutePerStep, DeepLinkRedirect } = composeStories(wizardRouterStories)
 
@@ -72,5 +73,24 @@ describe('Wizard router story: the announcement waits for the controlled wizard 
     // Arrival and announcement agree: the URL is on /signup/plan and the region says so.
     await waitFor(() => expect(screen.getByText('URL: /signup/plan')).toBeInTheDocument())
     await waitFor(() => expect(region()).toHaveTextContent('Step 2 of 3, Plan'))
+  })
+})
+
+/**
+ * #116: Enter on a non-last step advances it. This runs the story's own `play`, which
+ * drives the wizard entirely from the keyboard.
+ *
+ * **This is a jsdom run, not a browser one** — `runStoryPlay` is a stand-in for Storybook's
+ * play context built on Testing Library, and vitest's environment here is `jsdom` (see
+ * `vite.config.ts`). jsdom fabricates an implicit submit for Enter on a text input even with
+ * no submit control present, which a real browser will not do, so "the step changed" is not
+ * on its own proof the feature works. What this owns is that the play runs end to end
+ * without throwing and that the wired-up handler is reached; the real-browser confirmation
+ * is recorded in the ledger. `Wizard.test.tsx`'s `#116` block carries the assertions that
+ * distinguish a real `next()` from jsdom's spurious-submit path (`submitCount`).
+ */
+describe('Wizard EnterAdvances story (#116)', () => {
+  it('runs the keyboard-only play to completion', async () => {
+    await runStoryPlay(EnterAdvances)
   })
 })

@@ -1,9 +1,56 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useForkRef } from '@mui/material/utils'
 import { FormSection, type FormSectionProps } from '../FormSection'
 import { stepLabelId } from './WizardContext'
 import { useWizard } from './useWizard'
+
+/**
+ * Whether an Enter keydown that reached the step's `<fieldset>` is the user saying "I'm done
+ * with this screen" rather than a keystroke some field or control has its own meaning for.
+ *
+ * The load-bearing check is `defaultPrevented`. A field that consumes Enter marks the event
+ * handled, which is the same signal the browser's own implicit-submission rule respects — so
+ * this needs no allow-list of field types and stays correct for fields that do not exist yet.
+ * Today that covers MUI `Autocomplete` (Enter with an open popup selects the highlighted
+ * option and calls `preventDefault`, its own comment saying "Avoid early form validation, let
+ * the end-users continue filling the form"), MUI `Select` (Enter on a closed select opens the
+ * menu, likewise prevented) and `EmailListField` (Enter commits a chip). An *open*
+ * `Select`/`Autocomplete` listbox and a picker popper are portalled out of this fieldset
+ * entirely, so their keydown never reaches this handler in the first place — belt and braces.
+ *
+ * A *closed* date-picker field is the exception that proves the rule, and it arrives here by a
+ * different route than the two above. `PickersInputBase`'s own Enter handler does not
+ * `preventDefault` unconditionally: it looks up `closest('form')` and
+ * `querySelector('[type="submit"]')` and **returns early, leaving the event unprevented, when
+ * there is no submit trigger** (`@mui/x-date-pickers`, `PickersInputBase.js`). On a non-last
+ * step there is none — that absence is the very bug #116 is about — so the picker no-ops and
+ * this handler advances the step, exactly as it does for a plain text input. On the last step
+ * a `SubmitButton` does exist, so the picker submits the form itself; this handler is not
+ * installed there either way, so the two never race.
+ *
+ * The rest are the cases no `preventDefault` is involved in, so nothing else could catch them:
+ * a `<textarea>`/`contenteditable`, where Enter is natively a newline; a button or link, where
+ * Enter is that control's own activation (Back, a chip's delete, `ReadOnlyField`'s Edit); a
+ * modified Enter, which belongs to whatever gesture the modifier names; an auto-repeat from a
+ * held key; and an IME composition commit (`isComposing`, plus the legacy `keyCode === 229`
+ * that some IMEs still report instead).
+ */
+function isPlainEnter(event: KeyboardEvent<HTMLFieldSetElement>) {
+  if (event.key !== 'Enter') return false
+  if (event.defaultPrevented || event.repeat) return false
+  if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return false
+  if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return false
+  const target = event.target as HTMLElement | null
+  if (!target) return false
+  const tag = target.tagName
+  if (tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A' || target.isContentEditable) {
+    return false
+  }
+  const role = target.getAttribute('role')
+  if (role === 'button' || role === 'link') return false
+  return true
+}
 
 export interface WizardStepProps {
   id: string
@@ -38,6 +85,25 @@ export interface WizardStepProps {
  * a `title={null}` step, which has no naming element to reach. Cost if wrong: focus lands
  * somewhere less informative and the user navigates to find the step — an annoyance, not a
  * trap; nothing becomes unreachable.
+ *
+ * Ruling: Enter on a non-last step advances it, via one `onKeyDown` on this step's own
+ * `<fieldset>` — not by making `WizardNav`'s Next a `type="submit"` button (#116). The
+ * submit-button route is the browser-native one and was evaluated first, as it should be: it
+ * would make Enter, implicit submission and an assistive-tech "submit" action all work with no
+ * key handling at all. It loses on rule 4, "the form owns the lifecycle". `Wizard` renders
+ * *inside* `<Form>`, so it cannot wrap `Form`'s own `onSubmit`; intercepting a non-last step's
+ * submit would mean a capture-phase listener on the ancestor `<form>`, reached by DOM
+ * traversal, calling `stopPropagation()` so the component that owns submission never sees the
+ * event — a child swallowing the lifecycle owner's event, and a consumer's own handler on the
+ * `<form>` broken with it. It also feeds `submitCount`, the `#101` re-entrancy ref and the
+ * failed-submit navigation effect events that are not submits. And it would not even be free
+ * of key handling: `Select` and `Autocomplete` both `preventDefault` Enter, so implicit
+ * submission never fires for them regardless. Cost if wrong: this handler is more code than a
+ * `type` attribute and has to name its own exclusions (see `isPlainEnter`) — a bounded, local
+ * cost, against a lifecycle inversion every future `<Form>` change would have to work around.
+ *
+ * The last step is deliberately left alone: `WizardNav` renders a real `<SubmitButton>` there,
+ * so native implicit submission already works and already fires exactly once.
  */
 export function WizardStep({ id, title, description, slotProps, children }: WizardStepProps) {
   const {
@@ -48,6 +114,8 @@ export function WizardStep({ id, title, description, slotProps, children }: Wiza
     layout,
     contentEl,
     focusRequest,
+    isLast,
+    next,
     id: wizardId,
   } = useWizard('WizardStep')
 
@@ -61,6 +129,22 @@ export function WizardStep({ id, title, description, slotProps, children }: Wiza
   const focusMe = layout !== 'page' && focusRequest.stepId === id && current.id === id
   const labelledById = orientation === 'vertical' ? stepLabelId(wizardId, id) : undefined
   const { seq } = focusRequest
+
+  // `undefined` rather than a no-op handler on the last step, so the DOM carries no listener
+  // at all where Enter is the browser's own to handle. `preventDefault` on the way through
+  // stops jsdom's non-standard "fire a submit even with no submit button present" from also
+  // running (a real browser has nothing to prevent here, since there is no submit control on a
+  // non-last step — that absence is the whole bug), which keeps this one gesture from being
+  // both an advance and a spurious submit under test. `next()` is already re-entrancy-safe: it
+  // returns false while `pending`, so a fast double-Enter validates once and advances once.
+  const onKeyDown =
+    isLast || layout === 'page'
+      ? undefined
+      : (event: KeyboardEvent<HTMLFieldSetElement>) => {
+          if (!isPlainEnter(event)) return
+          event.preventDefault()
+          void next()
+        }
 
   useEffect(() => {
     // `seq: 0` is the resting value the wizard mounts with, so initial mount never steals
@@ -120,6 +204,7 @@ export function WizardStep({ id, title, description, slotProps, children }: Wiza
         aria-labelledby={labelledById}
         description={description}
         slotProps={slotProps}
+        onKeyDown={onKeyDown}
       >
         {children}
       </FormSection>,
@@ -132,6 +217,7 @@ export function WizardStep({ id, title, description, slotProps, children }: Wiza
       ref={fieldsetRef}
       title={effectiveTitle}
       description={description}
+      onKeyDown={onKeyDown}
       slotProps={{
         ...slotProps,
         // `FormSection` puts `slotProps.legend` on the `Typography` *inside* the `<legend>`,

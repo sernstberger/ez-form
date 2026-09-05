@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useFormContext } from 'react-hook-form'
 import { z } from 'zod'
@@ -8,6 +8,7 @@ import { Form } from '../Form'
 import { SubmitButton } from '../SubmitButton'
 import { TextField } from '../fields/TextField'
 import { Select } from '../fields/Select'
+import { TextareaField } from '../fields/TextareaField'
 import { expectNoA11yViolations } from '../test/axe'
 import { FormSection, formSectionClasses } from '../FormSection'
 import { FormErrorSummary } from '../Form/FormErrorSummary'
@@ -2196,5 +2197,254 @@ describe('live re-validation after a failed step validation (#115)', () => {
     expect(await screen.findByText('Name is required')).toBeInTheDocument()
     await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Ada')
     await waitFor(() => expect(screen.queryByText('Name is required')).not.toBeInTheDocument())
+  })
+})
+
+/**
+ * #116. Enter on a non-last step advances it, the same as clicking Next.
+ *
+ * **What jsdom can and cannot prove here, stated plainly** — the QA ledger for this issue
+ * found jsdom producing a *false positive* on exactly this question, so these assertions are
+ * written to be worth something anyway. jsdom fires a native `submit` event on Enter even
+ * with no submit-type control in the form, which a real browser will not do; that spurious
+ * submit fails full-schema validation, and `Wizard`'s failed-submit navigation effect then
+ * moves to the step owning the first error — which *resembles* "Enter advanced the step".
+ *
+ * So "the step changed" alone is not evidence. Every advance assertion below is paired with
+ * `expect(onSubmit).not.toHaveBeenCalled()` and a `submitCount` readout that must stay at 0:
+ * the spurious-submit path necessarily increments `submitCount`, and the real `next()` path
+ * necessarily does not. That pairing is what separates the two, and it is the most a jsdom
+ * test can do. **That Enter advances at all in a real browser is confirmed in Storybook, not
+ * here** — see the ledger. What these tests own is that the handler is wired to the step's
+ * fieldset and that each exclusion returns early.
+ */
+describe('Enter on a non-last step advances it (#116)', () => {
+  const enterSchema = z.object({
+    name: z.string().min(1, 'Name is required'),
+    notes: z.string(),
+    plan: z.string().min(1, 'Plan is required'),
+  })
+  type EnterInput = z.input<typeof enterSchema>
+  const enterSteps = [
+    { id: 'account', label: 'Account', fields: ['name', 'notes'] },
+    { id: 'plan', label: 'Plan', fields: ['plan'] },
+  ] as const satisfies WizardStepDef<EnterInput>[]
+
+  /** `submitCount` is the tell for jsdom's spurious submit: a real `next()` never raises it. */
+  function SubmitCount() {
+    const { formState } = useFormContext()
+    return <output data-testid="submits">{formState.submitCount}</output>
+  }
+
+  function EnterSteps({ children }: { children?: ReactNode }) {
+    const w = useWizard('EnterSteps')
+    return (
+      <>
+        <output data-testid="current">{w.current.id}</output>
+        <SubmitCount />
+        <WizardStep id="account">
+          <TextField name="name" label="Name" />
+          <TextareaField name="notes" label="Notes" />
+          {children}
+        </WizardStep>
+        <WizardStep id="plan">
+          <TextField name="plan" label="Plan" />
+        </WizardStep>
+      </>
+    )
+  }
+
+  function renderEnterWizard(
+    props: { defaultValues?: Partial<EnterInput>; children?: ReactNode } = {},
+  ) {
+    const onSubmit = vi.fn()
+    const utils = render(
+      <Form
+        schema={enterSchema}
+        defaultValues={{ name: 'Ada', notes: '', plan: '', ...props.defaultValues }}
+        onSubmit={onSubmit}
+      >
+        <Wizard steps={enterSteps}>
+          <EnterSteps>{props.children}</EnterSteps>
+          <WizardNav />
+        </Wizard>
+      </Form>,
+    )
+    return { ...utils, onSubmit }
+  }
+
+  /** No advance, and no submit either — the "nothing happened" both halves have to agree on. */
+  async function expectStayed(onSubmit: ReturnType<typeof vi.fn>) {
+    await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('account'))
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(screen.getByTestId('submits')).toHaveTextContent('0')
+  }
+
+  it('advances when the step is valid, without submitting the form', async () => {
+    const user = userEvent.setup()
+    const { onSubmit } = renderEnterWizard()
+    await user.click(screen.getByRole('textbox', { name: 'Name' }))
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+    // The pairing that rules out jsdom's spurious-submit path masquerading as an advance.
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(screen.getByTestId('submits')).toHaveTextContent('0')
+  })
+
+  it('shows the step error and stays put when the step is invalid, same as clicking Next', async () => {
+    const user = userEvent.setup()
+    const { onSubmit } = renderEnterWizard({ defaultValues: { name: '' } })
+    await user.click(screen.getByRole('textbox', { name: 'Name' }))
+    await user.keyboard('{Enter}')
+    await screen.findByText('Name is required')
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveFocus()
+    await expectStayed(onSubmit)
+  })
+
+  it('does not advance from a textarea — Enter is a newline there', async () => {
+    const user = userEvent.setup()
+    const { onSubmit } = renderEnterWizard()
+    await user.click(screen.getByRole('textbox', { name: 'Notes' }))
+    await user.keyboard('{Enter}')
+    await expectStayed(onSubmit)
+  })
+
+  it('does not advance when the field already handled Enter (defaultPrevented)', async () => {
+    const user = userEvent.setup()
+    // Stands in for MUI `Autocomplete` with an open popup and `Select` when closed: both
+    // `preventDefault()` Enter, which is the signal this handler defers to.
+    const { onSubmit } = renderEnterWizard({
+      children: (
+        <input
+          aria-label="Handled"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.preventDefault()
+          }}
+        />
+      ),
+    })
+    await user.click(screen.getByRole('textbox', { name: 'Handled' }))
+    await user.keyboard('{Enter}')
+    await expectStayed(onSubmit)
+  })
+
+  it('does not advance from a button — Enter activates the button instead', async () => {
+    const user = userEvent.setup()
+    const { onSubmit } = renderEnterWizard({
+      children: (
+        <button type="button" onClick={() => {}}>
+          inert
+        </button>
+      ),
+    })
+    await user.click(screen.getByRole('button', { name: 'inert' }))
+    await user.keyboard('{Enter}')
+    await expectStayed(onSubmit)
+  })
+
+  /**
+   * The one case where jsdom's fabricated submit is visible in the assertion rather than
+   * merely ruled out, so it is pinned rather than hidden. The handler declines a modified
+   * Enter (no `preventDefault`), and jsdom — unlike any real browser — then fires a native
+   * `submit` with no submit control on this step. That submit fails full-schema validation
+   * (`plan` is empty) and `Wizard`'s failed-submit effect navigates to the step owning the
+   * error, so `current` becomes `plan` *here and only here*. `submitCount === 1` is the
+   * proof it took that path and not ours: a real `next()` never raises it, which is what
+   * every other case in this block asserts. In a real browser Shift+Enter in a text input
+   * does nothing at all — confirmed in Storybook, not provable here.
+   */
+  it("does not advance on a modified Enter (the step change here is jsdom's own submit)", async () => {
+    const user = userEvent.setup()
+    const { onSubmit } = renderEnterWizard()
+    await user.click(screen.getByRole('textbox', { name: 'Name' }))
+    await user.keyboard('{Shift>}{Enter}{/Shift}')
+    // Our handler ran and declined: had it advanced, `submitCount` would still be 0.
+    await waitFor(() => expect(screen.getByTestId('submits')).toHaveTextContent('1'))
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('advances exactly one step on a fast double Enter', async () => {
+    const user = userEvent.setup()
+    const { onSubmit } = renderEnterWizard()
+    await user.click(screen.getByRole('textbox', { name: 'Name' }))
+    await user.keyboard('{Enter}{Enter}')
+    await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+    // Not 'review' — there is no third step, but the real check is that the second Enter
+    // (now on the last step, where the handler is not installed) did not submit either.
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  /**
+   * The `repeat` guard specifically, which the double-Enter test above does *not* reach: two
+   * discrete `{Enter}` presses both carry `repeat: false`, so that test exercises `next()`'s
+   * `pending` gate instead. A held key is the case this covers — the OS emits a stream of
+   * keydowns with `repeat: true`, and `userEvent` has no way to produce one, so the event is
+   * dispatched directly. Holding Enter must not walk the user through the wizard.
+   */
+  it('does not advance on an auto-repeat keydown from a held Enter', async () => {
+    const user = userEvent.setup()
+    const { onSubmit } = renderEnterWizard()
+    const name = screen.getByRole('textbox', { name: 'Name' })
+    await user.click(name)
+    fireEvent.keyDown(name, { key: 'Enter', repeat: true })
+    // A bare `keyDown` is not a full key sequence, so jsdom fabricates no submit here either
+    // — which makes this the one case where "nothing happened" can be asserted directly:
+    // still on `account`, `submitCount` untouched, no submit. The control is the assertion
+    // below it: the identical dispatch with `repeat: false` *does* advance.
+    await expectStayed(onSubmit)
+
+    // Control: same event, same target, only `repeat` differs — so the guard is what stopped
+    // the one above, not the dispatch method.
+    fireEvent.keyDown(name, { key: 'Enter', repeat: false })
+    await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('leaves the last step to native implicit submission (no handler installed)', async () => {
+    const user = userEvent.setup()
+    const { onSubmit } = renderEnterWizard({ defaultValues: { plan: 'pro' } })
+    await user.click(screen.getByRole('textbox', { name: 'Name' }))
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(screen.getByTestId('current')).toHaveTextContent('plan'))
+    const fieldset = screen.getByRole('group', { name: 'Plan' })
+    // The step's fieldset carries no keydown handler of ours on the last step: Enter there
+    // reaches `SubmitButton`'s native `type="submit"`, which is what already works today.
+    await user.click(screen.getByRole('textbox', { name: 'Plan' }))
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+    expect(fieldset).toBeInTheDocument()
+  })
+
+  it('installs no handler in layout="page", which never navigates', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      <Form
+        schema={enterSchema}
+        defaultValues={{ name: 'Ada', notes: '', plan: '' }}
+        onSubmit={onSubmit}
+      >
+        <Wizard steps={enterSteps} layout="page">
+          <WizardStep id="account">
+            <TextField name="name" label="Name" />
+          </WizardStep>
+          <WizardStep id="plan">
+            <TextField name="plan" label="Plan" />
+          </WizardStep>
+          <SubmitButton />
+        </Wizard>
+      </Form>,
+    )
+    // Both steps are on the page already; Enter is the form's own submit gesture here.
+    expect(screen.getByRole('textbox', { name: 'Plan' })).toBeInTheDocument()
+    await user.click(screen.getByRole('textbox', { name: 'Name' }))
+    await user.keyboard('{Enter}')
+    await screen.findByText('Plan is required')
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('has no accessibility violations with the Enter handler installed', async () => {
+    const { container } = renderEnterWizard()
+    await expectNoA11yViolations(container)
   })
 })
