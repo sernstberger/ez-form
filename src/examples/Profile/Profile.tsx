@@ -17,6 +17,8 @@ import { Checkbox } from '../../fields/Checkbox'
 import { Select } from '../../fields/Select'
 import { FileField } from '../../fields/FileField'
 import { loadProfileApi, saveProfileApi, type ProfileValues } from '../fakeApi'
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
 
 const schema = z.object({
   displayName: z.string().min(1, 'Display name is required'),
@@ -71,6 +73,10 @@ export interface ProfileProps {
  * the user has changed and only overwrites pristine fields. Documentation
  * only — not exported from the package (see `tsconfig.build.json`'s
  * `src/examples` exclusion).
+ *
+ * Wraps itself in `<LocalizationProvider>` (its `DateField` needs one), so it is
+ * copy-paste-safe standalone — under SSR as well as in the browser — rather than
+ * relying on an ancestor a consumer's app may not have (#125).
  */
 export function Profile({ onSuccess, loadSeed }: ProfileProps) {
   // `values` re-sync only fires when this prop changes identity/content; starting
@@ -87,87 +93,94 @@ export function Profile({ onSuccess, loadSeed }: ProfileProps) {
   const form = useRef<FormMethods<Input, z.output<typeof schema>>>(null)
 
   return (
-    <Container maxWidth="sm" sx={{ py: 6 }}>
-      <Paper variant="outlined" sx={{ p: 4 }}>
-        <Form
-          ref={form}
-          schema={schema}
-          defaultValues={() => loadProfileApi(loadSeed)}
-          values={reloaded}
-          resetOptions={{ keepDirtyValues: true }}
-          onDefaultValuesError={(error) => {
-            // Form guarantees this runs after hookform's post-rejection reset (#70),
-            // so a synchronous setError survives for FormError to render.
-            form.current?.setError('root.server', {
-              message: error instanceof Error ? error.message : 'Could not load your profile',
-            })
-          }}
-          title="Your profile"
-          description="Update how you appear to other members."
-          onSubmit={async (values, form) => {
-            try {
-              const result = await saveProfileApi(values)
-              form.clearErrors('root.server')
-              form.reset(result)
-              onSuccess?.(result)
-            } catch (error) {
-              form.setError('root.server', {
-                message: error instanceof Error ? error.message : 'Could not save your profile',
+    <LocalizationProvider dateAdapter={AdapterDateFns}>
+      <Container maxWidth="sm" sx={{ py: 6 }}>
+        <Paper variant="outlined" sx={{ p: 4 }}>
+          <Form
+            ref={form}
+            schema={schema}
+            defaultValues={() => loadProfileApi(loadSeed)}
+            values={reloaded}
+            resetOptions={{ keepDirtyValues: true }}
+            onDefaultValuesError={(error) => {
+              // Form guarantees this runs after hookform's post-rejection reset (#70),
+              // so a synchronous setError survives for FormError to render.
+              form.current?.setError('root.server', {
+                message: error instanceof Error ? error.message : 'Could not load your profile',
               })
-            }
-          }}
-        >
-          <Stack spacing={3}>
-            <FormError />
-            <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
-              <Button
-                type="button"
-                variant="text"
-                onClick={async () => {
-                  reloadCount.current += 1
-                  // Awaited rather than left as a bare `.then`: an unhandled rejection here
-                  // would surface as a console error with no connection to this button. The
-                  // fake API does not reject today, so the catch simply leaves the form on
-                  // the values it already has.
-                  try {
-                    setReloaded(
-                      await loadProfileApi({
-                        ...loadSeed,
-                        bio: `Reloaded from the server (reload #${reloadCount.current}).`,
-                      }),
-                    )
-                  } catch {
-                    // Keep the current values; a real app would surface this to the user.
-                  }
-                }}
-              >
-                Reload from server
-              </Button>
-            </Stack>
-            <FormSection title="Identity">
-              <Stack spacing={2}>
-                <TextField name="displayName" label="Display name" required />
-                <TextareaField name="bio" label="Bio" maxLength={280} />
-                <DateField name="birthday" label="Birthday" disableFuture minDate={MIN_BIRTHDAY} />
+            }}
+            title="Your profile"
+            description="Update how you appear to other members."
+            onSubmit={async (values, form) => {
+              try {
+                const result = await saveProfileApi(values)
+                form.clearErrors('root.server')
+                form.reset(result)
+                onSuccess?.(result)
+              } catch (error) {
+                form.setError('root.server', {
+                  message: error instanceof Error ? error.message : 'Could not save your profile',
+                })
+              }
+            }}
+          >
+            <Stack spacing={3}>
+              <FormError />
+              <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
+                <Button
+                  type="button"
+                  variant="text"
+                  onClick={async () => {
+                    reloadCount.current += 1
+                    // Awaited rather than left as a bare `.then`: an unhandled rejection here
+                    // would surface as a console error with no connection to this button. The
+                    // fake API does not reject today, so the catch simply leaves the form on
+                    // the values it already has.
+                    try {
+                      setReloaded(
+                        await loadProfileApi({
+                          ...loadSeed,
+                          bio: `Reloaded from the server (reload #${reloadCount.current}).`,
+                        }),
+                      )
+                    } catch {
+                      // Keep the current values; a real app would surface this to the user.
+                    }
+                  }}
+                >
+                  Reload from server
+                </Button>
               </Stack>
-            </FormSection>
-            <FormSection title="Preferences">
-              <Stack spacing={2}>
-                <Autocomplete name="country" label="Country" options={countries} required />
-                <Checkbox name="marketingEmails" label="Marketing emails" />
-                <Select name="language" label="Language" options={languages} required />
+              <FormSection title="Identity">
+                <Stack spacing={2}>
+                  <TextField name="displayName" label="Display name" required />
+                  <TextareaField name="bio" label="Bio" maxLength={280} />
+                  <DateField
+                    name="birthday"
+                    label="Birthday"
+                    disableFuture
+                    minDate={MIN_BIRTHDAY}
+                  />
+                </Stack>
+              </FormSection>
+              <FormSection title="Preferences">
+                <Stack spacing={2}>
+                  <Autocomplete name="country" label="Country" options={countries} required />
+                  <Checkbox name="marketingEmails" label="Marketing emails" />
+                  <Select name="language" label="Language" options={languages} required />
+                </Stack>
+              </FormSection>
+              <FormSection title="Avatar">
+                <FileField name="avatar" label="Upload avatar" accept="image/*" />
+              </FormSection>
+              <Stack direction="row" spacing={2} sx={{ justifyContent: 'flex-end' }}>
+                <ClearButton />
+                <SubmitButton>Save profile</SubmitButton>
               </Stack>
-            </FormSection>
-            <FormSection title="Avatar">
-              <FileField name="avatar" label="Upload avatar" accept="image/*" />
-            </FormSection>
-            <Stack direction="row" spacing={2} sx={{ justifyContent: 'flex-end' }}>
-              <ClearButton />
-              <SubmitButton>Save profile</SubmitButton>
             </Stack>
-          </Stack>
-        </Form>
-      </Paper>
-    </Container>
+          </Form>
+        </Paper>
+      </Container>
+    </LocalizationProvider>
   )
 }

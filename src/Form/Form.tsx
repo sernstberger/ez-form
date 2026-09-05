@@ -35,6 +35,8 @@ import { useConfirm, type ConfirmOptions } from '../ConfirmDialog'
 import { AssistedContext } from './AssistedContext'
 import { createErrorSummaryStore, ErrorSummaryContext } from './ErrorSummaryContext'
 import { createFieldFocusStore, FieldFocusContext } from './FieldFocusContext'
+import { createFormErrorFocusStore, FormErrorFocusContext } from './FormErrorFocusContext'
+import { flattenErrors } from './flattenErrors'
 import { LiveRegion, type LiveRegionProps } from './LiveRegion'
 import { RequiredIndicatorContext } from './RequiredIndicatorContext'
 import { RuleMessagesContext } from './RuleMessagesContext'
@@ -214,14 +216,48 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
    * Default "Submitting…".
    */
   submitPendingText?: ReactNode | false
-  /** Announced when `onSubmit` resolves. `false` suppresses. Default "Submitted." */
+  /**
+   * Announced when `onSubmit` resolves *and left no error behind*. `false`
+   * suppresses. Default "Submitted."
+   *
+   * "Left no error behind" is the load-bearing half — see `submitErrorText`
+   * for the full contract and why resolving is not on its own a success.
+   */
   submitSuccessText?: ReactNode | false
   /**
-   * Announced when `onSubmit` rejects. `false` suppresses. Default "Submit failed."
+   * Announced when a submit fails. `false` suppresses. Default "Submit failed."
    *
-   * A *validation* failure is not this: the schema rejected, `onSubmit` never
-   * ran, and `<FormErrorSummary>` already announces and lists what is wrong.
-   * Announcing "Submit failed." there would talk over it.
+   * A submit can fail in three ways, and `<Form>` treats all three as failures
+   * (#124) — a resolved `onSubmit` is not on its own a success, because the
+   * pattern this library documents for a server-side rejection is to *catch* it
+   * and map it to an error rather than to rethrow:
+   *
+   * | What `onSubmit` did | Announced here | Focus moves to |
+   * |---|---|---|
+   * | rejected | `submitErrorText` | see the focus order below |
+   * | resolved, set a **root** error (`setError('root.server', …)`), with a `<FormError>` | `submitErrorText` | the `<FormError>` alert |
+   * | resolved, set a **root** error, with **no** `<FormError>` | that error's own message | see below |
+   * | resolved, set **field** errors only (`setError('email', …)`) | `submitErrorText` | see below |
+   * | resolved, set nothing | `submitSuccessText` | nothing |
+   *
+   * A mounted `<FormError>` is *itself* an assertive live region (`role="alert"`)
+   * already reading the root message, so this polite region does not repeat it —
+   * two regions saying the same sentence for one event is worse than one. With no
+   * `<FormError>`, nothing else would say it, so this region does.
+   *
+   * **Focus after a failed submit has one owner and a fixed order** — the
+   * `<FormError>` alert, else a declared `<FormErrorSummary>` (which focuses its
+   * own heading; `<Form>` simply stays out of its way), else the first invalid
+   * field via hookform's `setFocus`. This is the same single-owner rule #123
+   * established for validation failures, extended to cover the post-submit case.
+   *
+   * Only errors that appear *during* this submit count: a stale root error a
+   * consumer never cleared cannot make the next, genuinely successful submit
+   * announce a failure.
+   *
+   * A *validation* failure is none of these: the schema rejected, `onSubmit`
+   * never ran, and `<FormErrorSummary>` already announces and lists what is
+   * wrong. Announcing "Submit failed." there would talk over it.
    */
   submitErrorText?: ReactNode | false
   slotProps?: {
@@ -429,6 +465,9 @@ function FormImpl<TIn extends FieldValues, TOut>(
     () => createFieldFocusStore(focusTargetIdPrefix),
     [focusTargetIdPrefix],
   )
+  // The mounted <FormError> alert, if this form has one, so the post-submit focus step below
+  // can send a keyboard/screen-reader user to it (#124). See FormErrorFocusContext.
+  const formErrorFocusStore = useMemo(() => createFormErrorFocusStore(), [])
   const methods = useForm<TIn, unknown, TOut>({
     resolver: ezResolver(schema, ruleMessages),
     defaultValues: wrappedDefaultValues,
@@ -553,14 +592,156 @@ function FormImpl<TIn extends FieldValues, TOut>(
     setAnnouncement((prev) => ({ text, seq: prev.seq + 1 }))
   }, [])
 
+  // Ruling: the post-submit outcome is read from `methods.getErrors()`, not from
+  // `methods.formState.errors` — #124. Inside `handleSubmit`'s own callback, `formState` is
+  // the *render-time* snapshot the closure captured, so a `setError` the consumer's
+  // `onSubmit` just ran is invisible to it (probed directly: `formState.errors` came back
+  // `[]` while hookform's internal `_formState.errors` held `["root","email"]`). `getErrors()`
+  // is hookform's own public reader for exactly this — "get all currently stored form errors
+  // without subscribing or running validation" — so nothing here reaches into `control._*`.
+  // Cost if wrong: every resolved-but-failed submit reverts to announcing success, which is
+  // the bug this replaces.
+  //
+  // Ruling: the *diff* against a snapshot taken before `onSubmit` ran, not the raw error set —
+  // only an error this submit raised may turn this submit into a failure. hookform's own
+  // re-validation at the top of `handleSubmit` already replaces the errors object, so in the
+  // ordinary case the snapshot is empty and the diff is the whole set; what it buys is the
+  // cases where it is not — a `resetOptions` carrying `keepErrors`, or a `setError` made from
+  // outside the form (`ResendCodeButton`'s `root.timeout`, `onDefaultValuesError`) between the
+  // resolver running and `onSubmit` finishing. The comparison is by message as well as by
+  // path, so a consumer who deliberately re-sets the identical error on each attempt still
+  // gets each one announced. Cost if wrong: a form that keeps its errors across submits goes
+  // quiet about its next real failure — the exact bug this replaces, one configuration over.
+  const errorsRaisedBySubmit = (before: ReturnType<typeof flattenErrors>) => {
+    const seen = new Set(before.map((e) => `${e.name} ${e.message}`))
+    return flattenErrors(methods.getErrors()).filter((e) => !seen.has(`${e.name} ${e.message}`))
+  }
+
+  // Ruling: one owner for post-submit focus, with a fixed precedence — the `<FormError>` alert
+  // if this form has one, else a declared `<FormErrorSummary>`, else the first invalid field.
+  //
+  // #123 established that exactly one thing may move focus after a failed attempt, and made
+  // the error-summary store the single answer every decision reads (`shouldFocusError` on
+  // `useForm`, `shouldFocus` on `<Wizard>`'s per-step `trigger`). A *post-submit* failure — an
+  // `onSubmit` that resolved after mapping a server rejection to `setError` — is a third mover
+  // that arrived after that work, and it has to obey the same order rather than race it.
+  // Without the summary branch, a form with a declared summary and a server-side field error
+  // (the README's own `setError('email', …)` pattern) had focus yanked to the field: the
+  // summary's heading effect and this one run in the same commit, child before parent, so this
+  // one silently overrode it — verified, focus landed on the input and never moved.
+  //
+  // The summary branch is deliberately a *no-op*, not a `heading.focus()` of its own. The
+  // summary already focuses itself on any failed attempt, keyed on `submitCount` — which
+  // `handleSubmit` has incremented by the time `onSubmit` runs, so a post-submit `setError`
+  // needs no new signal, only for this effect to stay out of its way. Verified by probe: with
+  // a summary mounted the list already showed the post-submit error; the one thing wrong was
+  // this effect stealing the focus. Adding a second focus call here would re-create precisely
+  // the two-movers bug #123 fixed.
+  //
+  // The alert still outranks the summary: it carries the root message, is the thing that just
+  // appeared, and the summary lists only field errors (it filters `root.*` — see its own
+  // comment), so for a root failure the summary may have nothing to show at all.
+  //
+  // Read through the store's own `getDeclared` (live), not the `hasErrorSummary` snapshot
+  // above: this effect can run in the very commit a summary first mounts, and #123's own doc
+  // records that the stale `false` is exactly what broke the wizard's jump focus. This is the
+  // same live read `useHasErrorSummaryRef` hands a consumer of the context; `<Form>` owns the
+  // store, so it reads it directly rather than through its own provider.
+  //
+  // The move is performed by an effect rather than inline, because the target does not exist at
+  // decision time: `<FormError>` renders nothing until the consumer's `setError` is committed.
+  // An effect rather than the `setTimeout(…, 0)` this was first written as — a timer only
+  // *usually* fires after React's commit, and under load (a full suite run) it fired before it,
+  // leaving focus on `<body>`. React guarantees an effect runs after the commit that scheduled
+  // it. Keyed on a counter, so a second failed submit re-focuses even when the first left focus
+  // where this would put it — the same reason `announce` bumps a `seq`.
+  //
+  // Cost if wrong: two things fight over focus after a failed submit (the #123 bug, one submit
+  // later), or focus stays on `<body>` (the #124 bug).
+  // Both halves — what to say and where to send focus — are settled *after* the commit, in one
+  // effect, because both turn on whether a `<FormError>` exists, and it does not exist yet when
+  // the submit handler runs: the consumer's `setError` has only queued the render that creates
+  // it. Deciding the wording in the handler and the focus in the effect would read the same
+  // store at two different times and disagree with itself — which the first draft did, still
+  // announcing the root message into the status region because the alert had not committed yet.
+  const pendingFailure = useRef<{ firstField?: string; rootMessage?: string } | null>(null)
+  const [failureSettled, setFailureSettled] = useState(0)
+  const reportFailure = (raised: ReturnType<typeof flattenErrors>) => {
+    const firstField = raised.find((e) => e.name !== 'root' && !e.name.startsWith('root.'))
+    const root = raised.find((e) => e.name === 'root' || e.name.startsWith('root.'))
+    pendingFailure.current = { firstField: firstField?.name, rootMessage: root?.message }
+    setFailureSettled((n) => n + 1)
+  }
+  useEffect(() => {
+    const failure = pendingFailure.current
+    if (!failure) return
+    pendingFailure.current = null
+    const alert = formErrorFocusStore.get()
+
+    // Announce first, so the region's text is in place before focus moves.
+    if (failure.rootMessage !== undefined && !alert) {
+      // A root failure with no `<FormError>` to carry it: this region is the only thing that
+      // can say what went wrong, so it says the error's own sentence rather than the generic
+      // string, which would throw that sentence away.
+      announce(failure.rootMessage)
+    } else {
+      // Either a field-only failure, or a root failure whose `<FormError>` alert is already
+      // announcing that exact message assertively. Both get the generic whole-form statement.
+      announce(submitErrorText)
+    }
+
+    if (alert) {
+      alert.focus()
+      return
+    }
+    // A declared summary owns this failure — it has already focused its own heading. Nothing
+    // to do but not fight it.
+    if (errorSummaryStore.getDeclared()) return
+    // No alert, no summary: the first invalid field, the same target a validation failure gets.
+    // `setFocus` is hookform's own, so a field that registered a custom focus target through
+    // `field.ref` is honoured the same way here.
+    if (failure.firstField) {
+      methods.setFocus(failure.firstField as Parameters<typeof methods.setFocus>[0])
+    }
+    // `failureSettled` is the trigger; the rest are stable for the form's life.
+  }, [failureSettled, formErrorFocusStore, errorSummaryStore, methods, announce, submitErrorText])
+
   const submit = methods.handleSubmit(async (submitted) => {
     setSubmitting(true)
     announce(submitPendingText)
+    const errorsBefore = flattenErrors(methods.getErrors())
     try {
       await onSubmit(submitted, methods)
-      announce(submitSuccessText)
+      // `onSubmit` resolved — but resolving is not the same as succeeding. The pattern this
+      // library documents for a server-side rejection catches it and maps it to
+      // `setError('root.server', …)` rather than rethrowing, so `<Form>` has to look at what
+      // was left behind rather than only at how the promise settled. See `submitErrorText`.
+      const raised = errorsRaisedBySubmit(errorsBefore)
+      if (raised.length === 0) {
+        announce(submitSuccessText)
+        return
+      }
+      // Ruling: when a `<FormError>` is mounted, `<Form>` does *not* repeat the root message —
+      // the alert is already an assertive live region (`role="alert"`, MUI's `Alert` default)
+      // carrying that exact sentence, and it is what takes focus. Saying it again from this
+      // polite `role="status"` region is the same text twice, from two regions, for one event;
+      // the first draft did that, and its own test asserted both regions held the identical
+      // string. Silence here is not a gap — the alert *is* the announcement — so this region
+      // falls back to its generic whole-form `submitErrorText`.
+      //
+      // With no `<FormError>` the root sentence would otherwise go unannounced entirely, so
+      // there this region says it instead. Both branches live in the effect above, which is the
+      // only place that can tell the two cases apart: the alert does not exist yet here.
+      //
+      // Cost if wrong: a root failure is announced twice (verbose, the state this replaces) or,
+      // in the no-`<FormError>` case, only generically.
+      reportFailure(raised)
     } catch (error) {
-      announce(submitErrorText)
+      // A rejection gets the same treatment as a caught-and-mapped failure — announcement and
+      // focus both — so a consumer who rethrows *and* maps to `root.server` (or whose global
+      // handler does) does not land somewhere different from one who only maps. `raised` is
+      // recomputed here because the throw skipped the computation above.
+      reportFailure(errorsRaisedBySubmit(errorsBefore))
       throw error
     } finally {
       setSubmitting(false)
@@ -628,53 +809,55 @@ function FormImpl<TIn extends FieldValues, TOut>(
     <FormProvider {...methods}>
       <ErrorSummaryContext.Provider value={errorSummaryContext}>
         <FieldFocusContext.Provider value={fieldFocusContext}>
-          <FormRoot
-            noValidate
-            {...formProps}
-            autoComplete={autoComplete}
-            className={`${formClasses.root}${className ? ` ${className}` : ''}`}
-            aria-labelledby={ariaLabelledBy ?? (title != null ? titleProps.id : undefined)}
-            aria-describedby={
-              ariaDescribedBy ?? (effectiveDescription != null ? descriptionProps.id : undefined)
-            }
-            onSubmit={guardedSubmit}
-          >
-            {title != null && (
-              <FormTitle
-                {...titleProps}
-                className={`${formClasses.title}${titleProps.className ? ` ${titleProps.className}` : ''}`}
-              >
-                {title}
-              </FormTitle>
-            )}
-            {effectiveDescription != null && (
-              <FormDescription
-                {...descriptionProps}
-                className={`${formClasses.description}${descriptionProps.className ? ` ${descriptionProps.className}` : ''}`}
-              >
-                {effectiveDescription}
-              </FormDescription>
-            )}
-            <AssistedContext.Provider value={assisted}>
-              <RequiredIndicatorContext.Provider value={{ requiredIndicator, optionalText }}>
-                <RuleMessagesContext.Provider value={ruleMessages}>
-                  {children}
-                </RuleMessagesContext.Provider>
-              </RequiredIndicatorContext.Provider>
-            </AssistedContext.Provider>
-            {/*
+          <FormErrorFocusContext.Provider value={formErrorFocusStore}>
+            <FormRoot
+              noValidate
+              {...formProps}
+              autoComplete={autoComplete}
+              className={`${formClasses.root}${className ? ` ${className}` : ''}`}
+              aria-labelledby={ariaLabelledBy ?? (title != null ? titleProps.id : undefined)}
+              aria-describedby={
+                ariaDescribedBy ?? (effectiveDescription != null ? descriptionProps.id : undefined)
+              }
+              onSubmit={guardedSubmit}
+            >
+              {title != null && (
+                <FormTitle
+                  {...titleProps}
+                  className={`${formClasses.title}${titleProps.className ? ` ${titleProps.className}` : ''}`}
+                >
+                  {title}
+                </FormTitle>
+              )}
+              {effectiveDescription != null && (
+                <FormDescription
+                  {...descriptionProps}
+                  className={`${formClasses.description}${descriptionProps.className ? ` ${descriptionProps.className}` : ''}`}
+                >
+                  {effectiveDescription}
+                </FormDescription>
+              )}
+              <AssistedContext.Provider value={assisted}>
+                <RequiredIndicatorContext.Provider value={{ requiredIndicator, optionalText }}>
+                  <RuleMessagesContext.Provider value={ruleMessages}>
+                    {children}
+                  </RuleMessagesContext.Provider>
+                </RequiredIndicatorContext.Provider>
+              </AssistedContext.Provider>
+              {/*
             Rendered unconditionally, empty at rest: a live region has to be in
             the DOM before its text arrives, or assistive tech has no prior
             content to observe changing and the first announcement is missed.
           */}
-            <FormStatus
-              {...slotProps?.liveRegion}
-              message={announcement.text}
-              announcementKey={announcement.seq}
-              className={`${formClasses.status}${slotProps?.liveRegion?.className ? ` ${slotProps.liveRegion.className}` : ''}`}
-            />
-            {dialog}
-          </FormRoot>
+              <FormStatus
+                {...slotProps?.liveRegion}
+                message={announcement.text}
+                announcementKey={announcement.seq}
+                className={`${formClasses.status}${slotProps?.liveRegion?.className ? ` ${slotProps.liveRegion.className}` : ''}`}
+              />
+              {dialog}
+            </FormRoot>
+          </FormErrorFocusContext.Provider>
         </FieldFocusContext.Provider>
       </ErrorSummaryContext.Provider>
     </FormProvider>

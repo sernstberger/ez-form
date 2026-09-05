@@ -7,7 +7,7 @@ import {
   type ElementType,
   type ReactNode,
 } from 'react'
-import { useFormState, type FieldErrors } from 'react-hook-form'
+import { useFormState } from 'react-hook-form'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import { styled } from '@mui/material/styles'
@@ -17,6 +17,7 @@ import { useEzFormContext } from '../useEzFormContext'
 import { useOptionalWizard } from '../Wizard/useWizard'
 import { useFailedConfirmAttempt, useRegisterErrorSummary } from './ErrorSummaryContext'
 import { useFocusTargetIds } from './FieldFocusContext'
+import { flattenErrors, type ErrorEntry } from './flattenErrors'
 
 export const formErrorSummaryClasses = generateUtilityClasses('EzFormErrorSummary', [
   'root',
@@ -59,46 +60,6 @@ const FormErrorSummaryItem = styled('li', { name: 'EzFormErrorSummary', slot: 'I
 const FormErrorSummaryLink = styled(Link, { name: 'EzFormErrorSummary', slot: 'Link' })({})
 
 /**
- * A `FieldError` leaf, recognised by hookform's own shape. Mirrors the check `Wizard` uses to
- * walk `formState.errors` (see `Wizard.tsx`'s `isFieldError` for the full reasoning): `type` is
- * always a string on a leaf, and `message`/`ref` are its discriminating optional siblings.
- */
-function isFieldError(node: object): node is { type: string; message?: string; ref?: unknown } {
-  return 'type' in node && typeof node.type === 'string' && ('message' in node || 'ref' in node)
-}
-
-interface ErrorEntry {
-  name: string
-  message: string
-}
-
-/**
- * Flattens `formState.errors` to `{ name, message }` leaves, in the order `Object.keys` visits
- * them at each level (schema order in practice, since react-hook-form builds the errors object
- * by walking the schema). A leaf with no `message` (e.g. a `refine` with no message) is skipped
- * — there is nothing to show as its link text.
- *
- * Ruling: DOM/schema order via `Object.keys` rather than a field-registration order — hookform
- * does not expose one, and this matches the order a sighted user reads the form top to bottom
- * in the common case (fields declared in schema order). Cost if wrong: a summary item and its
- * field appear in a different order than the form for a schema whose properties are declared
- * out of visual order — cosmetic, not a functional or a11y regression (each item's link still
- * focuses the right field).
- */
-function flattenErrors(errors: FieldErrors, prefix = ''): ErrorEntry[] {
-  return Object.entries(errors).flatMap(([key, value]) => {
-    if (value == null || typeof value !== 'object') return []
-    const path = prefix ? `${prefix}.${key}` : key
-    if (isFieldError(value)) {
-      return typeof value.message === 'string' && value.message
-        ? [{ name: path, message: value.message }]
-        : []
-    }
-    return flattenErrors(value as FieldErrors, path)
-  })
-}
-
-/**
  * Restricts a flattened error list to the given field paths and their descendants (an error on
  * `address.city` belongs to a step listing `address`). Used to scope the summary to the
  * current wizard step's own `fields`.
@@ -130,7 +91,15 @@ export function FormErrorSummary(inProps: FormErrorSummaryProps) {
   const failedConfirmAttempt = useFailedConfirmAttempt()
   const headingId = `${useId()}-heading`
 
-  const allEntries = useMemo(() => flattenErrors(errors), [errors])
+  // Root-level errors are dropped: every item here is a link that focuses the field it names,
+  // and `root`/`root.*` names no field — the item would render with no `href`, no `link` role
+  // and nothing to focus. `<FormError>` is what surfaces a root error, and it is the target
+  // `<Form>`'s own post-submit focus step uses for one. Filtered here rather than inside
+  // `flattenErrors` because `<Form>` needs the root leaves that walk finds (#124).
+  const allEntries = useMemo(
+    () => flattenErrors(errors).filter((e) => e.name !== 'root' && !e.name.startsWith('root.')),
+    [errors],
+  )
   const entries = wizard?.lastFailed ? scopedTo(allEntries, wizard.lastFailed) : allEntries
 
   // Outside a wizard: any failed attempt with errors left standing — a failed handleSubmit

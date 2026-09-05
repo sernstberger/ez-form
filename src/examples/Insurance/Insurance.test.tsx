@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { renderToString } from 'react-dom/server'
 import { Insurance } from './Insurance'
 import { APPLICATION_DECLINED_FOR } from '../fakeApi'
 import { expectNoA11yViolations } from '../../test/axe'
-import { withPickers } from '../../test/pickers'
 import { setValue } from '../../test/setValue'
 
 const STORAGE_KEY = 'ez-form:insurance-resume'
@@ -203,13 +203,13 @@ afterEach(() => {
 
 describe('Insurance', () => {
   it('has an accessible form name "Auto insurance application"', () => {
-    render(withPickers(<Insurance />))
+    render(<Insurance />)
     expect(screen.getByRole('form', { name: 'Auto insurance application' })).toBeInTheDocument()
   })
 
   it('renders exactly one named group per step, with aria-current="step" on the stepper', async () => {
     const user = userEvent.setup({ delay: null })
-    render(withPickers(<Insurance />))
+    render(<Insurance />)
     expect(screen.getByRole('group', { name: 'Applicant' })).toBeInTheDocument()
     const current = screen.getByRole('tab', { name: /Applicant/ })
     expect(current).toHaveAttribute('aria-current', 'step')
@@ -230,7 +230,7 @@ describe('Insurance', () => {
       'coverage',
       'has-vehicle',
     ])
-    render(withPickers(<Insurance />))
+    render(<Insurance />)
     // On the has-vehicle step, still unchecked (default false).
     expect(screen.getByRole('group', { name: 'Vehicle?' })).toBeInTheDocument()
     await goNext(user)
@@ -249,7 +249,7 @@ describe('Insurance', () => {
       'coverage',
       'has-vehicle',
     ])
-    render(withPickers(<Insurance />))
+    render(<Insurance />)
     await user.click(screen.getByRole('checkbox', { name: /insure a vehicle/i }))
     await goNext(user)
     expect(screen.getByRole('group', { name: 'Vehicle' })).toBeInTheDocument()
@@ -264,7 +264,7 @@ describe('Insurance', () => {
       'contact',
     )
     const user = userEvent.setup({ delay: null })
-    render(withPickers(<Insurance />))
+    render(<Insurance />)
     const address = screen.getByRole('group', { name: 'Address' })
     await pickStateFromMenu(user, 'Massachusetts', address)
     expect(within(address).getByRole('combobox', { name: /^state/i })).toHaveTextContent(
@@ -280,7 +280,7 @@ describe('Insurance', () => {
     // clearing it, so the test starts from the state it actually means to exercise.
     seedReview({ ...COMPLETE_VALUES, phone: '' }, 'contact')
     const user = userEvent.setup({ delay: null })
-    render(withPickers(<Insurance />))
+    render(<Insurance />)
     const phone = screen.getByLabelText(/^phone/i)
     expect(phone).toHaveValue('')
     await user.type(phone, '5551234')
@@ -299,7 +299,7 @@ describe('Insurance', () => {
   it('lists every value on the Review step, with a working Edit link back to its step', async () => {
     const user = userEvent.setup({ delay: null })
     seedReview()
-    render(withPickers(<Insurance />))
+    render(<Insurance />)
     const review = screen.getByRole('group', { name: 'Review' })
     expect(within(review).getByText('Ada')).toBeInTheDocument()
     expect(within(review).getByText('Lovelace')).toBeInTheDocument()
@@ -325,7 +325,7 @@ describe('Insurance', () => {
     // "has vehicle?" No, exactly as a completed no-vehicle session would leave it.
     seedReview({ ...COMPLETE_VALUES, hasVehicle: false })
     const user = userEvent.setup({ delay: null })
-    render(withPickers(<Insurance />))
+    render(<Insurance />)
     const review = screen.getByRole('group', { name: 'Review' })
     // Vehicle is hidden while hasVehicle is false.
     expect(screen.queryByRole('tab', { name: /^Vehicle$/ })).not.toBeInTheDocument()
@@ -354,7 +354,7 @@ describe('Insurance', () => {
       ALL_VISITED.filter((id) => id !== 'vehicle'),
     )
     const user = userEvent.setup({ delay: null })
-    render(withPickers(<Insurance />))
+    render(<Insurance />)
     // Since the submit is invalid, <Form confirm> never asks — the error summary appears
     // directly, with no confirm dialog in between.
     await user.click(screen.getByRole('button', { name: /submit application/i }))
@@ -368,13 +368,13 @@ describe('Insurance', () => {
 
   it('resumes from localStorage after a remount: step and values are restored', async () => {
     const user = userEvent.setup({ delay: null })
-    const { unmount } = render(withPickers(<Insurance />))
+    const { unmount } = render(<Insurance />)
     await fillApplicant(user)
     await user.type(screen.getByLabelText(/^email/i), 'ada@example.com')
     await waitFor(() => expect(localStorage.getItem(STORAGE_KEY)).toBeTruthy())
     unmount()
 
-    render(withPickers(<Insurance />))
+    render(<Insurance />)
     expect(screen.getByRole('group', { name: 'Contact' })).toBeInTheDocument()
     expect(screen.getByLabelText(/^email/i)).toHaveValue('ada@example.com')
     // Going back confirms the earlier step's values also survived.
@@ -391,7 +391,7 @@ describe('Insurance', () => {
       'documents',
       ALL_VISITED.filter((id) => id !== 'vehicle' && id !== 'review'),
     )
-    const { unmount } = render(withPickers(<Insurance />))
+    const { unmount } = render(<Insurance />)
     // On Documents: upload a file, then let the autosave effect run before remounting.
     const file = new File(['%PDF'], 'policy.pdf', { type: 'application/pdf' })
     await user.upload(screen.getByLabelText(/^upload documents/i), file)
@@ -406,7 +406,7 @@ describe('Insurance', () => {
     expect(saved.values.documents).toEqual([])
     unmount()
 
-    render(withPickers(<Insurance />))
+    render(<Insurance />)
     // Resumes on Documents (the last-visited step); the upload did not survive, and nothing
     // renders a stray "[object Object]" chip or an unlabelled Remove button.
     expect(screen.getByRole('group', { name: 'Documents' })).toBeInTheDocument()
@@ -435,7 +435,7 @@ describe('Insurance', () => {
         values: { hasVehicle: false },
       }),
     )
-    render(withPickers(<Insurance />))
+    render(<Insurance />)
     // Falls back to the last visited step that still matches a current step id
     // ("has-vehicle"), not the stale "vehicle" — and definitely not a crash.
     expect(screen.getByRole('group', { name: 'Vehicle?' })).toBeInTheDocument()
@@ -444,7 +444,7 @@ describe('Insurance', () => {
 
   it('"Start over" clears localStorage and resets to the first step with empty values', async () => {
     const user = userEvent.setup({ delay: null })
-    render(withPickers(<Insurance />))
+    render(<Insurance />)
     await fillApplicant(user)
     await waitFor(() => expect(localStorage.getItem(STORAGE_KEY)).toBeTruthy())
     await user.click(screen.getByRole('button', { name: /start over/i }))
@@ -460,7 +460,7 @@ describe('Insurance', () => {
     // hand, so the "a real walk produces submittable values" path stays covered once.
     seedReview({ ...COMPLETE_VALUES, firstName: APPLICATION_DECLINED_FOR })
     const user = userEvent.setup({ delay: null })
-    render(withPickers(<Insurance />))
+    render(<Insurance />)
     await user.click(screen.getByRole('button', { name: /submit application/i }))
     const dialog = await screen.findByRole('alertdialog', { name: /submit application\?/i })
     await user.click(within(dialog).getByRole('button', { name: /^confirm$/i }))
@@ -471,7 +471,7 @@ describe('Insurance', () => {
   it('submits successfully and clears saved resume state', async () => {
     const user = userEvent.setup({ delay: null })
     const onSuccess = vi.fn()
-    render(withPickers(<Insurance onSuccess={onSuccess} />))
+    render(<Insurance onSuccess={onSuccess} />)
     await fillThroughReview(user)
     await waitFor(() => expect(localStorage.getItem(STORAGE_KEY)).toBeTruthy())
     await user.click(screen.getByRole('button', { name: /submit application/i }))
@@ -483,7 +483,7 @@ describe('Insurance', () => {
 
   describe('page layout', () => {
     it('renders every step as a named group with valid heading order, and is axe-clean', async () => {
-      const { container } = render(withPickers(<Insurance layout="page" />))
+      const { container } = render(<Insurance layout="page" />)
       ;[
         'Applicant',
         'Contact',
@@ -505,7 +505,7 @@ describe('Insurance', () => {
   describe('agent mode', () => {
     it('has autoComplete off, renders one page, and shows every error after one submit', async () => {
       const user = userEvent.setup({ delay: null })
-      render(withPickers(<Insurance agentMode />))
+      render(<Insurance agentMode />)
       const form = screen.getByRole('form', { name: 'Auto insurance application' })
       expect(form).toHaveAttribute('autocomplete', 'off')
       expect(screen.getByRole('group', { name: 'Applicant' })).toBeInTheDocument()
@@ -523,7 +523,7 @@ describe('Insurance', () => {
     // still get autofill offers for their own name/address. ApplicantStep/ContactStep resolve
     // these against the form's assisted flag themselves; this asserts that actually happens.
     it('suppresses the hardcoded name/contact/address autoComplete tokens too', () => {
-      render(withPickers(<Insurance agentMode />))
+      render(<Insurance agentMode />)
       // agent mode renders every step (including Review's ReadOnlyFields, which repeat these
       // labels) as one page, so each real control is scoped to its own FormSection group
       // rather than queried by label text alone.
@@ -540,14 +540,14 @@ describe('Insurance', () => {
     })
 
     it('leaves the hardcoded tokens alone outside agent mode', () => {
-      render(withPickers(<Insurance />))
+      render(<Insurance />)
       expect(screen.getByLabelText(/first name/i)).toHaveAttribute('autoComplete', 'given-name')
       expect(screen.getByLabelText(/last name/i)).toHaveAttribute('autoComplete', 'family-name')
     })
   })
 
   it('is accessible on the Applicant step', async () => {
-    const { container } = render(withPickers(<Insurance />))
+    const { container } = render(<Insurance />)
     await expectNoA11yViolations(container)
   })
 
@@ -571,14 +571,39 @@ describe('Insurance', () => {
 
   it('is accessible on the Coverage step', async () => {
     seedReview(COMPLETE_VALUES, 'coverage')
-    const { container } = render(withPickers(<Insurance />))
+    const { container } = render(<Insurance />)
     expect(screen.getByRole('group', { name: 'Coverage' })).toBeInTheDocument()
     await expectNoA11yViolations(container)
   })
 
   it('is accessible on the Review step', async () => {
     seedReview()
-    const { container } = render(withPickers(<Insurance />))
+    const { container } = render(<Insurance />)
     await expectNoA11yViolations(container)
+  })
+})
+
+/**
+ * #125. This example is documentation — reference code a consumer copies into their own app.
+ * It uses `DateField`, so it needs an ancestor `LocalizationProvider`; it used to have none
+ * of its own and worked only because Storybook's global decorator (and, in this file, a
+ * `withPickers()` helper that has since been removed) supplied one. Copied out, it threw
+ * immediately, client-side and under SSR, with an MUI X error that named the provider but
+ * not the fact that the example itself should have carried it.
+ *
+ * Deliberately rendered bare — no wrapper of any kind. A test that supplies the provider the
+ * component is now responsible for supplying can never fail when that responsibility regresses.
+ */
+describe('Insurance standalone, with no ancestor LocalizationProvider', () => {
+  it('renders under SSR', () => {
+    expect(() => renderToString(<Insurance />)).not.toThrow()
+    expect(renderToString(<Insurance />)).toContain('Birthday')
+  })
+
+  it('renders on a plain client render, with the date field actually wired up', async () => {
+    render(<Insurance />)
+    // Not just "did not throw": the provider has to reach the field, which only renders its
+    // segmented spinbuttons once an adapter is in context.
+    expect(await screen.findByRole('group', { name: /birthday/i })).toBeInTheDocument()
   })
 })

@@ -28,6 +28,8 @@ import { NumberField } from '../../fields/NumberField'
 import { TextareaField } from '../../fields/TextareaField'
 import { CheckboxGroup } from '../../fields/CheckboxGroup'
 import { FileField } from '../../fields/FileField'
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
 import { ReadOnlyField } from '../../fields/ReadOnlyField'
 import { resolveAutoComplete } from '../../fields/resolveAutoComplete'
 import type { Option } from '../../fields/Option'
@@ -496,6 +498,10 @@ export interface InsuranceProps {
  * localStorage, and a Review step with per-field Edit links. Documentation
  * only — not exported from the package (see `tsconfig.build.json`'s
  * `src/examples` exclusion).
+ *
+ * Wraps itself in `<LocalizationProvider>` (its `DateField` needs one), so it is
+ * copy-paste-safe standalone — under SSR as well as in the browser — rather than
+ * relying on an ancestor a consumer's app may not have (#125).
  */
 export function Insurance({
   orientation = 'horizontal',
@@ -545,60 +551,62 @@ export function Insurance({
   }
 
   return (
-    <Container maxWidth="sm" sx={{ py: 6 }}>
-      <Paper variant="outlined" sx={{ p: 4 }}>
-        <Form
-          ref={form}
-          schema={schema}
-          defaultValues={values}
-          assisted={agentMode}
-          title="Auto insurance application"
-          confirm={agentMode ? undefined : { title: 'Submit application?' }}
-          guard={!agentMode}
-          mode={agentMode ? 'onSubmit' : undefined}
-          onSubmit={async (submitted, form) => {
-            try {
-              const result = await submitApplicationApi(submitted)
-              form.clearErrors('root.server')
-              clearSaved()
-              onSuccess?.(result)
-            } catch (error) {
-              form.setError('root.server', {
-                message: error instanceof Error ? error.message : 'Submission failed',
-              })
-            }
-          }}
-        >
-          <Stack spacing={3}>
-            <FormError />
-            <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
-              <Button type="button" variant="text" onClick={startOver}>
-                Start over
-              </Button>
+    <LocalizationProvider dateAdapter={AdapterDateFns}>
+      <Container maxWidth="sm" sx={{ py: 6 }}>
+        <Paper variant="outlined" sx={{ p: 4 }}>
+          <Form
+            ref={form}
+            schema={schema}
+            defaultValues={values}
+            assisted={agentMode}
+            title="Auto insurance application"
+            confirm={agentMode ? undefined : { title: 'Submit application?' }}
+            guard={!agentMode}
+            mode={agentMode ? 'onSubmit' : undefined}
+            onSubmit={async (submitted, form) => {
+              try {
+                const result = await submitApplicationApi(submitted)
+                form.clearErrors('root.server')
+                clearSaved()
+                onSuccess?.(result)
+              } catch (error) {
+                form.setError('root.server', {
+                  message: error instanceof Error ? error.message : 'Submission failed',
+                })
+              }
+            }}
+          >
+            <Stack spacing={3}>
+              <FormError />
+              <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
+                <Button type="button" variant="text" onClick={startOver}>
+                  Start over
+                </Button>
+              </Stack>
+              <WatchValues onValues={setValues} />
+              {layout === 'page' ? (
+                <Wizard steps={steps} layout="page">
+                  <InsuranceSteps hasVehicle={hasVehicle} />
+                  <SubmitButton>Submit application</SubmitButton>
+                </Wizard>
+              ) : (
+                <Wizard
+                  steps={steps}
+                  orientation={orientation}
+                  step={step}
+                  onStepChange={(s) => setStep(s.id)}
+                  visited={visited}
+                  onVisitedChange={setVisited}
+                >
+                  <WizardStepper />
+                  <InsuranceSteps hasVehicle={hasVehicle} />
+                  <WizardNav submitLabel="Submit application" />
+                </Wizard>
+              )}
             </Stack>
-            <WatchValues onValues={setValues} />
-            {layout === 'page' ? (
-              <Wizard steps={steps} layout="page">
-                <InsuranceSteps hasVehicle={hasVehicle} />
-                <SubmitButton>Submit application</SubmitButton>
-              </Wizard>
-            ) : (
-              <Wizard
-                steps={steps}
-                orientation={orientation}
-                step={step}
-                onStepChange={(s) => setStep(s.id)}
-                visited={visited}
-                onVisitedChange={setVisited}
-              >
-                <WizardStepper />
-                <InsuranceSteps hasVehicle={hasVehicle} />
-                <WizardNav submitLabel="Submit application" />
-              </Wizard>
-            )}
-          </Stack>
-        </Form>
-      </Paper>
-    </Container>
+          </Form>
+        </Paper>
+      </Container>
+    </LocalizationProvider>
   )
 }

@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { renderToString } from 'react-dom/server'
 import { Profile } from './Profile'
 import { PROFILE_LOAD_FAILS_FOR } from '../fakeApi'
 import { expectNoA11yViolations } from '../../test/axe'
-import { withPickers } from '../../test/pickers'
 
 const hiddenDateInput = () => document.querySelector<HTMLInputElement>('input[name="birthday"]')!
 
@@ -13,13 +13,13 @@ async function waitForLoaded() {
 
 describe('Profile', () => {
   it('has an accessible form name "Your profile"', async () => {
-    render(withPickers(<Profile />))
+    render(<Profile />)
     expect(screen.getByRole('form', { name: 'Your profile' })).toBeInTheDocument()
     await waitForLoaded()
   })
 
   it('groups fields under Identity, Preferences, and Avatar fieldsets', async () => {
-    render(withPickers(<Profile />))
+    render(<Profile />)
     await waitForLoaded()
 
     const identity = screen.getByRole('group', { name: 'Identity' })
@@ -39,7 +39,7 @@ describe('Profile', () => {
   })
 
   it('disables fields while the simulated fetch is pending, then fills them in once it resolves', async () => {
-    render(withPickers(<Profile />))
+    render(<Profile />)
     // Still loading: fields start disabled (async defaultValues), so nothing has a value yet.
     expect(screen.getByLabelText(/display name/i)).toBeDisabled()
     expect(screen.getByLabelText(/display name/i)).toHaveValue('')
@@ -52,7 +52,7 @@ describe('Profile', () => {
   it('saves and reports success with the current form values', async () => {
     const user = userEvent.setup({ delay: null })
     const onSuccess = vi.fn()
-    render(withPickers(<Profile onSuccess={onSuccess} />))
+    render(<Profile onSuccess={onSuccess} />)
     await waitForLoaded()
 
     const displayName = screen.getByLabelText(/display name/i)
@@ -66,7 +66,7 @@ describe('Profile', () => {
 
   it('shows the mapped disableFuture message for a birthday in the future', async () => {
     const user = userEvent.setup({ delay: null })
-    render(withPickers(<Profile />))
+    render(<Profile />)
     await waitForLoaded()
 
     fireEvent.change(hiddenDateInput(), { target: { value: '01/01/2999' } })
@@ -76,7 +76,7 @@ describe('Profile', () => {
 
   it('shows a bio counter as "n / 280"', async () => {
     const user = userEvent.setup({ delay: null })
-    render(withPickers(<Profile />))
+    render(<Profile />)
     await waitForLoaded()
 
     const bio = screen.getByLabelText(/^bio/i)
@@ -90,7 +90,7 @@ describe('Profile', () => {
 
   it('re-syncing values while dirty keeps the dirty field and updates the pristine one', async () => {
     const user = userEvent.setup({ delay: null })
-    render(withPickers(<Profile />))
+    render(<Profile />)
     await waitForLoaded()
 
     const bio = screen.getByLabelText(/^bio/i)
@@ -113,24 +113,47 @@ describe('Profile', () => {
   })
 
   it('is accessible once loaded', async () => {
-    const { container } = render(withPickers(<Profile />))
+    const { container } = render(<Profile />)
     await waitForLoaded()
     await expectNoA11yViolations(container)
   })
 
   it('is accessible when the initial load fails', async () => {
-    const { container } = render(
-      withPickers(<Profile loadSeed={{ displayName: PROFILE_LOAD_FAILS_FOR }} />),
-    )
+    const { container } = render(<Profile loadSeed={{ displayName: PROFILE_LOAD_FAILS_FOR }} />)
     await screen.findByRole('alert')
     await expectNoA11yViolations(container)
   })
 
   it('shows a FormError alert when the initial load fails', async () => {
-    render(withPickers(<Profile loadSeed={{ displayName: PROFILE_LOAD_FAILS_FOR }} />))
+    render(<Profile loadSeed={{ displayName: PROFILE_LOAD_FAILS_FOR }} />)
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent(/could not load your profile/i)
     // The form re-enables with empty fields rather than being stuck disabled.
     await waitFor(() => expect(screen.getByLabelText(/display name/i)).toBeEnabled())
+  })
+})
+
+/**
+ * #125. This example is documentation — reference code a consumer copies into their own app.
+ * It uses `DateField`, so it needs an ancestor `LocalizationProvider`; it used to have none
+ * of its own and worked only because Storybook's global decorator (and, in this file, a
+ * `withPickers()` helper that has since been removed) supplied one. Copied out, it threw
+ * immediately, client-side and under SSR, with an MUI X error that named the provider but
+ * not the fact that the example itself should have carried it.
+ *
+ * Deliberately rendered bare — no wrapper of any kind. A test that supplies the provider the
+ * component is now responsible for supplying can never fail when that responsibility regresses.
+ */
+describe('Profile standalone, with no ancestor LocalizationProvider', () => {
+  it('renders under SSR', () => {
+    expect(() => renderToString(<Profile />)).not.toThrow()
+    expect(renderToString(<Profile />)).toContain('Your profile')
+  })
+
+  it('renders on a plain client render, with the date field actually wired up', async () => {
+    render(<Profile />)
+    // Not just "did not throw": the provider has to reach the field, which only renders its
+    // segmented spinbuttons once an adapter is in context.
+    expect(await screen.findByRole('group', { name: /birthday/i })).toBeInTheDocument()
   })
 })

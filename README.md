@@ -150,6 +150,45 @@ Need `reset`, `setError`, `watch`? `onSubmit` receives the form methods as its s
 >
 ```
 
+**Catch the rejection, don't rethrow it.** For a server-side failure with no single field to
+blame, catch it and map it to a root error — `<FormError />` renders `errors.root` as an alert:
+
+```tsx
+onSubmit={async (values, form) => {
+  try {
+    await signIn(values)
+    form.clearErrors('root.server')
+  } catch (error) {
+    form.setError('root.server', { message: 'Invalid email or password' })
+  }
+}}
+```
+
+`<Form>` looks at what `onSubmit` left behind, not only at how its promise settled, so this
+pattern gets the full failure treatment — the announcement and the focus move — without
+rethrowing:
+
+| What `onSubmit` did                                   | Announced by `<Form>`    |
+| ----------------------------------------------------- | ------------------------ |
+| rejected                                              | `submitErrorText`        |
+| resolved, set a **root** error, with a `<FormError>`  | `submitErrorText`        |
+| resolved, set a **root** error, with no `<FormError>` | that error's own message |
+| resolved, set **field** errors only                   | `submitErrorText`        |
+| resolved, set nothing                                 | `submitSuccessText`      |
+
+A mounted `<FormError>` is itself an assertive live region (`role="alert"`) already reading the
+root message, so `<Form>`'s own polite region does not repeat it — one event should not be
+announced twice by two regions. With no `<FormError>` nothing else would say it, so `<Form>`
+does.
+
+**Focus after a failed submit has one owner and a fixed order:** the `<FormError>` alert, else
+a declared `<FormErrorSummary>` (which focuses its own heading), else the first invalid field.
+That is the same single-owner rule that governs a validation failure, extended to cover a
+server-side one.
+
+Only errors raised _during_ that submit count, so a stale root error a form never cleared
+cannot make the next, genuinely successful submit report a failure.
+
 Inside child components use `useFormContext()` from `react-hook-form`.
 
 Numbers: NumberField stores `number | null`, so use `z.number()` (add `.nullable()` if empty is allowed). TextField hands zod the string from the input, so a numeric TextField needs `z.coerce.number()`.
@@ -231,7 +270,10 @@ Each string is a prop, so it can be localised or turned off individually
 
 A _validation_ failure is deliberately not announced here: `onSubmit` never ran, and
 `<FormErrorSummary />` already announces and lists what needs fixing. "Submit failed." is
-reserved for a submit that started and then rejected.
+reserved for a submit that started and then failed — which includes an `onSubmit` that
+resolved after mapping a server rejection to `setError`, not only one that rejected outright.
+See the table under "Need `reset`, `setError`, `watch`?" for which of the four outcomes gets
+which announcement, and where focus lands in each.
 
 The region itself is `<LiveRegion />`, exported for your own announcements:
 

@@ -282,6 +282,10 @@ export interface LoanProps {
  * per-applicant document upload step, and a review step with computed
  * debt-to-income totals. Documentation only — not exported from the package
  * (see `tsconfig.build.json`'s `src/examples` exclusion).
+ *
+ * Wraps itself in `<LocalizationProvider>` (its `DateField` needs one), so it is
+ * copy-paste-safe standalone — under SSR as well as in the browser — rather than
+ * relying on an ancestor a consumer's app may not have (#125).
  */
 export function Loan({ onSuccess }: LoanProps) {
   return (

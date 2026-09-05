@@ -5,6 +5,8 @@ import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { z } from 'zod'
 import { Form, formClasses, willRenderFormDescription, type FormMethods } from './Form'
 import { liveRegionClasses } from './LiveRegion'
+import { FormError } from '../FormError'
+import { FormErrorSummary } from './FormErrorSummary'
 import { SubmitButton } from '../SubmitButton'
 import { TextField } from '../fields/TextField'
 import { Select } from '../fields/Select'
@@ -1541,5 +1543,272 @@ describe('submit status announcements', () => {
       await waitFor(() => expect(liveRegion()).toHaveTextContent('Submit failed.'))
       await expectNoA11yViolations(container)
     })
+  })
+})
+
+/**
+ * #124. Every shipped example — and the pattern the README recommends — catches its own API
+ * rejection and maps it to `setError('root.server', …)` rather than rethrowing, so from
+ * `handleSubmit`'s point of view `onSubmit` resolved normally. `<Form>` used to announce
+ * "Submitted." over the `<FormError>` alert saying the opposite, and moved focus nowhere.
+ * These pin the four outcomes of the `submitErrorText` contract table.
+ */
+describe('a submit that resolved but left an error behind', () => {
+  const liveRegion = () => document.querySelector<HTMLElement>(`.${formClasses.status}`)!
+
+  it("announces the root error's own message, focuses the alert, and never says 'Submitted.'", async () => {
+    const user = userEvent.setup()
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: 'a@b.co' }}
+        onSubmit={(_values, form) => {
+          form.setError('root.server', { message: 'Invalid email or password' })
+        }}
+      >
+        <FormError />
+        <SubmitButton>Sign in</SubmitButton>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Invalid email or password')
+    // The status region no longer contradicts the alert — and does not repeat it either. The
+    // alert is itself an assertive live region carrying that sentence, so this polite one says
+    // only the generic whole-form statement; two regions reading the same text for one event
+    // is what the first draft did.
+    await waitFor(() => expect(liveRegion()).toHaveTextContent('Submit failed.'))
+    expect(liveRegion()).not.toHaveTextContent('Submitted.')
+    expect(liveRegion()).not.toHaveTextContent('Invalid email or password')
+    // …and a keyboard/screen-reader user is taken to it, rather than left on <body>.
+    await waitFor(() => expect(alert).toHaveFocus())
+  })
+
+  it("announces the root error's own message when there is no <FormError> to carry it", async () => {
+    const user = userEvent.setup()
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: 'a@b.co' }}
+        onSubmit={(_values, form) => {
+          form.setError('root.server', { message: 'Invalid email or password' })
+        }}
+      >
+        <SubmitButton>Sign in</SubmitButton>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    // Nothing else can say what went wrong here, so the generic string would throw away the
+    // only sentence that does. This is the fallback half of the same ruling as the test above.
+    await waitFor(() => expect(liveRegion()).toHaveTextContent('Invalid email or password'))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('announces submitErrorText and focuses the first invalid field when only fields were flagged', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: 'a@b.co' }}
+        onSubmit={(_values, form) => {
+          form.setError('email', { message: 'That address is already registered' })
+        }}
+      >
+        <TextField name="email" label="Email" />
+        <SubmitButton>Go</SubmitButton>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+
+    // No root error to borrow a message from — the field's own role="alert" carries the
+    // detail, so the status region says only that the submit failed.
+    await waitFor(() => expect(liveRegion()).toHaveTextContent('Submit failed.'))
+    expect(liveRegion()).not.toHaveTextContent('Submitted.')
+    await waitFor(() => expect(screen.getByLabelText('Email')).toHaveFocus())
+  })
+
+  it('falls back to the first invalid field when a root error is set with no <FormError> mounted', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: 'a@b.co' }}
+        onSubmit={(_values, form) => {
+          form.setError('root.server', { message: 'Service unavailable' })
+          form.setError('email', { message: 'Try again' })
+        }}
+      >
+        <TextField name="email" label="Email" />
+        <SubmitButton>Go</SubmitButton>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+
+    // The root error still owns the announcement; only the focus target degrades.
+    await waitFor(() => expect(liveRegion()).toHaveTextContent('Service unavailable'))
+    await waitFor(() => expect(screen.getByLabelText('Email')).toHaveFocus())
+  })
+
+  it('still announces success, and moves no focus, when onSubmit resolves clean', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{ email: 'a@b.co' }} onSubmit={() => {}}>
+        <FormError />
+        <TextField name="email" label="Email" />
+        <SubmitButton>Go</SubmitButton>
+      </Form>,
+    )
+    const button = screen.getByRole('button', { name: 'Go' })
+    await user.click(button)
+
+    await waitFor(() => expect(liveRegion()).toHaveTextContent('Submitted.'))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    // The click left focus on the button; nothing in the success path takes it away.
+    expect(button).toHaveFocus()
+  })
+
+  it('does not treat a stale root error left over from an earlier submit as this one failing', async () => {
+    const user = userEvent.setup()
+    let shouldFail = true
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: 'a@b.co' }}
+        onSubmit={(_values, form) => {
+          // Deliberately never clears `root.server`, so the error is still standing when the
+          // second submit succeeds — only errors *raised by this submit* may count.
+          if (shouldFail) form.setError('root.server', { message: 'Service unavailable' })
+        }}
+      >
+        <FormError />
+        <SubmitButton>Go</SubmitButton>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    // <FormError> is mounted, so the alert carries "Service unavailable" and this region
+    // carries the generic statement — see the root-error tests above.
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Service unavailable'))
+    await waitFor(() => expect(liveRegion()).toHaveTextContent('Submit failed.'))
+
+    shouldFail = false
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    await waitFor(() => expect(liveRegion()).toHaveTextContent('Submitted.'))
+    // hookform's own re-validation at the top of the second `handleSubmit` replaces the whole
+    // errors object, so the stale root error is gone by the time `onSubmit` runs — which is
+    // why the before/after snapshot is taken *inside* the handler rather than at render time.
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('re-announces the identical root error on a repeated failure', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: 'a@b.co' }}
+        onSubmit={(_values, form) => {
+          form.setError('root.server', { message: 'Service unavailable' })
+        }}
+      >
+        <FormError />
+        <SubmitButton>Go</SubmitButton>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    await waitFor(() => expect(liveRegion()).toHaveTextContent('Submit failed.'))
+    const first = liveRegion()
+
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    // Setting the identical message is not a content change on its own; `announcementKey`
+    // replaces the node so assistive tech hears it again. Same mechanism as a repeated reject.
+    await waitFor(() => expect(liveRegion()).not.toBe(first))
+    expect(liveRegion()).toHaveTextContent('Submit failed.')
+  })
+
+  it('has no accessibility violations with the alert focused', async () => {
+    const user = userEvent.setup()
+    const { container } = render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: 'a@b.co' }}
+        onSubmit={(_values, form) => {
+          form.setError('root.server', { message: 'Service unavailable' })
+        }}
+      >
+        <FormError />
+        <TextField name="email" label="Email" />
+        <SubmitButton>Go</SubmitButton>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveFocus())
+    await expectNoA11yViolations(container)
+  })
+
+  /**
+   * #124 review, finding 2. #123 made the error-summary store the single answer every focus
+   * decision reads, so exactly one thing moves focus after a failed attempt. A *post-submit*
+   * failure — `onSubmit` resolving after mapping a server rejection to `setError('email', …)`,
+   * the README's own pattern — is a third mover that arrived after that work, and it used to
+   * ignore the store: the summary focused its own heading, then this effect (a parent, running
+   * after the child's) yanked focus to the field. Verified before the fix: focus landed on the
+   * input immediately and never moved.
+   */
+  it('lets a declared <FormErrorSummary> keep focus after a server-side field error', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: 'a@b.co' }}
+        onSubmit={(_values, form) => {
+          form.setError('email', { message: 'That address is already registered' })
+        }}
+      >
+        <FormErrorSummary />
+        <TextField name="email" label="Email" />
+        <SubmitButton>Go</SubmitButton>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+
+    const heading = await screen.findByRole('heading', { name: 'There is a problem' })
+    // The summary already lists a post-submit error without any new signal: its own `attempted`
+    // check reads `submitCount`, which handleSubmit incremented before `onSubmit` ran.
+    expect(
+      screen.getByRole('link', { name: 'That address is already registered' }),
+    ).toBeInTheDocument()
+    // Drain the macrotask queue: the pre-fix focus theft happened a tick after the summary's
+    // own effect, so an assertion that ran too early would have passed against the bug.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(heading).toHaveFocus()
+    expect(screen.getByLabelText('Email')).not.toHaveFocus()
+  })
+
+  it('still focuses the <FormError> alert when a form has both it and a summary', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form
+        schema={schema}
+        defaultValues={{ email: 'a@b.co' }}
+        onSubmit={(_values, form) => {
+          form.setError('root.server', { message: 'Service unavailable' })
+        }}
+      >
+        <FormError />
+        <FormErrorSummary />
+        <TextField name="email" label="Email" />
+        <SubmitButton>Go</SubmitButton>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+
+    // The alert outranks the summary: it carries the root sentence and is what just appeared,
+    // and the summary lists only field errors (it filters `root.*`), so here it has nothing to
+    // show at all.
+    const alert = await screen.findByRole('alert')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(alert).toHaveFocus()
+    expect(screen.queryByRole('heading', { name: 'There is a problem' })).not.toBeInTheDocument()
   })
 })
