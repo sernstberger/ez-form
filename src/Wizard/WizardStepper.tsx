@@ -22,6 +22,15 @@ export const wizardStepperClasses = generateUtilityClasses('EzWizardStepper', [
   'verticalStepButton',
 ])
 
+/** The `Stepper` itself, so `theme.components.EzWizardStepper.styleOverrides.root`
+ * generates CSS — a bare class name never does. Safe to wrap even though the
+ * horizontal step button cannot be (see the `StepButton` comment at its call
+ * site): `Stepper` computes `isTabList` from its *children*
+ * (`childrenArray.some(child => child.type === StepButton)`, see
+ * node_modules/@mui/material/Stepper/Stepper.js) and never inspects its own
+ * identity, and a `styled()` wrapper forwards `children` through untouched. */
+const WizardStepperRoot = styled(Stepper, { name: 'EzWizardStepper', slot: 'Root' })({})
+
 /** Vertical clickable step: `ButtonBase` wrapping `StepLabel` (see the
  * class-level comment for why this can't be `StepButton`). The default style
  * block is `StepButton`'s own vertical layout — the minimum needed for the
@@ -76,7 +85,7 @@ export function WizardStepper(inProps: WizardStepperProps) {
     useWizard('WizardStepper')
   if (layout === 'page') return null
   return (
-    <Stepper
+    <WizardStepperRoot
       {...props}
       className={`${wizardStepperClasses.root}${props.className ? ` ${props.className}` : ''}`}
       nonLinear
@@ -120,6 +129,10 @@ export function WizardStepper(inProps: WizardStepperProps) {
             // no `EzWizardStepper.styleOverrides.stepButton` slot here —
             // only the class name, for consumers to target with a plain
             // CSS override on `.EzWizardStepper-stepButton`.
+            //
+            // This constraint is on the *children* only: it does not stop
+            // the `Stepper` itself being a `styled()` slot, which is why
+            // `WizardStepperRoot` above is one and `root` is a real slot.
             <StepButton
               className={wizardStepperClasses.stepButton}
               optional={step.optional}
@@ -139,6 +152,6 @@ export function WizardStepper(inProps: WizardStepperProps) {
           </Step>
         )
       })}
-    </Stepper>
+    </WizardStepperRoot>
   )
 }

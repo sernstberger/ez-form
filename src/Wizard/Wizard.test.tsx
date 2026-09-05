@@ -1621,6 +1621,31 @@ describe('WizardStepper', () => {
     expect(label.id).toMatch(/-label-account$/)
   })
 
+  // The root renders through `styled(Stepper, { name: 'EzWizardStepper', slot: 'Root' })`,
+  // not a bare `Stepper` with the class appended — a class name alone generates no
+  // `styleOverrides` CSS at all, so the `getComputedStyle` half is the assertion that
+  // matters here. Horizontal on purpose: that is the orientation whose children are real
+  // `StepButton`s, so this also pins that wrapping the `Stepper` leaves MUI's
+  // `child.type === StepButton` tablist detection intact (`getByRole('tab')` below).
+  it('is themeable: styleOverrides.root applies to the stepper root', async () => {
+    const user = userEvent.setup()
+    const theme = createTheme({
+      components: {
+        EzWizardStepper: { styleOverrides: { root: { letterSpacing: 5 } } },
+      },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Inline orientation="horizontal" />
+      </ThemeProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: 'next' }))
+    const root = await screen.findByRole('tablist')
+    expect(root).toHaveClass(wizardStepperClasses.root)
+    expect(getComputedStyle(root).letterSpacing).toBe('5px')
+    expect(screen.getByRole('tab', { name: /Account/ })).toBeInTheDocument()
+  })
+
   it('is themeable: styleOverrides.verticalStepButton applies to the vertical step button', async () => {
     const user = userEvent.setup()
     const theme = createTheme({
