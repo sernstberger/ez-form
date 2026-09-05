@@ -55,6 +55,12 @@ const Slots = styled('div')(({ theme }) => ({
   gap: theme.spacing(1),
 }))
 
+/** The `FormControl` itself, so `theme.components.EzOtpField.styleOverrides.root`
+ * generates CSS — a bare `className={otpFieldClasses.root}` on a plain `FormControl`
+ * never does, which is the whole of #121. Empty default style block: the wrapper
+ * exists to give the typed key a real element, not to add a look. */
+const OtpFieldRoot = styled(FormControl, { name: 'EzOtpField', slot: 'Root' })({})
+
 // Base UI names slot 1 by whatever `<label>` points at the group; with an
 // ARIA-only name there is no such element, so slot 1 is the one input in the
 // row without a name and axe's "form elements must have labels" fires (#110).
@@ -168,7 +174,7 @@ export function OtpFieldControl(inProps: OtpFieldControlProps) {
     onBlur?.()
   }
   return (
-    <FormControl
+    <OtpFieldRoot
       size={size}
       error={error}
       disabled={disabled}
@@ -221,6 +227,6 @@ export function OtpFieldControl(inProps: OtpFieldControlProps) {
           {helperText}
         </OtpFieldHelperText>
       ) : null}
-    </FormControl>
+    </OtpFieldRoot>
   )
 }

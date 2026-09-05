@@ -9,6 +9,21 @@ import { useEzFormContext } from '../../useEzFormContext'
 
 export const textareaFieldClasses = generateUtilityClasses('EzTextareaField', ['root', 'counter'])
 
+/**
+ * The inner ez-form `TextField`, so `theme.components.EzTextareaField.styleOverrides.root`
+ * generates CSS. Threading `textareaFieldClasses.root` through as a plain `className` — what
+ * this did before — put the class on MUI's `FormControl` root but generated no
+ * `styleOverrides` CSS at all, because a bare class name never does (#121).
+ *
+ * The `Root` slot therefore lands exactly where the class already landed: MUI's `FormControl`,
+ * the outermost element the rendered textarea has. This is the same shape `PasswordFieldRoot`
+ * and `SsnFieldRoot` already use — `styled(TextField, { name: 'Ez<Name>', slot: 'Root' })` —
+ * so the wrapper-around-`TextField` fields are theming-registered one way, not two. No
+ * collision with `EzNumberField.root`: that wraps MUI's own `TextField` inside
+ * `NumberFieldControl`, a different component and a different class name.
+ */
+const TextareaFieldRoot = styled(TextField, { name: 'EzTextareaField', slot: 'Root' })({})
+
 // The length meter, rendered as a trailing element inside the `FormHelperText` row so
 // it stays under the same `aria-describedby` id `TextField` already points at. `span`,
 // not `Typography`: it sits inside `FormHelperText`, which supplies its own typography.
@@ -70,7 +85,7 @@ export function TextareaField(inProps: TextareaFieldProps) {
   )
 
   return (
-    <TextField
+    <TextareaFieldRoot
       name={name}
       componentName="TextareaField"
       helperText={composedHelperText}

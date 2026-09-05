@@ -44,6 +44,12 @@ export const fileFieldClasses = generateUtilityClasses('EzFileField', [
   'dropText',
 ])
 
+/** The `FormControl` itself, so `theme.components.EzFileField.styleOverrides.root`
+ * generates CSS — a bare `className={fileFieldClasses.root}` on a plain `FormControl`
+ * never does, which is the whole of #121. Empty default style block: the wrapper
+ * exists to give the typed key a real element, not to add a look. */
+const FileFieldRoot = styled(FormControl, { name: 'EzFileField', slot: 'Root' })({})
+
 // Chips wrap onto further rows once the row is full, with a gap above the
 // button — the component's minimum layout so the list doesn't collide with
 // it — so it lives on the styled slot's default style block, still
@@ -55,10 +61,28 @@ const FileFieldList = styled(Stack, { name: 'EzFileField', slot: 'FileList' })((
 
 // The dashed outline is the affordance that says "drop here" — the component's
 // minimum look for the mode, so it lives on the slot's default style block and
-// every value is themeable via
-// `theme.components.EzFileField.styleOverrides.dropZone` (and `.dragActive`,
-// which the class-selector nesting below picks up).
-const FileFieldDropZone = styled('div', { name: 'EzFileField', slot: 'DropZone' })(({ theme }) => ({
+// every value is themeable via `theme.components.EzFileField.styleOverrides.dropZone`.
+//
+// `dragActive` names a *state* of this element rather than a second element, so it gets no
+// `styled()` slot of its own; it needs the `overridesResolver` below instead. The default
+// resolver emits only `styles.dropZone` for this slot, so before #121 a
+// `styleOverrides.dragActive` generated **no CSS at all** — the only `.dragActive` rule in
+// the sheet was the hard-coded nesting further down. That is why the key looked like it
+// worked when probed with `borderColor`/`backgroundColor`: those are exactly the two
+// properties the nesting already sets, so any measurement of them reads as "applied"
+// whether or not the theme reached the element. Measure it with a property the component
+// does not set itself.
+const FileFieldDropZone = styled('div', {
+  name: 'EzFileField',
+  slot: 'DropZone',
+  // Append the `dragActive` overrides under the state class, after the slot's own, so a
+  // theme can style the dragging state and the more specific selector wins while dragging.
+  // No `ownerState` needed: the state is already carried as a class on this element.
+  overridesResolver: (_props, styles) => [
+    styles.dropZone,
+    { [`&.${fileFieldClasses.dragActive}`]: styles.dragActive },
+  ],
+})(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
@@ -71,6 +95,13 @@ const FileFieldDropZone = styled('div', { name: 'EzFileField', slot: 'DropZone' 
     backgroundColor: (theme.vars ?? theme).palette.action.hover,
   },
 }))
+
+/** Same story as `FileFieldRoot`: the drop zone's instruction line needs a real
+ * `styled()` slot for `theme.components.EzFileField.styleOverrides.dropText` to
+ * generate any CSS. A bare `<span>` with the class looked like it worked only
+ * because an inherited property set on `dropZone` reaches it — #121 measures a
+ * non-inheriting one (`paddingTop`) for exactly that reason. */
+const FileFieldDropText = styled('span', { name: 'EzFileField', slot: 'DropText' })({})
 
 export type FileFieldValue = File | null | File[]
 
@@ -350,7 +381,7 @@ export function FileField(inProps: FileFieldProps) {
   )
 
   return (
-    <FormControl
+    <FileFieldRoot
       error={f.invalid}
       disabled={isDisabled}
       required={f.required}
@@ -381,7 +412,7 @@ export function FileField(inProps: FileFieldProps) {
             add(event, multiple ? dropped : dropped.slice(0, 1))
           }}
         >
-          <span className={fileFieldClasses.dropText}>{dropText}</span>
+          <FileFieldDropText className={fileFieldClasses.dropText}>{dropText}</FileFieldDropText>
           {picker}
         </FileFieldDropZone>
       ) : (
@@ -412,6 +443,6 @@ export function FileField(inProps: FileFieldProps) {
         </FileFieldList>
       ) : null}
       {text ? <FormHelperText {...f.helperTextA11y}>{text}</FormHelperText> : null}
-    </FormControl>
+    </FileFieldRoot>
   )
 }

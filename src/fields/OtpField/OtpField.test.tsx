@@ -163,6 +163,25 @@ describe('OtpField', () => {
     expect(getComputedStyle(helperText).letterSpacing).toBe('9px')
   })
 
+  // The root renders through `styled(FormControl, { name: 'EzOtpField', slot: 'Root' })`,
+  // not a bare `FormControl` carrying the class — a class name alone generates no
+  // `styleOverrides` CSS at all, so `getComputedStyle` is the assertion that matters (#121).
+  it('is themeable: styleOverrides.root applies to the field root', () => {
+    const theme = createTheme({
+      components: { EzOtpField: { styleOverrides: { root: { letterSpacing: '5px' } } } },
+    })
+    const { container } = render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{ code: '' }} onSubmit={() => {}}>
+          <OtpField name="code" label="Code" length={4} />
+        </Form>
+      </ThemeProvider>,
+    )
+    const root = container.querySelector(`.${otpFieldClasses.root}`)!
+    expect(root).toBeInTheDocument()
+    expect(getComputedStyle(root).letterSpacing).toBe('5px')
+  })
+
   it('Form requiredIndicator="optional": required stays required with no label asterisk', () => {
     const { container } = render(
       <Form

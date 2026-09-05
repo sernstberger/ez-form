@@ -259,6 +259,25 @@ describe('FileField', () => {
     expect(getComputedStyle(fileList!).marginTop).toBe('9px')
   })
 
+  // The root renders through `styled(FormControl, { name: 'EzFileField', slot: 'Root' })`,
+  // not a bare `FormControl` carrying the class — a class name alone generates no
+  // `styleOverrides` CSS at all, so `getComputedStyle` is the assertion that matters (#121).
+  it('is themeable: styleOverrides.root applies to the field root', () => {
+    const theme = createTheme({
+      components: { EzFileField: { styleOverrides: { root: { letterSpacing: '5px' } } } },
+    })
+    const { container } = render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+          <FileField name="resume" label="Resume" />
+        </Form>
+      </ThemeProvider>,
+    )
+    const root = container.querySelector(`.${fileFieldClasses.root}`)!
+    expect(root).toBeInTheDocument()
+    expect(getComputedStyle(root).letterSpacing).toBe('5px')
+  })
+
   it('Form requiredIndicator="optional": required stays required with no asterisk in the label', () => {
     render(
       <Form
@@ -424,6 +443,49 @@ describe('FileField dropzone', () => {
       </ThemeProvider>,
     )
     expect(getComputedStyle(dropZone()).padding).toBe('7px')
+  })
+
+  // `paddingTop`, deliberately not `letterSpacing`: the drop text sits inside the drop zone,
+  // so an *inheriting* property set anywhere above it shows up here whether or not this slot
+  // generates any CSS of its own — which is how the inert slot passed as working before #121.
+  // A non-inheriting property can only arrive from this element's own rule.
+  it('is themeable: styleOverrides.dropText applies to the drop-zone instruction', () => {
+    const theme = createTheme({
+      components: { EzFileField: { styleOverrides: { dropText: { paddingTop: '7px' } } } },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+          <FileField name="resume" label="Resume" dropzone />
+        </Form>
+      </ThemeProvider>,
+    )
+    const text = screen.getByText('Drag files here, or')
+    expect(text).toHaveClass(fileFieldClasses.dropText)
+    expect(getComputedStyle(text).paddingTop).toBe('7px')
+  })
+
+  // `dragActive` is the one `EzFileField` key with no `styled()` slot of its own: it names a
+  // *state* of the drop zone, not a second element, so it rides `DropZone`'s
+  // `overridesResolver` instead. #121's audit listed it as a pass, but that was measured with
+  // `borderColor`/`backgroundColor` — the two properties `DropZone`'s own hard-coded
+  // `&.dragActive` nesting already sets, so the measurement could not tell a theme override
+  // from the component's own default. Measured with a property the component never sets, it
+  // produced no CSS at all until the resolver was added. Hence `letterSpacing` here.
+  it('is themeable: styleOverrides.dragActive applies while a drag is over the zone', () => {
+    const theme = createTheme({
+      components: { EzFileField: { styleOverrides: { dragActive: { letterSpacing: '3px' } } } },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+          <FileField name="resume" label="Resume" dropzone />
+        </Form>
+      </ThemeProvider>,
+    )
+    expect(getComputedStyle(dropZone()).letterSpacing).not.toBe('3px')
+    fireEvent.dragOver(dropZone())
+    expect(getComputedStyle(dropZone()).letterSpacing).toBe('3px')
   })
 
   it('has no axe violations with the zone rendered', async () => {

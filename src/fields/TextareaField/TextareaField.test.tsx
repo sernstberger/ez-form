@@ -180,6 +180,39 @@ describe('TextareaField', () => {
     expect(container.querySelector(`.${textareaFieldClasses.root}`)).toBeInTheDocument()
   })
 
+  // The class was on this element before #121 too — what was missing is the CSS. The root
+  // renders through `styled(TextField, { name: 'EzTextareaField', slot: 'Root' })`, so the
+  // `getComputedStyle` half is the assertion that matters: a bare class name generates no
+  // `styleOverrides` CSS at all.
+  it('is themeable: styleOverrides.root applies to the field root', () => {
+    const theme = createTheme({
+      components: {
+        EzTextareaField: { styleOverrides: { root: { letterSpacing: 5 } } },
+      },
+    })
+    const { container } = render(
+      <ThemeProvider theme={theme}>
+        <Form schema={schema} defaultValues={{ bio: '' }} onSubmit={() => {}}>
+          <TextareaField name="bio" label="Bio" />
+        </Form>
+      </ThemeProvider>,
+    )
+    const root = container.querySelector(`.${textareaFieldClasses.root}`)!
+    expect(getComputedStyle(root).letterSpacing).toBe('5px')
+  })
+
+  // A consumer `className` still rides alongside the slot class, as it did before the
+  // root became a styled slot — `styled()` merges its generated class with the incoming one.
+  it('keeps a consumer className alongside the root class', () => {
+    const { container } = render(
+      <Form schema={schema} defaultValues={{ bio: '' }} onSubmit={() => {}}>
+        <TextareaField name="bio" label="Bio" className="mine" />
+      </Form>,
+    )
+    const root = container.querySelector(`.${textareaFieldClasses.root}`)!
+    expect(root).toHaveClass('mine')
+  })
+
   it('Form requiredIndicator="optional": required stays required with no asterisk', () => {
     const { container } = render(
       <Form

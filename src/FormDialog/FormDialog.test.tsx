@@ -355,6 +355,33 @@ describe('FormDialog', () => {
     expect(getComputedStyle(actions).textTransform).toBe('lowercase')
   })
 
+  // Both buttons render through `styled(Button | SubmitButton, { name: 'EzFormDialog',
+  // slot: 'Cancel' | 'Submit' })`. Before #121 the class name was applied by hand to a plain
+  // button, which put the hook in the DOM but made MUI emit no `styleOverrides` CSS at all —
+  // so `getComputedStyle` is the assertion, not `toHaveClass` (which passed throughout).
+  it('is themeable: styleOverrides.cancel and .submit apply to the action buttons', async () => {
+    const user = userEvent.setup()
+    const theme = createTheme({
+      components: {
+        EzFormDialog: {
+          styleOverrides: { cancel: { letterSpacing: '5px' }, submit: { letterSpacing: '9px' } },
+        },
+      },
+    })
+    render(
+      <ThemeProvider theme={theme}>
+        <Harness />
+      </ThemeProvider>,
+    )
+    await openDialog(user)
+    const cancel = screen.getByRole('button', { name: 'Cancel' })
+    const submit = screen.getByRole('button', { name: 'Submit' })
+    expect(cancel).toHaveClass(formDialogClasses.cancel)
+    expect(submit).toHaveClass(formDialogClasses.submit)
+    expect(getComputedStyle(cancel).letterSpacing).toBe('5px')
+    expect(getComputedStyle(submit).letterSpacing).toBe('9px')
+  })
+
   it('forwards slotProps.form to the form element', async () => {
     const user = userEvent.setup()
     render(<Harness slotProps={{ form: { id: 'contact-form' } }} />)
