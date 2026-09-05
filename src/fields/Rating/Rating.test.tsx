@@ -116,10 +116,8 @@ describe('Rating', () => {
    * is. At the default size MUI sizes that icon with `font-size: 24px` and no
    * padding, which is exactly the WCAG 2.5.8 minimum.
    *
-   * Deliberately not run at `size="small"`: MUI drops the icon to 18px there,
-   * which is below 24×24. That is MUI's own sizing, not anything ez-form
-   * declares, and this lane is coverage only — recorded against #106 rather
-   * than fixed here.
+   * `size="small"` is the one documented exemption from that checklist line;
+   * the test below pins it.
    */
   it('the default-size star icons meet 24×24 target size', () => {
     const { container } = render(
@@ -130,5 +128,42 @@ describe('Rating', () => {
     const icons = container.querySelectorAll<HTMLElement>('.MuiRating-icon')
     expect(icons.length).toBeGreaterThan(0)
     icons.forEach(expectTargetSize)
+  })
+
+  /**
+   * **Documented exemption from the ≥24×24 checklist line (#111), not a bug.**
+   * At `size="small"` MUI sizes the star icon with `font-size: 18px` and no
+   * padding, an 18×18 target — below the WCAG 2.5.8 minimum.
+   *
+   * Ruling: `Rating size="small"` is a documented exemption, not an override —
+   * MUI owns the small-variant sizing, and padding a glyph the consumer
+   * explicitly asked to be small is a styling judgement ez-form should not
+   * make — cost if wrong: one control ships below the 24×24 guideline at a
+   * size the consumer opted into.
+   *
+   * So this asserts the 18px MUI actually renders rather than calling
+   * `expectTargetSize`. Pinning the number is the point: if MUI ever changes
+   * the small-variant sizing, this fails and the exemption gets re-decided
+   * instead of drifting silently. `Rating`'s JSDoc tells consumers who need
+   * the larger target how to add padding in their own theme.
+   */
+  it('documents that size="small" renders an 18×18 target, below the 24×24 minimum', () => {
+    const { container } = render(
+      <Form schema={schema} defaultValues={{ stars: 3 }} onSubmit={() => {}}>
+        <Rating name="stars" label="Stars" size="small" />
+      </Form>,
+    )
+    const icons = container.querySelectorAll<HTMLElement>('.MuiRating-icon')
+    expect(icons.length).toBeGreaterThan(0)
+    icons.forEach((icon) => {
+      const style = getComputedStyle(icon)
+      // Same lower-bound box `expectTargetSize` reconstructs for an icon:
+      // padding on both sides of the axis plus the icon's own font-size.
+      expect(style.fontSize).toBe('18px')
+      expect(style.paddingLeft).toBe('0')
+      expect(style.paddingRight).toBe('0')
+      expect(style.paddingTop).toBe('0')
+      expect(style.paddingBottom).toBe('0')
+    })
   })
 })
