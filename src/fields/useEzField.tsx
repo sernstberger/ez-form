@@ -1,6 +1,7 @@
-import { Fragment, useId, type ReactNode } from 'react'
+import { Fragment, useCallback, useId, type ReactNode } from 'react'
 import { useController, type UseControllerReturn } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
+import { useRegisterFocusTarget } from '../Form/FieldFocusContext'
 import { useRequiredIndicator } from '../Form/RequiredIndicatorContext'
 import { useRuleMessages } from '../Form/RuleMessagesContext'
 import { isRequired, normalizeRules, type FieldRules } from '../rules'
@@ -109,6 +110,20 @@ export function useEzField<TValue = unknown>(
   const normalized = normalizeRules(rules, typeof label === 'string' ? label : undefined, messages)
   const controller = useController({ name, rules: normalized })
   const helperTextId = useId()
+  // Fork `field.ref`: hookform still gets the element (it is what `setFocus` and
+  // `shouldFocusError` use), and the form also records it as this field's focus target so
+  // `<FormErrorSummary>` can link to it (#98). Every field already routes `field.ref` to the
+  // element focus should land on — the visible input, the group's first option, the combobox
+  // — so this is the one place that sees all of them without touching a single field file.
+  const registerFocusTarget = useRegisterFocusTarget()
+  const hookformRef = controller.field.ref
+  const fieldRef = useCallback(
+    (element: HTMLElement | null) => {
+      hookformRef(element)
+      registerFocusTarget(name, element)
+    },
+    [hookformRef, registerFocusTarget, name],
+  )
   const invalid = controller.fieldState.invalid
   const errorMessage = controller.fieldState.error?.message
   const required = isRequired(normalized)
@@ -123,6 +138,7 @@ export function useEzField<TValue = unknown>(
     )
   return {
     ...controller,
+    field: { ...controller.field, ref: fieldRef },
     required,
     invalid,
     errorMessage,

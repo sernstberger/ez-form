@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
@@ -6,6 +7,18 @@ import { Form } from './Form'
 import { FormErrorSummary, formErrorSummaryClasses } from './FormErrorSummary'
 import { SubmitButton } from '../SubmitButton'
 import { TextField } from '../fields/TextField'
+import { NumberField } from '../fields/NumberField'
+import { OtpField } from '../fields/OtpField'
+import { Slider } from '../fields/Slider'
+import { Checkbox } from '../fields/Checkbox'
+import { Switch } from '../fields/Switch'
+import { RadioGroup } from '../fields/RadioGroup'
+import { CheckboxGroup } from '../fields/CheckboxGroup'
+import { ToggleButtonGroup } from '../fields/ToggleButtonGroup'
+import { Rating } from '../fields/Rating'
+import { Autocomplete } from '../fields/Autocomplete'
+import { EmailListField } from '../fields/EmailListField'
+import { AddressField } from '../fields/AddressField'
 import { Wizard, type WizardStepDef } from '../Wizard/Wizard'
 import { WizardStep } from '../Wizard/WizardStep'
 import { WizardNav } from '../Wizard/WizardNav'
@@ -16,6 +29,11 @@ const schema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.email('Invalid email address'),
 })
+
+const options = [
+  { value: 'a', label: 'A' },
+  { value: 'b', label: 'B' },
+]
 
 function renderForm() {
   return render(
@@ -202,6 +220,188 @@ describe('FormErrorSummary', () => {
       expect(screen.getByLabelText('Name')).not.toHaveFocus()
       expect(onSubmit).not.toHaveBeenCalled()
     })
+  })
+})
+
+/**
+ * #98. The summary used to find each field's element with
+ * `document.querySelector('[name=…]')`; for a field whose `name` sits on a hidden
+ * input (Base UI's NumberField/OtpField, MUI's Slider/Checkbox/Switch), on the first
+ * option of a group (RadioGroup/CheckboxGroup), or on nothing at all
+ * (ToggleButtonGroup/EmailListField), that found either no element, an element with no
+ * `id`, or the wrong element — so the item rendered an `<a>` with no `href`: no `link`
+ * role, no tab stop, mouse-only. Every field registers its real focus target through
+ * `field.ref`, so that is what the summary reads now. One case per binding shape.
+ */
+describe('FormErrorSummary items are real links for every field shape', () => {
+  /** `getAllByRole` already throws when empty; this only narrows the index type. */
+  const first = (elements: HTMLElement[]): HTMLElement => elements[0]!
+
+  const fieldCases: {
+    name: string
+    element: ReactElement
+    /** How the field's own focus target is found once the link is activated. */
+    focused: () => HTMLElement
+  }[] = [
+    {
+      name: 'NumberField (Base UI hidden name input)',
+      element: <NumberField name="v" label="V" min={100} />,
+      focused: () => screen.getByLabelText('V'),
+    },
+    {
+      name: 'OtpField (Base UI hidden name input)',
+      element: <OtpField name="v" label="V" />,
+      focused: () => first(screen.getAllByRole('textbox')),
+    },
+    {
+      name: 'Slider (MUI hidden range input)',
+      element: <Slider name="v" label="V" />,
+      focused: () => screen.getByRole('slider'),
+    },
+    {
+      name: 'Checkbox (MUI hidden checkbox input)',
+      element: <Checkbox name="v" label="V" />,
+      focused: () => screen.getByRole('checkbox'),
+    },
+    {
+      name: 'Switch (MUI hidden checkbox input)',
+      element: <Switch name="v" label="V" />,
+      focused: () => screen.getByRole('switch'),
+    },
+    {
+      name: 'RadioGroup (name on the first option)',
+      element: <RadioGroup name="v" label="V" options={options} />,
+      focused: () => first(screen.getAllByRole('radio')),
+    },
+    {
+      name: 'CheckboxGroup (name on the first option)',
+      element: <CheckboxGroup name="v" label="V" options={options} />,
+      focused: () => first(screen.getAllByRole('checkbox')),
+    },
+    {
+      name: 'ToggleButtonGroup (no element carries name)',
+      element: <ToggleButtonGroup name="v" label="V" options={options} />,
+      focused: () => first(screen.getAllByRole('button', { name: /^[AB]$/ })),
+    },
+    {
+      name: 'Rating (name is on every radio, none of them the focus target)',
+      element: <Rating name="v" label="V" />,
+      focused: () => first(screen.getAllByRole('radio')),
+    },
+    {
+      name: 'Autocomplete (name on the hidden value input)',
+      element: <Autocomplete name="v" label="V" options={options} />,
+      focused: () => screen.getByRole('combobox'),
+    },
+    {
+      // Composes Autocomplete, so it registers through that field's own `useEzField`;
+      // listed separately because it is one of the shapes that carried no `name` in the
+      // DOM at all, which is what made its summary item unreachable.
+      name: 'EmailListField (no element carries name)',
+      element: <EmailListField name="v" label="V" />,
+      focused: () => screen.getByRole('combobox'),
+    },
+  ]
+
+  it.each(fieldCases)('$name', async ({ element, focused }) => {
+    const user = userEvent.setup()
+    render(
+      <Form
+        schema={z.object({ v: z.any().refine(() => false, 'V is wrong') })}
+        defaultValues={{ v: undefined }}
+        onSubmit={() => {}}
+      >
+        <FormErrorSummary />
+        {element}
+        <SubmitButton>Submit</SubmitButton>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    const summary = await findSummary()
+    // A real link: role, and an href that resolves to the field's own focus target.
+    const link = await within(summary).findByRole('link', { name: 'V is wrong' })
+    const target = focused()
+    await waitFor(() => expect(link).toHaveAttribute('href', `#${target.id}`))
+    expect(target.id).not.toBe('')
+
+    // Tab reaches it — the heading holds focus after the failed submit, and the link
+    // is the next thing in the tab order inside the summary.
+    const heading = within(summary).getByRole('heading', { name: 'There is a problem' })
+    await waitFor(() => expect(heading).toHaveFocus())
+    await user.tab()
+    expect(link).toHaveFocus()
+
+    // Activation focuses the visible control, not the hidden name input.
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(focused()).toHaveFocus())
+  })
+
+  it('nested paths (AddressField) link to their own leaf control', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form
+        schema={z.object({
+          addr: z.object({
+            street: z.string(),
+            street2: z.string(),
+            city: z.string().min(1, 'City is required'),
+            state: z.string(),
+            zip: z.string(),
+          }),
+        })}
+        defaultValues={{ addr: { street: '', street2: '', city: '', state: '', zip: '' } }}
+        onSubmit={() => {}}
+      >
+        <FormErrorSummary />
+        <AddressField name="addr" />
+        <SubmitButton>Submit</SubmitButton>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    const summary = await findSummary()
+    const link = await within(summary).findByRole('link', { name: 'City is required' })
+    const city = screen.getByLabelText(/City/)
+    await waitFor(() => expect(link).toHaveAttribute('href', `#${city.id}`))
+    await user.click(link)
+    await waitFor(() => expect(city).toHaveFocus())
+  })
+
+  it('has no accessibility violations with a Base UI-backed field listed', async () => {
+    const user = userEvent.setup()
+    const { container } = render(
+      <Form
+        schema={z.object({ v: z.number().min(100, 'V is too small') })}
+        defaultValues={{}}
+        onSubmit={() => {}}
+      >
+        <FormErrorSummary />
+        <NumberField name="v" label="V" min={100} />
+        <SubmitButton>Submit</SubmitButton>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    await findSummary()
+    await expectNoA11yViolations(container)
+  })
+
+  it("leaves a control's own id alone", async () => {
+    const user = userEvent.setup()
+    render(
+      <Form
+        schema={z.object({ name: z.string().min(1, 'Name is required') })}
+        defaultValues={{ name: '' }}
+        onSubmit={() => {}}
+      >
+        <FormErrorSummary />
+        <TextField name="name" label="Name" id="my-own-id" />
+        <SubmitButton>Submit</SubmitButton>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    const summary = await findSummary()
+    const link = within(summary).getByRole('link', { name: 'Name is required' })
+    expect(screen.getByLabelText('Name')).toHaveAttribute('id', 'my-own-id')
+    await waitFor(() => expect(link).toHaveAttribute('href', '#my-own-id'))
   })
 })
 

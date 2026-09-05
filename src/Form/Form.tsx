@@ -33,6 +33,7 @@ import { ezResolver } from './ezResolver'
 import { useConfirm, type ConfirmOptions } from '../ConfirmDialog'
 import { AssistedContext } from './AssistedContext'
 import { ErrorSummaryContext } from './ErrorSummaryContext'
+import { createFieldFocusStore, FieldFocusContext } from './FieldFocusContext'
 import { LiveRegion, type LiveRegionProps } from './LiveRegion'
 import { RequiredIndicatorContext } from './RequiredIndicatorContext'
 import { RuleMessagesContext } from './RuleMessagesContext'
@@ -400,6 +401,14 @@ function FormImpl<TIn extends FieldValues, TOut>(
     () => ({ registerErrorSummary, errorSummaryCount, failedConfirmAttempt }),
     [registerErrorSummary, errorSummaryCount, failedConfirmAttempt],
   )
+  // The id of every mounted field's focus target, so <FormErrorSummary> can point an `href`
+  // at it (#98). Written by `useEzField`'s forked `field.ref`, read by the summary — see
+  // FieldFocusContext for the store's shape and why it is a store rather than form state.
+  const focusTargetIdPrefix = useId()
+  const fieldFocusContext = useMemo(
+    () => createFieldFocusStore(focusTargetIdPrefix),
+    [focusTargetIdPrefix],
+  )
   const methods = useForm<TIn, unknown, TOut>({
     resolver: ezResolver(schema, ruleMessages),
     defaultValues: wrappedDefaultValues,
@@ -559,53 +568,55 @@ function FormImpl<TIn extends FieldValues, TOut>(
   return (
     <FormProvider {...methods}>
       <ErrorSummaryContext.Provider value={errorSummaryContext}>
-        <FormRoot
-          noValidate
-          {...formProps}
-          autoComplete={autoComplete}
-          className={`${formClasses.root}${className ? ` ${className}` : ''}`}
-          aria-labelledby={ariaLabelledBy ?? (title != null ? titleProps.id : undefined)}
-          aria-describedby={
-            ariaDescribedBy ?? (effectiveDescription != null ? descriptionProps.id : undefined)
-          }
-          onSubmit={guardedSubmit}
-        >
-          {title != null && (
-            <FormTitle
-              {...titleProps}
-              className={`${formClasses.title}${titleProps.className ? ` ${titleProps.className}` : ''}`}
-            >
-              {title}
-            </FormTitle>
-          )}
-          {effectiveDescription != null && (
-            <FormDescription
-              {...descriptionProps}
-              className={`${formClasses.description}${descriptionProps.className ? ` ${descriptionProps.className}` : ''}`}
-            >
-              {effectiveDescription}
-            </FormDescription>
-          )}
-          <AssistedContext.Provider value={assisted}>
-            <RequiredIndicatorContext.Provider value={{ requiredIndicator, optionalText }}>
-              <RuleMessagesContext.Provider value={ruleMessages}>
-                {children}
-              </RuleMessagesContext.Provider>
-            </RequiredIndicatorContext.Provider>
-          </AssistedContext.Provider>
-          {/*
+        <FieldFocusContext.Provider value={fieldFocusContext}>
+          <FormRoot
+            noValidate
+            {...formProps}
+            autoComplete={autoComplete}
+            className={`${formClasses.root}${className ? ` ${className}` : ''}`}
+            aria-labelledby={ariaLabelledBy ?? (title != null ? titleProps.id : undefined)}
+            aria-describedby={
+              ariaDescribedBy ?? (effectiveDescription != null ? descriptionProps.id : undefined)
+            }
+            onSubmit={guardedSubmit}
+          >
+            {title != null && (
+              <FormTitle
+                {...titleProps}
+                className={`${formClasses.title}${titleProps.className ? ` ${titleProps.className}` : ''}`}
+              >
+                {title}
+              </FormTitle>
+            )}
+            {effectiveDescription != null && (
+              <FormDescription
+                {...descriptionProps}
+                className={`${formClasses.description}${descriptionProps.className ? ` ${descriptionProps.className}` : ''}`}
+              >
+                {effectiveDescription}
+              </FormDescription>
+            )}
+            <AssistedContext.Provider value={assisted}>
+              <RequiredIndicatorContext.Provider value={{ requiredIndicator, optionalText }}>
+                <RuleMessagesContext.Provider value={ruleMessages}>
+                  {children}
+                </RuleMessagesContext.Provider>
+              </RequiredIndicatorContext.Provider>
+            </AssistedContext.Provider>
+            {/*
             Rendered unconditionally, empty at rest: a live region has to be in
             the DOM before its text arrives, or assistive tech has no prior
             content to observe changing and the first announcement is missed.
           */}
-          <FormStatus
-            {...slotProps?.liveRegion}
-            message={announcement.text}
-            announcementKey={announcement.seq}
-            className={`${formClasses.status}${slotProps?.liveRegion?.className ? ` ${slotProps.liveRegion.className}` : ''}`}
-          />
-          {dialog}
-        </FormRoot>
+            <FormStatus
+              {...slotProps?.liveRegion}
+              message={announcement.text}
+              announcementKey={announcement.seq}
+              className={`${formClasses.status}${slotProps?.liveRegion?.className ? ` ${slotProps.liveRegion.className}` : ''}`}
+            />
+            {dialog}
+          </FormRoot>
+        </FieldFocusContext.Provider>
       </ErrorSummaryContext.Provider>
     </FormProvider>
   )
