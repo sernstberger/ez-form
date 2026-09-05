@@ -11,13 +11,14 @@ import {
 import Button, { type ButtonProps } from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
-import FormControl from '@mui/material/FormControl'
+import FormControl, { type FormControlProps } from '@mui/material/FormControl'
 import FormHelperText from '@mui/material/FormHelperText'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import Stack from '@mui/material/Stack'
 import { styled } from '@mui/material/styles'
 import UploadFile from '@mui/icons-material/UploadFile'
 import { ChipDeleteIcon } from '../ChipDeleteIcon'
+import { hasLabel } from '../../devWarn'
 import { useEzField } from '../useEzField'
 import { useEzFormContext } from '../../useEzFormContext'
 import { mergeDisabled } from '../mergeDisabled'
@@ -107,10 +108,33 @@ export type FileFieldValue = File | null | File[]
 
 type PickerButtonProps = Omit<ButtonProps<'label'>, 'component' | 'htmlFor' | 'children' | 'role'>
 
-export type FileFieldProps = {
+/**
+ * Extends the MUI props type the field is actually built on: the root element is a
+ * `FormControl`, and `FormControlProps` resolves to `FormControlOwnProps &
+ * React.HTMLAttributes<HTMLDivElement>` — so the whole `aria-*` surface, `className`, `id`
+ * and `style` come from MUI rather than being re-declared here (#118, PHILOSOPHY rule 1).
+ * Before this the type was a closed object literal, and a consumer could not pass
+ * `aria-describedby` / `aria-label` / `aria-labelledby` at all.
+ *
+ * Omitted because the binding owns them: `error` (`f.invalid`), `children` (the picker, drop
+ * zone and chip list), `component` (the root is a `div`), `required` (re-supplied by
+ * `FieldRules` as a validation rule, like every sibling) and `onChange` (re-declared below
+ * with the field's `(event, value)` signature).
+ */
+export type FileFieldProps = Omit<
+  FormControlProps,
+  'error' | 'children' | 'component' | 'required' | 'onChange'
+> & {
   name: string
-  /** The button text, and the input's accessible name. */
-  label: ReactNode
+  /**
+   * The button text, and the input's accessible name.
+   *
+   * Optional since #118: a field named by `aria-label` / `aria-labelledby` alone is the
+   * family's other naming path, and it only became expressible here once the props type
+   * admitted those attributes. With no label and no ARIA name, `useEzField` dev-warns —
+   * the same check every other field gets.
+   */
+  label?: ReactNode
   helperText?: ReactNode
   disabled?: boolean
   /**
@@ -238,6 +262,15 @@ export function FileField(inProps: FileFieldProps) {
     onChange,
     required,
     validate,
+    // Destructured out of `rest` on purpose. Left in it they reach the `FormControl`
+    // root, which names or describes the wrapper `div` while the `<input type="file">`
+    // — the element that actually carries the role — stays anonymous (#99, #104). They
+    // go onto the input below instead, through the hook that also owns the missing-label
+    // warning, so one place decides what names this field.
+    'aria-label': ariaLabel,
+    'aria-labelledby': ariaLabelledBy,
+    'aria-describedby': ariaDescribedBy,
+    ...rest
   } = useDefaultProps({ props: inProps, name: 'EzFileField' })
   // The reason the last pick/drop rejected a file. Held here rather than pushed
   // through `setError` so it composes exactly like `required`: the built-in
@@ -267,6 +300,8 @@ export function FileField(inProps: FileFieldProps) {
           }
         : validate,
     },
+    'aria-label': ariaLabel,
+    'aria-labelledby': ariaLabelledBy,
   })
   const { trigger } = useEzFormContext('FileField')
   const id = useId()
@@ -338,10 +373,17 @@ export function FileField(inProps: FileFieldProps) {
   // supplies — see #62.
   const pickerButtonProps = { variant: 'outlined' as const, ...buttonProps, ...slotProps?.button }
 
+  // With no visible `label` the picker renders no text of its own, so the consumer's ARIA
+  // name has to reach it too: this element is both the visible affordance and the `<label>`
+  // for the input, and an empty one would be an unnamed control on screen even though the
+  // input beneath it is named. With a label there is nothing to add — the text is the name.
+  const pickerNameA11y = hasLabel(label) ? null : f.nameA11y
+
   const picker = (
     <Button
       startIcon={<UploadFile />}
       {...pickerButtonProps}
+      {...pickerNameA11y}
       component="label"
       htmlFor={id}
       disabled={isDisabled}
@@ -365,6 +407,16 @@ export function FileField(inProps: FileFieldProps) {
         required={f.required}
         disabled={isDisabled}
         {...f.inputA11y(text)}
+        // The consumer's own name, on the element that carries the role. Without a visible
+        // `label` the wrapping `<label>` Button has no text, so this is the only thing
+        // naming the input; with one, `aria-labelledby`/`aria-label` here outranks the
+        // label element, which is what a consumer passing them is asking for.
+        {...f.nameA11y}
+        // After `inputA11y`, which sets the description to the helper-text id alone. An
+        // accessible description is a list: the consumer's text and the error message are
+        // both meant to be read, so they are joined rather than one replacing the other
+        // (#104, #118).
+        aria-describedby={f.describedBy(ariaDescribedBy, text)}
         onBlur={() => f.field.onBlur()}
         onChange={(e) => {
           add(e, Array.from(e.target.files ?? []))
@@ -382,10 +434,16 @@ export function FileField(inProps: FileFieldProps) {
 
   return (
     <FileFieldRoot
+      // `{...rest}` first, before every binding-owned prop, so a consumer prop that collides
+      // with one cannot displace it — the order `TextField`, `Autocomplete` and `NumberField`
+      // already use. This is what makes the widened props type mean something: the
+      // `FormControl` props the type now admits (`fullWidth`, `margin`, `size`, `className`,
+      // `id`, `style`, the non-naming `aria-*`) actually reach the root.
+      {...rest}
       error={f.invalid}
       disabled={isDisabled}
       required={f.required}
-      className={fileFieldClasses.root}
+      className={`${fileFieldClasses.root}${rest.className ? ` ${rest.className}` : ''}`}
     >
       {dropzone ? (
         // Not focusable and given no role on purpose: the Button inside is the

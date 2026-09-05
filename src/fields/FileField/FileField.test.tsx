@@ -23,18 +23,22 @@ describeFieldContract({
   label: 'Resume',
   schema,
   defaultValues: { resume: null },
-  renderNamed: (name) => <FileField name="resume" label={name} />,
+  // Label-less and named by `aria-label` alone, which is the shape row 1 is about — and
+  // which only became expressible once #118 made `label` optional. It used to pass a visible
+  // `label`, where the name would have been answered by the label element whether or not the
+  // ARIA attribute reached the control.
+  renderNamed: (name) => <FileField name="resume" aria-label={name} />,
   render: (props) => <FileField name="resume" label="Resume" {...props} />,
-  // `<input type="file">` has no role, so the name is read through the label query.
-  findNamed: (name) => screen.getByLabelText(new RegExp(`^${name}`)),
-  exempt: {
-    // #118: `FileFieldProps` is a closed object literal with no `...rest` and no
-    // `aria-*` keys, so a consumer cannot pass `aria-describedby` at all — there is
-    // nothing for the line to preserve. That is an API gap, not a dropped
-    // description: unlike the eleven fields row 8 fixed, this one never receives the
-    // attribute. Delete this entry when #118 widens the props type.
-    consumerDescribedBy: '#118 — FileFieldProps admits no aria-describedby to preserve',
-  },
+  // `<input type="file">` has no role, so the name is read through the label query. Narrowed
+  // to the input by `selector`: under an ARIA-only name the picker Button carries the same
+  // name (it is the visible affordance and would otherwise be an unnamed control — see
+  // `pickerNameA11y`), so an unqualified query matches two elements. The input is the one
+  // this line is about.
+  findNamed: (name) =>
+    screen.getByLabelText(new RegExp(`^${name}`), { selector: 'input[type="file"]' }),
+  renderDescribed: (id, props) => (
+    <FileField name="resume" label="Resume" aria-describedby={id} {...props} />
+  ),
   getControl: () => fileInput('Resume'),
   expectSubmitted: { resume: pdf },
   themeDefault: {
@@ -181,6 +185,79 @@ describe('FileField', () => {
     await user.upload(fileInput('Resume'), pdf)
     await user.upload(fileInput('Resume'), pdf)
     expect(onChange).toHaveBeenCalledTimes(2)
+  })
+
+  // #118. `FileFieldProps` used to be a closed object literal, so none of these compiled at
+  // all; it now extends `FormControlProps`, and the naming/describing attributes are routed
+  // to the `<input type="file">` rather than left on the `FormControl` wrapper.
+  describe('consumer ARIA (#118)', () => {
+    it('joins a consumer aria-describedby with the error on the file input', async () => {
+      const user = userEvent.setup()
+      render(
+        <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+          <span id="hint">PDF only, under 5 MB</span>
+          <FileField name="resume" label="Resume" aria-describedby="hint" required />
+          <button type="submit">Go</button>
+        </Form>,
+      )
+      // Present from the first render, not only after an error.
+      expect(fileInput('Resume')).toHaveAccessibleDescription('PDF only, under 5 MB')
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      await screen.findByRole('alert')
+      // Both, in that order: the consumer wrote theirs first.
+      expect(fileInput('Resume')).toHaveAccessibleDescription(
+        'PDF only, under 5 MB Resume is required.',
+      )
+    })
+
+    it('aria-label names the file input with no visible label', () => {
+      render(
+        <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+          <FileField name="resume" aria-label="Resume" />
+        </Form>,
+      )
+      const input = screen.getByLabelText('Resume', { selector: 'input[type="file"]' })
+      expect(input).toHaveAttribute('type', 'file')
+      // The picker is the visible affordance and the input's <label>; with no text of its
+      // own it would be an unnamed control, so it carries the name too.
+      expect(screen.getByLabelText('Resume', { selector: 'label' })).toBeInTheDocument()
+    })
+
+    it('aria-labelledby names the file input with no visible label', () => {
+      render(
+        <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+          <span id="cv-label">Curriculum vitae</span>
+          <FileField name="resume" aria-labelledby="cv-label" />
+        </Form>,
+      )
+      expect(
+        screen.getByLabelText('Curriculum vitae', { selector: 'input[type="file"]' }),
+      ).toBeInTheDocument()
+    })
+
+    it('has no axe violations named by ARIA alone', async () => {
+      const { container } = render(
+        <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+          <FileField name="resume" aria-label="Resume" dropzone />
+        </Form>,
+      )
+      await expectNoA11yViolations(container)
+    })
+
+    // The widened type is `FormControlProps`, so the root now takes the FormControl props it
+    // always rendered but could never be given — and a consumer `className` composes with
+    // the slot class rather than replacing it.
+    it('forwards FormControl props and a className to the root', () => {
+      const { container } = render(
+        <Form schema={schema} defaultValues={{ resume: null }} onSubmit={() => {}}>
+          <FileField name="resume" label="Resume" fullWidth className="mine" id="resume-field" />
+        </Form>,
+      )
+      const root = container.querySelector(`.${fileFieldClasses.root}`)!
+      expect(root).toHaveClass('mine')
+      expect(root).toHaveClass('MuiFormControl-fullWidth')
+      expect(root).toHaveAttribute('id', 'resume-field')
+    })
   })
 
   it('is themeable: defaultProps.slotProps.button applies to the picker Button', () => {
