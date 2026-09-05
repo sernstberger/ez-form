@@ -4,6 +4,7 @@ import { expectConsole } from './expectConsole'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import type { DefaultValues, FieldValues } from 'react-hook-form'
 import type { z } from 'zod'
+import { renderToString } from 'react-dom/server'
 import { Form } from '../Form'
 import { expectNoA11yViolations } from './axe'
 
@@ -13,7 +14,7 @@ import { expectNoA11yViolations } from './axe'
  * compile error rather than an opt-out that silently never applies.
  */
 export type ContractLine =
-  'ariaLabelNames' | 'consumerDescribedBy' | 'submitPayload' | 'quietInteraction'
+  'ariaLabelNames' | 'consumerDescribedBy' | 'submitPayload' | 'quietInteraction' | 'ssr'
 
 export interface FieldContractProps {
   disabled?: boolean
@@ -303,6 +304,22 @@ export function describeFieldContract<TIn extends FieldValues, TOut>(c: FieldCon
       // `afterEach` is what fails the test; this only has to make the field do the
       // work. `getControl` last so the run cannot pass by rendering nothing.
       expect(c.getControl()).toBeInTheDocument()
+    })
+
+    /*
+     * Row 7 of #102. A field that throws on the server takes the whole page with it,
+     * and nothing else in the suite renders one without a DOM — jsdom is present for
+     * every other line, so a `document` read during render, a `useLayoutEffect`
+     * warning, or a hook that is not SSR-safe all pass unnoticed.
+     *
+     * `renderToString` is the assertion *and* the console check: React logs a hydration
+     * or layout-effect complaint rather than throwing, so the guard in `setup.ts` is
+     * what catches those, and the emitted markup being non-empty is what says the
+     * field rendered at all rather than bailing to nothing.
+     */
+    const ssrExemption = c.exempt?.ssr
+    it.skipIf(ssrExemption)('renders on the server without throwing or logging', () => {
+      expect(renderToString(inForm(c.render({ helperText: 'Some help' })))).not.toBe('')
     })
 
     it('has no accessibility violations in the error state', async () => {
