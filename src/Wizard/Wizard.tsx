@@ -225,9 +225,13 @@ function WizardBody<TIn extends FieldValues>({
 }: WizardBodyProps<TIn>) {
   const { trigger, control, setFocus, getValues } = useEzFormContext('Wizard')
   const { errors, submitCount } = useFormState({ control })
-  // A mounted <FormErrorSummary> moves focus to its own heading on a failed Next; letting
-  // hookform also focus the first invalid field here would fight it — same principle as
-  // <Form>'s own shouldFocusError suppression, applied to this step-local trigger() call.
+  // A <FormErrorSummary> moves focus to its own heading on a failed attempt; letting hookform
+  // also focus the first invalid field would fight it — same principle as <Form>'s own
+  // shouldFocusError suppression, applied here to the step-local trigger() below and to the
+  // failed-submit jump's setFocus(). "Declared", not "currently mounted", is the question
+  // being asked: a wizard's summary lives inside a step, and <WizardStep> unmounts every step
+  // but the current one, so a mount check answers `false` for the whole time the user is
+  // anywhere else — including the submit that triggers the jump (#123). See ErrorSummaryStore.
   const hasErrorSummary = useHasErrorSummary()
   // A failed Next raises errors through `trigger()`, which never sets hookform's
   // `isSubmitted` — so without telling `<Form>`, hookform's own change-time re-validation
@@ -438,10 +442,12 @@ function WizardBody<TIn extends FieldValues>({
   )
 
   // A failed submit: `submitCount` went up and left errors behind. hookform focused the
-  // first errored field, which does nothing when that field is on another step or on no
-  // step at all — so the wizard navigates to the step that owns it and focuses it there
-  // once it mounts. The ref makes this fire once per submit rather than on every render
-  // that follows one (and never on mount, where submitCount is already 0).
+  // first errored field — unless a `<FormErrorSummary>` is declared, in which case `<Form>`
+  // suppressed that — and either way its focus does nothing when the field is on another step
+  // or on no step at all. So the wizard navigates to the step that owns it and, when no
+  // summary is there to own the arrival instead, focuses it once it mounts (see the effect
+  // below). The ref makes this fire once per submit rather than on every render that follows
+  // one (and never on mount, where submitCount is already 0).
   const handledSubmit = useRef(submitCount)
   const [focusTarget, setFocusTarget] = useState<{ id: string; path: string } | null>(null)
 
@@ -497,8 +503,17 @@ function WizardBody<TIn extends FieldValues>({
     }
     // Clearing the one-shot focus target now that it has been used.
     setFocusTarget(null)
-    setFocus(focusTarget.path)
-  }, [focusTarget, current.id, setFocus])
+    // A `<FormErrorSummary>` mounts into this arrival and focuses its own heading, so the
+    // field must not be focused as well — the same suppression `validateCurrent` applies to
+    // its own `trigger()` above, and the one `<Form>` applies to hookform's `shouldFocusError`.
+    //
+    // This is the half of #123 that made the failure a settled wrong state rather than a
+    // near-miss: hookform's `setFocus` defers `fieldRef.focus()` inside a bare `setTimeout`
+    // (see its source), so this call landed a whole macrotask *after* the summary's heading
+    // effect and took focus back for good. The summary heading won the commit and lost the
+    // tick; a test sampling in between saw the right answer and a user never did.
+    if (!hasErrorSummary) setFocus(focusTarget.path)
+  }, [focusTarget, current.id, setFocus, hasErrorSummary])
 
   // Memoized separately from `stepChange` so the context object below keeps its identity on a
   // render where only the announcement `text` changed.

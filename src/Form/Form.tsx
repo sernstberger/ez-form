@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ElementType,
   type FormEvent,
   type FormHTMLAttributes,
@@ -32,7 +33,7 @@ import type { z } from 'zod'
 import { ezResolver } from './ezResolver'
 import { useConfirm, type ConfirmOptions } from '../ConfirmDialog'
 import { AssistedContext } from './AssistedContext'
-import { ErrorSummaryContext } from './ErrorSummaryContext'
+import { createErrorSummaryStore, ErrorSummaryContext } from './ErrorSummaryContext'
 import { createFieldFocusStore, FieldFocusContext } from './FieldFocusContext'
 import { LiveRegion, type LiveRegionProps } from './LiveRegion'
 import { RequiredIndicatorContext } from './RequiredIndicatorContext'
@@ -386,14 +387,11 @@ function FormImpl<TIn extends FieldValues, TOut>(
             throw error
           })
       : defaultValues
-  // How many mounted <FormErrorSummary> are inside this form. hookform's own "focus the
-  // first invalid field" (shouldFocusError) would fight a summary that moves focus to its
-  // heading instead, so it is suppressed for as long as at least one is mounted.
-  const [errorSummaryCount, setErrorSummaryCount] = useState(0)
-  const registerErrorSummary = useCallback(() => {
-    setErrorSummaryCount((n) => n + 1)
-    return () => setErrorSummaryCount((n) => n - 1)
-  }, [])
+  // Whether this form has a <FormErrorSummary> at all. hookform's own "focus the first invalid
+  // field" (shouldFocusError) would fight a summary that moves focus to its heading instead,
+  // so it is suppressed once one has been declared. A store rather than state, and "declared"
+  // rather than "currently mounted", both for #123 — see ErrorSummaryStore.
+  const errorSummaryStore = useMemo(() => createErrorSummaryStore(), [])
   // Bumped when the confirm path's own pre-submit trigger() (below) comes back invalid — see
   // ErrorSummaryContext's failedConfirmAttempt doc for why a plain form's summary needs this.
   const [failedConfirmAttempt, setFailedConfirmAttempt] = useState(0)
@@ -406,12 +404,22 @@ function FormImpl<TIn extends FieldValues, TOut>(
   const reportFailedValidationAttempt = useCallback(() => setValidationAttemptFailed(true), [])
   const errorSummaryContext = useMemo(
     () => ({
-      registerErrorSummary,
-      errorSummaryCount,
+      store: errorSummaryStore,
       failedConfirmAttempt,
       reportFailedValidationAttempt,
     }),
-    [registerErrorSummary, errorSummaryCount, failedConfirmAttempt, reportFailedValidationAttempt],
+    [errorSummaryStore, failedConfirmAttempt, reportFailedValidationAttempt],
+  )
+  // Subscribed, because this is the value hookform reads back off `control._options` inside
+  // `handleSubmit`, and `useForm` only refreshes `_options` on a render of *this* component: a
+  // summary declaring itself deeper in the tree does not re-render `<Form>` on its own, so
+  // without a subscription the suppression below would never take effect at all. `declared`
+  // only ever latches on, so this re-renders `<Form>` exactly once per form — on the commit
+  // where its first summary mounts, long before any submit. See ErrorSummaryStore.
+  const hasErrorSummary = useSyncExternalStore(
+    errorSummaryStore.subscribe,
+    errorSummaryStore.getDeclared,
+    errorSummaryStore.getDeclared,
   )
   // The id of every mounted field's focus target, so <FormErrorSummary> can point an `href`
   // at it (#98). Written by `useEzField`'s forked `field.ref`, read by the summary — see
@@ -463,10 +471,13 @@ function FormImpl<TIn extends FieldValues, TOut>(
     // Ruling: passed directly to useForm rather than written into control._options by a
     // separate effect — react-hook-form's own useForm re-assigns `control._options = props`
     // on every render (unconditionally, not just at mount; see its source), so this option is
-    // already live as errorSummaryCount changes with no extra wiring needed. Cost if wrong: a
-    // summary mounted after the initial render would fail to suppress hookform's own
-    // first-invalid-field focus, so both it and the summary heading would compete for focus.
-    shouldFocusError: errorSummaryCount === 0,
+    // already live as `hasErrorSummary` changes with no extra wiring needed. What it needs in
+    // return is that `<Form>` actually re-render when a summary appears, which is why
+    // `hasErrorSummary` above is subscribed rather than read bare. Cost if wrong: a summary
+    // mounted after the initial render would fail to suppress hookform's own
+    // first-invalid-field focus, so both it and the summary heading would compete for focus —
+    // which is exactly what #123 turned out to be.
+    shouldFocusError: !hasErrorSummary,
   })
   const { isLoading, isDirty, isSubmitting, isSubmitSuccessful } = useFormState({
     control: methods.control,
@@ -592,7 +603,7 @@ function FormImpl<TIn extends FieldValues, TOut>(
         // the `finally` above only releases the gate, it does not swallow. Nothing is stranded
         // either way — `submitting` and the dialog only ever get set after this awaits
         // successfully (`ask` itself never rejects, see useConfirm).
-        const valid = await methods.trigger(undefined, { shouldFocus: errorSummaryCount === 0 })
+        const valid = await methods.trigger(undefined, { shouldFocus: !hasErrorSummary })
         if (!valid) {
           // This path never reaches handleSubmit, so submitCount never increments — a plain
           // form's <FormErrorSummary> (outside a Wizard) needs its own signal that an attempt

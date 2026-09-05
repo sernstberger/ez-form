@@ -187,12 +187,17 @@ own pattern deliberately omits `role="alert"` here so a screen reader doesn't an
 alongside each field's own `role="alert"` helper text — and one link per invalid field showing
 its message. Activating a link (click or Enter) focuses that field via `setFocus`, so it works
 even without a native `href` target. Items disappear as their fields become valid, and the whole
-summary disappears once none are left. While a summary is mounted, `<Form>` (and, inside a
-`Wizard`, `Next`'s own step validation) suppresses react-hook-form's own "focus the first invalid
-field" behavior so the two don't fight over focus.
+summary disappears once none are left. Once a form contains a summary, that form's post-submit
+focus belongs to it: `<Form>` suppresses react-hook-form's own "focus the first invalid field"
+behavior, and inside a `Wizard` so do `Next`'s step validation and the failed-submit jump, so
+nothing fights the heading for focus. This holds even while the summary itself is unmounted —
+a `WizardStep` renders only when it is the current step, so a summary in an earlier step must
+still count when you submit from a later one.
 
 Inside a `Wizard`, place one `<FormErrorSummary />` per `WizardStep`: each shows only that step's
-own `fields` from its last failed `Next`, not the whole form's errors.
+own `fields` from its last failed `Next`, not the whole form's errors. A failed final submit
+navigates back to the first errored step, and the summary that mounts there takes focus and
+says why.
 
 ## Announcements
 
