@@ -23,6 +23,11 @@ describeFieldContract({
   getControl: combobox,
   expectDisabled: (control) => expect(control).toHaveAttribute('aria-disabled', 'true'),
   expectSubmitted: { state: 'CA' },
+  themeDefault: {
+    name: 'EzStateSelect',
+    defaultProps: { territories: true },
+    expect: () => expect(screen.getByRole('combobox', { name: 'State' })).toBeInTheDocument(),
+  },
   interact: async (user) => {
     await user.click(combobox())
     await user.click(await screen.findByRole('option', { name: 'California' }))

@@ -30,6 +30,11 @@ describeFieldContract({
   // (one `onChange`); the payload line types a whole address.
   interactSubmittable: (user) => user.type(input(), 'ada@example.com'),
   expectSubmitted: { email: 'ada@example.com' },
+  themeDefault: {
+    name: 'EzEmailField',
+    defaultProps: { helperText: 'From the theme' },
+    expect: () => expect(screen.getByText('From the theme')).toBeInTheDocument(),
+  },
   interact: (user) => user.type(screen.getByRole('textbox', { name: /Email/ }), 'a'),
 })
 

@@ -37,6 +37,11 @@ describeFieldContract({
   // `123-45-6789` (and masked until the reveal toggle is pressed).
   interactSubmittable: (user) => user.type(input(), '123456789'),
   expectSubmitted: { ssn: '123456789' },
+  themeDefault: {
+    name: 'EzSsnField',
+    defaultProps: { helperText: 'From the theme' },
+    expect: () => expect(screen.getByText('From the theme')).toBeInTheDocument(),
+  },
   interact: (user) => user.type(input(), '1'),
 })
 

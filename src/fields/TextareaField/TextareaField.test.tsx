@@ -45,6 +45,11 @@ describeFieldContract({
   ),
   getControl: textbox,
   expectSubmitted: { bio: 'a' },
+  themeDefault: {
+    name: 'EzTextareaField',
+    defaultProps: { helperText: 'From the theme' },
+    expect: () => expect(screen.getByText('From the theme')).toBeInTheDocument(),
+  },
   interact: (user) => user.type(textbox(), 'a'),
 })
 

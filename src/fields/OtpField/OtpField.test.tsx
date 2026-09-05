@@ -38,6 +38,11 @@ describeFieldContract({
     await user.type(screen.getByRole('textbox', { name: 'Code' }), '1234')
   },
   expectSubmitted: { code: '1234' },
+  themeDefault: {
+    name: 'EzOtpField',
+    defaultProps: { helperText: 'From the theme' },
+    expect: () => expect(screen.getByText('From the theme')).toBeInTheDocument(),
+  },
   interact: async (user) => {
     await user.type(screen.getByRole('textbox', { name: 'Code' }), '1')
   },

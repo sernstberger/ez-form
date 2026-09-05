@@ -99,6 +99,14 @@ describeFieldContract({
   // The whole composite's payload, not just the part the contract drives: the one
   // interaction types into `street`, and the other four keep their empty defaults.
   expectSubmitted: { address: { ...emptyAddress, street: '1' } },
+  // A part label rather than `helperText`: the composite has no top-level helper text
+  // (each part carries its own through `slotProps`), and a renamed part is the most
+  // visible thing a theme can set on this field.
+  themeDefault: {
+    name: 'EzAddressField',
+    defaultProps: { cityLabel: 'Town' },
+    expect: () => expect(screen.getByRole('textbox', { name: 'Town' })).toBeInTheDocument(),
+  },
   interact: (user) => user.type(street(), '1'),
 })
 

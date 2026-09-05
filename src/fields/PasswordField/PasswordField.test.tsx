@@ -34,6 +34,11 @@ describeFieldContract({
   ),
   getControl: input,
   expectSubmitted: { password: 'a' },
+  themeDefault: {
+    name: 'EzPasswordField',
+    defaultProps: { helperText: 'From the theme' },
+    expect: () => expect(screen.getByText('From the theme')).toBeInTheDocument(),
+  },
   interact: (user) => user.type(input(), 'a'),
 })
 

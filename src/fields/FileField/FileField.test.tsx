@@ -37,6 +37,11 @@ describeFieldContract({
   },
   getControl: () => fileInput('Resume'),
   expectSubmitted: { resume: pdf },
+  themeDefault: {
+    name: 'EzFileField',
+    defaultProps: { helperText: 'From the theme' },
+    expect: () => expect(screen.getByText('From the theme')).toBeInTheDocument(),
+  },
   interact: (user) => user.upload(fileInput('Resume'), pdf),
 })
 

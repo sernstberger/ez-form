@@ -29,6 +29,14 @@ describeFieldContract({
   ),
   getControl: () => screen.getByRole('textbox', { name: /Rate/ }),
   expectSubmitted: { rate: 1 },
+  // `helperText`, not `max`: `min`/`max` here are a validation rule and the stepper's
+  // bound, not HTML attributes on the input, so asserting one would be checking the
+  // rule rather than the default's arrival.
+  themeDefault: {
+    name: 'EzPercentField',
+    defaultProps: { helperText: 'From the theme' },
+    expect: () => expect(screen.getByText('From the theme')).toBeInTheDocument(),
+  },
   interact: (user) => user.type(screen.getByRole('textbox', { name: /Rate/ }), '1'),
 })
 

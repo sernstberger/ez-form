@@ -29,6 +29,11 @@ describeFieldContract({
   // `555-555-5555` — which is exactly the divergence this line exists to check.
   interactSubmittable: (user) => user.type(input(), '5555555555'),
   expectSubmitted: { phone: '5555555555' },
+  themeDefault: {
+    name: 'EzPhoneField',
+    defaultProps: { helperText: 'From the theme' },
+    expect: () => expect(screen.getByText('From the theme')).toBeInTheDocument(),
+  },
   interact: (user) => user.type(screen.getByRole('textbox', { name: /Phone/ }), '5'),
 })
 

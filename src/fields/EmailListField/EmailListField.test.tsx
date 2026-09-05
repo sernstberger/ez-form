@@ -53,6 +53,11 @@ describeFieldContract({
   ),
   getControl: combobox,
   expectSubmitted: { to: ['ada@example.com'] },
+  themeDefault: {
+    name: 'EzEmailListField',
+    defaultProps: { helperText: 'From the theme' },
+    expect: () => expect(screen.getByText('From the theme')).toBeInTheDocument(),
+  },
   interact: async (user) => {
     await user.type(combobox(), 'ada@example.com{Enter}')
   },

@@ -4,6 +4,7 @@ import { expectConsole } from './expectConsole'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import type { DefaultValues, FieldValues } from 'react-hook-form'
 import type { z } from 'zod'
+import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { renderToString } from 'react-dom/server'
 import { Form } from '../Form'
 import { expectNoA11yViolations } from './axe'
@@ -129,6 +130,27 @@ export interface FieldContract<TIn extends FieldValues, TOut> {
    * instead; everything else leaves it out and row 3 reuses `interact`.
    */
   interactSubmittable?: (user: UserEvent) => Promise<void>
+  /**
+   * Row 6: a `theme.components.Ez<Name>.defaultProps` value must actually reach the
+   * field. This is **opt-in rather than opt-out**, and deliberately so: a pure
+   * pass-through field keeps MUI's own `Mui*` keys and registers no `Ez*` name of
+   * its own (PHILOSOPHY, "A component ships when"), so there is nothing for the line
+   * to assert. Absence of this key is the honest answer for those fields — an
+   * `exempt` entry would claim a gap that does not exist.
+   *
+   * A field that *does* call `useDefaultProps({ name: 'Ez<Name>' })` states one
+   * default here: which theme key to set, to what, and how to see it in the DOM.
+   * Prefer a prop whose effect is visible without interaction, so the assertion is
+   * about the default arriving rather than about the prop's own behaviour.
+   */
+  themeDefault?: {
+    /** The `Ez<Name>` key, as registered in `src/theme/augmentation.ts`. */
+    name: string
+    /** The `defaultProps` object to put under it. */
+    defaultProps: Record<string, unknown>
+    /** Asserts the default arrived, against the rendered DOM. */
+    expect: () => void
+  }
   /** Changes the value exactly once (one consumer `onChange` call). */
   interact: (user: UserEvent) => Promise<void>
 }
@@ -321,6 +343,28 @@ export function describeFieldContract<TIn extends FieldValues, TOut>(c: FieldCon
     it.skipIf(ssrExemption)('renders on the server without throwing or logging', () => {
       expect(renderToString(inForm(c.render({ helperText: 'Some help' })))).not.toBe('')
     })
+
+    /*
+     * Row 6 of #102. PHILOSOPHY rule 2 says a component's every default must be
+     * reachable from `theme.components`, and `useDefaultProps` is the mechanism — but
+     * nothing asserted that the wiring was actually connected. A field that reads
+     * `inProps` and then destructures the *original* props object, or registers under
+     * a name that does not match its `augmentation.ts` entry, would ship a default no
+     * theme could override, which is the failure rule 2 exists to prevent.
+     *
+     * Opt-in by `themeDefault`: a pure pass-through field registers no `Ez*` key at
+     * all and has nothing to assert here.
+     */
+    const themeDefault = c.themeDefault
+    if (themeDefault) {
+      it('takes a default from theme.components.Ez<Name>.defaultProps', () => {
+        const theme = createTheme({
+          components: { [themeDefault.name]: { defaultProps: themeDefault.defaultProps } },
+        })
+        render(<ThemeProvider theme={theme}>{inForm(c.render({}))}</ThemeProvider>)
+        themeDefault.expect()
+      })
+    }
 
     it('has no accessibility violations in the error state', async () => {
       const user = userEvent.setup()

@@ -29,6 +29,11 @@ describeFieldContract({
   // all nine digits. The value stored is bare digits; the display is `12-3456789`.
   interactSubmittable: (user) => user.type(input(), '123456789'),
   expectSubmitted: { ein: '123456789' },
+  themeDefault: {
+    name: 'EzFeinField',
+    defaultProps: { helperText: 'From the theme' },
+    expect: () => expect(screen.getByText('From the theme')).toBeInTheDocument(),
+  },
   interact: (user) => user.type(screen.getByRole('textbox', { name: /EIN/ }), '1'),
 })
 

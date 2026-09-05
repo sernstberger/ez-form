@@ -28,6 +28,11 @@ describeFieldContract({
   ),
   getControl: input,
   expectSubmitted: { age: 4 },
+  themeDefault: {
+    name: 'EzNumberField',
+    defaultProps: { helperText: 'From the theme' },
+    expect: () => expect(screen.getByText('From the theme')).toBeInTheDocument(),
+  },
   interact: (user) => user.type(input(), '4'),
 })
 
