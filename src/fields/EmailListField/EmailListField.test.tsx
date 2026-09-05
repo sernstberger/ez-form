@@ -40,13 +40,24 @@ function setup(
 
 describeFieldContract({
   componentName: 'EmailListField',
+  role: 'combobox',
   label: 'To',
   schema: requiredSchema,
   defaultValues: { to: [] },
   errorProps: { required: true },
   errorMessage: 'To is required.',
+  renderNamed: (name) => <EmailListField name="to" aria-label={name} />,
   render: (props) => <EmailListField name="to" label="To" {...props} />,
+  renderDescribed: (id, props) => (
+    <EmailListField name="to" label="To" aria-describedby={id} {...props} />
+  ),
   getControl: combobox,
+  expectSubmitted: { to: ['ada@example.com'] },
+  themeDefault: {
+    name: 'EzEmailListField',
+    defaultProps: { helperText: 'From the theme' },
+    expect: () => expect(screen.getByText('From the theme')).toBeInTheDocument(),
+  },
   interact: async (user) => {
     await user.type(combobox(), 'ada@example.com{Enter}')
   },

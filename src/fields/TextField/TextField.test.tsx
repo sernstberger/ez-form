@@ -12,11 +12,22 @@ const schema = z.object({
 
 describeFieldContract({
   componentName: 'TextField',
+  role: 'textbox',
   label: 'Email',
   schema,
   defaultValues: { email: '' },
+  renderNamed: (name) => <TextField name="email" aria-label={name} />,
   render: (props) => <TextField name="email" label="Email" {...props} />,
+  renderDescribed: (id, props) => (
+    <TextField name="email" label="Email" aria-describedby={id} {...props} />
+  ),
   getControl: () => screen.getByRole('textbox', { name: 'Email' }),
+  // `interact` types one character so the `onChange` line can count one call, and
+  // this schema is `z.email()`, which rejects it — so the payload line needs a
+  // whole address to have a submit to follow.
+  interactSubmittable: (user) =>
+    user.type(screen.getByRole('textbox', { name: 'Email' }), 'a@b.co'),
+  expectSubmitted: { email: 'a@b.co' },
   interact: (user) => user.type(screen.getByRole('textbox', { name: 'Email' }), 'a'),
 })
 

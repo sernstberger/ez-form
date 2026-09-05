@@ -24,8 +24,21 @@ describeFieldContract({
   label: 'Password',
   schema,
   defaultValues: { password: '' },
+  renderNamed: (name) => <PasswordField name="password" aria-label={name} />,
   render: (props) => <PasswordField name="password" label="Password" {...props} />,
+  // A `type="password"` input has no role at all, so its accessible name is read
+  // through the label query — the same accname computation, a different entry point.
+  findNamed: (name) => screen.getByLabelText(name),
+  renderDescribed: (id, props) => (
+    <PasswordField name="password" label="Password" aria-describedby={id} {...props} />
+  ),
   getControl: input,
+  expectSubmitted: { password: 'a' },
+  themeDefault: {
+    name: 'EzPasswordField',
+    defaultProps: { helperText: 'From the theme' },
+    expect: () => expect(screen.getByText('From the theme')).toBeInTheDocument(),
+  },
   interact: (user) => user.type(input(), 'a'),
 })
 

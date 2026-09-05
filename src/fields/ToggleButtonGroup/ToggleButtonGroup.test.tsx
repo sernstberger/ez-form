@@ -22,17 +22,32 @@ const formats = [
 
 describeFieldContract({
   componentName: 'ToggleButtonGroup',
+  role: 'group',
   label: 'Align',
   schema,
   defaultValues: { align: null },
+  renderNamed: (name) => (
+    <ToggleButtonGroup name="align" label="" options={aligns} exclusive aria-label={name} />
+  ),
   render: (props) => (
     <ToggleButtonGroup name="align" label="Align" options={aligns} exclusive {...props} />
   ),
   // The inner MUI group, not the enclosing <fieldset>: that is the element
   // carrying aria-describedby/aria-invalid.
+  renderDescribed: (id, props) => (
+    <ToggleButtonGroup
+      name="align"
+      label="Align"
+      options={aligns}
+      exclusive
+      aria-describedby={id}
+      {...props}
+    />
+  ),
   getControl: () => getInnerGroup('Align'),
   requiredNotAnnounced: true,
   expectDisabled: () => expect(screen.getByRole('button', { name: 'Left' })).toBeDisabled(),
+  expectSubmitted: { align: 'center' },
   interact: (user) => user.click(screen.getByRole('button', { name: 'Center' })),
 })
 

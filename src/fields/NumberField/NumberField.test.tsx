@@ -15,13 +15,24 @@ const input = () => screen.getByRole('textbox', { name: 'Age' })
 
 describeFieldContract({
   componentName: 'NumberField',
+  role: 'textbox',
   label: 'Age',
   schema,
   defaultValues: {},
+  renderNamed: (name) => <NumberField name="age" aria-label={name} />,
   render: ({ onChange, ...props }) => (
     <NumberField name="age" label="Age" onValueChange={onChange} {...props} />
   ),
+  renderDescribed: (id, props) => (
+    <NumberField name="age" label="Age" aria-describedby={id} {...props} />
+  ),
   getControl: input,
+  expectSubmitted: { age: 4 },
+  themeDefault: {
+    name: 'EzNumberField',
+    defaultProps: { helperText: 'From the theme' },
+    expect: () => expect(screen.getByText('From the theme')).toBeInTheDocument(),
+  },
   interact: (user) => user.type(input(), '4'),
 })
 

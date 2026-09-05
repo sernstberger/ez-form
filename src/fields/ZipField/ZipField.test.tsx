@@ -11,11 +11,24 @@ const input = () => screen.getByRole('textbox', { name: 'Zip' })
 
 describeFieldContract({
   componentName: 'ZipField',
+  role: 'textbox',
   label: 'Zip',
   schema,
   defaultValues: { zip: '' },
+  renderNamed: (name) => <ZipField name="zip" aria-label={name} />,
   render: (props) => <ZipField name="zip" label="Zip" {...props} />,
+  renderDescribed: (id, props) => (
+    <ZipField name="zip" label="Zip" aria-describedby={id} {...props} />
+  ),
   getControl: input,
+  // A one-digit ZIP fails the field's own `complete` rule; five digits is a whole one.
+  interactSubmittable: (user) => user.type(input(), '90210'),
+  expectSubmitted: { zip: '90210' },
+  themeDefault: {
+    name: 'EzZipField',
+    defaultProps: { helperText: 'From the theme' },
+    expect: () => expect(screen.getByText('From the theme')).toBeInTheDocument(),
+  },
   interact: (user) => user.type(input(), '9'),
 })
 

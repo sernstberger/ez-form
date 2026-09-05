@@ -17,13 +17,26 @@ const typeDateTime = (name: string, text: string) =>
 
 describeFieldContract({
   componentName: 'DateTimePicker',
+  role: 'group',
   label: 'When',
   schema,
   defaultValues: { when: null },
+  renderNamed: (name) =>
+    withPickers(<DateTimePicker name="when" slotProps={{ textField: { 'aria-label': name } }} />),
   render: (props) => withPickers(<DateTimePicker name="when" label="When" {...props} />),
+  renderDescribed: (id, props) =>
+    withPickers(
+      <DateTimePicker
+        name="when"
+        label="When"
+        slotProps={{ textField: { 'aria-describedby': id } }}
+        {...props}
+      />,
+    ),
   getControl: () => screen.getByRole('group', { name: 'When' }),
   requiredNotAnnounced: true,
   expectDisabled: () => expect(hiddenInput('when')).toBeDisabled(),
+  expectSubmitted: { when: new Date(2030, 0, 15, 9, 30) },
   interact: async () => {
     typeDateTime('when', '01/15/2030 09:30 AM')
   },

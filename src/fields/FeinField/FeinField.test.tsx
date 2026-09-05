@@ -15,11 +15,25 @@ const input = () => screen.getByRole('textbox', { name: /EIN/ }) as HTMLInputEle
 
 describeFieldContract({
   componentName: 'FeinField',
+  role: 'textbox',
   label: 'EIN',
   schema,
   defaultValues: { ein: '' },
+  renderNamed: (name) => <FeinField name="ein" aria-label={name} />,
   render: (props) => <FeinField name="ein" label="EIN" {...props} />,
+  renderDescribed: (id, props) => (
+    <FeinField name="ein" label="EIN" aria-describedby={id} {...props} />
+  ),
   getControl: () => screen.getByRole('textbox', { name: /EIN/ }),
+  // A partial EIN fails the field's own `complete` rule, so the payload line types
+  // all nine digits. The value stored is bare digits; the display is `12-3456789`.
+  interactSubmittable: (user) => user.type(input(), '123456789'),
+  expectSubmitted: { ein: '123456789' },
+  themeDefault: {
+    name: 'EzFeinField',
+    defaultProps: { helperText: 'From the theme' },
+    expect: () => expect(screen.getByText('From the theme')).toBeInTheDocument(),
+  },
   interact: (user) => user.type(screen.getByRole('textbox', { name: /EIN/ }), '1'),
 })
 

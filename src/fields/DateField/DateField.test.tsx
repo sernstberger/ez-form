@@ -41,13 +41,26 @@ void typeGuardFlatOnPasteIsRejected
 
 describeFieldContract({
   componentName: 'DateField',
+  role: 'group',
   label: 'Birthday',
   schema,
   defaultValues: { birthday: null },
+  renderNamed: (name) =>
+    withPickers(<DateField name="birthday" slotProps={{ textField: { 'aria-label': name } }} />),
   render: (props) => withPickers(<DateField name="birthday" label="Birthday" {...props} />),
+  renderDescribed: (id, props) =>
+    withPickers(
+      <DateField
+        name="birthday"
+        label="Birthday"
+        slotProps={{ textField: { 'aria-describedby': id } }}
+        {...props}
+      />,
+    ),
   getControl: () => screen.getByRole('group', { name: 'Birthday' }),
   requiredNotAnnounced: true,
   expectDisabled: () => expect(hiddenInput('birthday')).toBeDisabled(),
+  expectSubmitted: { birthday: new Date(1985, 2, 2) },
   interact: async () => {
     typeDate('birthday', '03/02/1985')
   },

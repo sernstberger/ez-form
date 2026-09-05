@@ -51,9 +51,16 @@ interface BoundTextField {
   onPaste: (event: unknown) => void
   onClear: (event: unknown) => void
   'aria-label'?: string
+  'aria-describedby'?: string
   slotProps: {
     formHelperText: { role?: string }
     inputLabel: { required?: boolean }
+    input: {
+      'aria-label'?: string
+      'aria-labelledby'?: string
+      'aria-describedby'?: string
+      onClick?: () => void
+    }
   }
 }
 
@@ -541,7 +548,68 @@ describe('usePickerField', () => {
         slotProps: { field: { onClear: () => {} }, textField: { 'aria-label': 'Pick a day' } },
       })
       expect(result.current.slotProps.field).toBeDefined()
-      expect(textFieldOf(result.current)['aria-label']).toBe('Pick a day')
+    })
+
+    // #102 row 1 / #99: on the `textField` root the name lands on
+    // `MuiPickersTextField-root`, a `FormControl` div with no role, leaving the
+    // `role="group"` element the user operates anonymous. It is moved to
+    // `slotProps.input` — the one slot `PickersTextField` spreads *after* its own
+    // hard-coded `role="group"` / `aria-labelledby`.
+    it('moves a consumer aria-label off the text field root and onto the group', () => {
+      const { result } = renderPicker({
+        slotProps: { textField: { 'aria-label': 'Pick a day' } },
+      })
+      expect(textFieldOf(result.current)['aria-label']).toBeUndefined()
+      expect(textFieldOf(result.current).slotProps.input['aria-label']).toBe('Pick a day')
+    })
+
+    it('moves a consumer aria-labelledby the same way', () => {
+      const { result } = renderPicker({
+        slotProps: { textField: { 'aria-labelledby': 'ext' } },
+      })
+      expect(textFieldOf(result.current).slotProps.input['aria-labelledby']).toBe('ext')
+    })
+
+    // Absent keys, not `undefined` ones: this object is spread over the props MUI X
+    // built, and an explicit `undefined` would erase the `aria-labelledby` it set
+    // for a labelled picker.
+    it('adds no name keys at all when the consumer passed none', () => {
+      const { result } = renderPicker({})
+      const input = textFieldOf(result.current).slotProps.input
+      expect('aria-label' in input).toBe(false)
+      expect('aria-labelledby' in input).toBe(false)
+    })
+
+    // #102 row 8. MUI X puts the helper text's id on the group and derives it from the
+    // field id, so the merge has to repeat that derivation rather than use the hook's
+    // own `helperTextId` — the two are different ids, and only MUI X's is on the
+    // rendered `<p>`.
+    it('joins a consumer aria-describedby with MUI X’s own helper-text id', () => {
+      const { result } = renderPicker({
+        helperText: 'Some help',
+        slotProps: { textField: { 'aria-describedby': 'mine' } },
+      })
+      const textField = textFieldOf(result.current)
+      // Off the root, where it described a `FormControl` div nothing reads…
+      expect(textField['aria-describedby']).toBeUndefined()
+      // …and onto the group, alongside the helper text's id rather than replacing it.
+      const described = textField.slotProps.input['aria-describedby']
+      expect(described).toMatch(/^mine \S+-helper-text$/)
+    })
+
+    it('leaves MUI X’s description alone when there is nothing to add', () => {
+      const { result } = renderPicker({})
+      expect('aria-describedby' in textFieldOf(result.current).slotProps.input).toBe(false)
+    })
+
+    it('keeps a consumer’s own `slotProps.input` alongside the name', () => {
+      const onClick = () => {}
+      const { result } = renderPicker({
+        slotProps: { textField: { 'aria-label': 'Pick a day', slotProps: { input: { onClick } } } },
+      })
+      const input = textFieldOf(result.current).slotProps.input
+      expect(input.onClick).toBe(onClick)
+      expect(input['aria-label']).toBe('Pick a day')
     })
 
     it('gives the helper text role="alert" only while it shows an error', async () => {

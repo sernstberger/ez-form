@@ -18,12 +18,18 @@ const options = [
 
 describeFieldContract({
   componentName: 'Select',
+  role: 'combobox',
   label: 'Role',
   schema,
   defaultValues: {},
+  renderNamed: (name) => <Select name="role" options={options} aria-label={name} />,
   render: (props) => <Select name="role" label="Role" options={options} {...props} />,
+  renderDescribed: (id, props) => (
+    <Select name="role" label="Role" options={options} aria-describedby={id} {...props} />
+  ),
   getControl: () => screen.getByRole('combobox', { name: 'Role' }),
   expectDisabled: (control) => expect(control).toHaveAttribute('aria-disabled', 'true'),
+  expectSubmitted: { role: 'user' },
   interact: async (user) => {
     await user.click(screen.getByRole('combobox', { name: 'Role' }))
     await user.click(await screen.findByRole('option', { name: 'User' }))

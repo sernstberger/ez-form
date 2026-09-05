@@ -16,17 +16,31 @@ const toppings = [
 
 describeFieldContract({
   componentName: 'CheckboxGroup',
+  role: 'group',
   label: 'Toppings',
   schema,
   defaultValues: { toppings: [] },
+  renderNamed: (name) => (
+    <CheckboxGroup name="toppings" label="" options={toppings} aria-label={name} />
+  ),
   render: (props) => (
     <CheckboxGroup name="toppings" label="Toppings" options={toppings} {...props} />
   ),
   // The inner MUI FormGroup, not the enclosing <fieldset>: that is the element
   // carrying aria-describedby/aria-invalid.
+  renderDescribed: (id, props) => (
+    <CheckboxGroup
+      name="toppings"
+      label="Toppings"
+      options={toppings}
+      aria-describedby={id}
+      {...props}
+    />
+  ),
   getControl: () => getInnerGroup('Toppings'),
   requiredNotAnnounced: true,
   expectDisabled: () => expect(screen.getByRole('checkbox', { name: 'Cheese' })).toBeDisabled(),
+  expectSubmitted: { toppings: [2] },
   interact: (user) => user.click(screen.getByRole('checkbox', { name: 'Ham' })),
 })
 

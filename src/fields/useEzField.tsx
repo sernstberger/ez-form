@@ -97,15 +97,17 @@ export type UseEzFieldReturn = UseControllerReturn & {
    * still applies whenever there is no error to announce, so only the alert case
    * is owned here.
    *
-   * Whether the hook's `helperTextId` is pinned onto the slot depends on who wires
-   * the control's `aria-describedby`, and the two must agree:
+   * The hook's `helperTextId` is always pinned onto the slot, because every field
+   * points its control's `aria-describedby` at that id and the two must agree —
+   * `TextField` and `Autocomplete` through `describedBy` on `slotProps.htmlInput`,
+   * `NumberField` and `OtpField` through `describedBy` on their `inputProps`, the
+   * `FieldFrame` family through `bound.inputA11y`.
    *
-   * - `TextField` (via `describedBy` on `slotProps.htmlInput`), `NumberField` and
-   *   `OtpField` (via `inputA11y`) all point the control at `helperTextId`, so the
-   *   helper text must carry it. They get it — it is the default.
-   * - `Autocomplete` leaves the wiring to MUI, which generates its own id and links
-   *   the input to that. Pinning ours there would orphan the link and strip the
-   *   control's accessible description, so it opts out with `pinId: false`.
+   * `Autocomplete` used to opt out of the pin (a `pinId: false` option) on the
+   * grounds that MUI generated its own id and linked the input to that. That was
+   * also why a consumer's own `aria-describedby` could never reach the combobox:
+   * MUI writes the whole attribute. It owns the attribute itself now, so the
+   * option is gone and the helper has one shape again (#102 row 8).
    *
    * Handles the function form MUI accepts for a slot's props.
    *
@@ -118,7 +120,6 @@ export type UseEzFieldReturn = UseControllerReturn & {
     (): HelperTextA11y
     <TOwnerState, TProps extends object>(
       consumer: HelperTextSlotProps<TOwnerState, TProps>,
-      options?: { pinId?: boolean },
     ): TProps | ((ownerState: TOwnerState) => TProps)
   }
   /**
@@ -208,18 +209,17 @@ export function useEzField<TValue = unknown>(
     helperTextA11y: { id: helperTextId, role: invalid ? 'alert' : undefined },
     helperTextSlotProps: <TOwnerState, TProps extends object>(
       consumer?: HelperTextSlotProps<TOwnerState, TProps>,
-      { pinId = true }: { pinId?: boolean } = {},
     ) => {
       // Last, and deliberately not merged: while an error shows, the live region is
       // the binding's. With no error the `role` key is left off entirely, so a
       // consumer's own `role` survives the spread — `role: undefined` would erase it.
       const owned = {
-        ...(pinId ? { id: helperTextId } : null),
+        id: helperTextId,
         ...(invalid ? { role: 'alert' as const } : null),
       }
       // No consumer channel: the plain object, matching the no-argument overload.
       // `role: undefined` is stated so the shape is always `HelperTextA11y`; `owned`
-      // then supplies `alert` under error, and `id` only when `pinId` asked for it.
+      // then supplies the id, and `alert` under error.
       if (consumer === undefined) return { role: undefined, ...owned }
       // The function form stays a function, so MUI still resolves it with the real
       // ownerState; calling it here would hand the consumer an ownerState we do not have.

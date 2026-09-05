@@ -14,6 +14,7 @@ const setSlider = (input: HTMLElement, value: number) =>
 
 describeFieldContract({
   componentName: 'Slider',
+  role: 'slider',
   label: 'Volume',
   schema,
   defaultValues: { volume: 10 },
@@ -21,8 +22,13 @@ describeFieldContract({
   // the contract's error case uses a failing `max` instead.
   errorProps: { max: 0 },
   errorMessage: 'Volume must be at most 0.',
+  renderNamed: (name) => <Slider name="volume" label="" aria-label={name} />,
   render: (props) => <Slider name="volume" label="Volume" {...props} />,
+  renderDescribed: (id, props) => (
+    <Slider name="volume" label="Volume" aria-describedby={id} {...props} />
+  ),
   getControl: () => screen.getByRole('slider', { name: 'Volume' }),
+  expectSubmitted: { volume: 30 },
   interact: async () => {
     setSlider(screen.getByRole('slider', { name: 'Volume' }), 30)
   },

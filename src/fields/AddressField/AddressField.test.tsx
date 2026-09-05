@@ -79,7 +79,34 @@ describeFieldContract({
       slotProps={{ street: { helperText, onChange, required } }}
     />
   ),
+  role: 'textbox',
+  // The contract runs against the `street` part (see the note above), so row 1's
+  // ARIA name goes to that part rather than to the composite — an `aria-label` on
+  // `<AddressField>` itself names the enclosing fieldset, which is a different
+  // question and is covered by the composite's own cases below.
+  renderNamed: (name) => (
+    <AddressField name="address" slotProps={{ street: { 'aria-label': name } }} />
+  ),
+  // Same reasoning as `renderNamed`: the contract runs against the `street` part, so
+  // the consumer description goes to that part's slot, which is a TextField's props.
+  renderDescribed: (id, { helperText, onChange, required }) => (
+    <AddressField
+      name="address"
+      slotProps={{ street: { 'aria-describedby': id, helperText, onChange, required } }}
+    />
+  ),
   getControl: street,
+  // The whole composite's payload, not just the part the contract drives: the one
+  // interaction types into `street`, and the other four keep their empty defaults.
+  expectSubmitted: { address: { ...emptyAddress, street: '1' } },
+  // A part label rather than `helperText`: the composite has no top-level helper text
+  // (each part carries its own through `slotProps`), and a renamed part is the most
+  // visible thing a theme can set on this field.
+  themeDefault: {
+    name: 'EzAddressField',
+    defaultProps: { cityLabel: 'Town' },
+    expect: () => expect(screen.getByRole('textbox', { name: 'Town' })).toBeInTheDocument(),
+  },
   interact: (user) => user.type(street(), '1'),
 })
 

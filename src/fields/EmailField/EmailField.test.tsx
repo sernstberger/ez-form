@@ -15,11 +15,26 @@ const input = () => screen.getByRole('textbox', { name: /Email/ }) as HTMLInputE
 
 describeFieldContract({
   componentName: 'EmailField',
+  role: 'textbox',
   label: 'Email',
   schema,
   defaultValues: { email: '' },
+  renderNamed: (name) => <EmailField name="email" aria-label={name} />,
   render: (props) => <EmailField name="email" label="Email" {...props} />,
+  renderDescribed: (id, props) => (
+    <EmailField name="email" label="Email" aria-describedby={id} {...props} />
+  ),
   getControl: () => screen.getByRole('textbox', { name: /Email/ }),
+  // A single character is not a valid email, and the field's built-in rule says so —
+  // which blocks the submit this line has to follow. `interact` stays one character
+  // (one `onChange`); the payload line types a whole address.
+  interactSubmittable: (user) => user.type(input(), 'ada@example.com'),
+  expectSubmitted: { email: 'ada@example.com' },
+  themeDefault: {
+    name: 'EzEmailField',
+    defaultProps: { helperText: 'From the theme' },
+    expect: () => expect(screen.getByText('From the theme')).toBeInTheDocument(),
+  },
   interact: (user) => user.type(screen.getByRole('textbox', { name: /Email/ }), 'a'),
 })
 

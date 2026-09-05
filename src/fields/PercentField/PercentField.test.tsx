@@ -16,13 +16,27 @@ const input = () => screen.getByRole('textbox', { name: /Rate/ }) as HTMLInputEl
 
 describeFieldContract({
   componentName: 'PercentField',
+  role: 'textbox',
   label: 'Rate',
   schema,
   defaultValues: {},
+  renderNamed: (name) => <PercentField name="rate" aria-label={name} />,
   render: ({ onChange, ...props }) => (
     <PercentField name="rate" label="Rate" onValueChange={onChange} {...props} />
   ),
+  renderDescribed: (id, props) => (
+    <PercentField name="rate" label="Rate" aria-describedby={id} {...props} />
+  ),
   getControl: () => screen.getByRole('textbox', { name: /Rate/ }),
+  expectSubmitted: { rate: 1 },
+  // `helperText`, not `max`: `min`/`max` here are a validation rule and the stepper's
+  // bound, not HTML attributes on the input, so asserting one would be checking the
+  // rule rather than the default's arrival.
+  themeDefault: {
+    name: 'EzPercentField',
+    defaultProps: { helperText: 'From the theme' },
+    expect: () => expect(screen.getByText('From the theme')).toBeInTheDocument(),
+  },
   interact: (user) => user.type(screen.getByRole('textbox', { name: /Rate/ }), '1'),
 })
 

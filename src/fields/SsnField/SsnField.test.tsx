@@ -23,8 +23,25 @@ describeFieldContract({
   label: 'SSN',
   schema,
   defaultValues: { ssn: '' },
+  renderNamed: (name) => <SsnField name="ssn" aria-label={name} />,
   render: (props) => <SsnField name="ssn" label="SSN" {...props} />,
+  // Masked by default, so the control is a `type="password"` input, which has no
+  // role at all — same as `PasswordField`. The accessible name is read through
+  // the label query instead: the same accname computation, a different entry point.
+  findNamed: (name) => screen.getByLabelText(name),
+  renderDescribed: (id, props) => (
+    <SsnField name="ssn" label="SSN" aria-describedby={id} {...props} />
+  ),
   getControl: input,
+  // A partial SSN fails the field's own `complete` rule. Stored bare, shown as
+  // `123-45-6789` (and masked until the reveal toggle is pressed).
+  interactSubmittable: (user) => user.type(input(), '123456789'),
+  expectSubmitted: { ssn: '123456789' },
+  themeDefault: {
+    name: 'EzSsnField',
+    defaultProps: { helperText: 'From the theme' },
+    expect: () => expect(screen.getByText('From the theme')).toBeInTheDocument(),
+  },
   interact: (user) => user.type(input(), '1'),
 })
 

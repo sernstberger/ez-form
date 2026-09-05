@@ -34,11 +34,22 @@ const textbox = () => screen.getByRole('textbox', { name: 'Bio' })
 // rule, so it never triggers the length meter — that has its own tests below.
 describeFieldContract({
   componentName: 'TextareaField',
+  role: 'textbox',
   label: 'Bio',
   schema,
   defaultValues: { bio: '' },
+  renderNamed: (name) => <TextareaField name="bio" aria-label={name} />,
   render: (props) => <TextareaField name="bio" label="Bio" {...props} />,
+  renderDescribed: (id, props) => (
+    <TextareaField name="bio" label="Bio" aria-describedby={id} {...props} />
+  ),
   getControl: textbox,
+  expectSubmitted: { bio: 'a' },
+  themeDefault: {
+    name: 'EzTextareaField',
+    defaultProps: { helperText: 'From the theme' },
+    expect: () => expect(screen.getByText('From the theme')).toBeInTheDocument(),
+  },
   interact: (user) => user.type(textbox(), 'a'),
 })
 

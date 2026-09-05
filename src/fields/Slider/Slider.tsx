@@ -108,6 +108,10 @@ export function Slider({
       // still reaches MuiSlider through `rest`. No `aria-labelledby`: SliderProps omits
       // it outright (the frame's legend owns the slider's name).
       aria-label={rest['aria-label']}
+      // The consumer's own description, merged with the helper text's id on the
+      // control rather than replaced by it — read, not destructured, so the
+      // (inert) copy on MUI's root through `rest` is unchanged (#102).
+      aria-describedby={rest['aria-describedby']}
       renderControl={({ field, inputA11y, labelId }) => (
         <MuiSlider
           {...rest}

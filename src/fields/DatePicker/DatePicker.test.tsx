@@ -21,13 +21,26 @@ const typeDate = (name: string, text: string) =>
 
 describeFieldContract({
   componentName: 'DatePicker',
+  role: 'group',
   label: 'Start',
   schema,
   defaultValues: { start: null },
+  renderNamed: (name) =>
+    withPickers(<DatePicker name="start" slotProps={{ textField: { 'aria-label': name } }} />),
   render: (props) => withPickers(<DatePicker name="start" label="Start" {...props} />),
+  renderDescribed: (id, props) =>
+    withPickers(
+      <DatePicker
+        name="start"
+        label="Start"
+        slotProps={{ textField: { 'aria-describedby': id } }}
+        {...props}
+      />,
+    ),
   getControl: () => screen.getByRole('group', { name: 'Start' }),
   requiredNotAnnounced: true,
   expectDisabled: () => expect(hiddenInput('start')).toBeDisabled(),
+  expectSubmitted: { start: new Date(2030, 0, 15) },
   interact: async () => {
     typeDate('start', '01/15/2030')
   },

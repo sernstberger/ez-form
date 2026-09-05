@@ -11,12 +11,23 @@ const combobox = () => screen.getByRole('combobox', { name: 'State' })
 
 describeFieldContract({
   componentName: 'StateSelect',
+  role: 'combobox',
   label: 'State',
   schema,
   defaultValues: {},
+  renderNamed: (name) => <StateSelect name="state" aria-label={name} />,
   render: (props) => <StateSelect name="state" label="State" {...props} />,
+  renderDescribed: (id, props) => (
+    <StateSelect name="state" label="State" aria-describedby={id} {...props} />
+  ),
   getControl: combobox,
   expectDisabled: (control) => expect(control).toHaveAttribute('aria-disabled', 'true'),
+  expectSubmitted: { state: 'CA' },
+  themeDefault: {
+    name: 'EzStateSelect',
+    defaultProps: { territories: true },
+    expect: () => expect(screen.getByRole('combobox', { name: 'State' })).toBeInTheDocument(),
+  },
   interact: async (user) => {
     await user.click(combobox())
     await user.click(await screen.findByRole('option', { name: 'California' }))

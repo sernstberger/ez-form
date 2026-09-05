@@ -24,11 +24,17 @@ async function pick(user: ReturnType<typeof userEvent.setup>, name: string) {
 
 describeFieldContract({
   componentName: 'Autocomplete',
+  role: 'combobox',
   label: 'Role',
   schema,
   defaultValues: {},
+  renderNamed: (name) => <Autocomplete name="role" options={roles} aria-label={name} />,
   render: (props) => <Autocomplete name="role" label="Role" options={roles} {...props} />,
+  renderDescribed: (id, props) => (
+    <Autocomplete name="role" label="Role" options={roles} aria-describedby={id} {...props} />
+  ),
   getControl: combobox,
+  expectSubmitted: { role: 'user' },
   interact: (user) => pick(user, 'User'),
 })
 
