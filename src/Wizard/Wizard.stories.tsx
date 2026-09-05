@@ -265,3 +265,47 @@ export const Resume: Story = {
     )
   },
 }
+
+/**
+ * Enter in a field on a non-last step does what clicking Next does: validates this step,
+ * and either advances or shows the step's errors (#116). Enter is left alone wherever a
+ * control already means something by it — inside a textarea (a newline), on a button or
+ * link (that control's own activation), with a modifier held, and in any field that
+ * handles Enter itself: an open `Autocomplete` or `Select` listbox selects the highlighted
+ * option instead, and `EmailListField` commits a chip. The last step is untouched, where
+ * `WizardNav` renders a real `SubmitButton` and native Enter-to-submit already works.
+ *
+ * The `play` presses Enter per keystroke rather than clicking Next, so the keyboard path is
+ * what is exercised. Note it still runs under jsdom in `Wizard.stories.test.tsx` — the
+ * real-browser confirmation for this behaviour lives in the ledger, not in a test file.
+ */
+export const EnterAdvances: Story = {
+  render: (args) => (
+    <Form
+      schema={schema}
+      defaultValues={emptyValues}
+      onSubmit={onSubmit}
+      title="Create your account"
+    >
+      <Stack spacing={3} sx={{ width: 480 }}>
+        <Wizard {...args}>
+          <WizardStepper />
+          <StepsContent />
+          <WizardNav submitLabel="Create account" />
+        </Wizard>
+      </Stack>
+    </Form>
+  ),
+  play: async ({ canvas, userEvent }) => {
+    // Enter with the step still invalid surfaces this step's error and stays put.
+    await userEvent.click(await canvas.findByRole('textbox', { name: /Name/ }))
+    await userEvent.keyboard('{Enter}')
+    await canvas.findByText(/Name is required/)
+
+    // Filled in, the same keystroke advances — no Next click anywhere in this play.
+    await userEvent.type(canvas.getByRole('textbox', { name: /Name/ }), 'Ada')
+    await userEvent.type(canvas.getByRole('textbox', { name: /Email/ }), 'ada@x.io')
+    await userEvent.keyboard('{Enter}')
+    await canvas.findByRole('group', { name: /Plan/ })
+  },
+}
