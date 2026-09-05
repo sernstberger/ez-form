@@ -397,9 +397,21 @@ function FormImpl<TIn extends FieldValues, TOut>(
   // Bumped when the confirm path's own pre-submit trigger() (below) comes back invalid — see
   // ErrorSummaryContext's failedConfirmAttempt doc for why a plain form's summary needs this.
   const [failedConfirmAttempt, setFailedConfirmAttempt] = useState(0)
+  // Whether a validation attempt made outside handleSubmit (a Wizard step's Next, the confirm
+  // path's pre-submit trigger) has come back invalid — see reportFailedValidationAttempt in
+  // ErrorSummaryContext, and the `mode` passed to useForm below, for what it is for. A boolean
+  // rather than a count: nothing needs to distinguish the second failure from the first, and a
+  // count would hand the context a new value on every repeat failure for no reader's benefit.
+  const [validationAttemptFailed, setValidationAttemptFailed] = useState(false)
+  const reportFailedValidationAttempt = useCallback(() => setValidationAttemptFailed(true), [])
   const errorSummaryContext = useMemo(
-    () => ({ registerErrorSummary, errorSummaryCount, failedConfirmAttempt }),
-    [registerErrorSummary, errorSummaryCount, failedConfirmAttempt],
+    () => ({
+      registerErrorSummary,
+      errorSummaryCount,
+      failedConfirmAttempt,
+      reportFailedValidationAttempt,
+    }),
+    [registerErrorSummary, errorSummaryCount, failedConfirmAttempt, reportFailedValidationAttempt],
   )
   // The id of every mounted field's focus target, so <FormErrorSummary> can point an `href`
   // at it (#98). Written by `useEzField`'s forked `field.ref`, read by the summary — see
@@ -414,7 +426,36 @@ function FormImpl<TIn extends FieldValues, TOut>(
     defaultValues: wrappedDefaultValues,
     values,
     resetOptions,
-    mode,
+    // Ruling: after a validation attempt that ran outside `handleSubmit` has failed, hand
+    // hookform `'onChange'` as the *mode*, so its own change-time re-validation engages —
+    // rather than watching values here and re-running `trigger()` by hand.
+    //
+    // hookform consults `reValidateMode` only once `formState.isSubmitted` is true
+    // (`skipValidation`: `isSubmitted ? reValidateMode.isOnChange : mode.isOnChange`), and
+    // `isSubmitted` is set in exactly one place — inside `handleSubmit`. A `trigger()` never
+    // sets it. So an error raised by `<Wizard>`'s per-step Next, or by the confirm path's
+    // pre-submit `trigger()`, lands in a form still governed by `mode` — `'onSubmit'` by
+    // default, where every change event is skipped and the error cannot clear until something
+    // triggers again. The user fixes the value and the alert, `aria-invalid`, and the
+    // `<FormErrorSummary>` entry all stay stale (#115). Passing the mode is what closes that
+    // gap using hookform's own mechanism; nothing subscribes to values here.
+    //
+    // `'onChange'` is hookform's own `reValidateMode` default, and `<Form>` exposes no
+    // `reValidateMode` prop to override it with, so what this substitutes is exactly the
+    // re-validation a plain field already gets after its first failed submit — reached one
+    // attempt earlier. That is why it applies to `'onBlur'` and `'onTouched'` too, and not
+    // only to the `'onSubmit'` default: after a failed submit those modes also re-validate on
+    // *change*, because `reValidateMode` (not `mode`) is what governs from then on. `'all'`
+    // and `'onChange'` already validate on change, so for them this resolves to a no-op.
+    //
+    // Live on every render with no extra wiring, for the same reason `shouldFocusError` below
+    // is: hookform's `useForm` re-assigns `control._options = props` unconditionally on every
+    // render, through the accessor that recomputes both validation modes from it.
+    //
+    // Cost if wrong: a form that has had one failed out-of-band attempt validates on change
+    // for the rest of its life instead of on submit — which is exactly `reValidateMode`'s
+    // documented contract, and what every plain form already does after a failed submit.
+    mode: validationAttemptFailed && mode !== 'all' ? 'onChange' : mode,
     disabled: disabled || submitting || loading,
     // Ruling: passed directly to useForm rather than written into control._options by a
     // separate effect — react-hook-form's own useForm re-assigns `control._options = props`
@@ -554,6 +595,10 @@ function FormImpl<TIn extends FieldValues, TOut>(
           // form's <FormErrorSummary> (outside a Wizard) needs its own signal that an attempt
           // just failed. See ErrorSummaryContext.failedConfirmAttempt.
           setFailedConfirmAttempt((n) => n + 1)
+          // Same out-of-band `trigger()` as a Wizard step's Next: it raised errors without
+          // going through handleSubmit, so hookform's `isSubmitted` is still false and its
+          // change-time re-validation would otherwise never engage (#115).
+          setValidationAttemptFailed(true)
           return
         }
         if (await ask(confirmOptions)) await submit(event)

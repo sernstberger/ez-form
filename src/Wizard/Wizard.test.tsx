@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { Form } from '../Form'
 import { SubmitButton } from '../SubmitButton'
 import { TextField } from '../fields/TextField'
+import { Select } from '../fields/Select'
 import { expectNoA11yViolations } from '../test/axe'
 import { FormSection, formSectionClasses } from '../FormSection'
 import { FormErrorSummary } from '../Form/FormErrorSummary'
@@ -2018,5 +2019,157 @@ describe('WizardNav', () => {
       </Form>,
     )
     await expectNoA11yViolations(container)
+  })
+})
+
+/*
+ * #115. A failed `Next` raises its errors through `trigger()`, which never sets hookform's
+ * `isSubmitted` — and hookform consults `reValidateMode` only when `isSubmitted` is true. So
+ * without `<Wizard>` reporting the failed attempt to `<Form>`, the form stays in
+ * `mode: 'onSubmit'`, every subsequent change event is skipped, and the errors this step just
+ * raised cannot clear until the user clicks Next again. These cover all three places the stale
+ * error was visible (the field's alert, its `aria-invalid`, the summary's link) plus the
+ * baseline that a plain form is unaffected.
+ */
+describe('live re-validation after a failed step validation (#115)', () => {
+  const liveSchema = z.object({
+    name: z.string().min(1, 'Name is required'),
+    email: z.email('Invalid email'),
+    plan: z.enum(['basic', 'pro'], { error: 'Pick a plan' }),
+  })
+  type LiveInput = z.input<typeof liveSchema>
+
+  // Three steps, so neither `account` nor `plan` is last — `WizardNav` swaps Next for a
+  // `SubmitButton` on the last step, and these tests are about the per-step `trigger()` path.
+  const liveSteps = [
+    { id: 'account', label: 'Account', fields: ['name', 'email'] },
+    { id: 'plan', label: 'Plan', fields: ['plan'] },
+    { id: 'review', label: 'Review' },
+  ] as const satisfies WizardStepDef<LiveInput>[]
+
+  const plans = [
+    { value: 'basic', label: 'Basic' },
+    { value: 'pro', label: 'Pro' },
+  ] as const
+
+  function LiveWizard({ summary = false }: { summary?: boolean }) {
+    return (
+      <Form schema={liveSchema} defaultValues={{ name: '', email: '' }} onSubmit={() => {}}>
+        <Wizard steps={liveSteps}>
+          <WizardStep id="account">
+            {summary ? <FormErrorSummary /> : null}
+            <TextField name="name" label="Name" />
+            <TextField name="email" label="Email" />
+          </WizardStep>
+          <WizardStep id="plan">
+            <Select name="plan" label="Plan" options={plans} />
+          </WizardStep>
+          <WizardStep id="review">
+            <p>Review</p>
+          </WizardStep>
+          <WizardNav />
+        </Wizard>
+      </Form>
+    )
+  }
+
+  it('fixing a TextField clears its own alert and aria-invalid without another Next', async () => {
+    const user = userEvent.setup()
+    render(<LiveWizard />)
+
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    expect(await screen.findByText('Name is required')).toBeInTheDocument()
+    const name = screen.getByRole('textbox', { name: 'Name' })
+    expect(name).toHaveAttribute('aria-invalid', 'true')
+
+    await user.type(name, 'Ada')
+
+    // Only Name's error clears — Email is still empty, so its alert must survive, which is
+    // what proves the re-validation is per-field and not a blanket clear.
+    await waitFor(() => expect(screen.queryByText('Name is required')).not.toBeInTheDocument())
+    expect(name).toHaveAttribute('aria-invalid', 'false')
+    expect(screen.getByText('Invalid email')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Email' })).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('fixing a Select clears its alert and aria-invalid without another Next', async () => {
+    const user = userEvent.setup()
+    render(<LiveWizard />)
+
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Ada')
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'ada@example.com')
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+
+    const plan = await screen.findByRole('combobox', { name: 'Plan' })
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    expect(await screen.findByText('Pick a plan')).toBeInTheDocument()
+    expect(plan).toHaveAttribute('aria-invalid', 'true')
+
+    await user.click(plan)
+    await user.click(await screen.findByRole('option', { name: 'Pro' }))
+
+    await waitFor(() => expect(screen.queryByText('Pick a plan')).not.toBeInTheDocument())
+    // The combobox drops the attribute rather than setting it to "false" — `useEzField`
+    // renders `'aria-invalid': invalid || undefined`, so absence is what "valid" looks like
+    // here (unlike TextField, whose MUI input carries an explicit "false").
+    expect(screen.getByRole('combobox', { name: 'Plan' })).not.toHaveAttribute('aria-invalid')
+  })
+
+  it('drops the FormErrorSummary entry live once its field becomes valid', async () => {
+    const user = userEvent.setup()
+    render(<LiveWizard summary />)
+
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    // Located via its heading's parent, not `role="alert"`: the field alerts share that role,
+    // so the summary is not uniquely addressable by it. Same approach as FormErrorSummary.test.
+    const summary = (await screen.findByRole('heading', { name: 'There is a problem' }))
+      .parentElement!
+    expect(within(summary).getByRole('link', { name: 'Name is required' })).toBeInTheDocument()
+
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Ada')
+
+    await waitFor(() =>
+      expect(
+        within(summary).queryByRole('link', { name: 'Name is required' }),
+      ).not.toBeInTheDocument(),
+    )
+    // The summary itself stays, still listing the field that is genuinely still invalid.
+    expect(within(summary).getByRole('link', { name: 'Invalid email' })).toBeInTheDocument()
+  })
+
+  it('has no accessibility violations after a fixed field re-validates live', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<LiveWizard summary />)
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    // With a summary mounted, "Name is required" is on screen twice (the field's alert and the
+    // summary's link), so both waits count occurrences rather than asserting a single node.
+    await waitFor(() => expect(screen.getAllByText('Name is required')).toHaveLength(2))
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Ada')
+    await waitFor(() => expect(screen.queryAllByText('Name is required')).toHaveLength(0))
+    await expectNoA11yViolations(container)
+  })
+
+  // The baseline the issue measured the wizard against: a plain form validates on submit and
+  // only starts re-validating on change once a real submit has failed. Nothing here reports an
+  // out-of-band attempt, so this must behave exactly as it did before the fix.
+  it('a plain Form outside a Wizard is unchanged: no live validation before a submit', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={liveSchema} defaultValues={{ name: '', email: '' }} onSubmit={() => {}}>
+        <TextField name="name" label="Name" />
+        <SubmitButton />
+      </Form>,
+    )
+
+    // Typing an invalid value (empty again) before any submit raises nothing: still onSubmit.
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'a')
+    await user.clear(screen.getByRole('textbox', { name: 'Name' }))
+    expect(screen.queryByText('Name is required')).not.toBeInTheDocument()
+
+    // After a failed submit, hookform's own reValidateMode takes over and it clears live.
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    expect(await screen.findByText('Name is required')).toBeInTheDocument()
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Ada')
+    await waitFor(() => expect(screen.queryByText('Name is required')).not.toBeInTheDocument())
   })
 })

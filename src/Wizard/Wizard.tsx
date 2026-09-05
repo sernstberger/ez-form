@@ -4,7 +4,7 @@ import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import { styled } from '@mui/material/styles'
 import { useFormState, useWatch, type FieldValues, type Path } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
-import { useHasErrorSummary } from '../Form/ErrorSummaryContext'
+import { useHasErrorSummary, useReportFailedValidationAttempt } from '../Form/ErrorSummaryContext'
 import { warnUnmountedStepFields } from '../devWarn'
 import { LiveRegion } from '../Form/LiveRegion'
 import {
@@ -229,6 +229,11 @@ function WizardBody<TIn extends FieldValues>({
   // hookform also focus the first invalid field here would fight it — same principle as
   // <Form>'s own shouldFocusError suppression, applied to this step-local trigger() call.
   const hasErrorSummary = useHasErrorSummary()
+  // A failed Next raises errors through `trigger()`, which never sets hookform's
+  // `isSubmitted` — so without telling `<Form>`, hookform's own change-time re-validation
+  // stays disengaged and the errors this step just raised could not clear until the next
+  // Next (#115). See `reportFailedValidationAttempt` in ErrorSummaryContext.
+  const reportFailedValidationAttempt = useReportFailedValidationAttempt()
   const id = useId()
 
   // `steps` is required and a wizard with no steps has nothing to render;
@@ -364,11 +369,16 @@ function WizardBody<TIn extends FieldValues>({
       // consecutive failed `Next` clicks (nothing fixed in between) must still move focus back
       // to the heading the second time, which a reused `current.fields` reference would not do.
       setLastFailed(valid ? null : (fields.slice() as readonly string[]))
+      // Reported only on a failure, and only after `trigger()` has actually raised the errors:
+      // there is nothing to re-validate live until an error exists, and a step that passes
+      // must not switch the whole form to change-time validation as a side effect of a
+      // successful Next.
+      if (!valid) reportFailedValidationAttempt()
       return valid
     } finally {
       setPending(false)
     }
-  }, [current, trigger, control, getValues, hasErrorSummary])
+  }, [current, trigger, control, getValues, hasErrorSummary, reportFailedValidationAttempt])
   /* eslint-enable @typescript-eslint/no-unnecessary-type-assertion */
 
   // In `page` layout every step is already visible at once, so Next/Prev/go
