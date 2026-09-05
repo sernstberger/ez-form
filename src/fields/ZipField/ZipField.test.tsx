@@ -21,6 +21,9 @@ describeFieldContract({
     <ZipField name="zip" label="Zip" aria-describedby={id} {...props} />
   ),
   getControl: input,
+  // A one-digit ZIP fails the field's own `complete` rule; five digits is a whole one.
+  interactSubmittable: (user) => user.type(input(), '90210'),
+  expectSubmitted: { zip: '90210' },
   interact: (user) => user.type(input(), '9'),
 })
 

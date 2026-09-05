@@ -36,6 +36,15 @@ describeFieldContract({
   getControl: () => screen.getByRole('group', { name: 'At' }),
   requiredNotAnnounced: true,
   expectDisabled: () => expect(hiddenInput('at')).toBeDisabled(),
+  // A time-only field parses against *today* under date-fns, so the expected date is
+  // built the same way rather than hard-coded — the field stores a full `Date`.
+  expectSubmitted: {
+    at: (() => {
+      const d = new Date()
+      d.setHours(9, 30, 0, 0)
+      return d
+    })(),
+  },
   interact: async () => {
     typeTime('at', '09:30 AM')
   },

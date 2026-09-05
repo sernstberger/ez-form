@@ -27,6 +27,7 @@ describeFieldContract({
     <NumberField name="age" label="Age" aria-describedby={id} {...props} />
   ),
   getControl: input,
+  expectSubmitted: { age: 4 },
   interact: (user) => user.type(input(), '4'),
 })
 

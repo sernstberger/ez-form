@@ -36,6 +36,7 @@ describeFieldContract({
   getControl: () => screen.getByRole('group', { name: 'When' }),
   requiredNotAnnounced: true,
   expectDisabled: () => expect(hiddenInput('when')).toBeDisabled(),
+  expectSubmitted: { when: new Date(2030, 0, 15, 9, 30) },
   interact: async () => {
     typeDateTime('when', '01/15/2030 09:30 AM')
   },

@@ -52,6 +52,7 @@ describeFieldContract({
     <EmailListField name="to" label="To" aria-describedby={id} {...props} />
   ),
   getControl: combobox,
+  expectSubmitted: { to: ['ada@example.com'] },
   interact: async (user) => {
     await user.type(combobox(), 'ada@example.com{Enter}')
   },

@@ -28,6 +28,7 @@ describeFieldContract({
     <Slider name="volume" label="Volume" aria-describedby={id} {...props} />
   ),
   getControl: () => screen.getByRole('slider', { name: 'Volume' }),
+  expectSubmitted: { volume: 30 },
   interact: async () => {
     setSlider(screen.getByRole('slider', { name: 'Volume' }), 30)
   },

@@ -27,6 +27,7 @@ describeFieldContract({
   ),
   getControl: () => screen.getByRole('radiogroup', { name: 'Plan' }),
   expectDisabled: () => expect(screen.getByRole('radio', { name: 'Basic' })).toBeDisabled(),
+  expectSubmitted: { plan: 2 },
   interact: (user) => user.click(screen.getByRole('radio', { name: 'Pro' })),
 })
 

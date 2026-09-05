@@ -32,6 +32,12 @@ describeFieldContract({
     <OtpField name="code" label="Code" length={4} aria-describedby={id} {...props} />
   ),
   getControl: () => screen.getByRole('textbox', { name: 'Code' }),
+  // A half-typed code is never valid (the field's built-in `complete` rule), so the
+  // payload line types the whole `length={4}` code.
+  interactSubmittable: async (user) => {
+    await user.type(screen.getByRole('textbox', { name: 'Code' }), '1234')
+  },
+  expectSubmitted: { code: '1234' },
   interact: async (user) => {
     await user.type(screen.getByRole('textbox', { name: 'Code' }), '1')
   },

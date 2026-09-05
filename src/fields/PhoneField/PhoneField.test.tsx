@@ -25,6 +25,10 @@ describeFieldContract({
     <PhoneField name="phone" label="Phone" aria-describedby={id} {...props} />
   ),
   getControl: () => screen.getByRole('textbox', { name: /Phone/ }),
+  // A partial number fails the field's own `complete` rule. Stored bare, shown as
+  // `555-555-5555` — which is exactly the divergence this line exists to check.
+  interactSubmittable: (user) => user.type(input(), '5555555555'),
+  expectSubmitted: { phone: '5555555555' },
   interact: (user) => user.type(screen.getByRole('textbox', { name: /Phone/ }), '5'),
 })
 

@@ -23,6 +23,7 @@ describeFieldContract({
     <MoneyField name="price" label="Price" aria-describedby={id} {...props} />
   ),
   getControl: input,
+  expectSubmitted: { price: 1 },
   interact: (user) => user.type(input(), '1'),
 })
 

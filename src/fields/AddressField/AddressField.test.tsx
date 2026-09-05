@@ -96,6 +96,9 @@ describeFieldContract({
     />
   ),
   getControl: street,
+  // The whole composite's payload, not just the part the contract drives: the one
+  // interaction types into `street`, and the other four keep their empty defaults.
+  expectSubmitted: { address: { ...emptyAddress, street: '1' } },
   interact: (user) => user.type(street(), '1'),
 })
 

@@ -34,6 +34,7 @@ describeFieldContract({
     <Autocomplete name="role" label="Role" options={roles} aria-describedby={id} {...props} />
   ),
   getControl: combobox,
+  expectSubmitted: { role: 'user' },
   interact: (user) => pick(user, 'User'),
 })
 

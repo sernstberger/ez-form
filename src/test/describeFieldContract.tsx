@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { expectConsole } from './expectConsole'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import type { DefaultValues, FieldValues } from 'react-hook-form'
@@ -12,7 +12,7 @@ import { expectNoA11yViolations } from './axe'
  * the original five. The union exists so a typo in an `exempt` key is a
  * compile error rather than an opt-out that silently never applies.
  */
-export type ContractLine = 'ariaLabelNames' | 'consumerDescribedBy'
+export type ContractLine = 'ariaLabelNames' | 'consumerDescribedBy' | 'submitPayload'
 
 export interface FieldContractProps {
   disabled?: boolean
@@ -103,6 +103,30 @@ export interface FieldContract<TIn extends FieldValues, TOut> {
    * no `aria-describedby` has nothing for the line to preserve.
    */
   renderDescribed?: (id: string, props: FieldContractProps) => ReactElement
+  /**
+   * What `onSubmit` must receive after one `interact`, for row 3.
+   *
+   * "`onChange` was called" is not the same claim: a transform field can hand the
+   * consumer one value and store another, and the payload is the one that reaches
+   * the server. Asserted as a whole object so a field that writes a *sibling* key,
+   * or writes nothing at all, fails rather than passing on a partial match.
+   *
+   * The values are unavoidably per-field — the contract's single `interact` types
+   * one character, picks one option, drags one slider — so each field states what
+   * that produces. A field whose one interaction cannot produce a submittable value
+   * opts out with a reason instead.
+   */
+  expectSubmitted?: FieldValues
+  /**
+   * The interaction row 3 drives, when `interact` cannot be it.
+   *
+   * `interact` is constrained to change the value **exactly once**, so the
+   * `onChange` line can count calls — for a text field that means typing a single
+   * character, which some schemas (`TextField`'s `z.email()`) then reject, blocking
+   * the submit that row 3 is about. Such a field supplies a fuller interaction here
+   * instead; everything else leaves it out and row 3 reuses `interact`.
+   */
+  interactSubmittable?: (user: UserEvent) => Promise<void>
   /** Changes the value exactly once (one consumer `onChange` call). */
   interact: (user: UserEvent) => Promise<void>
 }
@@ -126,8 +150,12 @@ export function describeFieldContract<TIn extends FieldValues, TOut>(c: FieldCon
         )
       return screen.getByRole(c.role, { name })
     })
-  const inForm = (child: ReactElement, disabled = false) => (
-    <Form schema={c.schema} defaultValues={c.defaultValues} onSubmit={() => {}} disabled={disabled}>
+  const inForm = (
+    child: ReactElement,
+    disabled = false,
+    onSubmit: (values: TOut) => void = () => {},
+  ) => (
+    <Form schema={c.schema} defaultValues={c.defaultValues} onSubmit={onSubmit} disabled={disabled}>
       {child}
       <button type="submit">Go</button>
     </Form>
@@ -221,6 +249,31 @@ export function describeFieldContract<TIn extends FieldValues, TOut>(c: FieldCon
         )
       },
     )
+
+    /*
+     * Row 3 of #102. The existing `onChange` line counts calls; this one follows the
+     * value all the way to the payload, which is what a consumer's server sees. The
+     * two differ for every field whose stored value and displayed value deliberately
+     * diverge — `PhoneField` stores digits and shows `555-555-5555`, `PercentField`
+     * under `scale="fraction"` stores `0.125` and shows `12.5%` — and a mangling
+     * there is invisible to an `onChange` spy.
+     */
+    const payloadExemption = c.exempt?.submitPayload
+    it.skipIf(payloadExemption)('round-trips the value into the submit payload', async () => {
+      const user = userEvent.setup()
+      const expected = c.expectSubmitted
+      if (!expected)
+        throw new Error(
+          `describeFieldContract(${c.componentName}): row 3 needs \`expectSubmitted\` (the ` +
+            'payload one `interact` produces), or an `exempt.submitPayload` reason.',
+        )
+      const onSubmit = vi.fn()
+      render(inForm(c.render({}), false, onSubmit))
+      await (c.interactSubmittable ?? c.interact)(user)
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+      expect(onSubmit).toHaveBeenCalledWith(expected, expect.anything())
+    })
 
     it('has no accessibility violations in the error state', async () => {
       const user = userEvent.setup()

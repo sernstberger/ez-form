@@ -20,6 +20,7 @@ describeFieldContract({
     <Switch name="darkMode" label="Dark mode" aria-describedby={id} {...props} />
   ),
   getControl: () => screen.getByRole('switch', { name: 'Dark mode' }),
+  expectSubmitted: { darkMode: true },
   interact: (user) => user.click(screen.getByRole('switch', { name: 'Dark mode' })),
 })
 

@@ -40,6 +40,7 @@ describeFieldContract({
   getControl: () => getInnerGroup('Toppings'),
   requiredNotAnnounced: true,
   expectDisabled: () => expect(screen.getByRole('checkbox', { name: 'Cheese' })).toBeDisabled(),
+  expectSubmitted: { toppings: [2] },
   interact: (user) => user.click(screen.getByRole('checkbox', { name: 'Ham' })),
 })
 

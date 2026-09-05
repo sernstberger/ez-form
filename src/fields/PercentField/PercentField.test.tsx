@@ -28,6 +28,7 @@ describeFieldContract({
     <PercentField name="rate" label="Rate" aria-describedby={id} {...props} />
   ),
   getControl: () => screen.getByRole('textbox', { name: /Rate/ }),
+  expectSubmitted: { rate: 1 },
   interact: (user) => user.type(screen.getByRole('textbox', { name: /Rate/ }), '1'),
 })
 

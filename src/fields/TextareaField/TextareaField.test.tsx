@@ -44,6 +44,7 @@ describeFieldContract({
     <TextareaField name="bio" label="Bio" aria-describedby={id} {...props} />
   ),
   getControl: textbox,
+  expectSubmitted: { bio: 'a' },
   interact: (user) => user.type(textbox(), 'a'),
 })
 

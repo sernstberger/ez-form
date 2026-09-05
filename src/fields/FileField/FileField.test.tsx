@@ -36,6 +36,7 @@ describeFieldContract({
     consumerDescribedBy: '#118 — FileFieldProps admits no aria-describedby to preserve',
   },
   getControl: () => fileInput('Resume'),
+  expectSubmitted: { resume: pdf },
   interact: (user) => user.upload(fileInput('Resume'), pdf),
 })
 

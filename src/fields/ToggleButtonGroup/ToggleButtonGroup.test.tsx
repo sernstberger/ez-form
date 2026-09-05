@@ -47,6 +47,7 @@ describeFieldContract({
   getControl: () => getInnerGroup('Align'),
   requiredNotAnnounced: true,
   expectDisabled: () => expect(screen.getByRole('button', { name: 'Left' })).toBeDisabled(),
+  expectSubmitted: { align: 'center' },
   interact: (user) => user.click(screen.getByRole('button', { name: 'Center' })),
 })
 

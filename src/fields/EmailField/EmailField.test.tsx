@@ -25,6 +25,11 @@ describeFieldContract({
     <EmailField name="email" label="Email" aria-describedby={id} {...props} />
   ),
   getControl: () => screen.getByRole('textbox', { name: /Email/ }),
+  // A single character is not a valid email, and the field's built-in rule says so —
+  // which blocks the submit this line has to follow. `interact` stays one character
+  // (one `onChange`); the payload line types a whole address.
+  interactSubmittable: (user) => user.type(input(), 'ada@example.com'),
+  expectSubmitted: { email: 'ada@example.com' },
   interact: (user) => user.type(screen.getByRole('textbox', { name: /Email/ }), 'a'),
 })
 

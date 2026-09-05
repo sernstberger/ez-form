@@ -40,6 +40,7 @@ describeFieldContract({
   getControl: () => screen.getByRole('group', { name: 'Start' }),
   requiredNotAnnounced: true,
   expectDisabled: () => expect(hiddenInput('start')).toBeDisabled(),
+  expectSubmitted: { start: new Date(2030, 0, 15) },
   interact: async () => {
     typeDate('start', '01/15/2030')
   },

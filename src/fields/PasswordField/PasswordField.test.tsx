@@ -33,6 +33,7 @@ describeFieldContract({
     <PasswordField name="password" label="Password" aria-describedby={id} {...props} />
   ),
   getControl: input,
+  expectSubmitted: { password: 'a' },
   interact: (user) => user.type(input(), 'a'),
 })
 

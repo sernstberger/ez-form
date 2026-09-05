@@ -51,10 +51,16 @@ interface BoundTextField {
   onPaste: (event: unknown) => void
   onClear: (event: unknown) => void
   'aria-label'?: string
+  'aria-describedby'?: string
   slotProps: {
     formHelperText: { role?: string }
     inputLabel: { required?: boolean }
-    input: { 'aria-label'?: string; 'aria-labelledby'?: string; onClick?: () => void }
+    input: {
+      'aria-label'?: string
+      'aria-labelledby'?: string
+      'aria-describedby'?: string
+      onClick?: () => void
+    }
   }
 }
 

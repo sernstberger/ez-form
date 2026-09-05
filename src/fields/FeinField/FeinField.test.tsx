@@ -25,6 +25,10 @@ describeFieldContract({
     <FeinField name="ein" label="EIN" aria-describedby={id} {...props} />
   ),
   getControl: () => screen.getByRole('textbox', { name: /EIN/ }),
+  // A partial EIN fails the field's own `complete` rule, so the payload line types
+  // all nine digits. The value stored is bare digits; the display is `12-3456789`.
+  interactSubmittable: (user) => user.type(input(), '123456789'),
+  expectSubmitted: { ein: '123456789' },
   interact: (user) => user.type(screen.getByRole('textbox', { name: /EIN/ }), '1'),
 })
 

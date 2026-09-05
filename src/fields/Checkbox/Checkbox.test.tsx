@@ -22,6 +22,7 @@ describeFieldContract({
     <Checkbox name="tos" label="Accept terms" aria-describedby={id} {...props} />
   ),
   getControl: () => screen.getByRole('checkbox', { name: 'Accept terms' }),
+  expectSubmitted: { tos: true },
   interact: (user) => user.click(screen.getByRole('checkbox', { name: 'Accept terms' })),
 })
 

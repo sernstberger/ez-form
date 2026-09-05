@@ -33,6 +33,10 @@ describeFieldContract({
     <SsnField name="ssn" label="SSN" aria-describedby={id} {...props} />
   ),
   getControl: input,
+  // A partial SSN fails the field's own `complete` rule. Stored bare, shown as
+  // `123-45-6789` (and masked until the reveal toggle is pressed).
+  interactSubmittable: (user) => user.type(input(), '123456789'),
+  expectSubmitted: { ssn: '123456789' },
   interact: (user) => user.type(input(), '1'),
 })
 
