@@ -60,7 +60,7 @@ function sum(...values: (number | null)[]): number | null {
  * | `Checkbox`, `CheckboxGroup`, `RadioGroup`, `Switch` | the control's own declared box |
  * | `Slider` | the thumb |
  * | `ToggleButtonGroup` | each `ToggleButton` (its label may be an icon) |
- * | `Rating` | the star icon — default size only, see the note in its test |
+ * | `Rating` | the star icon — default size only; `size="small"` is exempt, below |
  * | `FieldArray` (not a field dir) | the add/remove row `IconButton`s |
  *
  * **Exempt, and why:**
@@ -80,6 +80,24 @@ function sum(...values: (number | null)[]): number | null {
  * - `DateField` — the keyboard-only picker: a section-based text field with no
  *   popup and therefore no adornment button. Its three popup siblings do
  *   assert it.
+ *
+ * **One prop-level exemption** — the only place ez-form knowingly renders a
+ * target under 24×24, and the only entry here that is a *prop value* rather
+ * than a whole field:
+ *
+ * - `Rating size="small"` (#111) — MUI sizes the small-variant star icon at
+ *   `font-size: 18px` with no padding, an 18×18 target. `Rating` asserts the
+ *   default size (exactly 24×24) here and pins the 18px small size in a
+ *   separate test that documents this exemption.
+ *
+ *   Ruling: `Rating size="small"` is a documented exemption, not an override —
+ *   MUI owns the small-variant sizing, and padding a glyph the consumer
+ *   explicitly asked to be small is a styling judgement ez-form should not
+ *   make — cost if wrong: one control ships below the 24×24 guideline at a
+ *   size the consumer opted into.
+ *
+ *   Consumers who need the larger target lift it in their own theme; the
+ *   recipe is in `Rating`'s JSDoc.
  */
 export function expectTargetSize(el: HTMLElement): void {
   const style = getComputedStyle(el)

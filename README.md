@@ -63,8 +63,10 @@ ez-form is a thin binding layer, not a component library: MUI supplies the widge
 react-hook-form the state, and zod the schema, so every prop and type traces back to
 one of those three. Nothing in `src/` makes a styling judgement call — defaults live
 only where a theme can override them — and every field ships accessible and
-axe-tested by default. Every control ez-form renders is at least 24×24 CSS px, per
-WCAG 2.5.8 Target Size (Minimum). The form owns submission, loading, and disabling;
+axe-tested by default. Every control ez-form renders is at least 24×24 CSS px at its
+default size, per WCAG 2.5.8 Target Size (Minimum) — the one exception is
+`Rating size="small"`, which MUI draws at 18×18 and which is
+[documented, not silently shipped](#rating). The form owns submission, loading, and disabling;
 fields just read from it. See [`docs/PHILOSOPHY.md`](docs/PHILOSOPHY.md) for the full
 rules and the checklist a component must pass before it ships.
 
@@ -92,7 +94,7 @@ React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form
 | `CheckboxGroup`                                | MUI `FormGroup` + `Checkbox`                  | `name`, `label` (legend), `options: readonly Option[]`, `row?`, `helperText?`; rules `required` (at least one), `validate`. Value is `Option['value'][]` in `options` order                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `ToggleButtonGroup`                            | MUI `ToggleButtonGroup`                       | `name`, `label` (legend), `options: readonly Option[]`, `exclusive?`, `helperText?`; rules `required`, `validate`. Value is `Option['value'] \| null` when exclusive, else `Option['value'][]`                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `Slider`                                       | MUI `Slider`                                  | `name`, `label` (legend), `helperText?`; rules `min`, `max` (also the slider bounds), `validate` — no `required`, since a slider always reports a value. Value is a `number`, or `[number, number]` for a range                                                                                                                                                                                                                                                                                                                                                                                               |
-| `Rating`                                       | MUI `Rating`                                  | `name`, `label` (legend), `helperText?`; rules `required`, `validate`. Value is `number \| null`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `Rating`                                       | MUI `Rating`                                  | `name`, `label` (legend), `helperText?`; rules `required`, `validate`. Value is `number \| null`. Note `size="small"` renders an 18×18 target, below the 24×24 minimum — [see below](#sizesmall-is-below-the-target-size-minimum)                                                                                                                                                                                                                                                                                                                                                                             |
 | `Autocomplete`                                 | MUI `Autocomplete`                            | `name`, `options`, `getOptionValue?` (default `o => o.value`; return `o` to store objects), `multiple`, `freeSolo`, `textFieldProps?`; all TextField rules. Options may carry extra fields (they reach `onChange`)                                                                                                                                                                                                                                                                                                                                                                                            |
 | `ChipDeleteIcon`                               | MUI `SvgIcon` (`Cancel`)                      | `label`, `removeLabel?` (default `` `Remove ${label}` ``). The delete icon every chip in ez-form renders — `Autocomplete` under `multiple`, `EmailListField`, `FileField` — named and sized to a 24×24 target; themeable once under `EzChipDeleteIcon`. Use it in your own `renderValue`                                                                                                                                                                                                                                                                                                                      |
 | `EmailListField`                               | ez-form `Autocomplete`                        | `name`; a `string[]` of addresses. `loadOptions?(query, signal)` for an async directory (debounced by `debounceMs?`, default 250, and aborted on the next keystroke), `allowNew?` (default `true`), `invalidMessage?`, `duplicateMessage?`, `addedMessage?`/`addedManyMessage?`/`removedMessage?`/`removedManyMessage?`, `autoComplete?` (default `'email'`, `'off'` under `assisted`), `slotProps?` (`chip`, `status`). Enter, comma, semicolon, space and blur commit; paste splits; duplicates collapse case-insensitively                                                                                 |
@@ -976,6 +978,46 @@ filling the form is not necessarily the person the addresses belong to; an expli
 
 Themeable under `EzEmailListField` (`defaultProps`, and `styleOverrides` for `chip` and
 `status`, exported as `emailListFieldClasses`).
+
+## Rating
+
+Value is `number | null`; clicking the currently selected star clears it back to `null`.
+The `label` renders as the legend above the stars.
+
+```tsx
+<Rating name="score" label="How was it?" required />
+```
+
+```ts
+const schema = z.object({ score: z.number().nullable() })
+```
+
+### `size="small"` is below the target-size minimum
+
+This is the one control ez-form renders that does not meet
+[WCAG 2.5.8 Target Size (Minimum)](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html).
+At the default size MUI draws the star at `font-size: 24px` with no padding — exactly the
+24×24 minimum. At `size="small"` it drops to 18px, an 18×18 target.
+
+ez-form leaves that alone on purpose: MUI owns the small-variant sizing, and padding a glyph
+you explicitly asked to be small is a styling judgement this library does not make for you.
+If you want the small star with a compliant hit area, add the padding in your theme — the
+star still looks small, the target does not:
+
+```ts
+const theme = createTheme({
+  components: {
+    MuiRating: {
+      styleOverrides: {
+        // 18px icon + 3px padding on each side = a 24×24 target.
+        sizeSmall: { '& .MuiRating-icon': { padding: 3 } },
+      },
+    },
+  },
+})
+```
+
+Or simply leave `size` off, which is already compliant.
 
 ## TextareaField
 

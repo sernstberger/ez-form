@@ -16,6 +16,31 @@ export type RatingProps = Omit<MuiRatingProps, 'name' | 'value' | 'defaultValue'
  * Form value is `number | null`; clicking the selected star clears to `null`.
  * MUI renders one hidden radio per star and groups them by `name`, so the
  * field's name doubles as the radio group name.
+ *
+ * **The small size renders below the WCAG target-size minimum.** Every other
+ * control ez-form renders is at least 24×24 CSS px, per WCAG 2.5.8 Target Size
+ * (Minimum), and `Rating` at its default size is exactly 24×24. Set the `size`
+ * prop to `small`, though, and MUI drops the star icon to `font-size: 18px`
+ * with no padding — an 18×18 target.
+ *
+ * ez-form leaves that alone deliberately: MUI owns the small-variant sizing,
+ * and padding a glyph you explicitly asked to be small is a styling judgement
+ * this library does not make for you. If you need the small star to keep a
+ * compliant target, add the padding in your own theme — the star still *looks*
+ * small, the hit area does not:
+ *
+ * ```ts
+ * createTheme({
+ *   components: {
+ *     MuiRating: {
+ *       styleOverrides: {
+ *         // 18px icon + 3px padding on each side = a 24×24 target.
+ *         sizeSmall: { '& .MuiRating-icon': { padding: 3 } },
+ *       },
+ *     },
+ *   },
+ * })
+ * ```
  */
 export function Rating({
   name,
