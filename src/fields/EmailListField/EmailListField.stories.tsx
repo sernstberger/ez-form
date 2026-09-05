@@ -29,16 +29,13 @@ export const FreeEntry: Story = {
 
 export const WithDefaultValue: Story = {
   parameters: {
-    form: {
-      schema,
-      defaultValues: { to: ['ada@example.com', 'grace@example.com'] },
-    },
+    form: { defaultValues: { to: ['ada@example.com', 'grace@example.com'] } },
   } satisfies FormParameters,
 }
 
 export const Invalid: Story = {
   parameters: {
-    form: { schema, defaultValues: { to: ['ada@example.com', 'not-an-email'] } },
+    form: { defaultValues: { to: ['ada@example.com', 'not-an-email'] } },
     docs: {
       description: {
         story:
@@ -50,7 +47,7 @@ export const Invalid: Story = {
 
 export const Disabled: Story = {
   parameters: {
-    form: { schema, defaultValues: { to: ['ada@example.com'] } },
+    form: { defaultValues: { to: ['ada@example.com'] } },
   } satisfies FormParameters,
   args: { disabled: true },
 }

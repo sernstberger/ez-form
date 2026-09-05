@@ -78,7 +78,7 @@ export const Required: Story = {
 }
 
 export const Prefilled: Story = {
-  parameters: { form: { schema, defaultValues: { ssn: '123456789' } } },
+  parameters: { form: { defaultValues: { ssn: '123456789' } } },
 }
 
 export const Disabled: Story = { args: { disabled: true } }

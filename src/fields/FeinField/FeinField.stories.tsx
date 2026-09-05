@@ -22,7 +22,7 @@ export const Required: Story = {
 }
 
 export const Prefilled: Story = {
-  parameters: { form: { schema, defaultValues: { ein: '123456789' } } } satisfies FormParameters,
+  parameters: { form: { defaultValues: { ein: '123456789' } } } satisfies FormParameters,
 }
 
 export const WithError: Story = {
