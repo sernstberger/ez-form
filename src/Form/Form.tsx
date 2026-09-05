@@ -35,6 +35,8 @@ import { useConfirm, type ConfirmOptions } from '../ConfirmDialog'
 import { AssistedContext } from './AssistedContext'
 import { createErrorSummaryStore, ErrorSummaryContext } from './ErrorSummaryContext'
 import { createFieldFocusStore, FieldFocusContext } from './FieldFocusContext'
+import { createFormErrorFocusStore, FormErrorFocusContext } from './FormErrorFocusContext'
+import { flattenErrors } from './flattenErrors'
 import { LiveRegion, type LiveRegionProps } from './LiveRegion'
 import { RequiredIndicatorContext } from './RequiredIndicatorContext'
 import { RuleMessagesContext } from './RuleMessagesContext'
@@ -214,14 +216,44 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
    * Default "Submitting…".
    */
   submitPendingText?: ReactNode | false
-  /** Announced when `onSubmit` resolves. `false` suppresses. Default "Submitted." */
+  /**
+   * Announced when `onSubmit` resolves *and left no error behind*. `false`
+   * suppresses. Default "Submitted."
+   *
+   * "Left no error behind" is the load-bearing half — see `submitErrorText`
+   * for the full contract and why resolving is not on its own a success.
+   */
   submitSuccessText?: ReactNode | false
   /**
-   * Announced when `onSubmit` rejects. `false` suppresses. Default "Submit failed."
+   * Announced when a submit fails. `false` suppresses. Default "Submit failed."
    *
-   * A *validation* failure is not this: the schema rejected, `onSubmit` never
-   * ran, and `<FormErrorSummary>` already announces and lists what is wrong.
-   * Announcing "Submit failed." there would talk over it.
+   * A submit can fail in three ways, and `<Form>` treats all three as failures
+   * (#124) — a resolved `onSubmit` is not on its own a success, because the
+   * pattern this library documents for a server-side rejection is to *catch* it
+   * and map it to an error rather than to rethrow:
+   *
+   * | What `onSubmit` did | Announced | Focus moves to |
+   * |---|---|---|
+   * | rejected | `submitErrorText` | the `<FormError>` alert, else the first invalid field |
+   * | resolved, set a **root** error (`setError('root.server', …)`) | that error's own message | the `<FormError>` alert |
+   * | resolved, set **field** errors only (`setError('email', …)`) | `submitErrorText` | the first invalid field |
+   * | resolved, set nothing | `submitSuccessText` | nothing |
+   *
+   * The root-error row announces the error's own message rather than this
+   * generic string so a screen-reader user hears what the sighted user reads in
+   * the alert ("Invalid email or password"), not a second, vaguer sentence over
+   * the top of it. The other two failure rows have no message of their own to
+   * borrow — a rejection's `Error` is the consumer's private detail, and field
+   * errors are already carried by each field's own `role="alert"` and by
+   * `<FormErrorSummary>` — so they get this string.
+   *
+   * Only errors that appear *during* this submit count: a stale root error a
+   * consumer never cleared cannot make the next, genuinely successful submit
+   * announce a failure.
+   *
+   * A *validation* failure is none of these: the schema rejected, `onSubmit`
+   * never ran, and `<FormErrorSummary>` already announces and lists what is
+   * wrong. Announcing "Submit failed." there would talk over it.
    */
   submitErrorText?: ReactNode | false
   slotProps?: {
@@ -429,6 +461,9 @@ function FormImpl<TIn extends FieldValues, TOut>(
     () => createFieldFocusStore(focusTargetIdPrefix),
     [focusTargetIdPrefix],
   )
+  // The mounted <FormError> alert, if this form has one, so the post-submit focus step below
+  // can send a keyboard/screen-reader user to it (#124). See FormErrorFocusContext.
+  const formErrorFocusStore = useMemo(() => createFormErrorFocusStore(), [])
   const methods = useForm<TIn, unknown, TOut>({
     resolver: ezResolver(schema, ruleMessages),
     defaultValues: wrappedDefaultValues,
@@ -553,14 +588,100 @@ function FormImpl<TIn extends FieldValues, TOut>(
     setAnnouncement((prev) => ({ text, seq: prev.seq + 1 }))
   }, [])
 
+  // Ruling: the post-submit outcome is read from `methods.getErrors()`, not from
+  // `methods.formState.errors` — #124. Inside `handleSubmit`'s own callback, `formState` is
+  // the *render-time* snapshot the closure captured, so a `setError` the consumer's
+  // `onSubmit` just ran is invisible to it (probed directly: `formState.errors` came back
+  // `[]` while hookform's internal `_formState.errors` held `["root","email"]`). `getErrors()`
+  // is hookform's own public reader for exactly this — "get all currently stored form errors
+  // without subscribing or running validation" — so nothing here reaches into `control._*`.
+  // Cost if wrong: every resolved-but-failed submit reverts to announcing success, which is
+  // the bug this replaces.
+  //
+  // Ruling: the *diff* against a snapshot taken before `onSubmit` ran, not the raw error set —
+  // only an error this submit raised may turn this submit into a failure. hookform's own
+  // re-validation at the top of `handleSubmit` already replaces the errors object, so in the
+  // ordinary case the snapshot is empty and the diff is the whole set; what it buys is the
+  // cases where it is not — a `resetOptions` carrying `keepErrors`, or a `setError` made from
+  // outside the form (`ResendCodeButton`'s `root.timeout`, `onDefaultValuesError`) between the
+  // resolver running and `onSubmit` finishing. The comparison is by message as well as by
+  // path, so a consumer who deliberately re-sets the identical error on each attempt still
+  // gets each one announced. Cost if wrong: a form that keeps its errors across submits goes
+  // quiet about its next real failure — the exact bug this replaces, one configuration over.
+  const errorsRaisedBySubmit = (before: ReturnType<typeof flattenErrors>) => {
+    const seen = new Set(before.map((e) => `${e.name} ${e.message}`))
+    return flattenErrors(methods.getErrors()).filter((e) => !seen.has(`${e.name} ${e.message}`))
+  }
+
+  // Ruling: the *decision* to move focus is made in the submit path — the one place that knows
+  // the move belongs to *this* submit rather than to a validation failure (which
+  // `<FormErrorSummary>` and hookform's own `shouldFocusError` already own between them) — but
+  // the move itself is performed by the effect below, on the commit that follows. The target
+  // does not exist yet at decision time: `<FormError>` renders nothing until the consumer's
+  // `setError` has been committed, and an element cannot be focused before it is in the DOM.
+  //
+  // An effect rather than a `setTimeout(…, 0)`, which is what this was first written as: a
+  // timer only *usually* fires after React's commit, and under load (a full suite run) it can
+  // fire before it, leaving focus on `<body>` — a genuine race, not a test artifact. React
+  // guarantees an effect runs after the commit that scheduled it, so the alert is always there.
+  //
+  // Keyed on a counter rather than a boolean so a second failed submit re-focuses even when
+  // the first left focus exactly where this would put it — the same reason `announce` bumps a
+  // `seq` rather than comparing text. Cost if wrong: focus stays on `<body>` after a
+  // server-side failure, which is exactly the state #124 reports.
+  const pendingFocus = useRef<{ firstField?: string } | null>(null)
+  const [focusRequest, setFocusRequest] = useState(0)
+  const requestFocusAfterFailure = (raised: ReturnType<typeof flattenErrors>) => {
+    const firstField = raised.find((e) => e.name !== 'root' && !e.name.startsWith('root.'))
+    pendingFocus.current = { firstField: firstField?.name }
+    setFocusRequest((n) => n + 1)
+  }
+  useEffect(() => {
+    const request = pendingFocus.current
+    if (!request) return
+    pendingFocus.current = null
+    const alert = formErrorFocusStore.get()
+    if (alert) {
+      alert.focus()
+      return
+    }
+    // No <FormError> mounted (or the failure was field-only): fall back to the same target a
+    // validation failure gets. `setFocus` is hookform's own, so a field that registered a
+    // custom focus target through `field.ref` is honoured the same way here.
+    if (request.firstField) {
+      methods.setFocus(request.firstField as Parameters<typeof methods.setFocus>[0])
+    }
+    // `focusRequest` is the trigger; `methods` and the store are stable for the form's life.
+  }, [focusRequest, formErrorFocusStore, methods])
+
   const submit = methods.handleSubmit(async (submitted) => {
     setSubmitting(true)
     announce(submitPendingText)
+    const errorsBefore = flattenErrors(methods.getErrors())
     try {
       await onSubmit(submitted, methods)
-      announce(submitSuccessText)
+      // `onSubmit` resolved — but resolving is not the same as succeeding. The pattern this
+      // library documents for a server-side rejection catches it and maps it to
+      // `setError('root.server', …)` rather than rethrowing, so `<Form>` has to look at what
+      // was left behind rather than only at how the promise settled. See `submitErrorText`.
+      const raised = errorsRaisedBySubmit(errorsBefore)
+      if (raised.length === 0) {
+        announce(submitSuccessText)
+        return
+      }
+      const root = raised.find((e) => e.name === 'root' || e.name.startsWith('root.'))
+      // A root error carries its own user-facing message — the exact text `<FormError>` is
+      // about to render — so announce that rather than the generic `submitErrorText`, and the
+      // live region agrees with the visible alert instead of contradicting it.
+      announce(root ? root.message : submitErrorText)
+      requestFocusAfterFailure(raised)
     } catch (error) {
       announce(submitErrorText)
+      // A rejection gets the same focus treatment as a caught-and-mapped failure: a consumer
+      // who rethrows *and* maps to `root.server` (or whose global handler does) should not
+      // land in a different place than one who only maps. `raised` is recomputed here because
+      // the throw skipped the computation above.
+      requestFocusAfterFailure(errorsRaisedBySubmit(errorsBefore))
       throw error
     } finally {
       setSubmitting(false)
@@ -628,53 +749,55 @@ function FormImpl<TIn extends FieldValues, TOut>(
     <FormProvider {...methods}>
       <ErrorSummaryContext.Provider value={errorSummaryContext}>
         <FieldFocusContext.Provider value={fieldFocusContext}>
-          <FormRoot
-            noValidate
-            {...formProps}
-            autoComplete={autoComplete}
-            className={`${formClasses.root}${className ? ` ${className}` : ''}`}
-            aria-labelledby={ariaLabelledBy ?? (title != null ? titleProps.id : undefined)}
-            aria-describedby={
-              ariaDescribedBy ?? (effectiveDescription != null ? descriptionProps.id : undefined)
-            }
-            onSubmit={guardedSubmit}
-          >
-            {title != null && (
-              <FormTitle
-                {...titleProps}
-                className={`${formClasses.title}${titleProps.className ? ` ${titleProps.className}` : ''}`}
-              >
-                {title}
-              </FormTitle>
-            )}
-            {effectiveDescription != null && (
-              <FormDescription
-                {...descriptionProps}
-                className={`${formClasses.description}${descriptionProps.className ? ` ${descriptionProps.className}` : ''}`}
-              >
-                {effectiveDescription}
-              </FormDescription>
-            )}
-            <AssistedContext.Provider value={assisted}>
-              <RequiredIndicatorContext.Provider value={{ requiredIndicator, optionalText }}>
-                <RuleMessagesContext.Provider value={ruleMessages}>
-                  {children}
-                </RuleMessagesContext.Provider>
-              </RequiredIndicatorContext.Provider>
-            </AssistedContext.Provider>
-            {/*
+          <FormErrorFocusContext.Provider value={formErrorFocusStore}>
+            <FormRoot
+              noValidate
+              {...formProps}
+              autoComplete={autoComplete}
+              className={`${formClasses.root}${className ? ` ${className}` : ''}`}
+              aria-labelledby={ariaLabelledBy ?? (title != null ? titleProps.id : undefined)}
+              aria-describedby={
+                ariaDescribedBy ?? (effectiveDescription != null ? descriptionProps.id : undefined)
+              }
+              onSubmit={guardedSubmit}
+            >
+              {title != null && (
+                <FormTitle
+                  {...titleProps}
+                  className={`${formClasses.title}${titleProps.className ? ` ${titleProps.className}` : ''}`}
+                >
+                  {title}
+                </FormTitle>
+              )}
+              {effectiveDescription != null && (
+                <FormDescription
+                  {...descriptionProps}
+                  className={`${formClasses.description}${descriptionProps.className ? ` ${descriptionProps.className}` : ''}`}
+                >
+                  {effectiveDescription}
+                </FormDescription>
+              )}
+              <AssistedContext.Provider value={assisted}>
+                <RequiredIndicatorContext.Provider value={{ requiredIndicator, optionalText }}>
+                  <RuleMessagesContext.Provider value={ruleMessages}>
+                    {children}
+                  </RuleMessagesContext.Provider>
+                </RequiredIndicatorContext.Provider>
+              </AssistedContext.Provider>
+              {/*
             Rendered unconditionally, empty at rest: a live region has to be in
             the DOM before its text arrives, or assistive tech has no prior
             content to observe changing and the first announcement is missed.
           */}
-            <FormStatus
-              {...slotProps?.liveRegion}
-              message={announcement.text}
-              announcementKey={announcement.seq}
-              className={`${formClasses.status}${slotProps?.liveRegion?.className ? ` ${slotProps.liveRegion.className}` : ''}`}
-            />
-            {dialog}
-          </FormRoot>
+              <FormStatus
+                {...slotProps?.liveRegion}
+                message={announcement.text}
+                announcementKey={announcement.seq}
+                className={`${formClasses.status}${slotProps?.liveRegion?.className ? ` ${slotProps.liveRegion.className}` : ''}`}
+              />
+              {dialog}
+            </FormRoot>
+          </FormErrorFocusContext.Provider>
         </FieldFocusContext.Provider>
       </ErrorSummaryContext.Provider>
     </FormProvider>

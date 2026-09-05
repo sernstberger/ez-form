@@ -4,6 +4,7 @@ import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import { useFormState } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
+import { useRegisterFormError } from '../Form/FormErrorFocusContext'
 
 export const formErrorClasses = generateUtilityClasses('EzFormError', ['root'])
 
@@ -16,6 +17,11 @@ const FormErrorRoot = styled(Alert, { name: 'EzFormError', slot: 'Root' })({})
  * for example a rejected async `onSubmit`) as an MUI `Alert`. `Alert`'s default
  * `role="alert"` makes the message a live-region announcement. Renders nothing
  * when there is no root error, so it is safe to always mount.
+ *
+ * It is also the target `<Form>` moves focus to when a submit leaves a root-level error
+ * behind (#124) — hence the `tabIndex={-1}`, which makes an element focusable
+ * programmatically without adding it to the tab order. It registers itself with the
+ * enclosing `<Form>` rather than being found by a DOM query; see `FormErrorFocusContext`.
  */
 export function FormError(inProps: FormErrorProps) {
   const {
@@ -28,6 +34,9 @@ export function FormError(inProps: FormErrorProps) {
   })
   useEzFormContext('FormError') // guard only; useFormState reads control from context
   const { errors } = useFormState()
+  // Published to the form's store straight from the ref, so it is there on the same commit
+  // the alert first renders — see useRegisterFormError for why an effect is a commit too late.
+  const registerAlert = useRegisterFormError()
   // `setError('root.<key>', { message })` (root.server, root.random, …) nests under
   // `errors.root[<key>]`; a bare `setError('root', { message })` sets `errors.root`
   // itself. Read whichever is present so either form works.
@@ -45,8 +54,10 @@ export function FormError(inProps: FormErrorProps) {
   return (
     <FormErrorRoot
       severity={severity}
+      tabIndex={-1}
       className={`${formErrorClasses.root}${className ? ` ${className}` : ''}`}
       {...rest}
+      ref={registerAlert}
     >
       {message}
     </FormErrorRoot>

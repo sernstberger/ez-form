@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { formClasses } from '../../Form'
 import { Login } from './Login'
 import { LOGIN_BAD_PASSWORD } from '../fakeApi'
 import { expectNoA11yViolations } from '../../test/axe'
@@ -26,6 +27,26 @@ describe('Login', () => {
     await user.click(screen.getByRole('button', { name: /sign in/i }))
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent(/invalid email or password/i)
+  })
+
+  /**
+   * #124's own repro, as a regression test. `onSubmit` here catches the API's rejection and
+   * maps it to `setError('root.server', …)` without rethrowing — the pattern this library
+   * documents — so `<Form>` sees a resolved promise. It used to announce "Submitted." over
+   * the top of the alert saying the opposite, and left focus on `<body>`.
+   */
+  it('announces the failure (not "Submitted.") and focuses the alert on a wrong password', async () => {
+    const user = userEvent.setup({ delay: null })
+    render(<Login />)
+    await user.type(screen.getByLabelText(/email/i), 'ada@example.com')
+    await user.type(screen.getByLabelText(/^password/i), LOGIN_BAD_PASSWORD)
+    await user.click(screen.getByRole('button', { name: /sign in/i }))
+
+    const alert = await screen.findByRole('alert')
+    const status = () => document.querySelector<HTMLElement>(`.${formClasses.status}`)!
+    await waitFor(() => expect(status()).toHaveTextContent(/invalid email or password/i))
+    expect(status()).not.toHaveTextContent('Submitted.')
+    await waitFor(() => expect(alert).toHaveFocus())
   })
 
   it('shows a pending state on the submit button while the fake API call is in flight', async () => {
