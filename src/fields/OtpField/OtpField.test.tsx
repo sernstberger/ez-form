@@ -285,4 +285,26 @@ describe('OtpField slot 1 accessible name (#110)', () => {
     expect(screen.getByRole('group')).toHaveAccessibleName('One-time code')
     await expectNoA11yViolations(container)
   })
+
+  // The helper-text role comes from `useEzField`, not a literal on this component, so
+  // the element that shows the error is the same one that announces it (#104).
+  it('gives the helper text the binding role="alert" while it shows an error', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{ code: '' }} onSubmit={() => {}}>
+        <OtpField name="code" label="Code" length={4} required helperText="Check your email" />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    // No error yet: the helper text is not a live region.
+    expect(screen.getByText('Check your email')).not.toHaveAttribute('role')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Code is required.')
+    // The alert *is* the described element, not a second node beside it.
+    expect(screen.getByRole('textbox', { name: 'Code' })).toHaveAttribute(
+      'aria-describedby',
+      alert.id,
+    )
+  })
 })

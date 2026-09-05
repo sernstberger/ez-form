@@ -7,14 +7,18 @@ import { useAssisted } from '../../Form/AssistedContext'
 import type { FieldRules } from '../../rules'
 
 /**
- * Omit only what the binding owns (`name`, `value`, `error`, `inputRef`, and
- * `required`, which the `required` rule drives). Anything the consumer might
- * also want (event handlers, `helperText`, `disabled`, `id`, `slotProps`) is
- * merged, hookform's handler first.
+ * Omit only what the binding owns (`name`, `value`, `defaultValue`, `error`,
+ * `inputRef`, and `required`, which the `required` rule drives). Anything the
+ * consumer might also want (event handlers, `helperText`, `disabled`, `id`,
+ * `slotProps`) is merged, hookform's handler first.
+ *
+ * `defaultValue` is omitted because the form owns the value: passing one
+ * alongside the bound `value` is React's controlled/uncontrolled error, and the
+ * initial value belongs on `<Form defaultValues>` instead (#104).
  */
 export type TextFieldProps = Omit<
   MuiTextFieldProps,
-  'name' | 'value' | 'error' | 'inputRef' | 'required'
+  'name' | 'value' | 'defaultValue' | 'error' | 'inputRef' | 'required'
 > & {
   name: string
   /**
@@ -97,6 +101,12 @@ export function TextField({
   // warning fires, so one place owns the name.
   'aria-label': ariaLabel,
   'aria-labelledby': ariaLabelledBy,
+  // Same wrapper problem, and the same fix: on the root this describes the
+  // `FormControl` div, which nothing reads, while the `<input>` keeps only the
+  // helper-text id. It is merged with that id onto `slotProps.htmlInput` below,
+  // because an accessible description is a list — a consumer's extra description
+  // and the error message are both meant to be read (#104).
+  'aria-describedby': ariaDescribedBy,
   ...rest
 }: TextFieldProps) {
   const assisted = useAssisted()
@@ -121,9 +131,20 @@ export function TextField({
   // so this extra layer changes nothing for a plain `TextField` without a consumer `inputRef`.
   const inputRef = useForkRef(ref, inputRefProp)
 
-  // MUI TextField sets aria-invalid and aria-describedby itself; only `role` comes from the hook.
+  const text = f.helperText(helperText)
+
+  // `{...rest}` is first, before every binding-owned prop, so a consumer prop that
+  // collides with one cannot displace it. `name`/`value`/`defaultValue`/`error`/
+  // `inputRef` are `Omit`ted from the props type, but a consumer building props
+  // dynamically still reaches them at runtime, and `value` deciding what the input
+  // shows is exactly the thing the binding must own (#104). Matches the order
+  // `Autocomplete`, `NumberField` and `OtpField` already use.
+  //
+  // MUI TextField sets `aria-invalid` itself; the helper-text `role` and the
+  // description come from the hook.
   return (
     <MuiTextField
+      {...rest}
       {...fieldProps}
       label={f.displayLabel}
       value={displayValue ?? value ?? ''}
@@ -139,12 +160,16 @@ export function TextField({
       required={f.required}
       inputRef={inputRef}
       error={f.invalid}
-      helperText={f.helperText(helperText)}
+      helperText={text}
       type={type}
       autoComplete={autoComplete}
       slotProps={{
         ...slotProps,
-        formHelperText: mergeSlotProps(slotProps?.formHelperText, { role: f.helperTextA11y.role }),
+        // Not `mergeSlotProps`: that exists to let the consumer's value win, which is
+        // right for `className`/`sx`/handlers and wrong for `role`. The hook re-applies
+        // `role="alert"` after the consumer's props so an error cannot render announced
+        // by nothing, and pins the id the description below points at (#104).
+        formHelperText: f.helperTextSlotProps(slotProps?.formHelperText),
         inputLabel: mergeSlotProps(slotProps?.inputLabel, { required: f.labelRequired }),
         htmlInput: mergeSlotProps(slotProps?.htmlInput, {
           inputMode: type ? INPUT_MODE_BY_TYPE[type] : undefined,
@@ -152,6 +177,12 @@ export function TextField({
           // TextField that is this `<input>`; under `select` MUI moves the role to
           // the trigger and takes its name from `slotProps.select` instead (below).
           ...(rest.select ? null : f.nameA11y),
+          // `slotProps.htmlInput` is spread after `InputBase`'s own
+          // `aria-describedby`, so this is the one channel that can widen it from
+          // the helper-text id alone to that id *plus* the consumer's. A `select`
+          // TextField's `htmlInput` is the hidden native input, not the combobox,
+          // so its description is routed through `slotProps.select` instead (below).
+          ...(rest.select ? null : { 'aria-describedby': f.describedBy(ariaDescribedBy, text) }),
         }),
         // A `select` TextField renders a hidden native input plus a separate
         // `role="combobox"` trigger div; `htmlInput` reaches only the hidden one, so
@@ -164,11 +195,14 @@ export function TextField({
           ? {
               select: mergeSlotProps(slotProps?.select, {
                 SelectDisplayProps: f.nameA11y,
+                // MUI puts `aria-describedby={helperTextId}` on the `Select` and then
+                // spreads the slot's props after it, so this is where a `select`
+                // TextField's description gets widened to include the consumer's.
+                'aria-describedby': f.describedBy(ariaDescribedBy, text),
               }),
             }
           : null),
       }}
-      {...rest}
     />
   )
 }

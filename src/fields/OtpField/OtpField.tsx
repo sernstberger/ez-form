@@ -94,7 +94,11 @@ export function OtpField({
       disabled={mergeDisabled(disabled, f.field.disabled)}
       error={f.invalid}
       helperText={text}
-      helperTextProps={f.helperTextA11y}
+      // Through the hook, not `f.helperTextA11y`: the binding owns the helper-text
+      // role wherever it is set (#104). `helperTextProps` is `@internal` and has no
+      // consumer channel today, so there is nothing to merge — calling the hook is
+      // what keeps the binding the owner if one is ever added.
+      helperTextProps={f.helperTextSlotProps()}
       inputRef={f.field.ref}
       inputProps={{
         ...f.inputA11y(text),

@@ -49,6 +49,16 @@ export interface HelperTextA11y {
   role: 'alert' | undefined
 }
 
+/**
+ * A consumer's `formHelperText` slot props, in either shape MUI accepts: the
+ * object, or the `(ownerState) => props` callback. The merge is generic over
+ * the caller's own slot type (`slotProps.formHelperText` on `TextFieldProps`,
+ * say) so the result stays assignable back to the slot it came from — the type
+ * is MUI's, not a re-declared copy of it.
+ */
+export type HelperTextSlotProps<TOwnerState = unknown, TProps = object> =
+  TProps | ((ownerState: TOwnerState) => TProps) | undefined
+
 export type UseEzFieldReturn = UseControllerReturn & {
   /** Derived from the `required` rule; drives `required`/`aria-required` on the input. */
   required: boolean
@@ -60,12 +70,57 @@ export type UseEzFieldReturn = UseControllerReturn & {
   /** a11y attributes for the control, linked to the helper text only when there is some. */
   inputA11y: (text: ReactNode) => InputA11y
   /**
+   * The control's `aria-describedby`: the consumer's ids **and** the helper text's,
+   * space-joined, because an accessible description is a list. Replacing one with the
+   * other silently drops half of what the control was meant to say (#104).
+   *
+   * `undefined` when neither side has anything, so the attribute is dropped rather
+   * than left pointing at nothing.
+   */
+  describedBy: (consumer: string | undefined, text: ReactNode) => string | undefined
+  /**
    * The consumer's `aria-label` / `aria-labelledby`, for the field to put on the
    * element that carries the role. Spread it there; do not rely on `{...rest}`,
    * which lands them on MUI's wrapper instead (#99).
    */
   nameA11y: NameA11y
   helperTextA11y: HelperTextA11y
+  /**
+   * The `formHelperText` slot props for a field that also lets the consumer set
+   * them. The binding's `role` is applied **after** the consumer's, so a consumer
+   * `role` cannot displace `role="alert"` and leave the error rendered but never
+   * announced (#104).
+   *
+   * MUI's own `mergeSlotProps` cannot do this: it exists to let the external value
+   * win, which is right for `className`/`sx`/handlers and wrong for the one
+   * attribute that makes the error reach a screen reader. The consumer's `role`
+   * still applies whenever there is no error to announce, so only the alert case
+   * is owned here.
+   *
+   * Whether the hook's `helperTextId` is pinned onto the slot depends on who wires
+   * the control's `aria-describedby`, and the two must agree:
+   *
+   * - `TextField` (via `describedBy` on `slotProps.htmlInput`), `NumberField` and
+   *   `OtpField` (via `inputA11y`) all point the control at `helperTextId`, so the
+   *   helper text must carry it. They get it — it is the default.
+   * - `Autocomplete` leaves the wiring to MUI, which generates its own id and links
+   *   the input to that. Pinning ours there would orphan the link and strip the
+   *   control's accessible description, so it opts out with `pinId: false`.
+   *
+   * Handles the function form MUI accepts for a slot's props.
+   *
+   * Two overloads, because the return shape follows the argument: called with no
+   * consumer props it returns a plain `HelperTextA11y` — the object a field with no
+   * consumer channel of its own (`NumberField`, `OtpField`) hands straight to its
+   * control, with no function form to narrow away at each call site.
+   */
+  helperTextSlotProps: {
+    (): HelperTextA11y
+    <TOwnerState, TProps extends object>(
+      consumer: HelperTextSlotProps<TOwnerState, TProps>,
+      options?: { pinId?: boolean },
+    ): TProps | ((ownerState: TOwnerState) => TProps)
+  }
   /**
    * The label to render: unchanged in `asterisk` mode; in `optional` mode, an
    * optional field's label gets the form's `optionalText` appended (unless the
@@ -148,7 +203,30 @@ export function useEzField<TValue = unknown>(
       'aria-invalid': invalid || undefined,
       'aria-describedby': text ? helperTextId : undefined,
     }),
+    describedBy: (consumer, text) =>
+      [consumer, text ? helperTextId : undefined].filter(Boolean).join(' ') || undefined,
     helperTextA11y: { id: helperTextId, role: invalid ? 'alert' : undefined },
+    helperTextSlotProps: <TOwnerState, TProps extends object>(
+      consumer?: HelperTextSlotProps<TOwnerState, TProps>,
+      { pinId = true }: { pinId?: boolean } = {},
+    ) => {
+      // Last, and deliberately not merged: while an error shows, the live region is
+      // the binding's. With no error the `role` key is left off entirely, so a
+      // consumer's own `role` survives the spread — `role: undefined` would erase it.
+      const owned = {
+        ...(pinId ? { id: helperTextId } : null),
+        ...(invalid ? { role: 'alert' as const } : null),
+      }
+      // No consumer channel: the plain object, matching the no-argument overload.
+      // `role: undefined` is stated so the shape is always `HelperTextA11y`; `owned`
+      // then supplies `alert` under error, and `id` only when `pinId` asked for it.
+      if (consumer === undefined) return { role: undefined, ...owned }
+      // The function form stays a function, so MUI still resolves it with the real
+      // ownerState; calling it here would hand the consumer an ownerState we do not have.
+      return typeof consumer === 'function'
+        ? (ownerState: TOwnerState) => ({ ...consumer(ownerState), ...owned }) as TProps
+        : ({ ...consumer, ...owned } as TProps)
+    },
     nameA11y: {
       ...(ariaLabel === undefined ? null : { 'aria-label': ariaLabel }),
       ...(ariaLabelledBy === undefined ? null : { 'aria-labelledby': ariaLabelledBy }),

@@ -414,4 +414,27 @@ describe('Autocomplete', () => {
       expect(screen.getByLabelText('Role (optional)')).toBeInTheDocument()
     })
   })
+
+  // The helper-text role comes from `useEzField`, not a literal on this component, so
+  // the element that shows the error is the same one that announces it (#104).
+  // `textFieldProps` `Omit`s `slotProps`, so a consumer cannot reach the slot to
+  // displace the role; this pins the behaviour the routing is there to guarantee.
+  it('gives the helper text the binding role="alert" while it shows an error', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <Autocomplete name="role" label="Role" options={roles} helperText="Pick one" />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    // No error yet: the helper text is not a live region.
+    expect(screen.getByText('Pick one')).not.toHaveAttribute('role')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Pick a role')
+    // The alert *is* the described element, not a second node beside it. Here the id
+    // linking them is MUI's own, which is why this field opts out of pinning ours.
+    expect(combobox()).toHaveAccessibleDescription('Pick a role')
+    expect(combobox().getAttribute('aria-describedby')).toBe(alert.id)
+  })
 })
