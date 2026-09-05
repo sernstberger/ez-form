@@ -15,9 +15,11 @@ const input = () => screen.getByRole('textbox', { name: /Email/ }) as HTMLInputE
 
 describeFieldContract({
   componentName: 'EmailField',
+  role: 'textbox',
   label: 'Email',
   schema,
   defaultValues: { email: '' },
+  renderNamed: (name) => <EmailField name="email" aria-label={name} />,
   render: (props) => <EmailField name="email" label="Email" {...props} />,
   getControl: () => screen.getByRole('textbox', { name: /Email/ }),
   interact: (user) => user.type(screen.getByRole('textbox', { name: /Email/ }), 'a'),

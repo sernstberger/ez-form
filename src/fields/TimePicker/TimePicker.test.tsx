@@ -17,9 +17,12 @@ const typeTime = (name: string, text: string) =>
 
 describeFieldContract({
   componentName: 'TimePicker',
+  role: 'group',
   label: 'At',
   schema,
   defaultValues: { at: null },
+  renderNamed: (name) =>
+    withPickers(<TimePicker name="at" slotProps={{ textField: { 'aria-label': name } }} />),
   render: (props) => withPickers(<TimePicker name="at" label="At" {...props} />),
   getControl: () => screen.getByRole('group', { name: 'At' }),
   requiredNotAnnounced: true,

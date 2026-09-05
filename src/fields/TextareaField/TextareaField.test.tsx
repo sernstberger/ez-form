@@ -34,9 +34,11 @@ const textbox = () => screen.getByRole('textbox', { name: 'Bio' })
 // rule, so it never triggers the length meter — that has its own tests below.
 describeFieldContract({
   componentName: 'TextareaField',
+  role: 'textbox',
   label: 'Bio',
   schema,
   defaultValues: { bio: '' },
+  renderNamed: (name) => <TextareaField name="bio" aria-label={name} />,
   render: (props) => <TextareaField name="bio" label="Bio" {...props} />,
   getControl: textbox,
   interact: (user) => user.type(textbox(), 'a'),

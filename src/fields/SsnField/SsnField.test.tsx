@@ -23,7 +23,12 @@ describeFieldContract({
   label: 'SSN',
   schema,
   defaultValues: { ssn: '' },
+  renderNamed: (name) => <SsnField name="ssn" aria-label={name} />,
   render: (props) => <SsnField name="ssn" label="SSN" {...props} />,
+  // Masked by default, so the control is a `type="password"` input, which has no
+  // role at all — same as `PasswordField`. The accessible name is read through
+  // the label query instead: the same accname computation, a different entry point.
+  findNamed: (name) => screen.getByLabelText(name),
   getControl: input,
   interact: (user) => user.type(input(), '1'),
 })

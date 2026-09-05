@@ -21,9 +21,12 @@ const typeDate = (name: string, text: string) =>
 
 describeFieldContract({
   componentName: 'DatePicker',
+  role: 'group',
   label: 'Start',
   schema,
   defaultValues: { start: null },
+  renderNamed: (name) =>
+    withPickers(<DatePicker name="start" slotProps={{ textField: { 'aria-label': name } }} />),
   render: (props) => withPickers(<DatePicker name="start" label="Start" {...props} />),
   getControl: () => screen.getByRole('group', { name: 'Start' }),
   requiredNotAnnounced: true,

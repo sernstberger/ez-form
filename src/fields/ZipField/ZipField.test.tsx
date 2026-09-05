@@ -11,9 +11,11 @@ const input = () => screen.getByRole('textbox', { name: 'Zip' })
 
 describeFieldContract({
   componentName: 'ZipField',
+  role: 'textbox',
   label: 'Zip',
   schema,
   defaultValues: { zip: '' },
+  renderNamed: (name) => <ZipField name="zip" aria-label={name} />,
   render: (props) => <ZipField name="zip" label="Zip" {...props} />,
   getControl: input,
   interact: (user) => user.type(input(), '9'),

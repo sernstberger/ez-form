@@ -77,6 +77,11 @@ interface ConsumerTextFieldSlotProps {
   slotProps?: Record<string, unknown> & {
     formHelperText?: object
     inputLabel?: { required?: boolean }
+    /**
+     * MUI X's `PickersInputBase` — the element that actually carries
+     * `role="group"`. See the `input` merge below for why the name has to go here.
+     */
+    input?: object
   }
   onPaste?: (event: ClipboardEvent<HTMLDivElement>) => void
   onClear?: (event: MouseEvent) => void
@@ -210,8 +215,9 @@ export function usePickerField<
       },
     },
     // A label-less picker is named through the text field it renders, so that is
-    // where the dev-mode "no accessible name" check has to look. Read, not
-    // removed: `slotProps.textField` is still spread onto the field below.
+    // where the dev-mode "no accessible name" check has to look. Read, and also
+    // *removed* from what reaches the text field root — see the `slotProps.input`
+    // merge below for why.
     'aria-label': consumerTextField?.['aria-label'],
     'aria-labelledby': consumerTextField?.['aria-labelledby'],
   })
@@ -273,6 +279,16 @@ export function usePickerField<
       // consumer's — the same precedence TextField uses.
       textField: {
         ...consumerTextField,
+        // Same wrapper bug as #99, one component over. On the `textField` root these
+        // land on `MuiPickersTextField-root`, which is a `FormControl` **div** with no
+        // role at all — so the name describes a `<div>` nothing reads while the
+        // `role="group"` element the user operates stays anonymous, and the
+        // missing-label warning above is silenced by a name that names nothing. They
+        // are re-emitted onto that group through `slotProps.input` below; absent (not
+        // `undefined`) keys are used here so a labelled picker keeps MUI X's own
+        // `aria-labelledby`.
+        'aria-label': undefined,
+        'aria-labelledby': undefined,
         required: f.required,
         error: f.invalid,
         helperText: text,
@@ -340,6 +356,19 @@ export function usePickerField<
           inputLabel: mergeSlotProps(consumerTextField?.slotProps?.inputLabel, {
             required: f.labelRequired,
           }),
+          // The one channel that reaches the `role="group"` element. `PickersTextField`
+          // hard-codes `role="group"` and `aria-labelledby={inputLabelId}` onto its
+          // `PickersInputBase` and *then* spreads this slot's props over them
+          // (PickersTextField.js), so a name set here wins — and `inputLabelId` is
+          // itself `undefined` without a label (`label && id ? … : undefined`), which
+          // is #100's empty-`aria-labelledby` trap avoided for free.
+          //
+          // Spread rather than merged for the same reason `Autocomplete` spreads
+          // `f.nameA11y` last: this is the field's own routing of a prop the consumer
+          // wrote, so it must beat what MUI X put there for the label-less case. Keys
+          // the consumer did not pass are absent, not `undefined`, so a labelled picker
+          // keeps MUI X's `aria-labelledby`.
+          input: { ...consumerTextField?.slotProps?.input, ...f.nameA11y },
         },
       },
     } as TSlotProps,

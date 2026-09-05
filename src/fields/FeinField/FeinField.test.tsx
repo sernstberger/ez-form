@@ -15,9 +15,11 @@ const input = () => screen.getByRole('textbox', { name: /EIN/ }) as HTMLInputEle
 
 describeFieldContract({
   componentName: 'FeinField',
+  role: 'textbox',
   label: 'EIN',
   schema,
   defaultValues: { ein: '' },
+  renderNamed: (name) => <FeinField name="ein" aria-label={name} />,
   render: (props) => <FeinField name="ein" label="EIN" {...props} />,
   getControl: () => screen.getByRole('textbox', { name: /EIN/ }),
   interact: (user) => user.type(screen.getByRole('textbox', { name: /EIN/ }), '1'),

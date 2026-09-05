@@ -23,7 +23,10 @@ describeFieldContract({
   label: 'Resume',
   schema,
   defaultValues: { resume: null },
+  renderNamed: (name) => <FileField name="resume" label={name} />,
   render: (props) => <FileField name="resume" label="Resume" {...props} />,
+  // `<input type="file">` has no role, so the name is read through the label query.
+  findNamed: (name) => screen.getByLabelText(new RegExp(`^${name}`)),
   getControl: () => fileInput('Resume'),
   interact: (user) => user.upload(fileInput('Resume'), pdf),
 })

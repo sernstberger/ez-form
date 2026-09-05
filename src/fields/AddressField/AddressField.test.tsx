@@ -79,6 +79,14 @@ describeFieldContract({
       slotProps={{ street: { helperText, onChange, required } }}
     />
   ),
+  role: 'textbox',
+  // The contract runs against the `street` part (see the note above), so row 1's
+  // ARIA name goes to that part rather than to the composite — an `aria-label` on
+  // `<AddressField>` itself names the enclosing fieldset, which is a different
+  // question and is covered by the composite's own cases below.
+  renderNamed: (name) => (
+    <AddressField name="address" slotProps={{ street: { 'aria-label': name } }} />
+  ),
   getControl: street,
   interact: (user) => user.type(street(), '1'),
 })

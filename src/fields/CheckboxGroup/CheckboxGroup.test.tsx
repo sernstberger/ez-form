@@ -16,9 +16,13 @@ const toppings = [
 
 describeFieldContract({
   componentName: 'CheckboxGroup',
+  role: 'group',
   label: 'Toppings',
   schema,
   defaultValues: { toppings: [] },
+  renderNamed: (name) => (
+    <CheckboxGroup name="toppings" label="" options={toppings} aria-label={name} />
+  ),
   render: (props) => (
     <CheckboxGroup name="toppings" label="Toppings" options={toppings} {...props} />
   ),

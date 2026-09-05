@@ -17,9 +17,14 @@ const inputs = () => screen.getAllByRole('textbox') as HTMLInputElement[]
 
 describeFieldContract({
   componentName: 'OtpField',
+  // The composite's own `role="group"` wrapper, not slot 1: an OTP field is named
+  // as a whole, and slots 2..n carry their own position names. `getControl` below
+  // still targets slot 1, which is where `aria-describedby`/`aria-invalid` live.
+  role: 'group',
   label: 'Code',
   schema,
   defaultValues: { code: '' },
+  renderNamed: (name) => <OtpField name="code" length={4} aria-label={name} />,
   render: ({ onChange, ...props }) => (
     <OtpField name="code" label="Code" length={4} onValueChange={onChange} {...props} />
   ),

@@ -12,9 +12,11 @@ const schema = z.object({
 
 describeFieldContract({
   componentName: 'TextField',
+  role: 'textbox',
   label: 'Email',
   schema,
   defaultValues: { email: '' },
+  renderNamed: (name) => <TextField name="email" aria-label={name} />,
   render: (props) => <TextField name="email" label="Email" {...props} />,
   getControl: () => screen.getByRole('textbox', { name: 'Email' }),
   interact: (user) => user.type(screen.getByRole('textbox', { name: 'Email' }), 'a'),

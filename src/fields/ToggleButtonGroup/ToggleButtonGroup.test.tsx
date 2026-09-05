@@ -22,9 +22,13 @@ const formats = [
 
 describeFieldContract({
   componentName: 'ToggleButtonGroup',
+  role: 'group',
   label: 'Align',
   schema,
   defaultValues: { align: null },
+  renderNamed: (name) => (
+    <ToggleButtonGroup name="align" label="" options={aligns} exclusive aria-label={name} />
+  ),
   render: (props) => (
     <ToggleButtonGroup name="align" label="Align" options={aligns} exclusive {...props} />
   ),

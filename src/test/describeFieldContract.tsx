@@ -7,6 +7,13 @@ import type { z } from 'zod'
 import { Form } from '../Form'
 import { expectNoA11yViolations } from './axe'
 
+/**
+ * The lines a field may opt out of, one key per `it` the contract adds beyond
+ * the original five. The union exists so a typo in an `exempt` key is a
+ * compile error rather than an opt-out that silently never applies.
+ */
+export type ContractLine = 'ariaLabelNames'
+
 export interface FieldContractProps {
   disabled?: boolean
   helperText?: string
@@ -46,6 +53,44 @@ export interface FieldContract<TIn extends FieldValues, TOut> {
    * attribute axe rejects. The legend asterisk and the error carry it instead.
    */
   requiredNotAnnounced?: boolean
+  /**
+   * Per-line opt-outs, keyed by contract line. The value is the **reason**, not
+   * `true`: a line a field cannot satisfy has to say why, in the field's own test
+   * file where the next person reading that field sees it, and the reason is
+   * expected to name an issue number. A line is never weakened for everyone
+   * because one field fails it.
+   *
+   * `requiredNotAnnounced` above predates this and stays as its own flag: it is
+   * already cited by six fields and folding it in would be churn with no gain.
+   */
+  exempt?: Partial<Record<ContractLine, string>>
+  /**
+   * The role the field's control exposes, for the lines that must query it by
+   * accessible name rather than by the label the rest of the contract uses.
+   * Omit it only alongside `renderNamed`/`findNamed` overrides.
+   */
+  role?: string
+  /**
+   * Renders the field with **no visible label**, named only by `aria-label` —
+   * the exact shape #99 and #100 broke, and the one the dev-mode warning tells
+   * consumers to reach for.
+   *
+   * It cannot default to `c.render({ 'aria-label': name })`, and the reason is
+   * the whole point of the line: with a visible label present, MUI names the
+   * control through `aria-labelledby` pointing at that label, and
+   * `aria-labelledby` **outranks** `aria-label` in the accname algorithm. The
+   * query would then be answered by the visible label on a control the
+   * `aria-label` never reached — a green test over the bug. Only a label-less
+   * render leaves `aria-label` as the sole possible name, so each field states
+   * its own here.
+   */
+  renderNamed: (name: string) => ReactElement
+  /**
+   * Finds the ARIA-named control for row 1. Defaults to
+   * `getByRole(c.role, { name })`; a field whose control has no role at all
+   * (`type="password"`) reads the name through a different query.
+   */
+  findNamed?: (name: string) => HTMLElement
   /** Changes the value exactly once (one consumer `onChange` call). */
   interact: (user: UserEvent) => Promise<void>
 }
@@ -58,6 +103,17 @@ export function describeFieldContract<TIn extends FieldValues, TOut>(c: FieldCon
   const expectDisabled = c.expectDisabled ?? ((control) => expect(control).toBeDisabled())
   const errorProps = c.errorProps ?? { required: true }
   const errorMessage = c.errorMessage ?? `${c.label} is required.`
+  const findNamed =
+    c.findNamed ??
+    ((name: string) => {
+      if (c.role === undefined)
+        throw new Error(
+          `describeFieldContract(${c.componentName}): row 1 needs \`role\` (the role the ` +
+            'control exposes) or a `findNamed` of its own, unless it opts out via ' +
+            '`exempt.ariaLabelNames`.',
+        )
+      return screen.getByRole(c.role, { name })
+    })
   const inForm = (child: ReactElement, disabled = false) => (
     <Form schema={c.schema} defaultValues={c.defaultValues} onSubmit={() => {}} disabled={disabled}>
       {child}
@@ -102,6 +158,18 @@ export function describeFieldContract<TIn extends FieldValues, TOut>(c: FieldCon
       expect(c.getControl()).toHaveAccessibleDescription(errorMessage)
       expect(c.getControl()).toHaveAttribute('aria-invalid', 'true')
       expect(screen.queryByText('Some help')).not.toBeInTheDocument()
+    })
+
+    /*
+     * Row 1 of #102. The P1 in #99/#100 was 15 of 17 fields with no accessible name
+     * from `aria-label`, passing 1564 tests, because no contract line ever asked.
+     * `getByRole(role, { name })` is the assertion — never `toHaveAttribute`, which a
+     * named wrapper around an anonymous control satisfies and which is the bug itself.
+     */
+    const namedExemption = c.exempt?.ariaLabelNames
+    it.skipIf(namedExemption)('is named by `aria-label` on the control itself', () => {
+      render(inForm(c.renderNamed('Contract ARIA name')))
+      expect(findNamed('Contract ARIA name')).toBeInTheDocument()
     })
 
     it('has no accessibility violations in the error state', async () => {

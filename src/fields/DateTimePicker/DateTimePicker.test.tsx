@@ -17,9 +17,12 @@ const typeDateTime = (name: string, text: string) =>
 
 describeFieldContract({
   componentName: 'DateTimePicker',
+  role: 'group',
   label: 'When',
   schema,
   defaultValues: { when: null },
+  renderNamed: (name) =>
+    withPickers(<DateTimePicker name="when" slotProps={{ textField: { 'aria-label': name } }} />),
   render: (props) => withPickers(<DateTimePicker name="when" label="When" {...props} />),
   getControl: () => screen.getByRole('group', { name: 'When' }),
   requiredNotAnnounced: true,

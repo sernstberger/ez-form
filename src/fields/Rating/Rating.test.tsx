@@ -32,9 +32,11 @@ function stopEvent(e: Event) {
 
 describeFieldContract({
   componentName: 'Rating',
+  role: 'radiogroup',
   label: 'Stars',
   schema,
   defaultValues: { stars: null },
+  renderNamed: (name) => <Rating name="stars" label="" aria-label={name} />,
   render: (props) => <Rating name="stars" label="Stars" {...props} />,
   getControl: () => screen.getByRole('radiogroup', { name: 'Stars' }),
   expectDisabled: () => expect(screen.getByRole('radio', { name: '3 Stars' })).toBeDisabled(),

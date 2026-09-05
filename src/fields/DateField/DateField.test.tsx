@@ -41,9 +41,12 @@ void typeGuardFlatOnPasteIsRejected
 
 describeFieldContract({
   componentName: 'DateField',
+  role: 'group',
   label: 'Birthday',
   schema,
   defaultValues: { birthday: null },
+  renderNamed: (name) =>
+    withPickers(<DateField name="birthday" slotProps={{ textField: { 'aria-label': name } }} />),
   render: (props) => withPickers(<DateField name="birthday" label="Birthday" {...props} />),
   getControl: () => screen.getByRole('group', { name: 'Birthday' }),
   requiredNotAnnounced: true,

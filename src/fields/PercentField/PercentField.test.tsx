@@ -16,9 +16,11 @@ const input = () => screen.getByRole('textbox', { name: /Rate/ }) as HTMLInputEl
 
 describeFieldContract({
   componentName: 'PercentField',
+  role: 'textbox',
   label: 'Rate',
   schema,
   defaultValues: {},
+  renderNamed: (name) => <PercentField name="rate" aria-label={name} />,
   render: ({ onChange, ...props }) => (
     <PercentField name="rate" label="Rate" onValueChange={onChange} {...props} />
   ),

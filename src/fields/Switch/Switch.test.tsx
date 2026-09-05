@@ -10,9 +10,11 @@ const schema = z.object({ darkMode: z.boolean() })
 
 describeFieldContract({
   componentName: 'Switch',
+  role: 'switch',
   label: 'Dark mode',
   schema,
   defaultValues: { darkMode: false },
+  renderNamed: (name) => <Switch name="darkMode" label="" aria-label={name} />,
   render: (props) => <Switch name="darkMode" label="Dark mode" {...props} />,
   getControl: () => screen.getByRole('switch', { name: 'Dark mode' }),
   interact: (user) => user.click(screen.getByRole('switch', { name: 'Dark mode' })),

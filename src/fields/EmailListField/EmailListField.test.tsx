@@ -40,11 +40,13 @@ function setup(
 
 describeFieldContract({
   componentName: 'EmailListField',
+  role: 'combobox',
   label: 'To',
   schema: requiredSchema,
   defaultValues: { to: [] },
   errorProps: { required: true },
   errorMessage: 'To is required.',
+  renderNamed: (name) => <EmailListField name="to" aria-label={name} />,
   render: (props) => <EmailListField name="to" label="To" {...props} />,
   getControl: combobox,
   interact: async (user) => {

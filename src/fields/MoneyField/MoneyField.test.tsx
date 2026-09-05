@@ -11,9 +11,11 @@ const input = () => screen.getByRole('textbox', { name: 'Price' })
 
 describeFieldContract({
   componentName: 'MoneyField',
+  role: 'textbox',
   label: 'Price',
   schema,
   defaultValues: {},
+  renderNamed: (name) => <MoneyField name="price" aria-label={name} />,
   render: ({ onChange, ...props }) => (
     <MoneyField name="price" label="Price" onValueChange={onChange} {...props} />
   ),

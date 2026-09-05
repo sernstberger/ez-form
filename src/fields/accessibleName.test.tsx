@@ -5,7 +5,11 @@ import { Form } from '../Form'
 import { resetDevWarnings } from '../devWarn'
 import { expectConsole } from '../test/expectConsole'
 import { expectNoA11yViolations } from '../test/axe'
+import { withPickers } from '../test/pickers'
 import { Autocomplete } from './Autocomplete'
+import { DateField } from './DateField'
+import { DatePicker } from './DatePicker'
+import { DateTimePicker } from './DateTimePicker'
 import { EmailField } from './EmailField'
 import { FeinField } from './FeinField'
 import { NumberField } from './NumberField'
@@ -16,6 +20,7 @@ import { PhoneField } from './PhoneField'
 import { Select } from './Select'
 import { StateSelect } from './StateSelect'
 import { TextField } from './TextField'
+import { TimePicker } from './TimePicker'
 import { TextareaField } from './TextareaField'
 import { ZipField } from './ZipField'
 
@@ -30,6 +35,12 @@ import { ZipField } from './ZipField'
  *
  * Fields rendered through `FieldFrame` have a second, different mechanism (an empty
  * legend's `aria-labelledby` outranking `aria-label`) and are covered by #100.
+ *
+ * The picker family is here too, added by #102: the same wrapper bug reached them
+ * through `slotProps.textField`. `describeFieldContract` now asks every field the
+ * name question, and these rows are the deeper version of it — they also pin the
+ * *tag* the name lands on, which is what tells a named control apart from a named
+ * wrapper that happens to carry the role.
  */
 
 const anySchema = z.object({ f: z.any() })
@@ -161,6 +172,41 @@ const cases: {
     // to point `aria-labelledby` at — see its own test file for the DOM.
     ariaLabel: (p) => <OtpField name="f" {...p} />,
     ariaLabelledBy: (p) => <OtpField name="f" {...p} />,
+  },
+  {
+    // The pickers name through `slotProps.textField`, and that lands on
+    // `MuiPickersTextField-root` — a `FormControl` **div** with no role, so the
+    // `role="group"` element the user operates stayed anonymous while the
+    // missing-label warning was silenced by a name that named nothing. Exactly
+    // #99's wrapper bug, one component over; found by #102's row 1 and fixed in
+    // `usePickerField`. The tag pin is the half that catches it: `DIV` here is
+    // `PickersInputBase`, the element carrying the role, not the outer wrapper.
+    name: 'DatePicker',
+    tag: 'DIV',
+    role: 'group',
+    ariaLabel: (p) => withPickers(<DatePicker name="f" slotProps={{ textField: p }} />),
+    ariaLabelledBy: (p) => withPickers(<DatePicker name="f" slotProps={{ textField: p }} />),
+  },
+  {
+    name: 'DateField',
+    tag: 'DIV',
+    role: 'group',
+    ariaLabel: (p) => withPickers(<DateField name="f" slotProps={{ textField: p }} />),
+    ariaLabelledBy: (p) => withPickers(<DateField name="f" slotProps={{ textField: p }} />),
+  },
+  {
+    name: 'TimePicker',
+    tag: 'DIV',
+    role: 'group',
+    ariaLabel: (p) => withPickers(<TimePicker name="f" slotProps={{ textField: p }} />),
+    ariaLabelledBy: (p) => withPickers(<TimePicker name="f" slotProps={{ textField: p }} />),
+  },
+  {
+    name: 'DateTimePicker',
+    tag: 'DIV',
+    role: 'group',
+    ariaLabel: (p) => withPickers(<DateTimePicker name="f" slotProps={{ textField: p }} />),
+    ariaLabelledBy: (p) => withPickers(<DateTimePicker name="f" slotProps={{ textField: p }} />),
   },
 ]
 
