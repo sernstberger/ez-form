@@ -404,6 +404,38 @@ describe('useEzFormContext', () => {
       expect(onSubmit).not.toHaveBeenCalled()
     })
 
+    /*
+     * #115. The confirm path validates with its own `trigger()` *before* opening the dialog,
+     * which never reaches `handleSubmit` — so hookform's `isSubmitted` stays false and its
+     * `reValidateMode` would never engage, leaving the error stale until another submit. Same
+     * root cause as the Wizard's failed `Next`, and the same fix reports it.
+     */
+    it('a value fixed after a failed confirm attempt clears its error live', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Form schema={schema} defaultValues={{ email: 'nope' }} onSubmit={onSubmit} confirm>
+          <TextField name="email" label="Email" />
+          <SubmitButton />
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      expect(await screen.findByText('Invalid email address')).toBeInTheDocument()
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+      const email = screen.getByRole('textbox', { name: 'Email' })
+      expect(email).toHaveAttribute('aria-invalid', 'true')
+
+      // No second submit click: the error must clear on the keystrokes alone.
+      await user.clear(email)
+      await user.type(email, 'a@b.co')
+
+      await waitFor(() =>
+        expect(screen.queryByText('Invalid email address')).not.toBeInTheDocument(),
+      )
+      expect(email).toHaveAttribute('aria-invalid', 'false')
+      expect(onSubmit).not.toHaveBeenCalled()
+    })
+
     it('Cancel leaves the form untouched and onSubmit uncalled', async () => {
       const user = userEvent.setup()
       const onSubmit = vi.fn()

@@ -19,6 +19,22 @@ export interface ErrorSummaryContextValue {
    * see its `attempted` check.
    */
   failedConfirmAttempt: number
+  /**
+   * Reports that a validation attempt run *outside* `handleSubmit` — `<Wizard>`'s per-step
+   * `trigger(step.fields)` on a failed `Next`, or `<Form confirm>`'s own pre-submit
+   * `trigger()` — came back invalid, so `<Form>` can start re-validating on change.
+   *
+   * react-hook-form only consults `reValidateMode` once `formState.isSubmitted` is true, and
+   * `isSubmitted` is set in exactly one place: inside `handleSubmit`. `trigger()` never sets
+   * it. So an error raised by one of these out-of-band calls sits in a form still governed by
+   * `mode` (`'onSubmit'` by default), where `skipValidation` skips every change event and the
+   * error cannot clear until something calls `trigger()` again — the user fixes the value and
+   * the alert, `aria-invalid`, and the `<FormErrorSummary>` entry all stay stale (#115).
+   * Telling `<Form>` an attempt failed is what lets it engage hookform's own change-time
+   * re-validation for the rest of the form's life, which is what a plain field already gets
+   * after its first failed submit.
+   */
+  reportFailedValidationAttempt: () => void
 }
 
 export const ErrorSummaryContext = createContext<ErrorSummaryContextValue | null>(null)
@@ -53,4 +69,19 @@ export function useHasErrorSummary(): boolean {
 export function useFailedConfirmAttempt(): number {
   const ctx = useContext(ErrorSummaryContext)
   return ctx?.failedConfirmAttempt ?? 0
+}
+
+// Nothing to report to outside `<Form>`: there is no form whose validation mode could change.
+// eslint-disable-next-line @typescript-eslint/no-empty-function
+const noopReport = () => {}
+
+/**
+ * `<Wizard>` calls this when a step's own `trigger()` comes back invalid, so the enclosing
+ * `<Form>` starts re-validating on change — see `reportFailedValidationAttempt` for why
+ * hookform does not do this on its own for a `trigger()`-raised error. No-op outside
+ * `<Form>`; `<Wizard>` itself still guards via `useEzFormContext`.
+ */
+export function useReportFailedValidationAttempt(): () => void {
+  const ctx = useContext(ErrorSummaryContext)
+  return ctx ? ctx.reportFailedValidationAttempt : noopReport
 }
