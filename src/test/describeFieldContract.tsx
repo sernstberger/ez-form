@@ -12,7 +12,8 @@ import { expectNoA11yViolations } from './axe'
  * the original five. The union exists so a typo in an `exempt` key is a
  * compile error rather than an opt-out that silently never applies.
  */
-export type ContractLine = 'ariaLabelNames' | 'consumerDescribedBy' | 'submitPayload'
+export type ContractLine =
+  'ariaLabelNames' | 'consumerDescribedBy' | 'submitPayload' | 'quietInteraction'
 
 export interface FieldContractProps {
   disabled?: boolean
@@ -273,6 +274,35 @@ export function describeFieldContract<TIn extends FieldValues, TOut>(c: FieldCon
       await user.click(screen.getByRole('button', { name: 'Go' }))
       await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
       expect(onSubmit).toHaveBeenCalledWith(expected, expect.anything())
+    })
+
+    /*
+     * Row 2 of #102. The console guard in `src/test/setup.ts` already fails any test
+     * that logs unexpectedly; what was missing was a test that drives a field far
+     * enough for it to have something to say. Every other line stops after one step,
+     * so an `act()` warning from a cleanup, a controlled/uncontrolled flip on the
+     * *second* change, or a devWarn that only fires once an error has rendered would
+     * all go unseen in a green run.
+     *
+     * The cycle is the one a user actually performs: submit empty → error → fix →
+     * resubmit → unmount (which the guard's own `afterEach` runs while still
+     * watching, so effect cleanups are covered too).
+     */
+    const quietExemption = c.exempt?.quietInteraction
+    it.skipIf(quietExemption)('logs nothing through a full interaction cycle', async () => {
+      const user = userEvent.setup()
+      render(inForm(c.render({ helperText: 'Some help', ...errorProps })))
+      // Fail first: the error path is where a live region, a focus move and a
+      // re-render all land at once.
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      await screen.findByRole('alert')
+      await (c.interactSubmittable ?? c.interact)(user)
+      await user.click(screen.getByRole('button', { name: 'Go' }))
+      // No assertion on the outcome — a field whose `errorProps` still fail after
+      // the fix is fine here. The subject is the console, and the guard's
+      // `afterEach` is what fails the test; this only has to make the field do the
+      // work. `getControl` last so the run cannot pass by rendering nothing.
+      expect(c.getControl()).toBeInTheDocument()
     })
 
     it('has no accessibility violations in the error state', async () => {
