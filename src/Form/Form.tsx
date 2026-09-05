@@ -232,20 +232,24 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
    * pattern this library documents for a server-side rejection is to *catch* it
    * and map it to an error rather than to rethrow:
    *
-   * | What `onSubmit` did | Announced | Focus moves to |
+   * | What `onSubmit` did | Announced here | Focus moves to |
    * |---|---|---|
-   * | rejected | `submitErrorText` | the `<FormError>` alert, else the first invalid field |
-   * | resolved, set a **root** error (`setError('root.server', …)`) | that error's own message | the `<FormError>` alert |
-   * | resolved, set **field** errors only (`setError('email', …)`) | `submitErrorText` | the first invalid field |
+   * | rejected | `submitErrorText` | see the focus order below |
+   * | resolved, set a **root** error (`setError('root.server', …)`), with a `<FormError>` | `submitErrorText` | the `<FormError>` alert |
+   * | resolved, set a **root** error, with **no** `<FormError>` | that error's own message | see below |
+   * | resolved, set **field** errors only (`setError('email', …)`) | `submitErrorText` | see below |
    * | resolved, set nothing | `submitSuccessText` | nothing |
    *
-   * The root-error row announces the error's own message rather than this
-   * generic string so a screen-reader user hears what the sighted user reads in
-   * the alert ("Invalid email or password"), not a second, vaguer sentence over
-   * the top of it. The other two failure rows have no message of their own to
-   * borrow — a rejection's `Error` is the consumer's private detail, and field
-   * errors are already carried by each field's own `role="alert"` and by
-   * `<FormErrorSummary>` — so they get this string.
+   * A mounted `<FormError>` is *itself* an assertive live region (`role="alert"`)
+   * already reading the root message, so this polite region does not repeat it —
+   * two regions saying the same sentence for one event is worse than one. With no
+   * `<FormError>`, nothing else would say it, so this region does.
+   *
+   * **Focus after a failed submit has one owner and a fixed order** — the
+   * `<FormError>` alert, else a declared `<FormErrorSummary>` (which focuses its
+   * own heading; `<Form>` simply stays out of its way), else the first invalid
+   * field via hookform's `setFocus`. This is the same single-owner rule #123
+   * established for validation failures, extended to cover the post-submit case.
    *
    * Only errors that appear *during* this submit count: a stale root error a
    * consumer never cleared cannot make the next, genuinely successful submit
@@ -613,46 +617,94 @@ function FormImpl<TIn extends FieldValues, TOut>(
     return flattenErrors(methods.getErrors()).filter((e) => !seen.has(`${e.name} ${e.message}`))
   }
 
-  // Ruling: the *decision* to move focus is made in the submit path — the one place that knows
-  // the move belongs to *this* submit rather than to a validation failure (which
-  // `<FormErrorSummary>` and hookform's own `shouldFocusError` already own between them) — but
-  // the move itself is performed by the effect below, on the commit that follows. The target
-  // does not exist yet at decision time: `<FormError>` renders nothing until the consumer's
-  // `setError` has been committed, and an element cannot be focused before it is in the DOM.
+  // Ruling: one owner for post-submit focus, with a fixed precedence — the `<FormError>` alert
+  // if this form has one, else a declared `<FormErrorSummary>`, else the first invalid field.
   //
-  // An effect rather than a `setTimeout(…, 0)`, which is what this was first written as: a
-  // timer only *usually* fires after React's commit, and under load (a full suite run) it can
-  // fire before it, leaving focus on `<body>` — a genuine race, not a test artifact. React
-  // guarantees an effect runs after the commit that scheduled it, so the alert is always there.
+  // #123 established that exactly one thing may move focus after a failed attempt, and made
+  // the error-summary store the single answer every decision reads (`shouldFocusError` on
+  // `useForm`, `shouldFocus` on `<Wizard>`'s per-step `trigger`). A *post-submit* failure — an
+  // `onSubmit` that resolved after mapping a server rejection to `setError` — is a third mover
+  // that arrived after that work, and it has to obey the same order rather than race it.
+  // Without the summary branch, a form with a declared summary and a server-side field error
+  // (the README's own `setError('email', …)` pattern) had focus yanked to the field: the
+  // summary's heading effect and this one run in the same commit, child before parent, so this
+  // one silently overrode it — verified, focus landed on the input and never moved.
   //
-  // Keyed on a counter rather than a boolean so a second failed submit re-focuses even when
-  // the first left focus exactly where this would put it — the same reason `announce` bumps a
-  // `seq` rather than comparing text. Cost if wrong: focus stays on `<body>` after a
-  // server-side failure, which is exactly the state #124 reports.
-  const pendingFocus = useRef<{ firstField?: string } | null>(null)
-  const [focusRequest, setFocusRequest] = useState(0)
-  const requestFocusAfterFailure = (raised: ReturnType<typeof flattenErrors>) => {
+  // The summary branch is deliberately a *no-op*, not a `heading.focus()` of its own. The
+  // summary already focuses itself on any failed attempt, keyed on `submitCount` — which
+  // `handleSubmit` has incremented by the time `onSubmit` runs, so a post-submit `setError`
+  // needs no new signal, only for this effect to stay out of its way. Verified by probe: with
+  // a summary mounted the list already showed the post-submit error; the one thing wrong was
+  // this effect stealing the focus. Adding a second focus call here would re-create precisely
+  // the two-movers bug #123 fixed.
+  //
+  // The alert still outranks the summary: it carries the root message, is the thing that just
+  // appeared, and the summary lists only field errors (it filters `root.*` — see its own
+  // comment), so for a root failure the summary may have nothing to show at all.
+  //
+  // Read through the store's own `getDeclared` (live), not the `hasErrorSummary` snapshot
+  // above: this effect can run in the very commit a summary first mounts, and #123's own doc
+  // records that the stale `false` is exactly what broke the wizard's jump focus. This is the
+  // same live read `useHasErrorSummaryRef` hands a consumer of the context; `<Form>` owns the
+  // store, so it reads it directly rather than through its own provider.
+  //
+  // The move is performed by an effect rather than inline, because the target does not exist at
+  // decision time: `<FormError>` renders nothing until the consumer's `setError` is committed.
+  // An effect rather than the `setTimeout(…, 0)` this was first written as — a timer only
+  // *usually* fires after React's commit, and under load (a full suite run) it fired before it,
+  // leaving focus on `<body>`. React guarantees an effect runs after the commit that scheduled
+  // it. Keyed on a counter, so a second failed submit re-focuses even when the first left focus
+  // where this would put it — the same reason `announce` bumps a `seq`.
+  //
+  // Cost if wrong: two things fight over focus after a failed submit (the #123 bug, one submit
+  // later), or focus stays on `<body>` (the #124 bug).
+  // Both halves — what to say and where to send focus — are settled *after* the commit, in one
+  // effect, because both turn on whether a `<FormError>` exists, and it does not exist yet when
+  // the submit handler runs: the consumer's `setError` has only queued the render that creates
+  // it. Deciding the wording in the handler and the focus in the effect would read the same
+  // store at two different times and disagree with itself — which the first draft did, still
+  // announcing the root message into the status region because the alert had not committed yet.
+  const pendingFailure = useRef<{ firstField?: string; rootMessage?: string } | null>(null)
+  const [failureSettled, setFailureSettled] = useState(0)
+  const reportFailure = (raised: ReturnType<typeof flattenErrors>) => {
     const firstField = raised.find((e) => e.name !== 'root' && !e.name.startsWith('root.'))
-    pendingFocus.current = { firstField: firstField?.name }
-    setFocusRequest((n) => n + 1)
+    const root = raised.find((e) => e.name === 'root' || e.name.startsWith('root.'))
+    pendingFailure.current = { firstField: firstField?.name, rootMessage: root?.message }
+    setFailureSettled((n) => n + 1)
   }
   useEffect(() => {
-    const request = pendingFocus.current
-    if (!request) return
-    pendingFocus.current = null
+    const failure = pendingFailure.current
+    if (!failure) return
+    pendingFailure.current = null
     const alert = formErrorFocusStore.get()
+
+    // Announce first, so the region's text is in place before focus moves.
+    if (failure.rootMessage !== undefined && !alert) {
+      // A root failure with no `<FormError>` to carry it: this region is the only thing that
+      // can say what went wrong, so it says the error's own sentence rather than the generic
+      // string, which would throw that sentence away.
+      announce(failure.rootMessage)
+    } else {
+      // Either a field-only failure, or a root failure whose `<FormError>` alert is already
+      // announcing that exact message assertively. Both get the generic whole-form statement.
+      announce(submitErrorText)
+    }
+
     if (alert) {
       alert.focus()
       return
     }
-    // No <FormError> mounted (or the failure was field-only): fall back to the same target a
-    // validation failure gets. `setFocus` is hookform's own, so a field that registered a
-    // custom focus target through `field.ref` is honoured the same way here.
-    if (request.firstField) {
-      methods.setFocus(request.firstField as Parameters<typeof methods.setFocus>[0])
+    // A declared summary owns this failure — it has already focused its own heading. Nothing
+    // to do but not fight it.
+    if (errorSummaryStore.getDeclared()) return
+    // No alert, no summary: the first invalid field, the same target a validation failure gets.
+    // `setFocus` is hookform's own, so a field that registered a custom focus target through
+    // `field.ref` is honoured the same way here.
+    if (failure.firstField) {
+      methods.setFocus(failure.firstField as Parameters<typeof methods.setFocus>[0])
     }
-    // `focusRequest` is the trigger; `methods` and the store are stable for the form's life.
-  }, [focusRequest, formErrorFocusStore, methods])
+    // `failureSettled` is the trigger; the rest are stable for the form's life.
+  }, [failureSettled, formErrorFocusStore, errorSummaryStore, methods, announce, submitErrorText])
 
   const submit = methods.handleSubmit(async (submitted) => {
     setSubmitting(true)
@@ -669,19 +721,27 @@ function FormImpl<TIn extends FieldValues, TOut>(
         announce(submitSuccessText)
         return
       }
-      const root = raised.find((e) => e.name === 'root' || e.name.startsWith('root.'))
-      // A root error carries its own user-facing message — the exact text `<FormError>` is
-      // about to render — so announce that rather than the generic `submitErrorText`, and the
-      // live region agrees with the visible alert instead of contradicting it.
-      announce(root ? root.message : submitErrorText)
-      requestFocusAfterFailure(raised)
+      // Ruling: when a `<FormError>` is mounted, `<Form>` does *not* repeat the root message —
+      // the alert is already an assertive live region (`role="alert"`, MUI's `Alert` default)
+      // carrying that exact sentence, and it is what takes focus. Saying it again from this
+      // polite `role="status"` region is the same text twice, from two regions, for one event;
+      // the first draft did that, and its own test asserted both regions held the identical
+      // string. Silence here is not a gap — the alert *is* the announcement — so this region
+      // falls back to its generic whole-form `submitErrorText`.
+      //
+      // With no `<FormError>` the root sentence would otherwise go unannounced entirely, so
+      // there this region says it instead. Both branches live in the effect above, which is the
+      // only place that can tell the two cases apart: the alert does not exist yet here.
+      //
+      // Cost if wrong: a root failure is announced twice (verbose, the state this replaces) or,
+      // in the no-`<FormError>` case, only generically.
+      reportFailure(raised)
     } catch (error) {
-      announce(submitErrorText)
-      // A rejection gets the same focus treatment as a caught-and-mapped failure: a consumer
-      // who rethrows *and* maps to `root.server` (or whose global handler does) should not
-      // land in a different place than one who only maps. `raised` is recomputed here because
-      // the throw skipped the computation above.
-      requestFocusAfterFailure(errorsRaisedBySubmit(errorsBefore))
+      // A rejection gets the same treatment as a caught-and-mapped failure — announcement and
+      // focus both — so a consumer who rethrows *and* maps to `root.server` (or whose global
+      // handler does) does not land somewhere different from one who only maps. `raised` is
+      // recomputed here because the throw skipped the computation above.
+      reportFailure(errorsRaisedBySubmit(errorsBefore))
       throw error
     } finally {
       setSubmitting(false)

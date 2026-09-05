@@ -44,8 +44,12 @@ describe('Login', () => {
 
     const alert = await screen.findByRole('alert')
     const status = () => document.querySelector<HTMLElement>(`.${formClasses.status}`)!
-    await waitFor(() => expect(status()).toHaveTextContent(/invalid email or password/i))
+    // The alert (an assertive live region) carries the specific sentence; the form's own polite
+    // region carries the generic one and does not repeat it. What matters for #124 is that it
+    // no longer says the opposite of the alert.
+    await waitFor(() => expect(status()).toHaveTextContent('Submit failed.'))
     expect(status()).not.toHaveTextContent('Submitted.')
+    expect(alert).toHaveTextContent(/invalid email or password/i)
     await waitFor(() => expect(alert).toHaveFocus())
   })
 

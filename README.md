@@ -168,17 +168,26 @@ onSubmit={async (values, form) => {
 pattern gets the full failure treatment — the announcement and the focus move — without
 rethrowing:
 
-| What `onSubmit` did                                    | Announced                | Focus moves to                                    |
-| ------------------------------------------------------ | ------------------------ | ------------------------------------------------- |
-| rejected                                               | `submitErrorText`        | the `<FormError>` alert, else the first bad field |
-| resolved, set a **root** error (`root`, `root.server`) | that error's own message | the `<FormError>` alert                           |
-| resolved, set **field** errors only                    | `submitErrorText`        | the first invalid field                           |
-| resolved, set nothing                                  | `submitSuccessText`      | nothing                                           |
+| What `onSubmit` did                                   | Announced by `<Form>`    |
+| ----------------------------------------------------- | ------------------------ |
+| rejected                                              | `submitErrorText`        |
+| resolved, set a **root** error, with a `<FormError>`  | `submitErrorText`        |
+| resolved, set a **root** error, with no `<FormError>` | that error's own message |
+| resolved, set **field** errors only                   | `submitErrorText`        |
+| resolved, set nothing                                 | `submitSuccessText`      |
 
-The root row announces the error's own text so a screen reader user hears exactly what the
-alert says, rather than a vaguer "Submit failed." over the top of it. Only errors raised
-_during_ that submit count, so a stale root error a form never cleared cannot make the next,
-genuinely successful submit report a failure.
+A mounted `<FormError>` is itself an assertive live region (`role="alert"`) already reading the
+root message, so `<Form>`'s own polite region does not repeat it — one event should not be
+announced twice by two regions. With no `<FormError>` nothing else would say it, so `<Form>`
+does.
+
+**Focus after a failed submit has one owner and a fixed order:** the `<FormError>` alert, else
+a declared `<FormErrorSummary>` (which focuses its own heading), else the first invalid field.
+That is the same single-owner rule that governs a validation failure, extended to cover a
+server-side one.
+
+Only errors raised _during_ that submit count, so a stale root error a form never cleared
+cannot make the next, genuinely successful submit report a failure.
 
 Inside child components use `useFormContext()` from `react-hook-form`.
 
