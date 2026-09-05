@@ -17,7 +17,7 @@ type Story = StoryObj<typeof meta>
 
 export const Default: Story = {}
 export const Required: Story = {
-  parameters: { form: { schema, defaultValues: {} } } satisfies FormParameters,
+  parameters: { form: { defaultValues: {} } } satisfies FormParameters,
   args: { required: true },
 }
 export const MinMax: Story = {

@@ -26,7 +26,7 @@ type Story = StoryObj<typeof meta>
 export const Default: Story = {}
 export const Required: Story = {
   args: { required: true, helperText: 'Pick at least one' },
-  parameters: { form: { schema, defaultValues: { toppings: [] } } } satisfies FormParameters,
+  parameters: { form: { defaultValues: { toppings: [] } } } satisfies FormParameters,
 }
 export const Row: Story = { args: { row: true } }
 export const DisabledOption: Story = {
@@ -41,7 +41,7 @@ export const DisabledOption: Story = {
 export const Disabled: Story = { args: { disabled: true } }
 export const Error: Story = {
   args: { required: true },
-  parameters: { form: { schema, defaultValues: { toppings: [] } } } satisfies FormParameters,
+  parameters: { form: { defaultValues: { toppings: [] } } } satisfies FormParameters,
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole('button', { name: 'Submit' }))
     await canvas.findByText('Toppings is required.')

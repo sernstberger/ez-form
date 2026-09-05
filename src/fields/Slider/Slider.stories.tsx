@@ -32,7 +32,7 @@ export const Bounded: Story = {
     max: { value: 50, message: 'Keep it under 50' },
     helperText: 'Default is out of range',
   },
-  parameters: { form: { schema, defaultValues: { volume: 80 } } } satisfies FormParameters,
+  parameters: { form: { defaultValues: { volume: 80 } } } satisfies FormParameters,
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole('button', { name: 'Submit' }))
     await canvas.findByText('Keep it under 50')

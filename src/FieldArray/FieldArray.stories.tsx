@@ -42,7 +42,6 @@ export const Reorder: Story = {
   args: { reorder: true },
   parameters: {
     form: {
-      schema,
       defaultValues: {
         applicants: [
           { name: 'Ada Lovelace', email: 'ada@example.com' },
