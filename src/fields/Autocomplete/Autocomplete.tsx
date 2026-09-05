@@ -248,7 +248,19 @@ export function Autocomplete<
           onBlur={() => f.field.onBlur()}
           slotProps={{
             ...params.slotProps,
-            formHelperText: { role: f.helperTextA11y.role },
+            // Through the hook, not a literal `{ role }`: the binding owns the
+            // helper-text role wherever it is set, so the one attribute that makes an
+            // error reach a screen reader cannot be displaced (#104). Nothing is
+            // merged in — `renderInput`'s `params.slotProps` carries no
+            // `formHelperText`, and `textFieldProps` `Omit`s `slotProps`, so there is
+            // no consumer channel here today. Routing it through the hook is what
+            // keeps the binding the owner if one is ever added.
+            //
+            // `pinId: false`: unlike the other fields this one leaves the
+            // `aria-describedby` wiring to MUI, which links the input to an id it
+            // generates. Pinning the hook's id here would orphan that link and leave
+            // the combobox with no accessible description at all.
+            formHelperText: f.helperTextSlotProps(undefined, { pinId: false }),
             inputLabel: mergeSlotProps(params.slotProps?.inputLabel, { required: f.labelRequired }),
             // `inputProps` first: `mergeSlotProps` lets the *external* value win
             // for plain props (so a caller's `autoComplete` beats the `'off'`

@@ -746,4 +746,24 @@ describe('NumberField valueScale (internal; PercentField scale="fraction")', () 
     await user.type(input(), '8')
     expect(seen.at(-1)).toBe(4)
   })
+
+  // The helper-text role comes from `useEzField`, not a literal on this component, so
+  // the element that shows the error is the same one that announces it (#104).
+  it('gives the helper text the binding role="alert" while it shows an error', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{}} onSubmit={() => {}}>
+        <NumberField name="age" label="Age" helperText="Years" />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    // No error yet: the helper text is not a live region.
+    expect(screen.getByText('Years')).not.toHaveAttribute('role')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Enter your age')
+    // The alert *is* the described element, not a second node beside it.
+    expect(input()).toHaveAccessibleDescription('Enter your age')
+    expect(input().getAttribute('aria-describedby')).toBe(alert.id)
+  })
 })

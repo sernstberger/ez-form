@@ -87,9 +87,9 @@ export type UseEzFieldReturn = UseControllerReturn & {
   helperTextA11y: HelperTextA11y
   /**
    * The `formHelperText` slot props for a field that also lets the consumer set
-   * them. The binding's `id` and `role` are applied **after** the consumer's, so
-   * a consumer `role` cannot displace `role="alert"` and leave the error rendered
-   * but never announced (#104).
+   * them. The binding's `role` is applied **after** the consumer's, so a consumer
+   * `role` cannot displace `role="alert"` and leave the error rendered but never
+   * announced (#104).
    *
    * MUI's own `mergeSlotProps` cannot do this: it exists to let the external value
    * win, which is right for `className`/`sx`/handlers and wrong for the one
@@ -97,11 +97,30 @@ export type UseEzFieldReturn = UseControllerReturn & {
    * still applies whenever there is no error to announce, so only the alert case
    * is owned here.
    *
+   * Whether the hook's `helperTextId` is pinned onto the slot depends on who wires
+   * the control's `aria-describedby`, and the two must agree:
+   *
+   * - `TextField` (via `describedBy` on `slotProps.htmlInput`), `NumberField` and
+   *   `OtpField` (via `inputA11y`) all point the control at `helperTextId`, so the
+   *   helper text must carry it. They get it — it is the default.
+   * - `Autocomplete` leaves the wiring to MUI, which generates its own id and links
+   *   the input to that. Pinning ours there would orphan the link and strip the
+   *   control's accessible description, so it opts out with `pinId: false`.
+   *
    * Handles the function form MUI accepts for a slot's props.
+   *
+   * Two overloads, because the return shape follows the argument: called with no
+   * consumer props it returns a plain `HelperTextA11y` — the object a field with no
+   * consumer channel of its own (`NumberField`, `OtpField`) hands straight to its
+   * control, with no function form to narrow away at each call site.
    */
-  helperTextSlotProps: <TOwnerState, TProps extends object>(
-    consumer: HelperTextSlotProps<TOwnerState, TProps>,
-  ) => TProps | ((ownerState: TOwnerState) => TProps)
+  helperTextSlotProps: {
+    (): HelperTextA11y
+    <TOwnerState, TProps extends object>(
+      consumer: HelperTextSlotProps<TOwnerState, TProps>,
+      options?: { pinId?: boolean },
+    ): TProps | ((ownerState: TOwnerState) => TProps)
+  }
   /**
    * The label to render: unchanged in `asterisk` mode; in `optional` mode, an
    * optional field's label gets the form's `optionalText` appended (unless the
@@ -188,12 +207,20 @@ export function useEzField<TValue = unknown>(
       [consumer, text ? helperTextId : undefined].filter(Boolean).join(' ') || undefined,
     helperTextA11y: { id: helperTextId, role: invalid ? 'alert' : undefined },
     helperTextSlotProps: <TOwnerState, TProps extends object>(
-      consumer: HelperTextSlotProps<TOwnerState, TProps>,
+      consumer?: HelperTextSlotProps<TOwnerState, TProps>,
+      { pinId = true }: { pinId?: boolean } = {},
     ) => {
       // Last, and deliberately not merged: while an error shows, the live region is
-      // the binding's. With no error nothing is added, so the consumer's own `role`
-      // survives — `role: undefined` here would erase it instead.
-      const owned = { id: helperTextId, ...(invalid ? { role: 'alert' as const } : null) }
+      // the binding's. With no error the `role` key is left off entirely, so a
+      // consumer's own `role` survives the spread — `role: undefined` would erase it.
+      const owned = {
+        ...(pinId ? { id: helperTextId } : null),
+        ...(invalid ? { role: 'alert' as const } : null),
+      }
+      // No consumer channel: the plain object, matching the no-argument overload.
+      // `role: undefined` is stated so the shape is always `HelperTextA11y`; `owned`
+      // then supplies `alert` under error, and `id` only when `pinId` asked for it.
+      if (consumer === undefined) return { role: undefined, ...owned }
       // The function form stays a function, so MUI still resolves it with the real
       // ownerState; calling it here would hand the consumer an ownerState we do not have.
       return typeof consumer === 'function'
