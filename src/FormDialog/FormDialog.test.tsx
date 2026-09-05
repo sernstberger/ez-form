@@ -325,11 +325,11 @@ describe('FormDialog', () => {
     await openDialog(user)
     await type(user, 'Ada')
     await user.keyboard('{Escape}')
-    // Waiting on the prompt being *present* rather than focused: this prompt is a dialog
-    // inside a dialog, and the outer Dialog's focus trap keeps focus on its paper, so
-    // ConfirmDialog's `autoFocus` on Cancel does not win the race here. Focus behaviour has
-    // its own tests (ConfirmDialog.test.tsx); what this one is for is the axe audit below.
-    expect(await screen.findByRole('button', { name: 'Keep editing' })).toBeInTheDocument()
+    // The prompt is a dialog inside a dialog, and MUI's Dialog claims initial focus for its
+    // own paper; ConfirmDialog's post-transition re-focus (#119) reclaims it, so the safe
+    // button ends up focused here too. Focus behaviour has its own tests
+    // (ConfirmDialog.test.tsx); what this one is for is the axe audit below.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Keep editing' })).toHaveFocus())
     await expectNoA11yViolations(baseElement)
   })
 
