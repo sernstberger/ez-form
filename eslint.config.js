@@ -5,6 +5,7 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import jsxA11y from 'eslint-plugin-jsx-a11y'
 import storybook from 'eslint-plugin-storybook'
 import prettier from 'eslint-config-prettier/flat'
+import ezForm from './eslint-plugin/index.js'
 
 /**
  * Flat config for the whole repo. `pnpm lint` runs `eslint . --max-warnings 0`, so every rule
@@ -174,11 +175,19 @@ export default tseslint.config(
     },
   },
 
-  // The guardrail scripts are plain JS with JSDoc types; they are not in any tsconfig, so
-  // typed rules have no program for them.
+  /*
+   * The guardrail scripts and the ESLint plugin are plain JS with JSDoc types; they are not
+   * in any tsconfig, so typed rules have no program for them.
+   *
+   * The plugin (`eslint-plugin/`, #107) is deliberately outside `src`: it ships as-is with no
+   * build step, so it is not part of the library bundle and has nothing to be compiled by.
+   * `globals.node` because a flat-config plugin is loaded by ESLint in Node, and the test file
+   * additionally gets vitest's globals via `languageOptions` below.
+   */
   {
-    files: ['scripts/**/*.mjs'],
+    files: ['scripts/**/*.mjs', 'eslint-plugin/**/*.js'],
     extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: { globals: globals.node },
   },
 
   storybook.configs['flat/recommended'],
@@ -205,6 +214,28 @@ export default tseslint.config(
        */
       '@typescript-eslint/require-await': 'off',
     },
+  },
+
+  /*
+   * This repo eating its own dog food: `prefer-specific-field`, the rule shipped at
+   * `ez-form/eslint-plugin` (#107), run over this repo's own sources.
+   *
+   * The point is not that it finds anything here — it should find nothing — but that
+   * "it does not fire on ez-form's own wrappers" is checked by `pnpm lint` on every run
+   * rather than only by the rule's unit tests. `EmailField`, `PhoneField`, `SsnField` and
+   * `PasswordField` all render through `TextField` and pass `type` themselves, which is
+   * exactly the code a careless version of this rule would report; here they are, being
+   * linted. The rule tracks the import, and these import `TextField` by relative path
+   * rather than from `'ez-form'`, so none of them matches.
+   *
+   * `src/examples` is the one place that writes JSX the way a consumer would, so this also
+   * keeps the examples honest: if one of them ever reaches for `<TextField type="email">`,
+   * the build says so.
+   */
+  {
+    files: ['src/**/*.tsx', '.storybook/**/*.tsx'],
+    plugins: { 'ez-form': ezForm },
+    rules: { 'ez-form/prefer-specific-field': 'error' },
   },
 
   // Must stay last: turns off every rule that would fight `prettier --write .`.
