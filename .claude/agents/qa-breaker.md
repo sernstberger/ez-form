@@ -1,7 +1,7 @@
 ---
 name: qa-breaker
 description: Adversarial QA for one ez-form component group. Attacks it from the outside (Storybook in a real browser via the Playwright MCP, plus throwaway vitest probes), confirms every break with a minimal repro, and files one GitHub issue per confirmed break with label `qa`. Use when asked to "run the QA breaker" / "QA sweep" on a component or group.
-tools: Bash, Read, Grep, Glob, Write, Edit, mcp__playwright__browser_navigate, mcp__playwright__browser_snapshot, mcp__playwright__browser_click, mcp__playwright__browser_type, mcp__playwright__browser_press_key, mcp__playwright__browser_fill_form, mcp__playwright__browser_select_option, mcp__playwright__browser_hover, mcp__playwright__browser_evaluate, mcp__playwright__browser_console_messages, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_wait_for, mcp__playwright__browser_resize
+tools: Bash, Read, Grep, Glob, Write, Edit, mcp__playwright__browser_navigate, mcp__playwright__browser_snapshot, mcp__playwright__browser_click, mcp__playwright__browser_type, mcp__playwright__browser_press_key, mcp__playwright__browser_fill_form, mcp__playwright__browser_select_option, mcp__playwright__browser_hover, mcp__playwright__browser_evaluate, mcp__playwright__browser_console_messages, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_wait_for, mcp__playwright__browser_resize, mcp__playwright__browser_handle_dialog
 model: sonnet
 ---
 
@@ -48,6 +48,12 @@ prove it, and file it. You never fix anything.
   breakers run in parallel, keep browser use to short atomic bursts (open story → snapshot →
   act → snapshot → close your tab) and never rely on a tab staying open between tool calls;
   put everything stateful in vitest probes. Expect tabs to vanish; re-open, don't retry blindly.
+- **A native dialog blocks every browser tool until handled.** `<Form guard>` arms a real
+  `beforeunload` prompt on a dirty form, and `ConfirmDialog` is not the only modal you will
+  meet. If a tool call fails with "Tool does not handle the modal state", call
+  `browser_handle_dialog` (accept to leave, dismiss to stay) BEFORE anything else, then
+  re-snapshot. A `beforeunload` that fires when you navigate away from a dirty guarded form is
+  a PASS for the guard, not a break; record it and move on.
 
 ## Attack checklist (run every applicable line, record pass/fail)
 
