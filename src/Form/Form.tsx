@@ -455,6 +455,9 @@ function FormImpl<TIn extends FieldValues, TOut>(
     // Cost if wrong: a form that has had one failed out-of-band attempt validates on change
     // for the rest of its life instead of on submit — which is exactly `reValidateMode`'s
     // documented contract, and what every plain form already does after a failed submit.
+    // The literal `'onChange'` mirrors hookform's own `reValidateMode` default. `<Form>`
+    // exposes no `reValidateMode` prop today, so there is nothing yet for it to read; if one
+    // is ever added, this must follow that prop instead of staying hardcoded.
     mode: validationAttemptFailed && mode !== 'all' ? 'onChange' : mode,
     disabled: disabled || submitting || loading,
     // Ruling: passed directly to useForm rather than written into control._options by a
