@@ -3,7 +3,6 @@ import {
   useId,
   useMemo,
   useRef,
-  useState,
   type ComponentProps,
   type ElementType,
   type ReactNode,
@@ -17,6 +16,7 @@ import Typography, { type TypographyProps } from '@mui/material/Typography'
 import { useEzFormContext } from '../useEzFormContext'
 import { useOptionalWizard } from '../Wizard/useWizard'
 import { useFailedConfirmAttempt, useRegisterErrorSummary } from './ErrorSummaryContext'
+import { useFocusTargetIds } from './FieldFocusContext'
 
 export const formErrorSummaryClasses = generateUtilityClasses('EzFormErrorSummary', [
   'root',
@@ -108,27 +108,6 @@ function scopedTo(entries: ErrorEntry[], fields: readonly string[]): ErrorEntry[
 }
 
 /**
- * The id of a registered field's rendered element, found by its `name` attribute in the DOM.
- *
- * Ruling: every ez-form field goes through `useController` (`useEzField`), and hookform wraps
- * whatever `ref` a `useController` field passes it in a minimal proxy (`{ focus, select,
- * setCustomValidity, reportValidity }`, see react-hook-form's `useController` source) before
- * storing it — `control._fields[name]._f.ref` is never the real DOM element for these fields,
- * so it has no `id` to read. A DOM query by `name` is the only place the real element (and
- * whatever id MUI generated for it) is still reachable. `undefined` (nothing rendered with
- * this name yet, or a group whose control has no `name` of its own) omits `href` entirely
- * rather than pointing at nothing; the item is still fully usable either way since the click
- * handler's `setFocus` — not the `href` — does the actual focusing. Cost if wrong: a false
- * match if two different fields ever rendered the same `name` in the same form, which is not
- * a state ez-form (or plain HTML) supports today.
- */
-function fieldElementId(name: string): string | undefined {
-  if (typeof document === 'undefined') return undefined
-  const el = document.querySelector(`[name="${CSS.escape(name)}"]`)
-  return el instanceof HTMLElement && el.id ? el.id : undefined
-}
-
-/**
  * Lists the errors from the form's (or, inside a `Wizard`, the current step's) last failed
  * validation attempt, GOV.UK-style: focus moves to a heading on failure, and each item is a
  * link that focuses its field. Placed by the consumer — under the form title, or inside the
@@ -188,25 +167,12 @@ export function FormErrorSummary(inProps: FormErrorSummaryProps) {
     if (visible) headingRef.current?.focus()
   }, [wizard?.lastFailed, submitCount, failedConfirmAttempt, visible])
 
-  // href lookups touch the DOM (see fieldElementId's ruling), so they run after commit rather
-  // than during render; entries with no match yet (or none at all) simply render without an
-  // href, and the click handler's setFocus still fully focuses the field either way.
-  const [fieldIds, setFieldIds] = useState<Record<string, string | undefined>>({})
-  useEffect(() => {
-    if (!visible) return
-    /* The ids come from a DOM lookup, which is only possible after commit; this is the
-       "synchronize with an external system" case the rule exempts in spirit. The dep key is the
-       serialized field-name list, so the resulting render recomputes the same ids and does not
-       re-fire. */
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFieldIds(
-      Object.fromEntries(entries.map((entry) => [entry.name, fieldElementId(entry.name)])),
-    )
-    // `entries` is a new array/object every render (flattenErrors/scopedTo are not memoized on
-    // identity); comparing its serialized field names keeps this from looping forever while
-    // still re-running whenever the actual set of listed fields changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, entries.map((e) => e.name).join(',')])
+  // The id of each field's focus target, registered by `useEzField`'s forked `field.ref` and
+  // read here through `useSyncExternalStore` (see FieldFocusContext), rather than looked up in
+  // the DOM after commit as this used to do. A field that has not registered yet has no entry
+  // and simply gets no `href` — the same behaviour as before, and the item is still fully
+  // usable either way since the click handler's `setFocus`, not the `href`, does the focusing.
+  const fieldIds = useFocusTargetIds()
 
   const register = useRegisterErrorSummary()
   useEffect(() => register(), [register])
