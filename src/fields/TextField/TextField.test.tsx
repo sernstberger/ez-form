@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { Form } from '../../Form'
 import { TextField } from './TextField'
 import { describeFieldContract } from '../../test/describeFieldContract'
+import { expectNoA11yViolations } from '../../test/axe'
 
 const schema = z.object({
   email: z.email({ error: (iss) => (iss.input === '' ? 'Email is required' : 'Invalid email') }),
@@ -331,5 +332,132 @@ describe('TextField displayValue', () => {
     expect(screen.getByLabelText('Email')).toHaveValue('shown instead')
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(onSubmit).toHaveBeenCalledWith({ email: 'a@b.co' }, expect.anything())
+  })
+})
+
+describe('TextField binding cannot be displaced by consumer props (#104)', () => {
+  it('announces the error even when a consumer sets slotProps.formHelperText.role', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+        <TextField name="email" label="Email" slotProps={{ formHelperText: { role: 'note' } }} />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Email is required')
+  })
+
+  it('honours a consumer helper-text role while there is no error to announce', () => {
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+        <TextField
+          name="email"
+          label="Email"
+          helperText="We never share it"
+          slotProps={{ formHelperText: { role: 'note' } }}
+        />
+      </Form>,
+    )
+    expect(screen.getByText('We never share it')).toHaveAttribute('role', 'note')
+  })
+
+  it('announces the error through the function form of slotProps.formHelperText', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+        <TextField
+          name="email"
+          label="Email"
+          slotProps={{ formHelperText: () => ({ role: 'note' }) }}
+        />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Email is required')
+  })
+
+  it('describes the input with both the consumer aria-describedby and the error', async () => {
+    const user = userEvent.setup()
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+        <span id="mine">Work address only</span>
+        <TextField name="email" label="Email" aria-describedby="mine" />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    const input = screen.getByRole('textbox', { name: 'Email' })
+    expect(input).toHaveAccessibleDescription('Work address only')
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    await screen.findByRole('alert')
+    expect(input).toHaveAccessibleDescription('Work address only Email is required')
+  })
+
+  it('describes the input with both the consumer aria-describedby and the helper text', () => {
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+        <span id="mine">Work address only</span>
+        <TextField
+          name="email"
+          label="Email"
+          aria-describedby="mine"
+          helperText="We never share it"
+        />
+      </Form>,
+    )
+    expect(screen.getByRole('textbox', { name: 'Email' })).toHaveAccessibleDescription(
+      'Work address only We never share it',
+    )
+  })
+
+  it('keeps the consumer aria-describedby off the FormControl wrapper', () => {
+    const { container } = render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+        <span id="mine">Work address only</span>
+        <TextField name="email" label="Email" aria-describedby="mine" />
+      </Form>,
+    )
+    // It belongs on the element that carries the `textbox` role, not on the wrapper div (#99).
+    expect(container.querySelector('.MuiFormControl-root')).not.toHaveAttribute('aria-describedby')
+  })
+
+  it('has no accessibility violations with a consumer aria-describedby and an error', async () => {
+    const user = userEvent.setup()
+    const { container } = render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+        <span id="mine">Work address only</span>
+        <TextField name="email" label="Email" aria-describedby="mine" />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    await screen.findByRole('alert')
+    await expectNoA11yViolations(container)
+  })
+
+  it('lets the binding win over a same-named prop arriving through a spread', () => {
+    // `value` and `error` are `Omit`ted from `TextFieldProps`, so this is a type error —
+    // but a consumer building props dynamically can still get here at runtime, and the
+    // binding, not the spread, must decide what the input shows.
+    const dynamic = { value: 'CLOBBERED', error: true } as unknown as { placeholder: string }
+    render(
+      <Form schema={schema} defaultValues={{ email: 'bound@b.co' }} onSubmit={() => {}}>
+        <TextField name="email" label="Email" {...dynamic} />
+      </Form>,
+    )
+    const input = screen.getByRole('textbox', { name: 'Email' })
+    expect(input).toHaveValue('bound@b.co')
+    expect(input).not.toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('rejects defaultValue at the type level', () => {
+    // Not rendered: the point is that `tsc` rejects it. Rendering it would emit React's
+    // "both value and defaultValue" error, which is the very thing the `Omit` prevents.
+    const rejected = (
+      // @ts-expect-error the form owns the value; a defaultValue would make the input uncontrolled
+      <TextField name="email" label="Email" defaultValue="x" />
+    )
+    expect(rejected).toBeTruthy()
   })
 })

@@ -49,6 +49,16 @@ export interface HelperTextA11y {
   role: 'alert' | undefined
 }
 
+/**
+ * A consumer's `formHelperText` slot props, in either shape MUI accepts: the
+ * object, or the `(ownerState) => props` callback. The merge is generic over
+ * the caller's own slot type (`slotProps.formHelperText` on `TextFieldProps`,
+ * say) so the result stays assignable back to the slot it came from — the type
+ * is MUI's, not a re-declared copy of it.
+ */
+export type HelperTextSlotProps<TOwnerState = unknown, TProps = object> =
+  TProps | ((ownerState: TOwnerState) => TProps) | undefined
+
 export type UseEzFieldReturn = UseControllerReturn & {
   /** Derived from the `required` rule; drives `required`/`aria-required` on the input. */
   required: boolean
@@ -60,12 +70,38 @@ export type UseEzFieldReturn = UseControllerReturn & {
   /** a11y attributes for the control, linked to the helper text only when there is some. */
   inputA11y: (text: ReactNode) => InputA11y
   /**
+   * The control's `aria-describedby`: the consumer's ids **and** the helper text's,
+   * space-joined, because an accessible description is a list. Replacing one with the
+   * other silently drops half of what the control was meant to say (#104).
+   *
+   * `undefined` when neither side has anything, so the attribute is dropped rather
+   * than left pointing at nothing.
+   */
+  describedBy: (consumer: string | undefined, text: ReactNode) => string | undefined
+  /**
    * The consumer's `aria-label` / `aria-labelledby`, for the field to put on the
    * element that carries the role. Spread it there; do not rely on `{...rest}`,
    * which lands them on MUI's wrapper instead (#99).
    */
   nameA11y: NameA11y
   helperTextA11y: HelperTextA11y
+  /**
+   * The `formHelperText` slot props for a field that also lets the consumer set
+   * them. The binding's `id` and `role` are applied **after** the consumer's, so
+   * a consumer `role` cannot displace `role="alert"` and leave the error rendered
+   * but never announced (#104).
+   *
+   * MUI's own `mergeSlotProps` cannot do this: it exists to let the external value
+   * win, which is right for `className`/`sx`/handlers and wrong for the one
+   * attribute that makes the error reach a screen reader. The consumer's `role`
+   * still applies whenever there is no error to announce, so only the alert case
+   * is owned here.
+   *
+   * Handles the function form MUI accepts for a slot's props.
+   */
+  helperTextSlotProps: <TOwnerState, TProps extends object>(
+    consumer: HelperTextSlotProps<TOwnerState, TProps>,
+  ) => TProps | ((ownerState: TOwnerState) => TProps)
   /**
    * The label to render: unchanged in `asterisk` mode; in `optional` mode, an
    * optional field's label gets the form's `optionalText` appended (unless the
@@ -148,7 +184,22 @@ export function useEzField<TValue = unknown>(
       'aria-invalid': invalid || undefined,
       'aria-describedby': text ? helperTextId : undefined,
     }),
+    describedBy: (consumer, text) =>
+      [consumer, text ? helperTextId : undefined].filter(Boolean).join(' ') || undefined,
     helperTextA11y: { id: helperTextId, role: invalid ? 'alert' : undefined },
+    helperTextSlotProps: <TOwnerState, TProps extends object>(
+      consumer: HelperTextSlotProps<TOwnerState, TProps>,
+    ) => {
+      // Last, and deliberately not merged: while an error shows, the live region is
+      // the binding's. With no error nothing is added, so the consumer's own `role`
+      // survives — `role: undefined` here would erase it instead.
+      const owned = { id: helperTextId, ...(invalid ? { role: 'alert' as const } : null) }
+      // The function form stays a function, so MUI still resolves it with the real
+      // ownerState; calling it here would hand the consumer an ownerState we do not have.
+      return typeof consumer === 'function'
+        ? (ownerState: TOwnerState) => ({ ...consumer(ownerState), ...owned }) as TProps
+        : ({ ...consumer, ...owned } as TProps)
+    },
     nameA11y: {
       ...(ariaLabel === undefined ? null : { 'aria-label': ariaLabel }),
       ...(ariaLabelledBy === undefined ? null : { 'aria-labelledby': ariaLabelledBy }),
