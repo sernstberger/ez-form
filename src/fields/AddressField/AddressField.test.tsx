@@ -666,7 +666,71 @@ describe('AddressField lookup', () => {
     expect(streetBox()).toHaveValue('350 5th Ave')
     expect(city()).toHaveValue('')
     expect(screen.queryByText('Address filled')).toBeNull()
+    // The failure is not silent: the same region that announces a fill says the
+    // pick did not land, so a screen reader hears what the empty city/state/zip
+    // only imply (#132). Scoped by the field's own status class — <Form> renders
+    // a role="status" region of its own, so the role alone matches two nodes.
+    const failure = screen.getByText(
+      'Address lookup failed. Fill in the remaining fields manually.',
+    )
+    expect(failure).toHaveClass(addressFieldClasses.status)
+    expect(failure).toHaveAttribute('role', 'status')
     expect(await submitted(user, onSubmit)).toMatchObject({ street: '350 5th Ave', city: '' })
+  })
+
+  it('announces lookupFailedText, overridable, and re-announces a second failure', async () => {
+    const user = userEvent.setup({ delay: null })
+    expectConsole('warn', /lookup\.resolve failed: Error: no such place/)
+    const provider: AddressLookupProvider = {
+      ...mockAddressLookup(),
+      resolve: () => Promise.reject(new Error('no such place')),
+    }
+    render(
+      <Form schema={looseSchema} defaultValues={defaultValues} onSubmit={() => {}}>
+        <AddressField
+          name="address"
+          lookup={provider}
+          lookupDebounceMs={0}
+          lookupFailedText="Could not fill that in"
+        />
+      </Form>,
+    )
+    await user.type(streetBox(), '350')
+    await user.click(await option(/350 5th Ave/))
+    const status = () => screen.findByText('Could not fill that in')
+    // `announcementKey` remounts the region, so an identical second message is
+    // announced again rather than counting as unchanged content.
+    const first = await status()
+    expect(first).toHaveClass(addressFieldClasses.status)
+    await user.clear(streetBox())
+    await user.type(streetBox(), '160')
+    await user.click(await option(/1600 Pennsylvania Ave NW/))
+    await waitFor(async () => expect(await status()).not.toBe(first))
+    // The dev warning is deduped per field; the announcement is not.
+    expect(consoleMessages('warn')).toHaveLength(1)
+  })
+
+  it('has no accessibility violations showing a failed lookup', async () => {
+    const user = userEvent.setup({ delay: null })
+    expectConsole('warn', /lookup\.resolve failed: Error: no such place/)
+    const provider: AddressLookupProvider = {
+      ...mockAddressLookup(),
+      resolve: () => Promise.reject(new Error('no such place')),
+    }
+    const { container } = render(
+      <Form schema={looseSchema} defaultValues={defaultValues} onSubmit={() => {}}>
+        <AddressField
+          name="address"
+          legend="Shipping address"
+          lookup={provider}
+          lookupDebounceMs={0}
+        />
+      </Form>,
+    )
+    await user.type(streetBox(), '350')
+    await user.click(await option(/350 5th Ave/))
+    await screen.findByText(/Address lookup failed/)
+    await expectNoA11yViolations(container)
   })
 
   it('a failed search warns and offers nothing', async () => {

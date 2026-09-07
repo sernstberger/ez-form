@@ -169,6 +169,14 @@ export interface AddressFieldProps extends PartRules {
   lookupMinChars?: number
   /** Announced (visually hidden) after a pick fills the parts. Default `'Address filled'`. */
   lookupFilledText?: ReactNode
+  /**
+   * Announced (visually hidden) when a picked row fails to resolve, so the pick
+   * is not silent to a screen reader: the street keeps the row's label but no
+   * other part is filled, and typing the rest by hand is the way out. The dev
+   * `console.warn` is a separate, developer-facing signal and still fires.
+   * Default `'Address lookup failed. Fill in the remaining fields manually.'`.
+   */
+  lookupFailedText?: ReactNode
   className?: string
   /**
    * Per-part props. `name` is omitted from every part: the composite derives
@@ -273,6 +281,7 @@ export function AddressField(inProps: AddressFieldProps) {
     lookupDebounceMs,
     lookupMinChars,
     lookupFilledText = 'Address filled',
+    lookupFailedText = 'Address lookup failed. Fill in the remaining fields manually.',
     required,
     disabled,
     className,
@@ -298,8 +307,18 @@ export function AddressField(inProps: AddressFieldProps) {
   const announce = (text: ReactNode) => setStatus((prev) => ({ text, seq: prev.seq + 1 }))
 
   const fillFrom = async (suggestion: AddressSuggestion) => {
-    const parts = await lookupState.resolve(suggestion)
-    if (!parts) return
+    const result = await lookupState.resolve(suggestion)
+    // A failed pick is otherwise silent to a screen reader: the street holds the
+    // row's label, every other part stays empty, and only the dev console hears
+    // about it. `'aborted'` is a newer pick or an unmount — say nothing, since
+    // either the next pick announces its own outcome or there is no one left to
+    // hear this one.
+    if (result.status === 'failed') {
+      announce(lookupFailedText)
+      return
+    }
+    if (result.status === 'aborted') return
+    const { parts } = result
     for (const part of PARTS) {
       // A hidden second line has nothing to show a value in; writing it would
       // put state in the form that no control reflects.

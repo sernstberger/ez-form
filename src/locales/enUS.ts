@@ -99,6 +99,7 @@ export const enUS = {
         stateLabel: 'State',
         zipLabel: 'ZIP code',
         lookupFilledText: 'Address filled',
+        lookupFailedText: 'Address lookup failed. Fill in the remaining fields manually.',
       },
     },
     EzPasswordField: {

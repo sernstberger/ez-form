@@ -14,6 +14,16 @@ export interface UseAddressLookupOptions {
   minChars?: number
 }
 
+/**
+ * What one `resolve` call came to. A tagged union rather than
+ * `Partial<AddressValue> | undefined` because a bare `undefined` cannot tell a
+ * provider that rejected from one whose answer nobody wants any more, and the
+ * two need opposite handling: the first is worth announcing to the user, the
+ * second must be silent (see `AddressLookupState.resolve`).
+ */
+export type AddressResolveResult =
+  { status: 'filled'; parts: Partial<AddressValue> } | { status: 'failed' } | { status: 'aborted' }
+
 export interface AddressLookupState {
   options: AddressSuggestion[]
   /** `true` from the keystroke that scheduled a search until its result (or failure) lands. */
@@ -23,11 +33,16 @@ export interface AddressLookupState {
   /** Drops the list and aborts anything in flight; the session is kept for the next query. */
   clear: () => void
   /**
-   * Resolves a picked row through the provider, then ends the session. Returns
-   * `undefined` — after a dev warning — when the provider failed, so the caller
-   * leaves the form as it is.
+   * Resolves a picked row through the provider, then ends the session.
+   *
+   * The three outcomes are distinct because the caller does something different
+   * with each: `'filled'` carries the parts to write, `'failed'` (after a dev
+   * warning) means the provider rejected and the user should be told, and
+   * `'aborted'` means this resolve was superseded by a newer pick or the field
+   * unmounted — nobody is waiting for that answer, so the caller must stay
+   * silent rather than announce a failure that did not happen.
    */
-  resolve: (suggestion: AddressSuggestion) => Promise<Partial<AddressValue> | undefined>
+  resolve: (suggestion: AddressSuggestion) => Promise<AddressResolveResult>
 }
 
 /** URL- and base64url-safe, the character set a session token has to stay inside. */
@@ -135,8 +150,9 @@ export function useAddressLookup({
   )
 
   const resolve = useCallback(
-    async (suggestion: AddressSuggestion) => {
-      if (!provider) return undefined
+    async (suggestion: AddressSuggestion): Promise<AddressResolveResult> => {
+      // No provider means no pick could have happened; nothing to report.
+      if (!provider) return { status: 'aborted' }
       // The list that produced the pick is stale the moment it is picked.
       clear()
       resolveAbortRef.current?.abort()
@@ -148,14 +164,16 @@ export function useAddressLookup({
       sessionRef.current = null
       try {
         const parts = await provider.resolve(suggestion, { signal: controller.signal, session })
-        return controller.signal.aborted ? undefined : parts
+        return controller.signal.aborted ? { status: 'aborted' } : { status: 'filled', parts }
       } catch (error: unknown) {
-        if (controller.signal.aborted) return undefined
+        // An abort is this pick being superseded or the field going away, not a
+        // provider failure: no warning, and nothing for the caller to say.
+        if (controller.signal.aborted) return { status: 'aborted' }
         devWarn(
           `address-lookup-resolve:${name}`,
           `ez-form: <AddressField name="${name}"> lookup.resolve failed: ${String(error)}`,
         )
-        return undefined
+        return { status: 'failed' }
       }
     },
     [provider, name, clear],

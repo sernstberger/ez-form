@@ -96,6 +96,8 @@ export const esES = {
         stateLabel: 'Estado',
         zipLabel: 'Código postal',
         lookupFilledText: 'Dirección completada',
+        lookupFailedText:
+          'Error al buscar la dirección. Complete los campos restantes manualmente.',
       },
     },
     EzPasswordField: {
