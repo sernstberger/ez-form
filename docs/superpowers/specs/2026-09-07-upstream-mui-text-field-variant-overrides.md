@@ -1,8 +1,9 @@
 # Upstream proposal — custom `variant`s on Material UI's text-input family
 
-Date: 2026-09-07. Status: **draft for Steve's review; nothing has been posted upstream.** A local
-patch exists at `scratchpad/mui-upstream` (branch `feat/text-field-variant-overrides`) and as
-`mui-variant-overrides.patch`; see §5 once the drafter reports.
+Date: 2026-09-07. Status: **minimal patch verified in a full mui/material-ui checkout; nothing has been
+posted upstream.** Patch: `docs/superpowers/specs/2026-09-07-upstream-mui-variant-overrides-minimal.patch`
+(12 files, +149 / −11). Steve ruled the first 39-file draft too big ("I don't understand why you
+wouldn't be adding an additional variable to this list"); §5 describes the cut.
 
 Steve: "I really want to be able to have additional variants on the TextField and/or FormControl
 more than anything." This memo is what it would take, what stands in the way, and a concrete change
@@ -57,67 +58,46 @@ augmentation the exported types are byte-identical, and the built-in variants ta
 path they take today. The answer to "structure depends on `variant`" is "since v6 it depends on
 `slots.input`; `variant` only picks the default".
 
-## 4. Forks for Steve
+## 4. Forks (two closed by the cut, two remain for Steve)
 
-| Fork | Option A (recommended) | Option B | Why it matters |
-| --- | --- | --- | --- |
-| Runtime fallback for an unknown variant | `InputBase` — the unstyled root the three built-ins share; the theme's `variants` dress it | `OutlinedInput` — "inherits the default variant's structure" | A decides what `variant="stacked"` looks like before any theme rule: A = bare input, B = outlined box with the notch permanently closed (TextField only passes `label` under `'outlined'`) |
-| Scope of the first PR | TextField + FormControl + InputLabel + InputAdornment (one PR, ~40 type lines + 2 runtime lines) | …plus Select/SelectInput/NativeSelect (second PR; Select needs the `cloneElement` guard) | Smaller first PR mirrors #33589's size and framing; Select has its own closed dup (#34690) to reopen |
-| Framing | Bug: "TextField: unable to create new variants" (#33589's wording) linking #37846 and #33510 | Feature: "Support custom variants" | Bug framing is what got #33589 merged; feature framing routes to `waiting for 👍` |
-| Where to speak first | Comment on #37846 with the diff summary + link to a draft PR | New issue | #37846 is the canonical thread the maintainer pointed at; a new issue would be duped to it |
-| x-date-pickers | Follow-up in mui/mui-x after the material PR lands (`PickersTextField.types.d.ts` imports `TextFieldVariants`, so the type flows; only its literal fields and `VARIANT_COMPONENT` fallback need the same two changes) | Same PR | Different repo |
+| Fork | Resolution |
+| --- | --- |
+| Runtime fallback for an unknown variant | **`OutlinedInput`** — the custom value lands in the existing outlined props arm, so its `slotProps.input` keeps MUI's `OutlinedInputProps` typing and no new interface is needed; `TextField` passes `label` to the input only under `'outlined'`, so the notch never opens |
+| Scope | **TextField + FormControl only.** Select/NativeSelect/InputAdornment/InputLabel dropped; Select's `cloneElement` throw is a separate, smaller PR if ever wanted |
+| Framing | *open* — Option A (recommended): bug, "TextField: unable to create new variants" (#33589's wording), linking #37846 and #33510. Option B: feature |
+| Where to speak first | *open* — Option A (recommended): comment on #37846 with the summary and a draft PR from Steve's fork. Option B: new issue |
 
-## 5. Change list (from the local patch)
-
-Patch: `docs/superpowers/specs/2026-09-07-upstream-mui-variant-overrides.patch` (1101 lines; 39 files,
-+500 / −47). Local branch `feat/text-field-variant-overrides` in the scratchpad clone, commit `a20b2d2`.
-**Not pushed, not posted.**
+## 5. The minimal patch
 
 ```
-types (7 .d.ts)                      runtime (7 .js)                      tests / docs
-──────────────────────────────────   ──────────────────────────────────   ─────────────────────────────────
-TextField.d.ts   +VariantOverrides    TextField.js   ?? InputBase +        TextField.test.js  +3 (fallback,
-                 +CustomTextFieldProps               dev warning naming    dev warning, no notch)
-                 4th conditional arm                 slots.input; PropTypes
-FormControl.d.ts +VariantOverrides    FormControl.js PropTypes oneOfType    Select.test.js     +2
-InputLabel.d.ts  +VariantOverrides    InputLabel.js  PropTypes             test/typescript/moduleAugmentation/
-InputAdornment.d.ts +VariantOverrides InputAdornment.js PropTypes            {textField,formControl,inputLabel,
-Select.d.ts      +VariantOverrides    Select.js      ?? <StyledInputBase/>   select}Variants.spec.tsx (+tsconfig)
-                 +CustomSelectProps                  + dev warning naming  docs text-fields.md  "Custom variants"
-SelectInput.d.ts reuses SelectVariants               `input`; PropTypes    api/*.json + translations (hand-applied
-NativeSelect(+Input).d.ts widened     NativeSelect(+Input).js PropTypes    `pnpm docs:api` deltas, 12 files)
+TextField.d.ts   +export interface TextFieldPropsVariantOverrides {}
+                 TextFieldVariants = OverridableStringUnion<'outlined' | 'standard' | 'filled', TextFieldPropsVariantOverrides>
+                 OutlinedTextFieldProps.variant: Exclude<TextFieldVariants, 'standard' | 'filled'>   // custom values resolve here
+                 BaseTextFieldProps omits 'variant' from the FormControlProps it extends           // one augmentation is enough
+TextField.js     const InputComponent = variantComponent[variant] ?? OutlinedInput;
+                 PropTypes: oneOfType([oneOf([...]), string])   (generator-confirmed)
+FormControl.d.ts +export interface FormControlPropsVariantOverrides {}; variant?: OverridableStringUnion<…>
+FormControl.js   PropTypes as above
+tests            TextField.test.js (+1: custom variant renders OutlinedInput, legend carries no label)
+                 test/typescript/moduleAugmentation/{textFieldVariants,formControlVariants}.spec.tsx (+tsconfigs)
+docs             text-fields.md "Custom variants" section; api/{text-field,form-control}.json regenerated
 ```
 
-Type design (probe-verified with ez-form's `tsc --strict` against the real `@mui/types`):
+Verified in a full checkout of master (`4d36029`), patch applied to a pristine tree, pnpm 11.24.0 / node 26:
 
-```ts
-export interface TextFieldPropsVariantOverrides {}
-export type TextFieldVariants = OverridableStringUnion<'outlined' | 'standard' | 'filled', TextFieldPropsVariantOverrides>
-export interface CustomTextFieldProps extends BaseTextFieldProps, TextFieldSlotsAndSlotProps<InputBaseProps> {
-  onChange?: InputBaseProps['onChange']
-  variant: Exclude<TextFieldVariants, 'outlined' | 'standard' | 'filled'>   // `never` until augmented
-}
-export type TextFieldProps<V extends TextFieldVariants = TextFieldVariants> =
-  V extends 'filled' ? FilledTextFieldProps
-  : V extends 'standard' ? StandardTextFieldProps
-  : V extends 'outlined' ? OutlinedTextFieldProps      // new explicit arm — was the else-branch
-  : CustomTextFieldProps
-```
+| Check | Result |
+| --- | --- |
+| `pnpm install --frozen-lockfile`, `git apply` | pass |
+| `pnpm --filter @mui/material typescript` | pass |
+| `typescript:module-augmentation` | 31/31; both new specs pass in isolation |
+| `pnpm proptypes` | no further diff |
+| `pnpm docs:api` | two JSON deltas, idempotent; generators reproduce the patch byte-for-byte |
+| TextField + FormControl unit tests (jsdom + chromium) | 223 passed, 13 skipped; reverting the fallback fails the new test |
+| prettier, eslint (touched files) | pass |
 
-Probe results: built-in instantiations unchanged; `'dashed'` rejected unaugmented, accepted augmented;
-`Variant` infers to the custom literal; `onChange` types are identical (`expectType`) per arm; the new
-type-only import cycle `Select.d.ts ↔ SelectInput.d.ts` resolves.
-
-Drafter's rulings worth knowing: explicit `'outlined'` arm so the else-branch is not silently retyped;
-`Select` gets a fourth union arm rather than a conditional rewrite; dev warnings fire per render like the
-adjacent `select && !children` warning; augmentation specs live in `test/typescript/moduleAugmentation/`
-(the repo's script says co-located augmentations leak across the TS program); `Select`'s fallback is a
-`styled(InputBase)` under `styledRootConfig` so `variant` is not forwarded to the DOM.
-
-**Unverified locally** (no monorepo install): `pnpm proptypes`, `pnpm docs:api`, the 5 new runtime tests,
-the 4 type-spec files, prettier/eslint. The hand-written PropTypes and JSON follow the
-`FormHelperText`/`Button` output exactly, so regeneration should be a no-op, but that is a claim to check
-in a real checkout before anything is opened.
+Finding worth citing in the PR: without the `'variant'` omit, augmenting only the TextField interface
+fails with `TS2430` because `OutlinedTextFieldProps` no longer satisfies the `FormControlProps` it
+inherits. The omit is one token; a negative test proves it is load-bearing.
 
 ## 6. What this would mean for ez-form
 

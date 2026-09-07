@@ -1,0 +1,311 @@
+diff --git a/docs/data/material/components/text-fields/text-fields.md b/docs/data/material/components/text-fields/text-fields.md
+index b8a3715..72331b2 100644
+--- a/docs/data/material/components/text-fields/text-fields.md
++++ b/docs/data/material/components/text-fields/text-fields.md
+@@ -189,6 +189,42 @@ Below is an example using the [`InputBase`](/material-ui/api/input-base/) compon
+ 
+ 🎨 If you are looking for inspiration, you can check [MUI Treasury's customization examples](https://mui-treasury.com/primitive/text-field).
+ 
++### Custom variants
++
++In addition to the built-in `outlined`, `filled`, and `standard` variants, you can add your own variant using the theme's `variants` key:
++
++```js
++const theme = createTheme({
++  components: {
++    MuiTextField: {
++      variants: [
++        {
++          props: { variant: 'dashed' },
++          style: {
++            '& .MuiOutlinedInput-notchedOutline': {
++              borderStyle: 'dashed',
++            },
++          },
++        },
++      ],
++    },
++  },
++});
++```
++
++If you're using TypeScript, you'll need to declare the new variant using [module augmentation](https://www.typescriptlang.org/docs/handbook/declaration-merging.html#module-augmentation):
++
++```tsx
++declare module '@mui/material/TextField' {
++  interface TextFieldPropsVariantOverrides {
++    dashed: true;
++  }
++}
++```
++
++A custom variant renders the [`OutlinedInput`](/material-ui/api/outlined-input/) component and never notches its outline for the label.
++Pass `slots.input` if you need it to render a different input component.
++
+ ## `useFormControl`
+ 
+ For advanced customization use cases, a `useFormControl()` hook is exposed.
+diff --git a/docs/pages/material-ui/api/form-control.json b/docs/pages/material-ui/api/form-control.json
+index 26670c9..4796c9f 100644
+--- a/docs/pages/material-ui/api/form-control.json
++++ b/docs/pages/material-ui/api/form-control.json
+@@ -39,8 +39,8 @@
+     },
+     "variant": {
+       "type": {
+-        "name": "enum",
+-        "description": "'filled'<br>&#124;&nbsp;'outlined'<br>&#124;&nbsp;'standard'"
++        "name": "union",
++        "description": "'filled'<br>&#124;&nbsp;'outlined'<br>&#124;&nbsp;'standard'<br>&#124;&nbsp;string"
+       },
+       "default": "'outlined'"
+     }
+diff --git a/docs/pages/material-ui/api/text-field.json b/docs/pages/material-ui/api/text-field.json
+index fe5f4c7..4febb8a 100644
+--- a/docs/pages/material-ui/api/text-field.json
++++ b/docs/pages/material-ui/api/text-field.json
+@@ -69,8 +69,8 @@
+     "value": { "type": { "name": "any" } },
+     "variant": {
+       "type": {
+-        "name": "enum",
+-        "description": "'filled'<br>&#124;&nbsp;'outlined'<br>&#124;&nbsp;'standard'"
++        "name": "union",
++        "description": "'filled'<br>&#124;&nbsp;'outlined'<br>&#124;&nbsp;'standard'<br>&#124;&nbsp;string"
+       },
+       "default": "'outlined'"
+     }
+diff --git a/packages/mui-material/src/FormControl/FormControl.d.ts b/packages/mui-material/src/FormControl/FormControl.d.ts
+index dd24c92..fb715c6 100644
+--- a/packages/mui-material/src/FormControl/FormControl.d.ts
++++ b/packages/mui-material/src/FormControl/FormControl.d.ts
+@@ -7,6 +7,7 @@ import { FormControlClasses } from './formControlClasses';
+ 
+ export interface FormControlPropsSizeOverrides {}
+ export interface FormControlPropsColorOverrides {}
++export interface FormControlPropsVariantOverrides {}
+ 
+ export interface FormControlOwnProps {
+   /**
+@@ -78,7 +79,9 @@ export interface FormControlOwnProps {
+    * The variant to use.
+    * @default 'outlined'
+    */
+-  variant?: 'standard' | 'outlined' | 'filled' | undefined;
++  variant?:
++    | OverridableStringUnion<'standard' | 'outlined' | 'filled', FormControlPropsVariantOverrides>
++    | undefined;
+ }
+ 
+ export interface FormControlTypeMap<
+diff --git a/packages/mui-material/src/FormControl/FormControl.js b/packages/mui-material/src/FormControl/FormControl.js
+index f05e75e..5c58da2 100644
+--- a/packages/mui-material/src/FormControl/FormControl.js
++++ b/packages/mui-material/src/FormControl/FormControl.js
+@@ -345,7 +345,10 @@ FormControl.propTypes /* remove-proptypes */ = {
+    * The variant to use.
+    * @default 'outlined'
+    */
+-  variant: PropTypes.oneOf(['filled', 'outlined', 'standard']),
++  variant: PropTypes /* @typescript-to-proptypes-ignore */.oneOfType([
++    PropTypes.oneOf(['filled', 'outlined', 'standard']),
++    PropTypes.string,
++  ]),
+ };
+ 
+ export default FormControl;
+diff --git a/packages/mui-material/src/TextField/TextField.d.ts b/packages/mui-material/src/TextField/TextField.d.ts
+index 912b0e4..89f9ffd 100644
+--- a/packages/mui-material/src/TextField/TextField.d.ts
++++ b/packages/mui-material/src/TextField/TextField.d.ts
+@@ -16,6 +16,7 @@ import { CreateSlotsAndSlotProps, SlotProps } from '../utils/types';
+ 
+ export interface TextFieldPropsColorOverrides {}
+ export interface TextFieldPropsSizeOverrides {}
++export interface TextFieldPropsVariantOverrides {}
+ 
+ export interface TextFieldSlots {
+   /**
+@@ -115,7 +116,9 @@ export type TextFieldSlotsAndSlotProps<InputPropsType> = CreateSlotsAndSlotProps
+ export interface BaseTextFieldProps extends StandardProps<
+   FormControlProps,
+   // event handlers are declared on derived interfaces
+-  'onChange' | 'onBlur' | 'onFocus' | 'defaultValue'
++  // `variant` is declared on each derived interface, so augmenting
++  // `TextFieldPropsVariantOverrides` alone is enough to add a variant
++  'onChange' | 'onBlur' | 'onFocus' | 'defaultValue' | 'variant'
+ > {
+   /**
+    * This prop helps users to fill forms faster, especially on mobile devices.
+@@ -284,12 +287,16 @@ export interface OutlinedTextFieldProps
+   onChange?: OutlinedInputProps['onChange'] | undefined;
+   /**
+    * The variant to use.
++   * A variant added through `TextFieldPropsVariantOverrides` resolves here, because it renders `OutlinedInput`.
+    * @default 'outlined'
+    */
+-  variant: 'outlined';
++  variant: Exclude<TextFieldVariants, 'standard' | 'filled'>;
+ }
+ 
+-export type TextFieldVariants = 'outlined' | 'standard' | 'filled';
++export type TextFieldVariants = OverridableStringUnion<
++  'outlined' | 'standard' | 'filled',
++  TextFieldPropsVariantOverrides
++>;
+ 
+ export type TextFieldProps<Variant extends TextFieldVariants = TextFieldVariants> =
+   Variant extends 'filled'
+@@ -348,6 +355,8 @@ export default function TextField<Variant extends TextFieldVariants>(
+   props: {
+     /**
+      * The variant to use.
++     * It supports both default and custom variants, which can be added as shown in the
++     * [custom variants guide](https://mui.com/material-ui/react-text-field/#custom-variants).
+      * @default 'outlined'
+      */
+     variant?: Variant | undefined;
+diff --git a/packages/mui-material/src/TextField/TextField.js b/packages/mui-material/src/TextField/TextField.js
+index 889d824..df50796 100644
+--- a/packages/mui-material/src/TextField/TextField.js
++++ b/packages/mui-material/src/TextField/TextField.js
+@@ -133,7 +133,10 @@ const TextField = React.forwardRef(function TextField(inProps, ref) {
+   const id = useId(idOverride);
+   const helperTextId = helperText && id ? `${id}-helper-text` : undefined;
+   const inputLabelId = label && id ? `${id}-label` : undefined;
+-  const InputComponent = variantComponent[variant];
++  // A variant added through `TextFieldPropsVariantOverrides` renders `OutlinedInput` and is
++  // styled through `theme.components.MuiTextField.variants`. The `variant === 'outlined'` block
++  // below stays as is, so a custom variant never opens the notch.
++  const InputComponent = variantComponent[variant] ?? OutlinedInput;
+ 
+   const externalForwardedProps = {
+     slots,
+@@ -456,7 +459,10 @@ TextField.propTypes /* remove-proptypes */ = {
+    * The variant to use.
+    * @default 'outlined'
+    */
+-  variant: PropTypes.oneOf(['filled', 'outlined', 'standard']),
++  variant: PropTypes /* @typescript-to-proptypes-ignore */.oneOfType([
++    PropTypes.oneOf(['filled', 'outlined', 'standard']),
++    PropTypes.string,
++  ]),
+ };
+ 
+ export default TextField;
+diff --git a/packages/mui-material/src/TextField/TextField.test.js b/packages/mui-material/src/TextField/TextField.test.js
+index 8ea1682..1e9e038 100644
+--- a/packages/mui-material/src/TextField/TextField.test.js
++++ b/packages/mui-material/src/TextField/TextField.test.js
+@@ -207,6 +207,25 @@ describe('<TextField />', () => {
+     );
+   });
+ 
++  describe('prop: variant', () => {
++    it('renders OutlinedInput for a variant added through TextFieldPropsVariantOverrides', () => {
++      const { container } = render(
++        <TextField
++          variant="dashed"
++          label="Label"
++          slotProps={{ input: { 'data-testid': 'input' } }}
++        />,
++      );
++
++      expect(screen.getByTestId('input')).to.have.class(outlinedInputClasses.root);
++      // The outline renders, but the notch never opens: `label` is only forwarded to the
++      // outline for the built-in `outlined` variant, so the legend stays empty.
++      const outline = container.querySelector(`.${outlinedInputClasses.notchedOutline}`);
++      expect(outline).not.to.equal(null);
++      expect(outline.querySelector('legend')).not.to.have.text('Label');
++    });
++  });
++
+   describe('prop: InputProps', () => {
+     it('should apply additional props to the Input component', () => {
+       render(
+diff --git a/packages/mui-material/test/typescript/moduleAugmentation/formControlVariants.spec.tsx b/packages/mui-material/test/typescript/moduleAugmentation/formControlVariants.spec.tsx
+new file mode 100644
+index 0000000..7cdf9bf
+--- /dev/null
++++ b/packages/mui-material/test/typescript/moduleAugmentation/formControlVariants.spec.tsx
+@@ -0,0 +1,20 @@
++import * as React from 'react';
++import FormControl from '@mui/material/FormControl';
++
++// Adding a `FormControl` variant, for consumers composing `FormControl` directly,
++// requires augmenting this interface and nothing else.
++declare module '@mui/material/FormControl' {
++  interface FormControlPropsVariantOverrides {
++    plain: true;
++  }
++}
++
++<FormControl variant="plain" />;
++
++// The built-in variants keep working.
++<FormControl variant="outlined" />;
++<FormControl variant="filled" />;
++<FormControl variant="standard" />;
++
++// @ts-expect-error a variant that was never added is still rejected
++<FormControl variant="plane" />;
+diff --git a/packages/mui-material/test/typescript/moduleAugmentation/formControlVariants.tsconfig.json b/packages/mui-material/test/typescript/moduleAugmentation/formControlVariants.tsconfig.json
+new file mode 100644
+index 0000000..6d22a01
+--- /dev/null
++++ b/packages/mui-material/test/typescript/moduleAugmentation/formControlVariants.tsconfig.json
+@@ -0,0 +1,4 @@
++{
++  "extends": "../../../../../tsconfig.json",
++  "files": ["formControlVariants.spec.tsx"]
++}
+diff --git a/packages/mui-material/test/typescript/moduleAugmentation/textFieldVariants.spec.tsx b/packages/mui-material/test/typescript/moduleAugmentation/textFieldVariants.spec.tsx
+new file mode 100644
+index 0000000..8979583
+--- /dev/null
++++ b/packages/mui-material/test/typescript/moduleAugmentation/textFieldVariants.spec.tsx
+@@ -0,0 +1,34 @@
++import * as React from 'react';
++import { createTheme } from '@mui/material/styles';
++import TextField from '@mui/material/TextField';
++
++// Adding a `TextField` variant requires augmenting this interface and nothing else.
++declare module '@mui/material/TextField' {
++  interface TextFieldPropsVariantOverrides {
++    dashed: true;
++  }
++}
++
++<TextField variant="dashed" />;
++
++// The built-in variants keep working.
++<TextField variant="outlined" />;
++<TextField variant="filled" />;
++<TextField variant="standard" />;
++
++// @ts-expect-error a variant that was never added is still rejected
++<TextField variant="dashd" />;
++
++// A custom variant is styled through `theme.components.MuiTextField.variants`.
++createTheme({
++  components: {
++    MuiTextField: {
++      variants: [
++        {
++          props: { variant: 'dashed' },
++          style: {},
++        },
++      ],
++    },
++  },
++});
+diff --git a/packages/mui-material/test/typescript/moduleAugmentation/textFieldVariants.tsconfig.json b/packages/mui-material/test/typescript/moduleAugmentation/textFieldVariants.tsconfig.json
+new file mode 100644
+index 0000000..9a0ea11
+--- /dev/null
++++ b/packages/mui-material/test/typescript/moduleAugmentation/textFieldVariants.tsconfig.json
+@@ -0,0 +1,4 @@
++{
++  "extends": "../../../../../tsconfig.json",
++  "files": ["textFieldVariants.spec.tsx"]
++}
