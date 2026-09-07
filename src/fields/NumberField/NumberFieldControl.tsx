@@ -16,7 +16,7 @@ import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import IconButton from '@mui/material/IconButton'
 import InputAdornment from '@mui/material/InputAdornment'
-import MuiTextField from '@mui/material/TextField'
+import MuiTextField, { type TextFieldProps as MuiTextFieldProps } from '@mui/material/TextField'
 import { styled, type Theme } from '@mui/material/styles'
 import { useForkRef } from '@mui/material/utils'
 import KeyboardArrowUp from '@mui/icons-material/KeyboardArrowUp'
@@ -27,6 +27,7 @@ import {
   normalizeForeignShape,
   type Separators,
 } from './groupWhileTyping'
+import { customVariantSlots, type EzTextFieldVariants } from '../textFieldVariants'
 
 export interface NumberFieldInputProps {
   'aria-invalid'?: true
@@ -64,6 +65,15 @@ export interface NumberFieldControlProps extends Omit<
    * it, today's behavior.
    */
   labelRequired?: false
+  /**
+   * UPSTREAM SHIM (#142). The rendered `TextField`'s `variant` — MUI's own prop,
+   * reopened (see `src/fields/textFieldVariants.ts`). This component's props come
+   * from Base UI's `NumberField.Root`, which has no `variant` of its own, so this
+   * is the only channel to the `TextField` underneath; left `undefined` the theme's
+   * `MuiTextField.defaultProps.variant` decides, which is what the preset sets to
+   * `'stacked'`.
+   */
+  variant?: EzTextFieldVariants
 }
 
 export const numberFieldClasses = generateUtilityClasses('EzNumberField', [
@@ -128,6 +138,7 @@ interface NumberInputProps {
   className: string | undefined
   inputRef: Ref<HTMLInputElement> | undefined
   inputProps: NumberFieldInputProps | undefined
+  variant: EzTextFieldVariants | undefined
   /** null turns live grouping off (`format.useGrouping === false`). */
   separators: Separators | null
 }
@@ -147,6 +158,7 @@ function NumberInput({
   className,
   inputRef,
   inputProps,
+  variant,
   separators,
 }: NumberInputProps) {
   const { ref, ...rest } = baseProps
@@ -175,6 +187,13 @@ function NumberInput({
       helperText={helperText}
       disabled={disabled}
       required={required}
+      // UPSTREAM SHIM (#142). The one MUI boundary: the cast widens back to MUI's
+      // closed union, and `customVariantSlots` supplies the `slots.input` its own
+      // `variantComponent` map has no entry for. This component owns `slots.input`'s
+      // absence deliberately (see `htmlInput` below), so there is no consumer
+      // `slots` to merge — `undefined` is the whole external side.
+      variant={variant as MuiTextFieldProps['variant']}
+      slots={customVariantSlots(variant, undefined)}
       slotProps={{
         formHelperText: helperTextProps,
         inputLabel: { required: labelRequired },
@@ -302,6 +321,7 @@ export function NumberFieldControl(inProps: NumberFieldControlProps) {
     inputProps,
     className,
     labelRequired,
+    variant,
     ...rootProps
   } = props
   const generatedId = useId()
@@ -330,6 +350,7 @@ export function NumberFieldControl(inProps: NumberFieldControlProps) {
             className={className}
             inputRef={inputRef}
             inputProps={inputProps}
+            variant={variant}
             separators={separators}
           />
         )}
