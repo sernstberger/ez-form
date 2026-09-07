@@ -10,6 +10,20 @@ export interface FieldFocusStore {
   register: (name: string, element: HTMLElement | null) => void
   /** The `id` of each registered field's focus target, keyed by field name. */
   getIds: () => Record<string, string>
+  /**
+   * Records what a field rendered in a `<FieldArray layout="table">` cell is called there —
+   * `"Line item 2 Qty"`, the row header plus the column header — so `<FormErrorSummary>` can
+   * say which cell an error belongs to (#14). `undefined` clears the entry (unmount, or the
+   * field left the cell). Called from `useEzField`'s effect, keyed by field name like `register`.
+   *
+   * A second map on this store rather than a fourth store: it is the same key (field name),
+   * the same writer (`useEzField`) and the same one reader (the summary), and the spec asked
+   * for "a small `cellLabels` map on the same registry". The ruling on why the registries are
+   * stores, and why they stay separate from each other, is above and is not restated.
+   */
+  registerCellLabel: (name: string, label: string | undefined) => void
+  /** `"<row name> <column header>"` for every mounted cell field, keyed by field name. */
+  getCellLabels: () => Record<string, string>
   subscribe: (listener: () => void) => () => void
 }
 
@@ -59,6 +73,7 @@ export const FieldFocusContext = createContext<FieldFocusStore | null>(null)
  */
 export function createFieldFocusStore(idPrefix: string): FieldFocusStore {
   let ids: Record<string, string> = {}
+  let cellLabels: Record<string, string> = {}
   const listeners = new Set<() => void>()
 
   return {
@@ -92,6 +107,18 @@ export function createFieldFocusStore(idPrefix: string): FieldFocusStore {
       for (const listener of listeners) listener()
     },
     getIds: () => ids,
+    registerCellLabel(name, label) {
+      if (label === undefined) {
+        if (!(name in cellLabels)) return
+        const { [name]: _removed, ...rest } = cellLabels
+        cellLabels = rest
+      } else {
+        if (cellLabels[name] === label) return
+        cellLabels = { ...cellLabels, [name]: label }
+      }
+      for (const listener of listeners) listener()
+    },
+    getCellLabels: () => cellLabels,
     subscribe(listener) {
       listeners.add(listener)
       return () => {
@@ -105,6 +132,7 @@ export function createFieldFocusStore(idPrefix: string): FieldFocusStore {
 // `useEzFormContext`, and an unbound control (`NumberFieldControl` and friends) has no name.
 const noopRegister = () => undefined
 const noIds: Record<string, string> = {}
+const noLabels: Record<string, string> = {}
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 const noopSubscribe = () => () => {}
 
@@ -113,6 +141,24 @@ const noopSubscribe = () => () => {}
  */
 export function useRegisterFocusTarget(): FieldFocusStore['register'] {
   return useContext(FieldFocusContext)?.register ?? noopRegister
+}
+
+/** The cell-label registration callback, to call from an effect. No-op outside `<Form>`. */
+export function useRegisterCellLabel(): FieldFocusStore['registerCellLabel'] {
+  return useContext(FieldFocusContext)?.registerCellLabel ?? noopRegister
+}
+
+/**
+ * `"<row name> <column header>"` for every mounted table-cell field, keyed by field name
+ * (#14). `<FormErrorSummary>` prefixes an item's message with it.
+ */
+export function useCellLabels(): Record<string, string> {
+  const store = useContext(FieldFocusContext)
+  return useSyncExternalStore(
+    store?.subscribe ?? noopSubscribe,
+    store?.getCellLabels ?? (() => noLabels),
+    store?.getCellLabels ?? (() => noLabels),
+  )
 }
 
 /**

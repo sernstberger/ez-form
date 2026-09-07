@@ -1,11 +1,11 @@
-import { Fragment, useCallback, useId, type ChangeEvent, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useId, type ChangeEvent, type ReactNode } from 'react'
 import {
   useController,
   type ControllerRenderProps,
   type UseControllerReturn,
 } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
-import { useRegisterFocusTarget } from '../Form/FieldFocusContext'
+import { useRegisterCellLabel, useRegisterFocusTarget } from '../Form/FieldFocusContext'
 import {
   fieldLayoutClasses,
   fieldLayoutClassName,
@@ -298,6 +298,17 @@ export function useEzField<TValue = unknown>(
   // field calls, for the same reason the placement axis is: it reaches every family
   // without a new element in the tree or a prop on each field.
   const cell = useFieldCell()
+  // Tell the form what this field is called in its cell, so `<FormErrorSummary>` can list
+  // "Line item 2 Qty: Qty must be at least 1" rather than the bare message (#14). An effect
+  // with a cleanup: a row that moves or is removed renumbers the fields around it, and each
+  // gets a new `name`/label pair — the cleanup drops the old entry before the new one lands.
+  const registerCellLabel = useRegisterCellLabel()
+  const cellLabel = cell?.label
+  useEffect(() => {
+    if (cellLabel === undefined) return
+    registerCellLabel(name, cellLabel)
+    return () => registerCellLabel(name, undefined)
+  }, [registerCellLabel, name, cellLabel])
   const messages = useRuleMessages()
   const normalized = normalizeRules(rules, typeof label === 'string' ? label : undefined, messages)
   const controller = useController({ name, rules: normalized })

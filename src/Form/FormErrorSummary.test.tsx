@@ -19,6 +19,7 @@ import { Rating } from '../fields/Rating'
 import { Autocomplete } from '../fields/Autocomplete'
 import { EmailListField } from '../fields/EmailListField'
 import { AddressField } from '../fields/AddressField'
+import { FieldArray } from '../FieldArray'
 import { Wizard, type WizardStepDef } from '../Wizard/Wizard'
 import { WizardStep } from '../Wizard/WizardStep'
 import { WizardNav } from '../Wizard/WizardNav'
@@ -402,6 +403,62 @@ describe('FormErrorSummary items are real links for every field shape', () => {
     const link = within(summary).getByRole('link', { name: 'Name is required' })
     expect(screen.getByLabelText('Name')).toHaveAttribute('id', 'my-own-id')
     await waitFor(() => expect(link).toHaveAttribute('href', '#my-own-id'))
+  })
+
+  it("names a table cell's error by row and column, and links to the cell (#14)", async () => {
+    const user = userEvent.setup()
+    render(
+      <Form
+        schema={z.object({
+          lines: z.array(
+            z.object({ sku: z.string(), qty: z.number().min(1, 'Qty must be at least 1') }),
+          ),
+        })}
+        defaultValues={{
+          lines: [
+            { sku: 'A', qty: 1 },
+            { sku: 'B', qty: 0 },
+          ],
+        }}
+        onSubmit={() => {}}
+      >
+        <FormErrorSummary />
+        <FieldArray
+          name="lines"
+          label="Line items"
+          layout="table"
+          emptyRow={{ sku: '', qty: 1 }}
+          columns={[
+            {
+              key: 'sku',
+              header: 'SKU',
+              render: (row) => <TextField name={row.name('sku')} label="SKU" />,
+            },
+            {
+              key: 'qty',
+              header: 'Qty',
+              render: (row) => <NumberField name={row.name('qty')} label="Qty" />,
+            },
+          ]}
+        />
+        <SubmitButton>Submit</SubmitButton>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    const summary = await findSummary()
+    // The cell's own error text is visually hidden (`cellErrors="summary"`), so the summary
+    // item is where a sighted user reads which row it is about.
+    const link = within(summary).getByRole('link', {
+      name: 'Line item 2 Qty: Qty must be at least 1',
+    })
+    const qty = screen.getByRole('textbox', { name: 'Line item 2 Qty' })
+    await waitFor(() => expect(link).toHaveAttribute('href', `#${qty.id}`))
+    await user.click(link)
+    await waitFor(() => expect(qty).toHaveFocus())
+    // Fixing the value removes the item; a row removed takes its label with it (the effect
+    // cleanup), so nothing stale can prefix another field later.
+    await user.type(qty, '3')
+    await waitFor(() => expect(querySummary()).toBeNull())
   })
 })
 
