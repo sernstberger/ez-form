@@ -614,7 +614,9 @@ function FormImpl<TIn extends FieldValues, TOut>(
   // quiet about its next real failure — the exact bug this replaces, one configuration over.
   const errorsRaisedBySubmit = (before: ReturnType<typeof flattenErrors>) => {
     const seen = new Set(before.map((e) => `${e.name}\u0000${e.message}`))
-    return flattenErrors(methods.getErrors()).filter((e) => !seen.has(`${e.name}\u0000${e.message}`))
+    return flattenErrors(methods.getErrors()).filter(
+      (e) => !seen.has(`${e.name}\u0000${e.message}`),
+    )
   }
 
   // Ruling: one owner for post-submit focus, with a fixed precedence — the `<FormError>` alert

@@ -301,7 +301,17 @@ describe('FormDialog', () => {
 
   it('has no accessibility violations with the dialog open', async () => {
     const user = userEvent.setup()
-    const { baseElement } = render(<Harness />)
+    // Same exposure as the exit-prompt case below, one dialog up: the FormDialog's own Fade
+    // keeps updating Transition state after the dialog is already in the DOM, and on a slow
+    // runner (CI, 2026-09-06) axe walked the tree while that update was in flight, outside
+    // act(). `motion.reducedMotion: 'always'` settles the transition at 0ms so RTL's own
+    // act-wrapped polling observes it — see the fuller note on the next test.
+    const theme = createTheme({ motion: { reducedMotion: 'always' } })
+    const { baseElement } = render(
+      <ThemeProvider theme={theme}>
+        <Harness />
+      </ThemeProvider>,
+    )
     await openDialog(user)
     await expectNoA11yViolations(baseElement)
   })
