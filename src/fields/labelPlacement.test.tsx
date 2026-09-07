@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
+import { formControlLabelClasses } from '@mui/material/FormControlLabel'
 import { formHelperTextClasses } from '@mui/material/FormHelperText'
 import { formLabelClasses } from '@mui/material/FormLabel'
 import { z } from 'zod'
@@ -10,8 +11,13 @@ import { TextField } from './TextField'
 import { Select } from './Select'
 import { Checkbox } from './Checkbox'
 import { RadioGroup } from './RadioGroup'
+import { FileField } from './FileField'
 import { createEzFormTheme } from '../theme/ezFormTheme'
-import { fieldLayoutClasses, type LabelPlacement } from './LabelPlacementContext'
+import {
+  fieldLayoutClasses,
+  fieldLayoutClassName,
+  type LabelPlacement,
+} from './LabelPlacementContext'
 import { expectNoA11yViolations } from '../test/axe'
 
 /**
@@ -69,6 +75,13 @@ const emittedCss = () =>
 const startRules = (css: string): string =>
   [...css.matchAll(/([^{}]*)\{([^{}]*)\}/g)]
     .filter(([, selector]) => selector?.includes(fieldLayoutClasses.start))
+    .map(([rule]) => rule)
+    .join('\n')
+
+/** Of some rules, only those whose selector mentions `needle`. */
+const rulesMentioning = (css: string, needle: string): string =>
+  [...css.matchAll(/([^{}]*)\{([^{}]*)\}/g)]
+    .filter(([, selector]) => selector?.includes(needle))
     .map(([rule]) => rule)
     .join('\n')
 
@@ -229,9 +242,16 @@ describe('labelPlacement', () => {
     // column 1 with every other field's. jsdom cannot compute a media query, so the
     // claim is read off the emitted selector rather than the element.
     const above = startRulesAboveBreakpoint(emittedCss())
-    expect(above).toContain(`.${formLabelClasses.root}{`)
-    expect(above).toContain('grid-column:1')
-    expect(above).toContain(`>*:not(.${formLabelClasses.root}){`)
+    // The column-1 rule: a selector list since #133 (`.MuiFormLabel-root` *or* a
+    // guarded plain `<label>`), so match the class-keyed half followed by the rest of
+    // the list and a block that places it — not `.MuiFormLabel-root{`, which the
+    // opt-out's own label reset would also satisfy.
+    expect(above).toMatch(
+      new RegExp(
+        `\\.${fieldLayoutClasses.start} \\.${formLabelClasses.root},[^{]*\\{[^}]*grid-column:1;`,
+      ),
+    )
+    expect(above).toContain(`>*:not(.${formLabelClasses.root}):not(label){grid-column:2;}`)
   })
 
   it('start keeps the helper text in the control’s column, not a third one', () => {
@@ -372,6 +392,108 @@ describe('labelPlacement', () => {
     checkbox.querySelectorAll('*').forEach((el) => {
       expect(getComputedStyle(el as HTMLElement).gridColumn).not.toBe('1')
     })
+  })
+
+  it('start leaves FileField alone: its picker button is its own label (#133)', () => {
+    // FileField's picker is a `Button component="label"` — the field's label *text*
+    // and its control in one element, with no `.MuiFormLabel-root` anywhere in the
+    // box. `startBox` names column 1 by that class and sends everything else to
+    // column 2, so without an opt-out the button landed in column 2 beside an empty
+    // label column: a permanent `labelWidth` gutter. The field declares itself
+    // self-labelled instead, and the block Checkbox gets applies to it.
+    const { container } = render(
+      <Form
+        schema={z.object({ file: z.any() })}
+        defaultValues={{ file: null }}
+        onSubmit={() => {}}
+        labelPlacement="start"
+      >
+        <FileField name="file" label="Attachment" />
+      </Form>,
+    )
+    const file = box(container, 'start')
+    expect(file.querySelector(`.${formLabelClasses.root}`)).toBeNull()
+    expect(file).toHaveClass(fieldLayoutClasses.selfLabelled)
+
+    // The opt-out is keyed on that class, on the *same element* as the placement
+    // class (a compound selector, not a descendant heuristic), and it undoes the
+    // grid: the box is the stacked inline-flex box again with no column template,
+    // and its children carry no column.
+    const compound = `.${fieldLayoutClasses.start}.${fieldLayoutClasses.selfLabelled}`
+    const optOut = rulesMentioning(startRulesAboveBreakpoint(emittedCss()), compound)
+    expect(optOut).toContain('display:inline-flex')
+    expect(optOut).toContain('grid-template-columns:none')
+    expect(optOut).toMatch(new RegExp(`${compound}>\\*[^{]*\\{grid-column:auto;\\}`))
+    // `BoundField`'s `labelAs="control"` now puts the class on the root itself (#28),
+    // so Checkbox and Switch are explicit. The `:has(> .MuiFormControlLabel-root)` half
+    // stays as the second arm of the same rule — it still covers a consumer's own
+    // `FormControlLabel` inside a `render` prop — and is deletable in a follow-up once
+    // nothing relies on it.
+    expect(optOut).toContain(`:has(> .${formControlLabelClasses.root})`)
+    // And, like every other `start`-only rule, it exists only above the breakpoint:
+    // below it there is no grid to opt out of.
+    expect(rulesMentioning(cssOutsideMinWidth(emittedCss()), fieldLayoutClasses.selfLabelled)).toBe(
+      '',
+    )
+  })
+
+  it('selfLabelled is declared by the field, not inferred from a missing label', () => {
+    // A TextField named by `aria-label` alone renders no `.MuiFormLabel-root` either
+    // (MUI mounts `InputLabel` only when `label` is set) — yet its control belongs in
+    // the control column, aligned with its neighbours'. That is why the opt-out is
+    // keyed on a class the component sets rather than on `:not(:has(.MuiFormLabel-root))`,
+    // and why this box must *not* carry it.
+    const { container } = render(
+      <Form
+        schema={schema}
+        defaultValues={defaultValues}
+        onSubmit={() => {}}
+        labelPlacement="start"
+      >
+        <TextField name="email" aria-label="Email" />
+      </Form>,
+    )
+    const text = box(container, 'start')
+    expect(text.querySelector(`.${formLabelClasses.root}`)).toBeNull()
+    expect(text).not.toHaveClass(fieldLayoutClasses.selfLabelled)
+    expect(startRules(emittedCss())).not.toContain(`:not(:has(.${formLabelClasses.root}))`)
+  })
+
+  it('start puts a plain direct-child <label> in column 1, unless the box is self-labelled', () => {
+    // A consumer-built control (`BoundField labelAs="none"`, #28) renders its own
+    // `<label htmlFor>` + `<input>` as direct children of the field box. Its label
+    // has no `.MuiFormLabel-root`, so before this the column-1 rule missed it and the
+    // column-2 catch-all took it — the same empty gutter FileField had (#133).
+    render(
+      <Form
+        schema={schema}
+        defaultValues={defaultValues}
+        onSubmit={() => {}}
+        labelPlacement="start"
+      >
+        <div className={fieldLayoutClassName('start')}>
+          <label htmlFor="plain">Plain</label>
+          <input id="plain" />
+        </div>
+      </Form>,
+    )
+    const above = startRulesAboveBreakpoint(emittedCss())
+    const start = fieldLayoutClasses.start
+    // Column 1: `.MuiFormLabel-root` as before, *or* a direct-child `label` — guarded
+    // so that a self-labelled box's `<label>` (FileField's picker Button, a Checkbox's
+    // FormControlLabel) is not pulled into a column it opted out of, nor given the
+    // label block's `padding: 0` / `transition: none` / top padding.
+    const guard = `:not(.${fieldLayoutClasses.selfLabelled}):not(:has(> .${formControlLabelClasses.root}))`
+    const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    expect(above).toMatch(
+      new RegExp(`\\.${start}${escape(guard)}>label[^{]*\\{[^}]*grid-column:1;grid-row:1;`),
+    )
+    // Column 2: everything that is neither, so the plain label is no longer caught.
+    expect(above).toMatch(
+      new RegExp(
+        `\\.${start}>\\*:not\\(\\.${formLabelClasses.root}\\):not\\(label\\)\\{grid-column:2;\\}`,
+      ),
+    )
   })
 
   it('a field’s own labelPlacement beats the form’s', () => {

@@ -34,6 +34,7 @@ import { ezResolver } from './ezResolver'
 import { useConfirm, type ConfirmOptions } from '../ConfirmDialog'
 import { AssistedContext } from './AssistedContext'
 import { createErrorSummaryStore, ErrorSummaryContext } from './ErrorSummaryContext'
+import { createFieldArrayRowsStore, FieldArrayRowsContext } from './FieldArrayRowsContext'
 import { createFieldFocusStore, FieldFocusContext } from './FieldFocusContext'
 import { createFormErrorFocusStore, FormErrorFocusContext } from './FormErrorFocusContext'
 import { flattenErrors } from './flattenErrors'
@@ -524,6 +525,11 @@ function FormImpl<TIn extends FieldValues, TOut>(
   // The mounted <FormError> alert, if this form has one, so the post-submit focus step below
   // can send a keyboard/screen-reader user to it (#124). See FormErrorFocusContext.
   const formErrorFocusStore = useMemo(() => createFormErrorFocusStore(), [])
+  // The rows of every <FieldArray> in this form, so `useFieldArrayRows(name)` elsewhere can
+  // render per-row content against the same stable ids without owning add/remove (#79). See
+  // FieldArrayRowsContext for why a second `useFieldArray` cannot do this and why the
+  // registry keeps publishing an array's rows after that array unmounts.
+  const fieldArrayRowsStore = useMemo(() => createFieldArrayRowsStore(), [])
   const methods = useForm<TIn, unknown, TOut>({
     resolver: ezResolver(schema, ruleMessages),
     defaultValues: wrappedDefaultValues,
@@ -868,56 +874,59 @@ function FormImpl<TIn extends FieldValues, TOut>(
       <ErrorSummaryContext.Provider value={errorSummaryContext}>
         <FieldFocusContext.Provider value={fieldFocusContext}>
           <FormErrorFocusContext.Provider value={formErrorFocusStore}>
-            <FormRoot
-              noValidate
-              {...formProps}
-              ownerState={{ labelPlacementBreakpoint, labelWidth }}
-              autoComplete={autoComplete}
-              className={`${formClasses.root}${className ? ` ${className}` : ''}`}
-              aria-labelledby={ariaLabelledBy ?? (title != null ? titleProps.id : undefined)}
-              aria-describedby={
-                ariaDescribedBy ?? (effectiveDescription != null ? descriptionProps.id : undefined)
-              }
-              onSubmit={guardedSubmit}
-            >
-              {title != null && (
-                <FormTitle
-                  {...titleProps}
-                  className={`${formClasses.title}${titleProps.className ? ` ${titleProps.className}` : ''}`}
-                >
-                  {title}
-                </FormTitle>
-              )}
-              {effectiveDescription != null && (
-                <FormDescription
-                  {...descriptionProps}
-                  className={`${formClasses.description}${descriptionProps.className ? ` ${descriptionProps.className}` : ''}`}
-                >
-                  {effectiveDescription}
-                </FormDescription>
-              )}
-              <AssistedContext.Provider value={assisted}>
-                <RequiredIndicatorContext.Provider value={{ requiredIndicator, optionalText }}>
-                  <LabelPlacementContext.Provider value={labelPlacementContext}>
-                    <RuleMessagesContext.Provider value={ruleMessages}>
-                      {children}
-                    </RuleMessagesContext.Provider>
-                  </LabelPlacementContext.Provider>
-                </RequiredIndicatorContext.Provider>
-              </AssistedContext.Provider>
-              {/*
+            <FieldArrayRowsContext.Provider value={fieldArrayRowsStore}>
+              <FormRoot
+                noValidate
+                {...formProps}
+                ownerState={{ labelPlacementBreakpoint, labelWidth }}
+                autoComplete={autoComplete}
+                className={`${formClasses.root}${className ? ` ${className}` : ''}`}
+                aria-labelledby={ariaLabelledBy ?? (title != null ? titleProps.id : undefined)}
+                aria-describedby={
+                  ariaDescribedBy ??
+                  (effectiveDescription != null ? descriptionProps.id : undefined)
+                }
+                onSubmit={guardedSubmit}
+              >
+                {title != null && (
+                  <FormTitle
+                    {...titleProps}
+                    className={`${formClasses.title}${titleProps.className ? ` ${titleProps.className}` : ''}`}
+                  >
+                    {title}
+                  </FormTitle>
+                )}
+                {effectiveDescription != null && (
+                  <FormDescription
+                    {...descriptionProps}
+                    className={`${formClasses.description}${descriptionProps.className ? ` ${descriptionProps.className}` : ''}`}
+                  >
+                    {effectiveDescription}
+                  </FormDescription>
+                )}
+                <AssistedContext.Provider value={assisted}>
+                  <RequiredIndicatorContext.Provider value={{ requiredIndicator, optionalText }}>
+                    <LabelPlacementContext.Provider value={labelPlacementContext}>
+                      <RuleMessagesContext.Provider value={ruleMessages}>
+                        {children}
+                      </RuleMessagesContext.Provider>
+                    </LabelPlacementContext.Provider>
+                  </RequiredIndicatorContext.Provider>
+                </AssistedContext.Provider>
+                {/*
             Rendered unconditionally, empty at rest: a live region has to be in
             the DOM before its text arrives, or assistive tech has no prior
             content to observe changing and the first announcement is missed.
           */}
-              <FormStatus
-                {...slotProps?.liveRegion}
-                message={announcement.text}
-                announcementKey={announcement.seq}
-                className={`${formClasses.status}${slotProps?.liveRegion?.className ? ` ${slotProps.liveRegion.className}` : ''}`}
-              />
-              {dialog}
-            </FormRoot>
+                <FormStatus
+                  {...slotProps?.liveRegion}
+                  message={announcement.text}
+                  announcementKey={announcement.seq}
+                  className={`${formClasses.status}${slotProps?.liveRegion?.className ? ` ${slotProps.liveRegion.className}` : ''}`}
+                />
+                {dialog}
+              </FormRoot>
+            </FieldArrayRowsContext.Provider>
           </FormErrorFocusContext.Provider>
         </FieldFocusContext.Provider>
       </ErrorSummaryContext.Provider>

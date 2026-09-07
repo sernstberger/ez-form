@@ -486,6 +486,100 @@ describe('BoundField render prop', () => {
 })
 
 /**
+ * `start`'s label column and the self-labelled opt-out, per `labelAs` (#133 + #28).
+ *
+ * The class half is asserted on the DOM; the CSS half has to be asserted on the
+ * *emitted rule text*, because jsdom has no layout engine and evaluates no media
+ * queries — every `start`-only declaration lives inside a `@media (min-width…)` block
+ * (#130), so `getComputedStyle` on a box reports the stacked fallback and would report
+ * a pass whatever the grid said. Same technique as `labelPlacement.test.tsx`.
+ */
+describe('BoundField under labelPlacement="start"', () => {
+  /** Every rule in the document whose selector mentions `needle`. */
+  const rulesMentioning = (needle: string): string =>
+    [
+      ...[...document.querySelectorAll('style')]
+        .map((s) => s.textContent ?? '')
+        .join('\n')
+        .matchAll(/([^{}]*)\{([^{}]*)\}/g),
+    ]
+      .filter(([, selector]) => selector?.includes(needle))
+      .map(([rule]) => rule)
+      .join('\n')
+
+  const startForm = (child: ReactElement) =>
+    render(
+      <Form
+        schema={z.object({ f: z.string() })}
+        defaultValues={{ f: '' }}
+        onSubmit={() => {}}
+        labelPlacement="start"
+      >
+        {child}
+      </Form>,
+    )
+
+  const rootOf = (container: HTMLElement) => container.querySelector(`.${fieldLayoutClasses.root}`)!
+
+  it('marks a `labelAs="control"` root self-labelled', () => {
+    // MUI's `FormControlLabel` puts the label inside the click target, so there is no
+    // separate element for column 1 and the box opts out of the grid entirely.
+    const { container } = startForm(
+      <BoundField<boolean>
+        name="f"
+        label="Terms"
+        labelAs="control"
+        render={(b) => <input type="checkbox" ref={b.field.ref} {...b.inputA11y} />}
+      />,
+    )
+    expect(rootOf(container)).toHaveClass(fieldLayoutClasses.selfLabelled)
+  })
+
+  it('does not mark a `labelAs="none"` root self-labelled', () => {
+    // The documented `'none'` shape is a plain `<label>` beside its control — an
+    // ordinary two-part field, which belongs *in* the grid. Marking it self-labelled by
+    // default would un-align every wrapped control from its neighbours.
+    const { container } = startForm(<ReferenceControl name="f" label="Nickname" />)
+    expect(rootOf(container)).not.toHaveClass(fieldLayoutClasses.selfLabelled)
+  })
+
+  it('lets a consumer opt out with `fieldLayoutClasses.selfLabelled`', () => {
+    // The escape hatch for a control that really is its own label. The class is
+    // exported, and `BoundField` appends the consumer's `className` after its own.
+    const { container } = startForm(
+      <BoundField<string>
+        name="f"
+        label="Avatar"
+        className={fieldLayoutClasses.selfLabelled}
+        render={(b) => <button type="button" ref={b.field.ref} {...b.inputA11y} />}
+      />,
+    )
+    expect(rootOf(container)).toHaveClass(fieldLayoutClasses.selfLabelled)
+  })
+
+  it('emits the guarded column-1 rule that puts the reference control label in the label column', () => {
+    startForm(<ReferenceControl name="f" label="Nickname" />)
+    // The label the reference control renders is a plain direct-child `<label>` with no
+    // MUI class, so column 1 has to reach it by tag — guarded by *not* being
+    // self-labelled, or a `labelAs="control"` box would pull its inner label out of the
+    // click target.
+    const columnOne = rulesMentioning(`${fieldLayoutClasses.start}`)
+    expect(columnOne).toMatch(
+      new RegExp(`:not\\(\\.${fieldLayoutClasses.selfLabelled}\\)[^{]*>\\s*label`),
+    )
+    // …and it is column *1* that the rule sets, not merely that a selector exists.
+    expect(columnOne).toMatch(
+      new RegExp(
+        `:not\\(\\.${fieldLayoutClasses.selfLabelled}\\)[^{]*>\\s*label\\{[^}]*grid-column:1;`,
+      ),
+    )
+    // …and the catch-all that sends everything else to column 2 excludes that same
+    // plain `label`, or the two rules would fight over it.
+    expect(columnOne).toMatch(/:not\(label\)[^{]*\{grid-column:2;\}/)
+  })
+})
+
+/**
  * `theme.components.EzBoundField.defaultProps` belongs to the **public** `<BoundField>`
  * and must not reach the seven fields that render through the same frame.
  *

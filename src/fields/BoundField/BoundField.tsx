@@ -6,7 +6,7 @@ import FormLabel from '@mui/material/FormLabel'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import { useEzField, type InputA11y, type NameA11y } from '../useEzField'
 import type { TypedControllerRenderProps } from '../useEzField'
-import type { LabelPlacement } from '../LabelPlacementContext'
+import { fieldLayoutClasses, type LabelPlacement } from '../LabelPlacementContext'
 import { mergeDisabled } from '../mergeDisabled'
 import type { FieldRules } from '../../rules'
 import { hasLabel } from '../../devWarn'
@@ -130,9 +130,14 @@ export interface Bound<TValue = unknown> {
  *   place, and renders only the `FormControl` box and the helper text. The right
  *   mode for any control that owns its own label — which is most of them, and why
  *   it is the default: a control the frame knows nothing about is one it cannot
- *   choose label markup for.
+ *   choose label markup for. Under `labelPlacement="start"` a plain direct-child
+ *   `<label>` lands in the label column (#133); a control that is genuinely
+ *   self-labelled passes `className={fieldLayoutClasses.selfLabelled}` to opt out.
  * - `'control'`: label beside the control (MUI `FormControlLabel`, a `<label>`
- *   wrapping it) — Checkbox, Switch.
+ *   wrapping it) — Checkbox, Switch. Self-labelled, so the root carries
+ *   `fieldLayoutClasses.selfLabelled` and opts out of `labelPlacement="start"`'s grid
+ *   (#133): the label is already inside the click target, so there is nothing to put in
+ *   the label column.
  * - `'legend'`: label above a group of controls (`<fieldset>` + `<legend>`) —
  *   RadioGroup, Rating, Slider, CheckboxGroup, ToggleButtonGroup. A `legend` frame
  *   renders a fieldset whose implicit role is `group` named by the legend; when the
@@ -267,13 +272,37 @@ export function BoundFieldBase<TValue>({
   className,
   render,
 }: BoundFieldProps<TValue>) {
+  /*
+   * `labelAs="control"` is self-labelled (#133): MUI's `FormControlLabel` puts the label
+   * text *inside* the single `<label>` that is also the click target, so there is no
+   * separate label element for `start`'s column 1 — and leaving the grid in place would
+   * park the control in column 2 beside an empty label column, a permanent `labelWidth`
+   * gutter. Checkbox and Switch are the two, and they now say so on their root rather
+   * than being recognised by the `:has(> .MuiFormControlLabel-root)` half of the same
+   * rule, which stays for a consumer's own `FormControlLabel` inside a `render` prop.
+   *
+   * `labelAs="none"` deliberately does **not** get it. With #133, `start`'s column 1 also
+   * takes a plain direct-child `<label>`, which is exactly what the documented `'none'`
+   * shape renders — a label paired to `controlId` beside its control. That is a normal
+   * two-part field and belongs in the grid. A consumer whose custom control really is
+   * self-labelled (a button that is its own label) adds
+   * `className={fieldLayoutClasses.selfLabelled}` themselves; the class is exported for
+   * that. Adding it here by default would put every wrapped control in the opt-out and
+   * silently un-align the common case.
+   *
+   * Prefixed onto `className` rather than appended after it: `fieldLayoutClassName` puts
+   * the consumer's `className` last so it can win, and this is the binding's own class,
+   * not the consumer's.
+   */
+  const selfLabelled = labelAs === 'control' ? fieldLayoutClasses.selfLabelled : undefined
+  const rootClassName = [selfLabelled, className].filter(Boolean).join(' ') || undefined
   const f = useEzField<TValue>(name, componentName, {
     label,
     rules,
     'aria-label': ariaLabel,
     'aria-labelledby': ariaLabelledBy,
     labelPlacement,
-    className,
+    className: rootClassName,
   })
   // One call, two ids: `labelId` and `controlId` are always a matched pair, which is
   // what a `labelAs="none"` consumer pairs `<label htmlFor>` with `id`.

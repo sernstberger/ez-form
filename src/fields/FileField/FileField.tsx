@@ -19,7 +19,7 @@ import { styled } from '@mui/material/styles'
 import UploadFile from '@mui/icons-material/UploadFile'
 import { ChipDeleteIcon } from '../ChipDeleteIcon'
 import { hasLabel } from '../../devWarn'
-import type { LabelPlacementProps } from '../LabelPlacementContext'
+import { fieldLayoutClasses, type LabelPlacementProps } from '../LabelPlacementContext'
 import { useEzField } from '../useEzField'
 import { useEzFormContext } from '../../useEzFormContext'
 import { mergeDisabled } from '../mergeDisabled'
@@ -452,7 +452,11 @@ export function FileField(inProps: FileFieldProps) {
       error={f.invalid}
       disabled={isDisabled}
       required={f.required}
-      className={`${fileFieldClasses.root} ${f.layoutClassName}`}
+      // `selfLabelled` (#133): the picker Button *is* this field's label — there is no
+      // separate label element — so `start`'s label column would sit empty beside it.
+      // The class tells the placement rules to keep the stacked box instead; it holds
+      // in both button and dropzone modes, with or without a visible `label`.
+      className={`${fileFieldClasses.root} ${fieldLayoutClasses.selfLabelled} ${f.layoutClassName}`}
     >
       {dropzone ? (
         // Not focusable and given no role on purpose: the Button inside is the
