@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import MuiSwitch, { type SwitchProps as MuiSwitchProps } from '@mui/material/Switch'
 import { mergeSlotProps } from '@mui/material/utils'
-import { FieldFrame } from '../FieldFrame'
+import { BoundFieldBase } from '../BoundField'
 import type { LabelPlacementProps } from '../LabelPlacementContext'
 import type { BooleanFieldRules } from '../../rules'
 
@@ -36,7 +36,7 @@ export function Switch({
   ...rest
 }: SwitchProps) {
   return (
-    <FieldFrame<boolean>
+    <BoundFieldBase<boolean>
       componentName="Switch"
       name={name}
       label={label}
@@ -53,7 +53,7 @@ export function Switch({
       // control rather than replaced by it — read, not destructured, so the
       // (inert) copy on MUI's root through `rest` is unchanged (#102).
       aria-describedby={rest['aria-describedby']}
-      renderControl={({ field, required: isRequired, inputA11y }) => (
+      render={({ field, required: isRequired, inputA11y }) => (
         <MuiSwitch
           {...rest}
           name={field.name}

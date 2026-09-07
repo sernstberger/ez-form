@@ -1,4 +1,3 @@
-import { Fragment } from 'react'
 import Container from '@mui/material/Container'
 import Paper from '@mui/material/Paper'
 import Stack from '@mui/material/Stack'
@@ -20,6 +19,7 @@ import { DateField } from '../../fields/DateField'
 import { FileField } from '../../fields/FileField'
 import { ReadOnlyField } from '../../fields/ReadOnlyField'
 import { FieldArray, type FieldArrayRow } from '../../FieldArray'
+import { useFieldArrayRows } from '../../Form/FieldArrayRowsContext'
 import { Wizard, type WizardStepDef } from '../../Wizard'
 import { WizardStepper } from '../../Wizard/WizardStepper'
 import { WizardStep } from '../../Wizard/WizardStep'
@@ -541,29 +541,45 @@ export function Loan({ onSuccess }: LoanProps) {
 }
 
 /**
- * One `FileField` for the primary applicant plus one per co-applicant row, named over the
- * watched array so a row added/removed on the earlier Co-applicants step is reflected here
- * without its own FieldArray. Keyed by array index rather than a stable id: a plain
- * `useWatch` never sees hookform's field-array `field.id`s, only the current values, so
- * there is no stable id to key on here — see #79 (filed while building this step) for the
- * gap and its caveat (removing/reordering co-applicants after documents are attached here
- * can point a later upload at the wrong row's field name).
+ * One `FileField` for the primary applicant plus one per co-applicant row (#79).
+ *
+ * The rows belong to the Co-applicants step's `<FieldArray>`, two steps back and unmounted by
+ * the time this renders, so `useFieldArrayRows('coApplicants')` reads them from the form's
+ * registry: the same stable `row.id` that array keys its own rows by, and `row.name()` for the
+ * path, without this step owning add/remove/reorder. Keying by array index here — the shape
+ * this started as — is correct only until someone removes or reorders a co-applicant, after
+ * which `coApplicants.1.documents` addresses a different person's row.
+ *
+ * The co-applicant's *name* is still a watch, because a name is a value rather than a row
+ * identity; the two hooks are each doing the job they are for.
  */
 function DocumentUploads() {
-  const coApplicants = useWatch<Input, 'coApplicants'>({ name: 'coApplicants' }) ?? []
+  const coApplicants = useFieldArrayRows('coApplicants')
 
   return (
     <Stack spacing={3}>
       <FileField name="applicantDocuments" label="Upload applicant documents" multiple />
-      {coApplicants.map((coApplicant, index) => (
-        <Fragment key={index}>
-          <FileField
-            name={`coApplicants.${index}.documents`}
-            label={`Upload documents for ${coApplicant.name || `Co-applicant ${index + 1}`}`}
-            multiple
-          />
-        </Fragment>
+      {coApplicants.map((row) => (
+        <CoApplicantDocuments key={row.id} row={row} />
       ))}
     </Stack>
+  )
+}
+
+/**
+ * One co-applicant's upload field. Its own component so the watch that reads this row's typed
+ * name is scoped to that one path, rather than re-rendering every upload field in the step
+ * whenever any co-applicant's name changes.
+ */
+function CoApplicantDocuments({ row }: { row: FieldArrayRow }) {
+  const name = useWatch<Input, `coApplicants.${number}.name`>({
+    name: `coApplicants.${row.index}.name`,
+  })
+  return (
+    <FileField
+      name={row.name('documents')}
+      label={`Upload documents for ${name || `Co-applicant ${row.index + 1}`}`}
+      multiple
+    />
   )
 }

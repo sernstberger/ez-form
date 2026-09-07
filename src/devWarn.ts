@@ -74,7 +74,7 @@ export function warnMissingLabel(
  * `null`, `false` and `''` — and any element or non-empty string counts, since an
  * icon-only label element still names a field.
  *
- * Exported because `FieldFrame` has to ask the same question for a different reason: it
+ * Exported because `BoundField` has to ask the same question for a different reason: it
  * renders a legend only when there is something to put in it, and emits the legend's id
  * as `aria-labelledby` only then (#100). Sharing the predicate keeps the two in step —
  * the input that warns is exactly the input that gets no legend. Unlike the warnings,
@@ -289,41 +289,88 @@ interface MarkedResolver {
 export function warnUnknownFieldName(
   componentName: string,
   name: string,
-  control:
-    | {
-        _defaultValues?: unknown
-        _names?: { mount: ReadonlySet<string>; array: ReadonlySet<string> }
-        _options?: { resolver?: unknown }
-      }
-    | undefined,
+  control: NameCheckControl,
 ): void {
   if (!isDev) return
-  if (!name) return
+  if (!isUnknownName(name, control)) return
+  devWarn(
+    `unknown-field-name:${componentName}:${name}`,
+    `ez-form: <${componentName} name="${name}"> — the form has no "${rootSegment(name)}". ` +
+      'The field renders and accepts input, but its value is dropped on submit. ' +
+      'Check for a typo against the schema and `defaultValues`.',
+  )
+}
+
+/** The slice of hookform's `control` the name checks read. */
+export interface NameCheckControl {
+  _defaultValues?: unknown
+  _names?: { mount: ReadonlySet<string>; array: ReadonlySet<string> }
+  _options?: { resolver?: unknown }
+}
+
+/**
+ * Whether `name`'s root segment names nothing this form knows about — the shared discriminator
+ * behind `warnUnknownFieldName` and `warnUnknownFieldArrayName`.
+ *
+ * `false` is the answer both for "the form has this name" and for "cannot tell", which is what
+ * makes it safe to warn on `true`: see `warnUnknownFieldName`'s doc for why it checks only the
+ * root segment, why an unreadable schema means no opinion, and why the schema keys — fixed
+ * when the resolver is built, before any field registers — are what let this answer on the
+ * very first render.
+ */
+export function isUnknownName(name: string, control: NameCheckControl | undefined): boolean {
+  if (!name) return false
   const resolver = control?._options?.resolver
   const fromSchema =
     typeof resolver === 'function' ? (resolver as MarkedResolver)[schemaKeys] : undefined
   // No readable schema, no opinion. `defaultValues` alone cannot tell a typo from a field
   // the consumer chose not to seed, so without the schema there is nothing to warn about.
-  if (!fromSchema?.size) return
+  if (!fromSchema?.size) return false
   const root = rootSegment(name)
-  if (fromSchema.has(root)) return
+  if (fromSchema.has(root)) return false
   const defaults = control?._defaultValues
   if (typeof defaults === 'object' && defaults !== null && !Array.isArray(defaults)) {
     // A key the schema does not list but the form was seeded with: a `z.looseObject` passes
     // it through, and a consumer may park state under a name the schema strips. Not a typo.
-    if (Object.keys(defaults).includes(root)) return
+    if (Object.keys(defaults).includes(root)) return false
   }
   const names = control?._names
   if (names) {
     for (const registered of [...names.mount, ...names.array]) {
-      if (registered === root || rootSegment(registered) === root) return
+      if (registered === root || rootSegment(registered) === root) return false
     }
   }
+  return true
+}
+
+/**
+ * `useFieldArrayRows(name)` for a name this form has no array under.
+ *
+ * This asks the #108 question — is the *root segment* a name the schema, the seeded defaults
+ * or the registered names know? — rather than "has a `<FieldArray name>` published rows for it
+ * yet", which is not the same question and answers wrongly for the case the hook exists to
+ * serve. The owning array is routinely unmounted when a reader renders: that is the whole
+ * point of the latch. It may also never have mounted at all — its `<WizardStep>` is hidden
+ * behind a `when`, or the form is controlled to a step before it — and a reader on a step the
+ * user reached first would then warn about a perfectly correct name. The schema, by contrast,
+ * lists `coApplicants` whether or not any step showing it has rendered.
+ *
+ * The cost of the narrower question is that a *correctly spelled* name that no `<FieldArray>`
+ * anywhere actually owns — a plain `z.array()` the consumer never wrapped in one — stays
+ * silent. That is the right trade: it renders nothing either way, and a warning that fires on
+ * correct code is worse than one that misses.
+ */
+export function warnUnknownFieldArrayName(
+  name: string,
+  control: NameCheckControl | undefined,
+): void {
+  if (!isDev) return
+  if (!isUnknownName(name, control)) return
   devWarn(
-    `unknown-field-name:${componentName}:${name}`,
-    `ez-form: <${componentName} name="${name}"> — the form has no "${root}". ` +
-      'The field renders and accepts input, but its value is dropped on submit. ' +
-      'Check for a typo against the schema and `defaultValues`.',
+    `unknown-field-array-name:${name}`,
+    `ez-form: useFieldArrayRows("${name}") — the form has no "${rootSegment(name)}". ` +
+      'It renders nothing. Check the name against the <FieldArray> that owns those rows; ' +
+      'that array does not have to be mounted, but it must belong to the same <Form>.',
   )
 }
 

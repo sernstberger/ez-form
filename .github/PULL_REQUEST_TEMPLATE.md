@@ -3,7 +3,7 @@ Closes #
 ## A component ships when
 
 - [ ] Props extend the MUI / Base UI type with only the binding-owned keys omitted; no re-declared upstream types.
-- [ ] Bound through `useEzField` / `FieldFrame` (fields) or `useEzFormContext` (form-level parts); `required`, `disabled`, `error`, `helperText` come from the form.
+- [ ] Bound through `useEzField` / `BoundField` (fields) or `useEzFormContext` (form-level parts); `required`, `disabled`, `error`, `helperText` come from the form.
 - [ ] Anything with a visual default registers as `Ez<Name>`: `useDefaultProps`, `styled` slots, `<name>Classes`, and an entry in `src/theme/augmentation.ts`. A pure pass-through field keeps MUI's own `Mui*` keys and registers nothing.
 - [ ] No `sx`, ripple props, or theme-unreachable literals in `src/`.
 - [ ] Interactive targets ≥ 24×24 px (`expectTargetSize`). An exemption is allowed only when the size is the library's, the consumer opted into it, and the test pins the measured number with the ruling — see the audit note in `src/test/targetSize.ts`.

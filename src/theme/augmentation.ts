@@ -31,6 +31,7 @@ import type { ZipFieldProps } from '../fields/ZipField'
 import type { StateSelectProps } from '../fields/StateSelect'
 import type { ChipDeleteIconProps } from '../fields/ChipDeleteIcon'
 import type { GooglePlacesAttributionProps } from '../address-lookup/GooglePlacesAttribution'
+import type { BoundFieldProps } from '../fields/BoundField'
 
 declare module '@mui/material/styles' {
   interface ComponentsPropsList {
@@ -70,6 +71,8 @@ declare module '@mui/material/styles' {
     EzStateSelect: Partial<StateSelectProps>
     EzChipDeleteIcon: Partial<ChipDeleteIconProps>
     EzGooglePlacesAttribution: Partial<GooglePlacesAttributionProps>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    EzBoundField: Partial<BoundFieldProps<any>>
   }
 
   interface ComponentNameToClassKey {
@@ -269,6 +272,15 @@ declare module '@mui/material/styles' {
     EzChipDeleteIcon?: {
       defaultProps?: ComponentsProps['EzChipDeleteIcon']
       styleOverrides?: ComponentsOverrides<Theme>['EzChipDeleteIcon']
+    }
+    // The frame every non-`TextField` field renders through, and the public way to
+    // bind a control this library does not wrap. It adds no box of its own — the
+    // markup is MUI's `FormControl` / `FormLabel` / `FormHelperText` unchanged, whose
+    // own `Mui*` keys already reach it — so `defaultProps` only. That is what makes
+    // `labelAs` theme-settable, and a class hook onto markup a consumer's `render`
+    // does not control would be a promise about markup that is deliberately not API.
+    EzBoundField?: {
+      defaultProps?: ComponentsProps['EzBoundField']
     }
     // The line `googlePlaces()` renders under the suggestion list. `defaultProps.children` is
     // where an app swaps the "Powered by Google" text for Google's logo image once, app-wide.

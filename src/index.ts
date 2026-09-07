@@ -6,6 +6,21 @@ export {
   type FormErrorSummaryHeadingProps,
 } from './Form/FormErrorSummary'
 export { SubmitButton, submitButtonClasses, type SubmitButtonProps } from './SubmitButton'
+// The binding itself, for a control this library does not wrap (#28). Also the frame
+// the seven non-`TextField` fields render through, so there is one binding path, not
+// two: the `field.ref` fork that registers the focus target (#98), the
+// `aria-describedby` merge (#102/#104) and the empty-`aria-labelledby` guard (#100)
+// have one home.
+export {
+  BoundField,
+  type BoundFieldProps,
+  type BoundFieldLabelAs,
+  type Bound,
+} from './fields/BoundField'
+// The three member types of `Bound`. Exported so a consumer can name them when they
+// split `render` into helpers — `(a11y: InputA11y) => …` — rather than only reach them
+// structurally through `Bound<T>`, which is all the emitted `.d.ts` allows otherwise.
+export type { InputA11y, NameA11y, TypedControllerRenderProps } from './fields/useEzField'
 export { TextField, type TextFieldProps } from './fields/TextField'
 export { Select, type SelectProps, type SelectOption } from './fields/Select'
 export type { Option } from './fields/Option'
@@ -160,6 +175,7 @@ export {
   type FieldArrayProps,
   type FieldArrayRow,
 } from './FieldArray'
+export { useFieldArrayRows } from './Form/FieldArrayRowsContext'
 export {
   PasswordStrength,
   passwordStrengthClasses,

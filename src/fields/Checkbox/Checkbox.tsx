@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import MuiCheckbox, { type CheckboxProps as MuiCheckboxProps } from '@mui/material/Checkbox'
 import { mergeSlotProps } from '@mui/material/utils'
-import { FieldFrame } from '../FieldFrame'
+import { BoundFieldBase } from '../BoundField'
 import type { LabelPlacementProps } from '../LabelPlacementContext'
 import type { BooleanFieldRules } from '../../rules'
 
@@ -34,7 +34,7 @@ export function Checkbox({
   ...rest
 }: CheckboxProps) {
   return (
-    <FieldFrame<boolean>
+    <BoundFieldBase<boolean>
       componentName="Checkbox"
       name={name}
       label={label}
@@ -51,7 +51,7 @@ export function Checkbox({
       // control rather than replaced by it — read, not destructured, so the
       // (inert) copy on MUI's root through `rest` is unchanged (#102).
       aria-describedby={rest['aria-describedby']}
-      renderControl={({ field, required: isRequired, inputA11y }) => (
+      render={({ field, required: isRequired, inputA11y }) => (
         <MuiCheckbox
           {...rest}
           name={field.name}

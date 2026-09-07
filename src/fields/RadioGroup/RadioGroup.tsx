@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import FormControlLabel from '@mui/material/FormControlLabel'
 import Radio from '@mui/material/Radio'
 import MuiRadioGroup, { type RadioGroupProps as MuiRadioGroupProps } from '@mui/material/RadioGroup'
-import { FieldFrame } from '../FieldFrame'
+import { BoundFieldBase } from '../BoundField'
 import type { LabelPlacementProps } from '../LabelPlacementContext'
 import type { Option } from '../Option'
 import type { FieldRules } from '../../rules'
@@ -41,7 +41,7 @@ export function RadioGroup({
 }: RadioGroupProps) {
   warnDuplicateOptions('RadioGroup', name, options)
   return (
-    <FieldFrame<Option['value']>
+    <BoundFieldBase<Option['value']>
       componentName="RadioGroup"
       name={name}
       label={label}
@@ -58,7 +58,7 @@ export function RadioGroup({
       // control rather than replaced by it — read, not destructured, so the
       // (inert) copy on MUI's root through `rest` is unchanged (#102).
       aria-describedby={rest['aria-describedby']}
-      renderControl={({ field, required: isRequired, inputA11y, labelId }) => (
+      render={({ field, required: isRequired, inputA11y, labelId }) => (
         <MuiRadioGroup
           {...rest}
           {...inputA11y}

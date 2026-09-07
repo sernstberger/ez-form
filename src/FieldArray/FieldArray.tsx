@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -28,6 +29,17 @@ import { cx } from '../cx'
 import { warnFieldArrayLayout } from '../devWarn'
 import { FormSection, type FormSectionProps } from '../FormSection'
 import { LiveRegion, type LiveRegionProps } from '../Form/LiveRegion'
+import { useRegisterFieldArrayRows } from '../Form/FieldArrayRowsContext'
+// In its own module so `Form/FieldArrayRowsContext` can name it without importing this
+// component (which imports that context back), and re-exported here because this is the
+// module consumers of the render prop already take it from. The row *slot* below is
+// `FieldArrayRowRoot` rather than `FieldArrayRow` for the same reason: TypeScript keeps a type
+// and a value of one name apart, but the declaration build cannot emit the collision — it
+// fails to name the `styled` const's inferred type ("cannot be named without a reference to
+// MUIStyledCommonProps").
+import type { FieldArrayRow } from './FieldArrayRow'
+
+export type { FieldArrayRow }
 import { FieldCellContext, type FieldCellContextValue } from '../fields/FieldCellContext'
 import { visuallyHidden } from '../visuallyHidden'
 
@@ -88,16 +100,6 @@ export interface FieldArrayColumn<TRow = Record<string, unknown>> {
   align?: TableCellProps['align']
   /** The cell's content — an ordinary ez-form field bound to `row.name(...)`. */
   render: (row: FieldArrayRow) => ReactNode
-}
-
-/** What the `children` render prop receives for one row. */
-export interface FieldArrayRow {
-  /** Zero-based position in the array. */
-  index: number
-  /** hookform's stable `field.id` — the React `key` for the row, already applied. */
-  id: string
-  /** Builds the full form path for a field in this row: `name('email')` → `applicants.0.email`. */
-  name: (field: string) => string
 }
 
 export interface FieldArrayProps<TRow = Record<string, unknown>> extends Pick<
@@ -197,7 +199,7 @@ export interface FieldArrayProps<TRow = Record<string, unknown>> extends Pick<
 }
 
 const FieldArrayRoot = styled(FormSection, { name: 'EzFieldArray', slot: 'Root' })({})
-const FieldArrayRow = styled(FormSection, { name: 'EzFieldArray', slot: 'Row' })({})
+const FieldArrayRowRoot = styled(FormSection, { name: 'EzFieldArray', slot: 'Row' })({})
 // The row's buttons sit on one line rather than stacking as block-level
 // children — the component's minimum layout, so it lives on the styled slot's
 // default style block rather than as `sx`, and stays overridable via
@@ -378,6 +380,35 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
   warnFieldArrayLayout(name, layout, children !== undefined, columns !== undefined)
   const { fields, append, remove, move } = useFieldArray({ name, rules, shouldUnregister })
   const { errors } = useFormState()
+
+  // The one authoritative row list for this array name, built once and used for both the
+  // rendered rows and the registry below, so the two cannot describe different rows.
+  const rows = useMemo<readonly FieldArrayRow[]>(
+    () =>
+      fields.map((field, index) => ({
+        index,
+        id: field.id,
+        name: (f: string) => `${name}.${index}.${f}`,
+      })),
+    [fields, name],
+  )
+
+  // Publish to the form's registry so `useFieldArrayRows(name)` elsewhere — typically a later
+  // wizard step rendering one field per row of this array — sees the same stable ids this
+  // component keys its rows by. A second `useFieldArray` on this name would not: hookform
+  // mints ids per hook instance and keeps only one live subscription per name, so the second
+  // reader gets ids matching nothing and a list frozen at mount. See FieldArrayRowsContext,
+  // which also records why the registry keeps publishing after this array unmounts.
+  //
+  // `useLayoutEffect`, so the registry is current before the browser paints. A reader mounted
+  // alongside this array re-renders from the store's notification; with a passive effect that
+  // notification lands after paint, and an update React does not process synchronously — a
+  // `replace`, a `reset`, a `setValue` on the array — would show the reader one commit of
+  // stale rows first. Publishing during the layout phase closes that window.
+  const registerRows = useRegisterFieldArrayRows()
+  useLayoutEffect(() => {
+    registerRows(name, rows)
+  }, [registerRows, name, rows])
 
   // `seq` is not decoration: it becomes the region's `announcementKey`, so every
   // announcement mounts a *fresh* node. Clearing then setting the text in one
@@ -594,24 +625,18 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
     </FieldArrayActions>
   )
 
-  const rowFor = (index: number, id: string): FieldArrayRow => ({
-    index,
-    id,
-    name: (f) => `${name}.${index}.${f}`,
-  })
-
   const renderStacked = () =>
-    fields.map((field, index) => (
-      <FieldArrayRow
-        key={field.id}
+    rows.map((row) => (
+      <FieldArrayRowRoot
+        key={row.id}
         {...rowSlotProps}
-        title={nameRow(index)}
-        ref={(el: HTMLFieldSetElement | null) => setRowRef(field.id, el)}
+        title={nameRow(row.index)}
+        ref={(el: HTMLFieldSetElement | null) => setRowRef(row.id, el)}
         className={cx(fieldArrayClasses.row, rowSlotProps?.className)}
       >
-        {children?.(rowFor(index, field.id))}
-        {renderActions(index, nameRowForAria(index))}
-      </FieldArrayRow>
+        {children?.(row)}
+        {renderActions(row.index, nameRowForAria(row.index))}
+      </FieldArrayRowRoot>
     ))
 
   /**
@@ -675,21 +700,21 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
         </FieldArrayTableHead>
         <ThemeProvider theme={denseTheme}>
           <TableBody>
-            {fields.map((field, index) => {
+            {rows.map((row) => {
+              const { index, id } = row
               const rowAriaName = nameRowForAria(index)
-              const row = rowFor(index, field.id)
               return (
                 <FieldArrayTableRow
-                  key={field.id}
+                  key={id}
                   {...tableRowSlotProps}
-                  ref={(el: HTMLTableRowElement | null) => setRowRef(field.id, el)}
+                  ref={(el: HTMLTableRowElement | null) => setRowRef(id, el)}
                   className={cx(fieldArrayClasses.tableRow, tableRowSlotProps?.className)}
                 >
                   <FieldArrayRowHeader
                     component="th"
                     scope="row"
                     {...rowHeaderProps}
-                    id={rowHeaderId(field.id)}
+                    id={rowHeaderId(id)}
                     ownerState={{ visuallyHidden: rowHeaderHidden }}
                     className={cx(fieldArrayClasses.rowHeader, rowHeaderProps.className)}
                   >
@@ -697,7 +722,7 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
                   </FieldArrayRowHeader>
                   {columns?.map((column) => {
                     const cell: FieldCellContextValue = {
-                      rowHeaderId: rowHeaderId(field.id),
+                      rowHeaderId: rowHeaderId(id),
                       headerId: columnHeaderId(column.key),
                       label:
                         typeof column.header === 'string'

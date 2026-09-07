@@ -29,12 +29,24 @@ export type LabelPlacement = 'floating' | 'stacked' | 'start'
  *
  * `root` is on every bound field regardless of placement, so a theme (or a test)
  * can select "every ez-form field box" without knowing which placement is active.
+ *
+ * `selfLabelled` is orthogonal to the three placements: a field whose label lives
+ * *inside* its control — `FileField`, whose picker `Button component="label"` is
+ * both the label text and the control — carries it alongside its placement class,
+ * and `start` reads it as "there is no separate label element to put in column 1",
+ * so the box stays the stacked box instead of a grid with an empty label column
+ * (#133). It is a declaration, not a heuristic: a label-less `TextField` named by
+ * `aria-label` has no label element either, but its control still belongs in the
+ * control column, aligned with its neighbours', and only the component knows which
+ * of the two it is. A consumer's own control with its label inside can carry the
+ * class the same way.
  */
 export const fieldLayoutClasses = generateUtilityClasses('EzFieldLayout', [
   'root',
   'floating',
   'stacked',
   'start',
+  'selfLabelled',
   // The two below are *not* placements and `LabelPlacement` does not name them:
   // they mark a field rendered inside a `<FieldArray layout="table">` cell (#14),
   // where its own label is visually hidden and the row + column headers name the

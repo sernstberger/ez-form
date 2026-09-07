@@ -21,12 +21,12 @@ Commands: `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm build-storybook`, `
 statically, so the permission checker falls back to a deny rule and prompts Steve for every
 call. Pass absolute paths instead, and use each tool's own directory flag:
 
-| Instead of | Use |
-|---|---|
-| `cd <wt> && grep -rn x src/foo.tsx` | `grep -rn x <wt>/src/foo.tsx` |
-| `cd <wt> && pnpm test` | `pnpm --dir <wt> test` |
+| Instead of                                       | Use                                                   |
+| ------------------------------------------------ | ----------------------------------------------------- |
+| `cd <wt> && grep -rn x src/foo.tsx`              | `grep -rn x <wt>/src/foo.tsx`                         |
+| `cd <wt> && pnpm test`                           | `pnpm --dir <wt> test`                                |
 | `cd <wt> && pnpm exec vitest run src/x.test.tsx` | `pnpm --dir <wt> exec vitest run <wt>/src/x.test.tsx` |
-| `cd <wt> && git status` | `git -C <wt> status` |
+| `cd <wt> && git status`                          | `git -C <wt> status`                                  |
 
 This matters most in worktree lanes, where every path sits under `.worktrees/<track>/`. Put the
 rule in each lane's dispatch prompt — subagents inherit no memory of it.

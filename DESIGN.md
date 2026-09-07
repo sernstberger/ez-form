@@ -255,6 +255,17 @@ Nothing is square, nothing is a circle except the 12px step dot.
   at its intrinsic width instead of beside it (#131). Its top padding is the same
   `spacing(1)` every other label gets — measured against a group's first option the
   two are within 1.5px, so there is no separate knob.
+- Under `'start'`, a **self-labelled** field — its label inside its control, with no
+  separate label element — keeps the stacked box and sits flush left, like its
+  neighbours' label column, rather than in column 2 beside an empty label cell.
+  `Checkbox` and `Switch` (label inside the `<label>` click target) and `FileField`
+  (the picker button _is_ the label text) are the three today; the field declares it
+  with `EzFieldLayout-selfLabelled` on its root, which a consumer's own control can
+  carry too (#133). Declared, not inferred from "has no label element": an
+  `aria-label`-only text field has no label element either, and its control belongs
+  in the control column. The label column also takes a plain direct-child `<label>`
+  from a consumer-built control (`BoundField labelAs="none"`, #28) — guarded by the
+  same self-labelled predicate, since a self-labelled box's `<label>` is its control.
 - The form description gets `spacing(2)` beneath it under `'stacked'` and `'start'`,
   where the next thing down is a line of label text that would otherwise touch it.
   Not under `'floating'`, whose label is inside the outline and whose input box
