@@ -17,8 +17,19 @@ type Story = StoryObj<typeof meta>
 
 export const Default: Story = {}
 export const Marks: Story = { args: { step: 10, marks: true, valueLabelDisplay: 'auto' } }
+/**
+ * A range slider is two controls under one legend, so each thumb needs its own name
+ * ("Hours minimum" / "Hours maximum") rather than the shared legend text twice (#129).
+ * `getAriaLabel` names them; repeat the field's own label in the string, since the
+ * legend is no longer part of the thumb's name and "minimum" alone says nothing.
+ */
 export const Range: Story = {
-  args: { name: 'hours', label: 'Hours', max: 24 },
+  args: {
+    name: 'hours',
+    label: 'Hours',
+    max: 24,
+    getAriaLabel: (index) => (index === 0 ? 'Hours minimum' : 'Hours maximum'),
+  },
   parameters: {
     form: {
       schema: z.object({ hours: z.tuple([z.number(), z.number()]) }),

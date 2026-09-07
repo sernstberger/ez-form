@@ -116,7 +116,14 @@ export function Slider({
         <MuiSlider
           {...rest}
           name={field.name}
-          aria-labelledby={labelId}
+          // A range slider is two controls under one legend, and MUI's contract for
+          // naming them apart is `getAriaLabel(index)` — which it puts on each thumb as
+          // `aria-label`. `aria-labelledby` outranks `aria-label` in the accname
+          // algorithm, so pointing the thumbs at the legend as well would compute the
+          // consumer's names and then discard them, leaving both thumbs named by the
+          // legend. When `getAriaLabel` is passed, the thumbs are named by it and the
+          // legend still labels the surrounding fieldset (#129).
+          aria-labelledby={rest.getAriaLabel ? undefined : labelId}
           // MUI's Slider does not read `disabled` from FormControl context (unlike Radio/Checkbox).
           disabled={mergeDisabled(disabled, field.disabled)}
           min={minBound}

@@ -5,6 +5,7 @@ import { Form } from '../../Form'
 import { Slider } from './Slider'
 import { describeFieldContract } from '../../test/describeFieldContract'
 import { expectTargetSize } from '../../test/targetSize'
+import { expectNoA11yViolations } from '../../test/axe'
 
 const schema = z.object({ volume: z.number() })
 
@@ -70,6 +71,61 @@ describe('Slider', () => {
     setSlider(end, 18)
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(onSubmit).toHaveBeenCalledWith({ hours: [9, 18] }, expect.anything())
+  })
+
+  /**
+   * #129. `getAriaLabel` is MUI's contract for naming the two thumbs of a range
+   * slider apart, and it only works if the field stops pointing them at the legend:
+   * `aria-labelledby` outranks `aria-label` in accname, so the legend reference
+   * would compute the consumer's names and then discard them.
+   */
+  it('gives each range thumb a distinct name via getAriaLabel', async () => {
+    const rangeSchema = z.object({ hours: z.tuple([z.number(), z.number()]) })
+    const { container } = render(
+      <Form schema={rangeSchema} defaultValues={{ hours: [9, 17] }} onSubmit={() => {}}>
+        <Slider
+          name="hours"
+          label="Hours"
+          max={24}
+          getAriaLabel={(index) => (index === 0 ? 'Hours minimum' : 'Hours maximum')}
+        />
+      </Form>,
+    )
+    expect(screen.getByRole('slider', { name: 'Hours minimum' })).toHaveValue('9')
+    expect(screen.getByRole('slider', { name: 'Hours maximum' })).toHaveValue('17')
+    // The shared name is gone: neither thumb answers to the legend text alone.
+    expect(screen.queryAllByRole('slider', { name: 'Hours' })).toHaveLength(0)
+    await expectNoA11yViolations(container)
+  })
+
+  /**
+   * The inverse of the line above: dropping the legend reference is conditional on
+   * `getAriaLabel`, so without it the legend still names both thumbs, as it always
+   * has. This is what makes the shared name visible as a deliberate default rather
+   * than an accident.
+   */
+  it('leaves both range thumbs named by the legend without getAriaLabel', () => {
+    const rangeSchema = z.object({ hours: z.tuple([z.number(), z.number()]) })
+    render(
+      <Form schema={rangeSchema} defaultValues={{ hours: [9, 17] }} onSubmit={() => {}}>
+        <Slider name="hours" label="Hours" max={24} />
+      </Form>,
+    )
+    expect(screen.getAllByRole('slider', { name: 'Hours' })).toHaveLength(2)
+  })
+
+  /**
+   * A single-thumb slider takes the same path: `getAriaLabel(0)` names the one thumb
+   * and the legend stops naming it, so the consumer's string is what is announced.
+   */
+  it('names a single-thumb slider by getAriaLabel too', () => {
+    render(
+      <Form schema={schema} defaultValues={{ volume: 10 }} onSubmit={() => {}}>
+        <Slider name="volume" label="Volume" getAriaLabel={() => 'Playback volume'} />
+      </Form>,
+    )
+    expect(screen.getByRole('slider', { name: 'Playback volume' })).toHaveValue('10')
+    expect(screen.queryByRole('slider', { name: 'Volume' })).not.toBeInTheDocument()
   })
 
   it('uses min/max as both the slider bounds and rules', async () => {
