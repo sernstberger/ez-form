@@ -1,5 +1,4 @@
 import { Fragment, useCallback, useId, type ReactNode } from 'react'
-import { mergeSlotProps } from '@mui/material/utils'
 import { useController, type UseControllerReturn } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
 import { useRegisterFocusTarget } from '../Form/FieldFocusContext'
@@ -99,13 +98,12 @@ export type UseEzFieldReturn = UseControllerReturn & {
    * `<input>` and the `<p>` the same id and leave the group's `aria-describedby`
    * pointing at nothing (#127).
    *
-   * MUI's own `mergeSlotProps` does the merge underneath — so `className`, `style`,
-   * `sx` and event handlers still compose the way a consumer expects — but it alone
-   * cannot do this: it exists to let the external value win, which is right for all
-   * of those and wrong for the one attribute that makes the error reach a screen
-   * reader, so the binding's `role` is re-applied on top. The consumer's `role`
-   * still applies whenever there is no error to announce, so only the alert case
-   * is owned here.
+   * MUI's own `mergeSlotProps` is not used for this: it exists to let the external
+   * value win, which is wrong for the one attribute that makes the error reach a
+   * screen reader — and for the function form it would rewrite the `ownerState` the
+   * consumer's function receives. See `applyOwned`. The consumer's `role` still
+   * applies whenever there is no error to announce, so only the alert case is
+   * owned here.
    *
    * Handles the function form MUI accepts for a slot's props.
    */
@@ -163,19 +161,29 @@ export type UseEzFieldReturn = UseControllerReturn & {
  * Merges the consumer's `formHelperText` slot props with the binding's, then puts
  * the binding's keys back **on top**.
  *
- * `mergeSlotProps` does the merge, so a consumer keeps everything it composes —
- * `className` via clsx, merged `style`, concatenated `sx`, chained event handlers.
- * What it will not do is let the binding win a plain attribute: it exists to let
- * the external value win (`...defaultSlotProps, ...externalSlotProps`), which is
- * right for all of the above and wrong for the one attribute that makes an error
- * reach a screen reader. So `owned` is re-applied afterwards. It holds only
- * `role`/`id` — never `className`, `style`, `sx` or a handler — so re-applying it
- * overwrites nothing `mergeSlotProps` just composed.
+ * A plain spread, deliberately **not** MUI's `mergeSlotProps`, in both branches.
  *
- * The function form MUI accepts stays *a function*: resolving it here would hand
- * the consumer an `ownerState` this hook does not have. `mergeSlotProps` already
- * returns a function when either side is one, so this only re-applies `owned`
- * inside that call.
+ * `mergeSlotProps` would be wrong for the function form: it calls the consumer's
+ * function with `{ ...ownerState, ...defaultSlotProps }` (mergeSlotProps.js), so
+ * the binding's `id`/`role` would be merged into the `ownerState` the consumer
+ * sees. `TextField`'s ownerState is its own props, so a consumer reading
+ * `ownerState.id` would get the internal helper-text id instead of the `id` they
+ * passed to the field. The consumer's function must see the component's real
+ * ownerState, untouched.
+ *
+ * And for the object form it would add nothing: everything `mergeSlotProps`
+ * composes beyond a spread — `className` via clsx, merged `style`, concatenated
+ * `sx`, chained event handlers — is keyed off those keys being present in the
+ * *defaults* argument, and `owned` only ever holds `id`/`role`. So it reduces to
+ * `{ ...owned, ...consumer }`, and since the binding's keys have to win it would
+ * then need `owned` re-applied on top anyway — which is exactly the spread below.
+ * (Verified against `className`/`style`/`sx`/handler consumers: identical output.)
+ *
+ * Nothing is lost by that: `owned` carries no key a consumer could want composed
+ * with, so every other key on the slot passes through untouched either way.
+ *
+ * The function form stays *a function*: resolving it here would hand the consumer
+ * an `ownerState` this hook does not have.
  *
  * Shared by `helperTextRole` and `helperTextSlotProps` so "the binding's keys go
  * last" is written once; the two differ only in what `owned` holds.
@@ -183,18 +191,10 @@ export type UseEzFieldReturn = UseControllerReturn & {
 const applyOwned = <TOwnerState, TProps extends object>(
   consumer: HelperTextSlotProps<TOwnerState, TProps>,
   owned: object | null,
-): TProps | ((ownerState: TOwnerState) => TProps) => {
-  // `mergeSlotProps` is typed for MUI's own slot generics; the cast is only at this
-  // boundary, and the declared return type above is what callers actually see.
-  const merge = mergeSlotProps as (
-    external: HelperTextSlotProps<TOwnerState, TProps>,
-    defaults: object,
-  ) => TProps | ((ownerState: TOwnerState) => TProps)
-  const merged = merge(consumer, owned ?? {})
-  return typeof merged === 'function'
-    ? (ownerState: TOwnerState) => ({ ...merged(ownerState), ...owned })
-    : { ...merged, ...owned }
-}
+): TProps | ((ownerState: TOwnerState) => TProps) =>
+  typeof consumer === 'function'
+    ? (ownerState: TOwnerState) => ({ ...consumer(ownerState), ...owned })
+    : ({ ...consumer, ...owned } as TProps)
 
 /**
  * Binds a field to the enclosing <Form>. Rules are normalized here (bare value

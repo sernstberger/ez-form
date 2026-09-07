@@ -379,9 +379,9 @@ export function usePickerField<
           // `aria-describedby` pointing at nothing. The hook keeps one copy of the
           // ordering rule either way — see `helperTextRole` in `useEzField`.
           //
-          // `mergeSlotProps` still does the merge underneath (inside the hook), so a
-          // consumer's `className`/`style`/`sx`/handlers keep winning as before; only
-          // `role` is the binding's.
+          // Every other key the consumer put on this slot — `className`, `style`,
+          // `sx`, handlers — passes through untouched; `role` under error is the only
+          // one the binding takes, and only for as long as there is an error.
           formHelperText: f.helperTextRole(consumerTextField?.slotProps?.formHelperText),
           // PickersTextField spreads `slotProps.inputLabel` straight onto the real MUI
           // `InputLabel` (see PickersTextField.js), the same shape TextField's own
