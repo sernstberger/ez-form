@@ -232,15 +232,19 @@ Nothing is square, nothing is a circle except the 12px step dot.
 
 ### Inputs (TextField, Select, Autocomplete, NumberField, pickers)
 
-- Static label: `InputLabel` permanently shrunk, in normal flow, no transform, no
-  animation; the outline never notches (`notched: false` on `OutlinedInput` and
-  `PickersOutlinedInput`). These overrides **are** the mechanism — whether a label
+- `variant: 'stacked'`: the static label — `InputLabel` in normal flow, no transform,
+  no animation; the outline never notches. The preset keys those `MuiInputLabel` rules
+  on the variant and sets it as `MuiTextField`/`MuiPickersTextField`'s
+  `defaultProps.variant` (#142), so `variant="outlined"` is the per-field opt-out back
+  to MUI's floating label. These overrides **are** the mechanism — whether a label
   floats is `InputLabel`'s `shrink`, a theme concern in vanilla MUI, so it is a theme
   concern here (#139). The runtime axis says only _where_ the label goes
   (`labelPlacement: 'top' | 'start'`, default `'top'`); the preset sets no
   `EzForm.defaultProps.labelPlacement`, because it has no opinion about where. It
   also means these rules reach a consumer's own bare `<MuiTextField>` outside any
-  `<Form>`, which a form-scoped axis never could.
+  `<Form>`, which a form-scoped axis never could. The **box** rules (root border,
+  focus ring, padding) stay theme-wide in this pass, so `variant="outlined"` floats
+  its label over a solid border until follow-up #143 keys them on the variant too.
 - `'start'` is **a label column above `labelPlacementBreakpoint`**, and the CSS says
   it that way: every `start` declaration lives inside `theme.breakpoints.up(breakpoint)`,
   so below the breakpoint a `start` field applies no CSS at all and is MUI's own box —
