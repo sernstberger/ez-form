@@ -3,8 +3,10 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { expectTypeOf } from 'vitest'
 import type { DefaultValues, FieldValues, RefCallBack } from 'react-hook-form'
+import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { z } from 'zod'
 import { Form } from '../../Form'
+import { fieldLayoutClasses } from '../LabelPlacementContext'
 import { BoundField, type Bound } from './BoundField'
 import type { UseEzFieldReturn } from '../useEzField'
 import { Checkbox } from '../Checkbox'
@@ -480,5 +482,62 @@ describe('BoundField render prop', () => {
       inForm(<ReferenceControl name="nickname" label="Nickname" helperText="Some help" />),
     )
     await expectNoA11yViolations(container)
+  })
+})
+
+/**
+ * `theme.components.EzBoundField.defaultProps` belongs to the **public** `<BoundField>`
+ * and must not reach the seven fields that render through the same frame.
+ *
+ * `useDefaultProps` fills any key the caller left `undefined` — MUI's `resolveProps`
+ * cannot tell "not passed" from "not applicable" — so with the call inside the shared
+ * component, a consumer's default for their own wrapped controls leaked into this
+ * library's Checkbox. Measured before the split: `defaultProps.helperText = 'Leaked'`
+ * rendered helper text under a plain `<Checkbox name="f" label="Visible" />`, and
+ * `defaultProps.labelPlacement = 'start'` re-laid-out that Checkbox inside a `floating`
+ * form.
+ *
+ * The fix is the `BoundField` / `BoundFieldBase` split; these two cases are what pins
+ * it. Both halves matter: a split that stopped the leak by never reading the theme at
+ * all would pass the first and fail the second.
+ */
+describe('EzBoundField.defaultProps scope', () => {
+  const withTheme = (defaultProps: Record<string, unknown>, child: ReactElement) => {
+    const theme = createTheme({ components: { EzBoundField: { defaultProps } } })
+    return render(
+      <ThemeProvider theme={theme}>
+        <Form
+          schema={z.object({ f: z.boolean() })}
+          defaultValues={{ f: false }}
+          onSubmit={() => {}}
+        >
+          {child}
+        </Form>
+      </ThemeProvider>,
+    )
+  }
+
+  it('does not reach a <Checkbox> rendering through the same frame', () => {
+    withTheme({ helperText: 'Leaked' }, <Checkbox name="f" label="Visible" />)
+    expect(screen.queryByText('Leaked')).not.toBeInTheDocument()
+  })
+
+  it('does not re-lay-out a <Checkbox> through `labelPlacement`', () => {
+    const { container } = withTheme({ labelPlacement: 'start' }, <Checkbox name="f" label="V" />)
+    // The form's own placement (`floating`, the default) still owns the field.
+    expect(container.querySelector(`.${fieldLayoutClasses.start}`)).toBeNull()
+    expect(container.querySelector(`.${fieldLayoutClasses.floating}`)).not.toBeNull()
+  })
+
+  it('does reach the public <BoundField>', () => {
+    withTheme(
+      { helperText: 'From the theme' },
+      <BoundField<boolean>
+        name="f"
+        label="Visible"
+        render={(b) => <input ref={b.field.ref} aria-labelledby={b.labelId} {...b.inputA11y} />}
+      />,
+    )
+    expect(screen.getByText('From the theme')).toBeInTheDocument()
   })
 })

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import MuiCheckbox, { type CheckboxProps as MuiCheckboxProps } from '@mui/material/Checkbox'
 import { mergeSlotProps } from '@mui/material/utils'
-import { BoundField } from '../BoundField'
+import { BoundFieldBase } from '../BoundField'
 import type { LabelPlacementProps } from '../LabelPlacementContext'
 import type { BooleanFieldRules } from '../../rules'
 
@@ -34,7 +34,7 @@ export function Checkbox({
   ...rest
 }: CheckboxProps) {
   return (
-    <BoundField<boolean>
+    <BoundFieldBase<boolean>
       componentName="Checkbox"
       name={name}
       label={label}

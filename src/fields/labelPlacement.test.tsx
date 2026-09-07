@@ -218,7 +218,7 @@ describe('labelPlacement', () => {
   it('start puts a Select’s label in column 1 even though it is a <div>', () => {
     // The label's element varies by field: `TextField` renders `<label>`, `Select`
     // renders a `<div>` (there is no `htmlFor` target — the combobox is named
-    // through `aria-labelledby`), `FieldFrame`'s legend frame renders `<legend>`.
+    // through `aria-labelledby`), `BoundField`'s legend frame renders `<legend>`.
     // A tag-based column rule would leave a Select's label in column 2 stacked on
     // top of its own control, which looks like a broken row and nothing else fails.
     const { container } = renderForm({ labelPlacement: 'start' })
@@ -246,7 +246,7 @@ describe('labelPlacement', () => {
   })
 
   it('start floats a legend so it joins the grid instead of sitting above it', () => {
-    // #131. A `legend` field (`FieldFrame`'s `labelAs="legend"` — RadioGroup,
+    // #131. A `legend` field (`BoundField`'s `labelAs="legend"` — RadioGroup,
     // CheckboxGroup, Rating, Slider, ToggleButtonGroup) renders its box as a
     // `<fieldset>`, and a `<fieldset>`'s `<legend>` is a *rendered legend*: CSS pulls
     // it out of the fieldset's formatting context and paints it above the content

@@ -74,7 +74,7 @@ export function warnMissingLabel(
  * `null`, `false` and `''` — and any element or non-empty string counts, since an
  * icon-only label element still names a field.
  *
- * Exported because `FieldFrame` has to ask the same question for a different reason: it
+ * Exported because `BoundField` has to ask the same question for a different reason: it
  * renders a legend only when there is something to put in it, and emits the legend's id
  * as `aria-labelledby` only then (#100). Sharing the predicate keeps the two in step —
  * the input that warns is exactly the input that gets no legend. Unlike the warnings,

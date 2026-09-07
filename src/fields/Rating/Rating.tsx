@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import MuiRating, { type RatingProps as MuiRatingProps } from '@mui/material/Rating'
-import { BoundField } from '../BoundField'
+import { BoundFieldBase } from '../BoundField'
 import type { LabelPlacementProps } from '../LabelPlacementContext'
 import { mergeDisabled } from '../mergeDisabled'
 import type { FieldRules } from '../../rules'
@@ -57,7 +57,7 @@ export function Rating({
   ...rest
 }: RatingProps) {
   return (
-    <BoundField<number | null>
+    <BoundFieldBase<number | null>
       componentName="Rating"
       name={name}
       label={label}

@@ -3,7 +3,7 @@ import ToggleButton from '@mui/material/ToggleButton'
 import MuiToggleButtonGroup, {
   type ToggleButtonGroupProps as MuiToggleButtonGroupProps,
 } from '@mui/material/ToggleButtonGroup'
-import { BoundField } from '../BoundField'
+import { BoundFieldBase } from '../BoundField'
 import type { LabelPlacementProps } from '../LabelPlacementContext'
 import { mergeDisabled } from '../mergeDisabled'
 import type { Option } from '../Option'
@@ -46,7 +46,7 @@ export function ToggleButtonGroup({
 }: ToggleButtonGroupProps) {
   warnDuplicateOptions('ToggleButtonGroup', name, options)
   return (
-    <BoundField<Value | null | Value[]>
+    <BoundFieldBase<Value | null | Value[]>
       componentName="ToggleButtonGroup"
       name={name}
       label={label}

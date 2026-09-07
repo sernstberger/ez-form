@@ -127,7 +127,7 @@ const startBox = (theme: Theme, labelWidth: string | number): CSSObject => ({
     // border box; `theme.spacing(1)` is the outlined input's own vertical padding.
     paddingTop: theme.spacing(1),
   },
-  // A `legend` label (`FieldFrame`'s `labelAs="legend"`: RadioGroup, CheckboxGroup,
+  // A `legend` label (`BoundField`'s `labelAs="legend"`: RadioGroup, CheckboxGroup,
   // Rating, Slider, ToggleButtonGroup) needs one rule more than the others (#131).
   //
   // Its box is a `<fieldset>`, and a `<fieldset>`'s `<legend>` is a *rendered
@@ -159,14 +159,14 @@ const startBox = (theme: Theme, labelWidth: string | number): CSSObject => ({
   // Selected by *not being* `.MuiFormLabel-root` rather than by tag, because the
   // label's element varies by field: a `TextField` renders `<label>`, a `Select`
   // renders a `<div>` (there is no `htmlFor` target — the combobox is named through
-  // `aria-labelledby`), and `FieldFrame`'s legend frame renders `<legend>`. A
+  // `aria-labelledby`), and `BoundField`'s legend frame renders `<legend>`. A
   // tag-based rule would put a `Select`'s label in column 2 with its own control.
   '& > *:not(.MuiFormLabel-root)': { gridColumn: 2 },
   [`& .${formHelperTextClasses.root}`]: { marginLeft: 0, marginRight: 0 },
 })
 
 /**
- * `Checkbox` and `Switch` (`FieldFrame`'s `labelAs="control"`) opt out of the grid.
+ * `Checkbox` and `Switch` (`BoundField`'s `labelAs="control"`) opt out of the grid.
  *
  * Their label is already beside the control, inside the single `<label>` that *is*
  * the click target — pulling it into a left column would either break that target

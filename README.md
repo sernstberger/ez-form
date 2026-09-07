@@ -1610,22 +1610,40 @@ function NicknameField({ name, label }: { name: string; label: string }) {
 That component is now a field like any other: it validates through the form's schema and
 `rules`, disables under `<Form disabled>`, shows its error as helper text in a live region,
 takes focus after a failed submit, appears in `<FormErrorSummary>`, and follows the form's
-`labelPlacement` and `requiredIndicator`.
+`requiredIndicator`.
 
-### Three things `render` must forward
+**`labelPlacement` needs one thing from you.** `'floating'` and `'stacked'` work with any
+markup `render` returns. `'start'` lays the field out as a two-column grid, and it picks the
+label out by MUI's `.MuiFormLabel-root` class — everything else in the root goes in column 2
+with the control. So under `labelAs="none"`, a label you render as a plain `<label>` lands in
+the control's column rather than its own. Give it that class (MUI's `<FormLabel>` carries it,
+as does `className="MuiFormLabel-root"` on your own element) and make it a direct child of
+what `render` returns. `'floating'` and `'stacked'`, the defaults, need none of this.
+
+### Four things `render` must forward
 
 The rest of `bound` is optional. These are not, and each one fails silently:
 
-| Forward           | Or else                                                                                                                                                                      |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bound.field.ref` | Nothing focuses the control after a failed submit, and `<FormErrorSummary>`'s link to this field goes nowhere.                                                               |
-| `bound.inputA11y` | The error renders but no screen reader ever associates it with the control (`aria-describedby`, `aria-invalid`).                                                             |
-| `bound.nameA11y`  | A field named only by `aria-label` / `aria-labelledby` leaves the name on the `FormControl` wrapper — a `<div>` — while the real control stays anonymous. axe reports clean. |
+| Forward                                                            | Or else                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bound.field.ref`                                                  | Nothing focuses the control after a failed submit, and `<FormErrorSummary>`'s link to this field goes nowhere.                                                                                                                                                                                            |
+| `bound.inputA11y`                                                  | The error renders but no screen reader ever associates it with the control (`aria-describedby`, `aria-invalid`).                                                                                                                                                                                          |
+| `bound.nameA11y`                                                   | A field named only by `aria-label` / `aria-labelledby` leaves the name on the `FormControl` wrapper — a `<div>` — while the real control stays anonymous. axe reports clean.                                                                                                                              |
+| `bound.displayLabel` **or** `bound.nameA11y` — one of them, always | Under the default `labelAs="none"` the frame renders **no label element**, so a `label` you passed to `<BoundField>` names nothing until `render` puts it somewhere. The control ends up anonymous, and the dev warning cannot tell you: it checks the props you passed, sees a `label`, and stays quiet. |
 
-All three go on **the element that carries the role** — the `<input>`, the combobox, the
-`role="group"` — not on a wrapper around it. The third is the one that has actually shipped
-broken here: 15 of 17 fields in this library were once named that way and every test passed,
-which is why `describeFieldContract` now asserts accessible _names_ rather than attributes.
+The first three go on **the element that carries the role** — the `<input>`, the combobox,
+the `role="group"` — not on a wrapper around it. The third is the one that has actually
+shipped broken here: 15 of 17 fields in this library were once named that way and every test
+passed, which is why `describeFieldContract` now asserts accessible _names_ rather than
+attributes.
+
+The fourth is the trap specific to `labelAs="none"`, and it is worth restating: **under
+`'none'`, naming the control is yours.** Render `bound.displayLabel` in a `<label
+htmlFor={bound.controlId}>` (with `id={bound.labelId}`) and give the control
+`id={bound.controlId}`; or, for a field with no visible label, spread `bound.nameA11y` on
+the control. Passing `label` to `<BoundField>` and forgetting to render it is the one way to
+get an unnamed field that no warning catches — every other path either renders the label
+itself or has no label to render, which is what makes the warning reliable there.
 
 `bound.inputA11y`'s `aria-describedby` is already **merged**: if you pass an
 `aria-describedby` of your own to `<BoundField>`, it arrives joined with the helper text's

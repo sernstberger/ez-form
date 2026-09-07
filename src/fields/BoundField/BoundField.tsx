@@ -40,7 +40,20 @@ import { hasLabel } from '../../devWarn'
  */
 export interface Bound<TValue = unknown> {
   field: TypedControllerRenderProps<TValue>
+  /**
+   * Does this field currently have a validation error? `inputA11y` already carries it
+   * to the control as `aria-invalid`, so this is for a control that also *looks*
+   * different when invalid — an error colour, an icon.
+   */
   invalid: boolean
+  /**
+   * Is a `required` rule in force? Put it on the control as `required` /
+   * `aria-required` so the requirement is announced, not only drawn.
+   *
+   * This is the *rule*, not the indicator: in `requiredIndicator="optional"` mode a
+   * required field still has `required: true` here while `labelRequired` is `false`,
+   * so the control announces the requirement and the label shows no asterisk.
+   */
   required: boolean
   /** Resolved against the helper text: `aria-describedby` is set only when there is text. */
   inputA11y: InputA11y
@@ -78,6 +91,10 @@ export interface Bound<TValue = unknown> {
    * The label to render: the `label` prop unchanged in `asterisk` mode; in
    * `optional` mode an optional field's label carries the form's `optionalText`
    * (#66). Only `labelAs="none"` needs it — the other two modes render it already.
+   *
+   * `undefined` when the field has no `label` — check it before rendering a label
+   * element, or you emit an empty one that names nothing (and, if `labelId` is on it,
+   * one that actively suppresses a consumer's `aria-label`, #100).
    */
   displayLabel: ReactNode
   /**
@@ -93,8 +110,14 @@ export interface Bound<TValue = unknown> {
    */
   helperText: ReactNode
   /**
-   * Id of the rendered helper text. Already in `inputA11y['aria-describedby']`;
-   * exposed for a control that needs to point at it from somewhere else.
+   * Id the helper text *would* carry. Exposed for a control that needs to point at it
+   * from somewhere `inputA11y` does not reach.
+   *
+   * It is always a string, but it **names an element only when `helperText` above is
+   * non-empty** — the frame renders no `<p>` for absent text, so pointing at this id
+   * unconditionally leaves a dangling `aria-describedby`. Prefer `inputA11y`, which
+   * has already made that check and omits the attribute when there is nothing to
+   * describe.
    */
   helperTextId: string
 }
@@ -182,36 +205,68 @@ export interface BoundFieldProps<TValue> {
 }
 
 /**
+ * The public binding: `<BoundField>` with `theme.components.EzBoundField.defaultProps`
+ * applied, wrapping the shared `BoundFieldBase` below.
+ *
+ * ### Why the theme defaults are applied *here* and not in the base
+ *
+ * `BoundFieldBase` is also the frame the seven non-`TextField` fields render through
+ * (Checkbox, Switch, RadioGroup, Rating, Slider, CheckboxGroup, ToggleButtonGroup),
+ * and `useDefaultProps` fills **any** key the caller left `undefined` — MUI's
+ * `resolveProps` makes no distinction between "not passed" and "not applicable". With
+ * the call in the shared component, an `EzBoundField.defaultProps.helperText` rendered
+ * helper text under a plain `<Checkbox name="f" label="Visible" />`, and a
+ * `defaultProps.labelPlacement` re-laid-out a Checkbox inside a `floating` form. Both
+ * measured, both wrong: a consumer setting a default for *their own* wrapped controls
+ * has said nothing about this library's Checkbox.
+ *
+ * So `EzBoundField.defaultProps` reaches the public path only. The seven fields import
+ * `BoundFieldBase` and each carry their own `Ez*` key (or, being pure pass-throughs,
+ * MUI's own `Mui*` keys) — which is what PHILOSOPHY rule 2 asks for anyway: a default
+ * belongs to the component the consumer named, not to the frame underneath it.
+ *
+ * The split costs one internal component and no behaviour: `BoundFieldBase` is the same
+ * function this was before, minus the one line.
+ */
+export function BoundField<TValue>(inProps: BoundFieldProps<TValue>) {
+  const props = useDefaultProps({ props: inProps, name: 'EzBoundField' })
+  return <BoundFieldBase<TValue> {...props} />
+}
+
+/**
  * Binds one field to the enclosing `<Form>` and hands a `render` prop everything the
  * binding knows: the typed `field`, the a11y attributes, the label and helper text.
  * It renders the `FormControl` box, the helper text, and — under `labelAs` — the
  * label; the control itself is entirely the caller's.
  *
- * This is both the library's own frame for the seven fields that are not a MUI
- * `TextField` (Checkbox, Switch, RadioGroup, Rating, Slider, CheckboxGroup,
- * ToggleButtonGroup) and the public way to bind a control this library does not
- * wrap. One component, deliberately: the four things a consumer cannot get right
- * unaided — the `field.ref` fork that registers the focus target (#98), the
- * `aria-describedby` merge (#102/#104), the empty-`aria-labelledby` trap (#100) and
- * the `aria-label` routing (#99) — were all this library's own bugs, and a second
- * parallel binding path would be a second place for each of them to come back.
+ * The library's own frame for the seven fields that are not a MUI `TextField`
+ * (Checkbox, Switch, RadioGroup, Rating, Slider, CheckboxGroup, ToggleButtonGroup),
+ * and — through the `BoundField` wrapper above — the public way to bind a control this
+ * library does not wrap. One binding path, deliberately: the four things a consumer
+ * cannot get right unaided — the `field.ref` fork that registers the focus target
+ * (#98), the `aria-describedby` merge (#102/#104), the empty-`aria-labelledby` trap
+ * (#100) and the `aria-label` routing (#99) — were all this library's own bugs, and a
+ * second parallel implementation would be a second place for each of them to come back.
+ *
+ * Not exported from the package: the public name is `BoundField`. The only difference
+ * between the two is which one reads `theme.components.EzBoundField.defaultProps` —
+ * see the wrapper above for why that cannot be this one.
  */
-export function BoundField<TValue>(inProps: BoundFieldProps<TValue>) {
-  const {
-    componentName = 'BoundField',
-    name,
-    label,
-    helperText,
-    disabled,
-    rules,
-    labelAs = 'none',
-    'aria-label': ariaLabel,
-    'aria-labelledby': ariaLabelledBy,
-    'aria-describedby': ariaDescribedBy,
-    labelPlacement,
-    className,
-    render,
-  } = useDefaultProps({ props: inProps, name: 'EzBoundField' })
+export function BoundFieldBase<TValue>({
+  componentName = 'BoundField',
+  name,
+  label,
+  helperText,
+  disabled,
+  rules,
+  labelAs = 'none',
+  'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledBy,
+  'aria-describedby': ariaDescribedBy,
+  labelPlacement,
+  className,
+  render,
+}: BoundFieldProps<TValue>) {
   const f = useEzField<TValue>(name, componentName, {
     label,
     rules,

@@ -2,7 +2,7 @@ import type { ChangeEvent, FocusEvent, ReactNode } from 'react'
 import Checkbox from '@mui/material/Checkbox'
 import FormControlLabel from '@mui/material/FormControlLabel'
 import FormGroup, { type FormGroupProps } from '@mui/material/FormGroup'
-import { BoundField } from '../BoundField'
+import { BoundFieldBase } from '../BoundField'
 import type { LabelPlacementProps } from '../LabelPlacementContext'
 import type { Option } from '../Option'
 import type { FieldRules } from '../../rules'
@@ -45,7 +45,7 @@ export function CheckboxGroup({
 }: CheckboxGroupProps) {
   warnDuplicateOptions('CheckboxGroup', name, options)
   return (
-    <BoundField<Value[]>
+    <BoundFieldBase<Value[]>
       componentName="CheckboxGroup"
       name={name}
       label={label}

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import MuiSwitch, { type SwitchProps as MuiSwitchProps } from '@mui/material/Switch'
 import { mergeSlotProps } from '@mui/material/utils'
-import { BoundField } from '../BoundField'
+import { BoundFieldBase } from '../BoundField'
 import type { LabelPlacementProps } from '../LabelPlacementContext'
 import type { BooleanFieldRules } from '../../rules'
 
@@ -36,7 +36,7 @@ export function Switch({
   ...rest
 }: SwitchProps) {
   return (
-    <BoundField<boolean>
+    <BoundFieldBase<boolean>
       componentName="Switch"
       name={name}
       label={label}

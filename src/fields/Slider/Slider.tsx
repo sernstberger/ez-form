@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import MuiSlider, { type SliderProps as MuiSliderProps } from '@mui/material/Slider'
 import { mergeSlotProps } from '@mui/material/utils'
 import type { FieldValues, Validate, ValidationRule } from 'react-hook-form'
-import { BoundField } from '../BoundField'
+import { BoundFieldBase } from '../BoundField'
 import type { LabelPlacementProps } from '../LabelPlacementContext'
 import { mergeDisabled } from '../mergeDisabled'
 import { useRuleMessages } from '../../Form/RuleMessagesContext'
@@ -80,7 +80,7 @@ export function Slider({
   const messages = useRuleMessages()
   const l = typeof label === 'string' ? label : messages.fallbackLabel
   return (
-    <BoundField<SliderValue>
+    <BoundFieldBase<SliderValue>
       componentName="Slider"
       name={name}
       label={label}
