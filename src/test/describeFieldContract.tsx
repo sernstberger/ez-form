@@ -7,6 +7,7 @@ import type { z } from 'zod'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { renderToString } from 'react-dom/server'
 import { Form } from '../Form'
+import { fieldLayoutClasses, type LabelPlacement } from '../fields/LabelPlacementContext'
 import { expectNoA11yViolations } from './axe'
 
 /**
@@ -178,8 +179,15 @@ export function describeFieldContract<TIn extends FieldValues, TOut>(c: FieldCon
     child: ReactElement,
     disabled = false,
     onSubmit: (values: TOut) => void = () => {},
+    labelPlacement?: LabelPlacement,
   ) => (
-    <Form schema={c.schema} defaultValues={c.defaultValues} onSubmit={onSubmit} disabled={disabled}>
+    <Form
+      schema={c.schema}
+      defaultValues={c.defaultValues}
+      onSubmit={onSubmit}
+      disabled={disabled}
+      labelPlacement={labelPlacement}
+    >
       {child}
       <button type="submit">Go</button>
     </Form>
@@ -365,6 +373,62 @@ export function describeFieldContract<TIn extends FieldValues, TOut>(c: FieldCon
         themeDefault.expect()
       })
     }
+
+    /*
+     * #9 / #66. Label placement is a layout axis: `stacked` un-floats the label and
+     * `start` puts it in a grid column beside the control, both purely in CSS on the
+     * one `FormControl` box every field's root already is. Nothing about the markup
+     * moves — which is exactly the claim that needs a test, because the cheap wrong
+     * implementation (re-rendering the label somewhere else per family) would break
+     * the name/description wiring in seventeen different ways and axe would only
+     * catch some of them.
+     *
+     * Run for every field rather than for three representatives: the whole design
+     * rests on "every family funnels through the same box", and a field that quietly
+     * does not is precisely what this has to find.
+     */
+    describe.each(['floating', 'stacked', 'start'] as const)('under labelPlacement=%s', (
+      placement,
+    ) => {
+      it('keeps the control named, described and marked required', async () => {
+        const user = userEvent.setup()
+        render(
+          inForm(c.render({ helperText: 'Some help', ...errorProps }), false, () => {}, placement),
+        )
+        // The name, computed by the accname algorithm on the control itself —
+        // not `toHaveAttribute`, which a wrapper named around an anonymous control
+        // satisfies and which is the bug #99/#100 were. `getControl` rather than
+        // `getByRole(role, { name })`: a `labelAs="legend"` field's fieldset and its
+        // inner `role="group"` share one name, so only the field knows which element
+        // is the control (the same disambiguation `FieldFrame` already documents).
+        expect(c.getControl()).toHaveAccessibleName(new RegExp(c.label))
+        expect(c.getControl()).toHaveAccessibleDescription('Some help')
+        if (c.errorProps === undefined && !c.requiredNotAnnounced)
+          expect(c.getControl()).toBeRequired()
+        // And the error still reaches `aria-describedby` and the live region.
+        await user.click(screen.getByRole('button', { name: 'Go' }))
+        expect(await screen.findByRole('alert')).toHaveTextContent(errorMessage)
+        expect(c.getControl()).toHaveAccessibleDescription(errorMessage)
+        expect(c.getControl()).toHaveAttribute('aria-invalid', 'true')
+      })
+
+      it('carries the placement classes on its FormControl root', () => {
+        const { container } = render(inForm(c.render({}), false, () => {}, placement))
+        const box = container.querySelector(`.${fieldLayoutClasses[placement]}`)
+        expect(box).not.toBeNull()
+        // The rules select `.MuiFormControl-root` descendants of the form; a field
+        // whose class landed on some other element would be classed but unstyled.
+        expect(box).toHaveClass('MuiFormControl-root')
+        expect(box).toHaveClass(fieldLayoutClasses.root)
+      })
+
+      it('has no accessibility violations', async () => {
+        const { container } = render(
+          inForm(c.render({ helperText: 'Some help', ...errorProps }), false, () => {}, placement),
+        )
+        await expectNoA11yViolations(container)
+      })
+    })
 
     it('has no accessibility violations in the error state', async () => {
       const user = userEvent.setup()
