@@ -17,8 +17,25 @@ type Story = StoryObj<typeof meta>
 
 export const Default: Story = {}
 export const Marks: Story = { args: { step: 10, marks: true, valueLabelDisplay: 'auto' } }
+/**
+ * A range slider is two controls under one legend, so each thumb needs its own name
+ * ("Hours minimum" / "Hours maximum"), not the shared legend text twice (#129).
+ *
+ * That takes **both** props, not just MUI's `getAriaLabel`. The frame points every
+ * thumb at the legend with `aria-labelledby`, and `aria-labelledby` outranks
+ * `aria-label` in the accname algorithm — so `getAriaLabel` alone is computed and then
+ * ignored, leaving both thumbs named "Hours". Clearing the legend reference on the
+ * input slot lets `getAriaLabel` win. Repeat the field's own label inside the returned
+ * string: without the legend in the name, "minimum" alone says nothing.
+ */
 export const Range: Story = {
-  args: { name: 'hours', label: 'Hours', max: 24 },
+  args: {
+    name: 'hours',
+    label: 'Hours',
+    max: 24,
+    getAriaLabel: (index) => (index === 0 ? 'Hours minimum' : 'Hours maximum'),
+    slotProps: { input: { 'aria-labelledby': undefined } },
+  },
   parameters: {
     form: {
       schema: z.object({ hours: z.tuple([z.number(), z.number()]) }),

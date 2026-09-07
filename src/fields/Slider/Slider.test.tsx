@@ -5,6 +5,7 @@ import { Form } from '../../Form'
 import { Slider } from './Slider'
 import { describeFieldContract } from '../../test/describeFieldContract'
 import { expectTargetSize } from '../../test/targetSize'
+import { expectNoA11yViolations } from '../../test/axe'
 
 const schema = z.object({ volume: z.number() })
 
@@ -70,6 +71,34 @@ describe('Slider', () => {
     setSlider(end, 18)
     await user.click(screen.getByRole('button', { name: 'Go' }))
     expect(onSubmit).toHaveBeenCalledWith({ hours: [9, 18] }, expect.anything())
+  })
+
+  /**
+   * #129: two thumbs under one legend share one accessible name. MUI's escape hatch
+   * is `getAriaLabel`, and `...rest` passes it through — but the frame's
+   * `aria-labelledby` outranks `aria-label` in accname, so it takes clearing the
+   * legend reference on the input slot too. Pinned here so the passthrough and the
+   * slot override both stay available to a consumer; the `Range` story uses this
+   * exact pair.
+   */
+  it('gives each range thumb a distinct name via getAriaLabel', async () => {
+    const rangeSchema = z.object({ hours: z.tuple([z.number(), z.number()]) })
+    const { container } = render(
+      <Form schema={rangeSchema} defaultValues={{ hours: [9, 17] }} onSubmit={() => {}}>
+        <Slider
+          name="hours"
+          label="Hours"
+          max={24}
+          getAriaLabel={(index) => (index === 0 ? 'Hours minimum' : 'Hours maximum')}
+          slotProps={{ input: { 'aria-labelledby': undefined } }}
+        />
+      </Form>,
+    )
+    expect(screen.getByRole('slider', { name: 'Hours minimum' })).toHaveValue('9')
+    expect(screen.getByRole('slider', { name: 'Hours maximum' })).toHaveValue('17')
+    // The shared name is gone: neither thumb answers to the legend text alone.
+    expect(screen.queryAllByRole('slider', { name: 'Hours' })).toHaveLength(0)
+    await expectNoA11yViolations(container)
   })
 
   it('uses min/max as both the slider bounds and rules', async () => {
