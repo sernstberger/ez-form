@@ -129,7 +129,7 @@ React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form
 | `FormError`                                    | MUI `Alert`                                   | Renders `formState.errors.root` (set via `form.setError('root.<key>', { message })`, e.g. a rejected async `onSubmit`); renders nothing when there is no root error                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `FormErrorSummary`                             | —                                             | `title?` (default "There is a problem"), `slotProps?` (`heading`, `list`, `item`, `link`); lists the last failed validation's errors as focusable links, GOV.UK-style — see "Error summary" below                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `LiveRegion`                                   | —                                             | `message`, `announcementKey?` (bump to re-announce identical text), `politeness?` (`polite`/`assertive`), `visuallyHidden?` (default `true`), `component?`; the shared announcement region. `<Form>` renders one for submit status — see "Announcements" below                                                                                                                                                                                                                                                                                                                                                                     |
-| `FieldArray`                                   | hookform `useFieldArray`                      | `name`, `label` (array legend), `emptyRow`, `singular?`/`rowLabel?`, `minRows?`/`maxRows?`, `addLabel?`/`removeLabel?`, `reorder?`, `slotProps?`; children is a render prop `(row) => ...` given `row.name('field')` for the array path. Rows are keyed by hookform's `field.id`; Add/Remove/Move move focus and announce in a `role="status"` region                                                                                                                                                                                                                                                                              |
+| `FieldArray`                                   | hookform `useFieldArray`                      | `name`, `label` (array legend), `emptyRow`, `singular?`/`rowLabel?`, `minRows?`/`maxRows?`, `addLabel?`/`removeLabel?`, `reorder?`, `slotProps?`; children is a render prop `(row) => ...` given `row.name('field')` for the array path. Rows are keyed by hookform's `field.id`; Add/Remove/Move move focus and announce in a `role="status"` region. `layout="table"` + `columns` renders one MUI `Table` instead (`cellErrors?`, `actionsHeader?`; see Table layout)                                                                                                                                                            |
 | `BoundField`                                   | your own control                              | `name`, `render: (bound) => ReactElement`; `label?`, `helperText?`, `rules?`, `disabled?`, `labelAs?` (`'none'` default / `'control'` / `'legend'`), `componentName?`, `labelPlacement?`. Binds a control ez-form does not wrap: `render` gets `bound.field` (typed over the field's value), `bound.inputA11y`, `bound.nameA11y`, `bound.labelId`/`controlId`, `bound.displayLabel`, `bound.helperText`. See [Wrap your own control](#wrap-your-own-control)                                                                                                                                                                       |
 
 `Form`'s `title` / `description` give the form its accessible name and instructions (wired to the `<form>` via `aria-labelledby` / `aria-describedby`); `slotProps.title.component` sets the heading level (default `h2`). `FormSection` groups fields in a `<fieldset>` named by its `title` (`<legend>`, heading level configurable via `slotProps.legend.component`, default `h3`); `description` is helper text wired via `aria-describedby`.
@@ -387,6 +387,98 @@ An **array-level** message renders under the Add button as a `role="alert"`: zod
 `form.setError('applicants.root', { message })`. Per-row field errors stay on their
 own fields as normal helper text.
 
+### Table layout
+
+`layout="table"` renders the same array as one MUI `Table` — a column per field, a
+row per entry, the row's Remove / Move buttons in a trailing actions column and Add
+under the table — for the line-items case where stacked rows waste the screen and
+the user expects to work down a column like a spreadsheet.
+
+```tsx
+<FieldArray
+  name="lines"
+  label="Line items"
+  layout="table"
+  emptyRow={() => ({ sku: '', qty: 1, price: 0 })}
+  minRows={1}
+  reorder
+  columns={[
+    {
+      key: 'sku',
+      header: 'SKU',
+      render: (row) => <TextField name={row.name('sku')} label="SKU" />,
+    },
+    {
+      key: 'qty',
+      header: 'Qty',
+      width: '6rem',
+      align: 'right',
+      render: (row) => <NumberField name={row.name('qty')} label="Qty" min={1} />,
+    },
+    {
+      key: 'price',
+      header: 'Price',
+      render: (row) => <MoneyField name={row.name('price')} label="Price" />,
+    },
+  ]}
+/>
+```
+
+| Prop                                                                                          | Type                                            | Notes                                                                                                                                                                                                                                                                               |
+| --------------------------------------------------------------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `layout`                                                                                      | `'stacked' \| 'table'`                          | Default `'stacked'`. `children` is the render prop for stacked rows, `columns` for the table; passing the one the layout does not read is a dev-mode warning.                                                                                                                       |
+| `columns`                                                                                     | `FieldArrayColumn<TRow>[]`                      | `{ key, header, field?, width?, align?, render(row) }`. `field` is the row-relative field name the column's control is bound to — for keyboard navigation and error-summary links — and defaults to `key`. `width` is any CSS length, on the header cell; `align` is `TableCell`'s. |
+| `cellErrors`                                                                                  | `'summary' \| 'inline'`                         | Default `'summary'`: a cell shows `aria-invalid` and the error outline, the text is visually hidden (still the control's description) and `<FormErrorSummary>` lists it. `'inline'` shows the text under the control and the row grows.                                             |
+| `actionsHeader`                                                                               | `ReactNode`                                     | Visually hidden header of the actions column. Default `"Actions"` (`esES`: `Acciones`).                                                                                                                                                                                             |
+| `slotProps.tableContainer` / `.table` / `.tableHead` / `.tableRow` / `.cell` / `.actionsCell` | MUI `TableContainerProps` / `TableProps` / …    | `stickyHeader` and `size` pass through `slotProps.table`; `size` defaults to `'small'` and also sets the cells' density (below).                                                                                                                                                    |
+| `slotProps.rowHeader`                                                                         | `TableCellProps & { visuallyHidden?: boolean }` | The `<th scope="row">` carrying the row's name. Hidden by default; `visuallyHidden: false` shows the names as a first column.                                                                                                                                                       |
+
+**Naming.** Every cell control is named by its row **and** column — `"Line item 2 Qty"`
+(`aria-labelledby` pointing at the hidden row header and the column header). The
+field's own `label` is still required and still rendered, visually hidden, so nothing
+about the field changes but its name. In tests query cells by role and name
+(`getByRole('textbox', { name: 'Line item 2 Qty' })`); `getByLabelText` follows the
+same accname rule and resolves through the header text, not the hidden label.
+`TextField`, `Select`, `Autocomplete`, `NumberField` and the pickers take the cell
+name; the `BoundField` family (`Checkbox`, `Switch`, `RadioGroup`, …) keeps its own
+label as the name for now (#137).
+
+**Density.** The table body renders its controls under a nested theme whose
+`defaultProps.size` is the table's `size` (`small` by default), so a `TextField`,
+`Select`, `NumberField` or picker in a cell is small without each column saying so.
+A field's explicit `size` still wins. `Rating` is left at its default size: its small
+star is below the 24 px target minimum.
+
+**Errors.** A cell's error is the control's `aria-describedby` target in both
+`cellErrors` modes. `<FormErrorSummary>` lists it as
+`Line item 2 Qty: Qty must be at least 1`, linked to the cell's control. The
+array-level error (`.min`, `.max`, `setError('lines.root')`) renders under Add as in
+the stacked layout.
+
+**Keyboard.** Tab is the browser's. One handler on the table body adds:
+
+| Key                    | In a cell                                                                                                                                                                                          |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Enter                  | Same column, next row. On the last row: appends a row (under `maxRows`) and lands in that column; at the cap, nothing. **Never submits.**                                                          |
+| ArrowDown / ArrowUp    | Same column, one row down / up, no wrap — when the control did not consume the key. A closed `Select` opens its menu instead; `Autocomplete`, the pickers, `Slider` and `Radio` keep their arrows. |
+| ArrowLeft / ArrowRight | The caret's, untouched.                                                                                                                                                                            |
+| Escape, Tab            | Untouched.                                                                                                                                                                                         |
+| Keys on Remove / Move  | The button's own.                                                                                                                                                                                  |
+
+The exclusions are the same one-line rule the Wizard's Enter uses (`isPlainKey`): a
+control that handles the key calls `preventDefault()`, and the table defers to it.
+The pickers are the one control the table has to disarm itself — MUI X submits the
+form on Enter wherever it finds a submit button — and does, from inside the picker
+binding.
+
+**The Enter exception.** Every ez-form field's contract says "Enter submits the form
+once". Inside a table cell it does not: Enter is the row-advance key there, as in a
+spreadsheet, and `FieldArray.test.tsx` pins "Enter in a cell never submits" in its
+place. Outside a table nothing changes.
+
+Out of scope for now: pasting TSV/CSV into a cell to fill a row and append rows (#136),
+column sorting/resizing, virtualisation.
+
 ### Per-row content outside the array
 
 Sometimes a row needs content somewhere the `<FieldArray>` isn't: one upload field per
@@ -448,8 +540,9 @@ and only one instance per name stays subscribed, so the second one stops updatin
 first append. hookform documents the rule — one `useFieldArray` per name.
 
 Themeable under `EzFieldArray` (`defaultProps`, `styleOverrides` for `root` | `row`
-| `actions` | `add` | `remove` | `move` | `status` | `error`) and exported as
-`fieldArrayClasses`. Note the class for the error slot is `fieldArrayClasses.errorText`:
+| `actions` | `add` | `remove` | `move` | `status` | `error`, and for the table layout
+`tableContainer` | `table` | `tableHead` | `tableRow` | `cell` | `rowHeader` |
+`actionsCell` | `actionsHeaderText`) and exported as `fieldArrayClasses`. Note the class for the error slot is `fieldArrayClasses.errorText`:
 MUI reserves `error` as a global state class (`Mui-error`), so only the `styleOverrides`
 key is `error`.
 
