@@ -618,9 +618,9 @@ describe('EzBoundField.defaultProps scope', () => {
 
   it('does not re-lay-out a <Checkbox> through `labelPlacement`', () => {
     const { container } = withTheme({ labelPlacement: 'start' }, <Checkbox name="f" label="V" />)
-    // The form's own placement (`floating`, the default) still owns the field.
+    // The form's own placement (`top`, the default) still owns the field.
     expect(container.querySelector(`.${fieldLayoutClasses.start}`)).toBeNull()
-    expect(container.querySelector(`.${fieldLayoutClasses.floating}`)).not.toBeNull()
+    expect(container.querySelector(`.${fieldLayoutClasses.top}`)).not.toBeNull()
   })
 
   it('does reach the public <BoundField>', () => {

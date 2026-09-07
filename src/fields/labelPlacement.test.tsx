@@ -26,10 +26,17 @@ import {
 import { expectNoA11yViolations } from '../test/axe'
 
 /**
- * The label-placement axis itself (#9, #66). The per-field guarantees — name,
+ * The label-placement axis itself (#9, #66, #139). The per-field guarantees — name,
  * description, required marker, axe — are asserted for every field by
  * `describeFieldContract`; what is left here is the axis's own behavior: what the
  * CSS resolves to, where the default comes from, and how the overrides compose.
+ *
+ * The axis is now MUI's own vocabulary, `'top' | 'start'`. Whether a `top` label
+ * *floats* is `InputLabel`'s `shrink` — a theme question — so the tests that used
+ * to pin `stacked`'s un-float / notch CSS are now theme tests: one against stock
+ * `createTheme()` (the label floats, and the axis has emitted nothing to stop it)
+ * and one against `createEzFormTheme()` (the label is static, and the *theme* is
+ * what made it so).
  */
 
 const schema = z.object({
@@ -94,10 +101,10 @@ const rulesMentioning = (css: string, needle: string): string =>
  * The `start` rules that apply *above* the breakpoint — the label-column layout.
  *
  * jsdom has no layout engine and evaluates no media queries, so `getComputedStyle`
- * on a box reports only the rules outside them: under this file's shape (#130) that
- * is the stacked fallback, and the two-column grid is invisible to it. Assertions
- * about the columns therefore read the emitted rule text, which is also the only
- * thing that can be checked about a media query at all.
+ * on a box reports only the rules outside them: under this file's shape (#130,
+ * #139) that is *nothing at all*, and the two-column grid is invisible to it.
+ * Assertions about the columns therefore read the emitted rule text, which is also
+ * the only thing that can be checked about a media query at all.
  */
 const startRulesAboveBreakpoint = (css: string): string => {
   // The complement of `cssOutsideMinWidth`: keep only what the min-width blocks
@@ -160,35 +167,37 @@ const cssOutsideMinWidth = (css: string): string => {
 }
 
 describe('labelPlacement', () => {
-  it('defaults to floating — MUI’s own layout, untouched', () => {
-    // The library ships unstyled (PHILOSOPHY rule 2): a consumer on plain
-    // `createTheme()` who never opted into ez-form's taste keeps MUI's floating
-    // label. The stacked default is `createEzFormTheme()`'s, asserted below.
+  it('defaults to top', () => {
     const { container } = renderForm()
-    expect(container.querySelectorAll(`.${fieldLayoutClasses.floating}`)).toHaveLength(4)
-    const label = box(container, 'floating').querySelector('label') as HTMLElement
-    expect(getComputedStyle(label).position).toBe('absolute')
+    expect(container.querySelectorAll(`.${fieldLayoutClasses.top}`)).toHaveLength(4)
   })
 
-  it('stacked puts the label in normal flow above the control', () => {
-    const { container } = renderForm({ labelPlacement: 'stacked' })
-    const label = box(container, 'stacked').querySelector('label') as HTMLElement
+  it('top emits no placement CSS: under a stock theme the label still floats', () => {
+    // #139. The axis says *where* the label is, not whether it floats. Under plain
+    // `createTheme()` a `top` field is byte-for-byte MUI's `FormControl` box, so the
+    // label keeps MUI's own `position: absolute` — the library ships unstyled
+    // (PHILOSOPHY rule 2) and has emitted nothing to un-float it.
+    const { container } = renderForm({ labelPlacement: 'top' })
+    const label = box(container, 'top').querySelector('label') as HTMLElement
+    expect(getComputedStyle(label).position).toBe('absolute')
+    // And nothing in the emitted CSS keys off the `top` class at all.
+    expect(rulesMentioning(emittedCss(), fieldLayoutClasses.top)).toBe('')
+  })
+
+  it('under createEzFormTheme a top label is static — the theme did it, not the axis', () => {
+    // The other half of the same ruling: static labels are the preset's, reached the
+    // way a vanilla MUI consumer reaches them (`MuiInputLabel: { shrink,
+    // disableAnimation }` + overrides), not a value of this axis.
+    const { container } = renderForm({}, createEzFormTheme({ defaultColorScheme: 'light' }))
+    const label = box(container, 'top').querySelector('label') as HTMLElement
     const style = getComputedStyle(label)
     expect(style.position).toBe('relative')
     expect(style.transform).toBe('none')
-    // The box itself is still MUI's flex column: `stacked` moves the label out of
-    // its absolute positioning, it does not re-lay-out the field.
-    expect(getComputedStyle(box(container, 'stacked')).display).toBe('inline-flex')
-  })
-
-  it('stacked closes the outline notch the floating label opened', () => {
-    // The notch exists only to make room for a label sitting *on* the border. With
-    // the label above it there is nothing to make room for, and an open notch would
-    // leave a visible gap in the box.
-    const { container } = renderForm({ labelPlacement: 'stacked' })
-    const legend = box(container, 'stacked').querySelector(
-      '.MuiOutlinedInput-notchedOutline legend',
-    )!
+    // Still MUI's flex column: the theme moves the label, it does not re-lay-out
+    // the field.
+    expect(getComputedStyle(box(container, 'top')).display).toBe('inline-flex')
+    // …and it closes the notch too, since there is no label on the border any more.
+    const legend = box(container, 'top').querySelector('.MuiOutlinedInput-notchedOutline legend')!
     expect(getComputedStyle(legend).maxWidth).toBe('0.01px')
   })
 
@@ -206,10 +215,11 @@ describe('labelPlacement', () => {
     expect(startRulesAboveBreakpoint(emittedCss())).toContain('grid-template-columns:18ch 1fr')
   })
 
-  it('start below the breakpoint is the stacked box, with nothing left to undo', () => {
-    // #130's acceptance line: under the breakpoint a `start` field is *identical* to
-    // a `stacked` one. jsdom reports exactly the outside-the-media-query rules, so
-    // `getComputedStyle` here is the fallback — which is the thing being asserted.
+  it('start below the breakpoint is MUI’s own box, with nothing left to undo', () => {
+    // #130's acceptance line, restated for #139: under the breakpoint a `start` field
+    // is *identical* to a `top` one, which is to say identical to MUI's own box.
+    // jsdom reports exactly the outside-the-media-query rules, so `getComputedStyle`
+    // here is the fallback — which is the thing being asserted.
     const startForm = renderForm({ labelPlacement: 'start' })
     const read = (el: HTMLElement) => {
       const s = getComputedStyle(el)
@@ -217,20 +227,24 @@ describe('labelPlacement', () => {
       return {
         // `align-items` is the one that broke it: in a flex column it is the cross
         // (horizontal) axis, so a leftover `start` shrank every control to its
-        // intrinsic width — a Select measured 46px in Chrome where `stacked` gave 349.
+        // intrinsic width — a Select measured 46px in Chrome where the fallback box
+        // gave 349.
         alignItems: s.alignItems,
         display: s.display,
         gridTemplateColumns: s.gridTemplateColumns,
+        labelPosition: label.position,
         labelGridColumn: label.gridColumn,
         labelPaddingTop: label.paddingTop,
       }
     }
     const below = read(box(startForm.container, 'start'))
     startForm.unmount()
-    const stacked = read(box(renderForm({ labelPlacement: 'stacked' }).container, 'stacked'))
-    // Not "close enough": the same box, declaration for declaration.
-    expect(below).toEqual(stacked)
+    const top = read(box(renderForm({ labelPlacement: 'top' }).container, 'top'))
+    // Not "close enough": the same box, declaration for declaration — the floating
+    // label included, since below the breakpoint `start` un-floats nothing.
+    expect(below).toEqual(top)
     expect(below.alignItems).not.toBe('start')
+    expect(below.labelPosition).toBe('absolute')
   })
 
   it('start puts a Select’s label in column 1 even though it is a <div>', () => {
@@ -293,26 +307,28 @@ describe('labelPlacement', () => {
     expect(above).toContain('width:12rem')
   })
 
-  it('the legend float is start-only, so a stacked fallback legend is not floated', () => {
-    // Below the breakpoint the box is stacked and the legend belongs above the
+  it('the legend float is start-only, so a fallback legend is not floated', () => {
+    // Below the breakpoint the box is MUI's own and the legend belongs above the
     // control at its natural width, which is what a float would break.
     renderForm({ labelPlacement: 'start' })
     expect(startRules(cssOutsideMinWidth(emittedCss()))).not.toContain('float')
   })
 
-  it('spaces the form description away from the first field under stacked and start', () => {
-    // #131's third observation. Under `floating` the first thing below the
-    // description is the input box, whose label sits inside the outline, so MUI's
-    // own spacing already reads as a gap — 16px measured in Chrome. Under the other
-    // two the next thing is a line of label text flush against the description's
-    // last line: measured at 0px, text touching text.
+  it('spaces the form description away from the first field under start, above the breakpoint', () => {
+    // #131's third observation, rescoped by #139. With a label in column 1 the first
+    // thing below the description is a line of label text flush against the
+    // description's last line: measured at 0px, text touching text. Under `top` the
+    // axis emits nothing at all, so how much room the description needs is the
+    // theme's question — the preset carries it as `EzForm.styleOverrides.description`
+    // (asserted in `ezFormTheme.test.tsx`), and a stock theme's floating label
+    // already reads as a 16px gap.
+    //
     // Asserted on the emitted rule rather than a computed margin because the
     // selector is `:has()`, which jsdom's CSS engine does not implement — it parses
     // the rule and then matches nothing, so `getComputedStyle` reports `0px` here
-    // whatever the rule says. Measured in Chrome instead: 0px before, 16px after,
-    // matching the 16px `floating` already had.
+    // whatever the rule says. Measured in Chrome instead: 0px before, 16px after.
     renderForm({
-      labelPlacement: 'stacked',
+      labelPlacement: 'start',
       title: 'Account',
       description: 'Tell us where to send receipts.',
     })
@@ -322,13 +338,16 @@ describe('labelPlacement', () => {
       .find((r) => r.includes(formClasses.description) && r.includes('margin-bottom'))
     expect(rule).toBeDefined()
     expect(rule).toContain('margin-bottom:16px')
-    // Keyed on the form containing a non-floating field. `floating` is left alone: it
-    // does not have the problem, and a rule there would add a second gap on top of
-    // the one MUI already provides — so the selector names the two classes and the
-    // `floating` class appears in no description rule.
-    expect(rule).toContain(fieldLayoutClasses.stacked)
+    // Keyed on the form containing a `start` field, and on nothing else.
     expect(rule).toContain(fieldLayoutClasses.start)
-    expect(rule).not.toContain(fieldLayoutClasses.floating)
+    expect(rule).not.toContain(fieldLayoutClasses.top)
+    // …and it lives inside the same `up(breakpoint)` block as the grid, so a phone
+    // — where `start` is MUI's own box — gets no extra gap from the axis either.
+    // Scoped to the `start`-keyed rules: emotion's stylesheet is shared across this
+    // file's tests, so `createEzFormTheme()`'s own description gap (its
+    // `EzForm.styleOverrides.description`, a theme rule with no placement class in
+    // its selector) is in the document too and is not what is under test here.
+    expect(startRules(cssOutsideMinWidth(emittedCss()))).not.toContain(formClasses.description)
   })
 
   it('start keeps the label column only above labelPlacementBreakpoint', () => {
@@ -351,9 +370,9 @@ describe('labelPlacement', () => {
     // stretched. Below the breakpoint the box is a flex column, where `align-items`
     // is the **cross** axis — horizontal — so the same declaration means "shrink
     // every control to its intrinsic width". Measured in Chrome at 380px before the
-    // fix: the TextField's input was 194px and the Select's 46px where `stacked` gave
-    // both the full 349px, while the box itself was 349px in both. The box was never
-    // the problem; the declaration leaking past the breakpoint was.
+    // fix: the TextField's input was 194px and the Select's 46px where MUI's own box
+    // gave both the full 349px, while the box itself was 349px in both. The box was
+    // never the problem; the declaration leaking past the breakpoint was.
     'align-items',
     // The grid itself, and the label's placement in it. These were reset by hand
     // under `down()` before; now there is nothing to reset because they never apply.
@@ -362,14 +381,14 @@ describe('labelPlacement', () => {
     'grid-column',
     'grid-row',
     // The label-column's top padding, which lines the label up with the control's
-    // first line. In a stacked box there is no column for it to line up with.
+    // first line. In MUI's own box there is no column for it to line up with.
     'padding-top',
   ])('start’s %s exists only above the breakpoint, so nothing has to undo it', (declaration) => {
     // The shape that makes #130 unrepeatable. A `down()` fallback that undoes a list
     // of declarations is a list you can forget from — `align-items` was forgotten,
     // and jsdom (no layout, no media queries) cannot catch that by measuring. Scoping
     // every `start`-only rule under `up(breakpoint)` means the box below the
-    // breakpoint simply *is* the stacked box, so a declaration added to `startBox`
+    // breakpoint simply *is* MUI's own box, so a declaration added to `startBox`
     // tomorrow cannot leak either.
     renderForm({ labelPlacement: 'start' })
     // Every `start` rule that carries this declaration must sit inside a
@@ -422,7 +441,7 @@ describe('labelPlacement', () => {
 
     // The opt-out is keyed on that class, on the *same element* as the placement
     // class (a compound selector, not a descendant heuristic), and it undoes the
-    // grid: the box is the stacked inline-flex box again with no column template,
+    // grid: the box is MUI's own inline-flex box again with no column template,
     // and its children carry no column.
     const compound = `.${fieldLayoutClasses.start}.${fieldLayoutClasses.selfLabelled}`
     const optOut = rulesMentioning(startRulesAboveBreakpoint(emittedCss()), compound)
@@ -509,10 +528,10 @@ describe('labelPlacement', () => {
         onSubmit={() => {}}
         labelPlacement="start"
       >
-        <TextField name="email" label="Email" labelPlacement="floating" />
+        <TextField name="email" label="Email" labelPlacement="top" />
       </Form>,
     )
-    expect(container.querySelector(`.${fieldLayoutClasses.floating}`)).not.toBeNull()
+    expect(container.querySelector(`.${fieldLayoutClasses.top}`)).not.toBeNull()
     expect(container.querySelector(`.${fieldLayoutClasses.start}`)).toBeNull()
   })
 
@@ -529,13 +548,31 @@ describe('labelPlacement', () => {
     const theme = createTheme({
       components: { EzForm: { defaultProps: { labelPlacement: 'start' } } },
     })
-    const { container } = renderForm({ labelPlacement: 'stacked' }, theme)
-    expect(container.querySelectorAll(`.${fieldLayoutClasses.stacked}`)).toHaveLength(4)
+    const { container } = renderForm({ labelPlacement: 'top' }, theme)
+    expect(container.querySelectorAll(`.${fieldLayoutClasses.top}`)).toHaveLength(4)
   })
 
-  it('createEzFormTheme defaults to stacked — the preset is where the taste lives', () => {
+  it('createEzFormTheme sets no labelPlacement — the axis is not where its taste lives', () => {
+    // #139: the preset's opinion is "labels are static", and that is `MuiInputLabel`
+    // / `MuiOutlinedInput`, theme-wide. It leaves the axis at its `top` default, so a
+    // consumer who wants a label column still asks for one.
     const { container } = renderForm({}, createEzFormTheme({ defaultColorScheme: 'light' }))
-    expect(container.querySelectorAll(`.${fieldLayoutClasses.stacked}`)).toHaveLength(4)
+    expect(container.querySelectorAll(`.${fieldLayoutClasses.top}`)).toHaveLength(4)
+    expect(container.querySelector(`.${fieldLayoutClasses.start}`)).toBeNull()
+  })
+
+  it('fieldLayoutClasses has exactly the six keys the rules are built on', () => {
+    // Two placements plus the four pieces of layout state. Pinned because a stray
+    // key is a class a theme could select that nothing ever renders, and a missing
+    // one is a `fieldLayoutClassName` that throws `undefined` into a className.
+    expect(Object.keys(fieldLayoutClasses).sort()).toEqual([
+      'cell',
+      'cellHelperHidden',
+      'root',
+      'selfLabelled',
+      'start',
+      'top',
+    ])
   })
 
   it('theme.components.EzForm.styleOverrides.root reaches the placement rules', () => {
@@ -567,7 +604,7 @@ describe('labelPlacement', () => {
     expect(getComputedStyle(box(rtl.container, 'start')).gridTemplateColumns).toBe(ltrColumns)
   })
 
-  it.each(['floating', 'stacked', 'start'] as const)(
+  it.each(['top', 'start'] as const)(
     '%s: the label still labels the control, and the error still describes it',
     async (labelPlacement) => {
       const user = userEvent.setup()
@@ -631,7 +668,7 @@ describe('labelPlacement inside a table cell (#14)', () => {
     )
   }
 
-  const renderCell = (children: ReactNode, placement: LabelPlacement = 'floating') =>
+  const renderCell = (children: ReactNode, placement: LabelPlacement = 'top') =>
     render(
       withPickers(
         <Form
@@ -661,7 +698,7 @@ describe('labelPlacement inside a table cell (#14)', () => {
       .getByRole('textbox', { name: 'Line item 2 Qty' })
       .closest('.MuiFormControl-root')!
     expect(outside).not.toHaveClass(fieldLayoutClasses.cell)
-    expect(inside).toHaveClass(fieldLayoutClasses.root, fieldLayoutClasses.floating)
+    expect(inside).toHaveClass(fieldLayoutClasses.root, fieldLayoutClasses.top)
     expect(inside).toHaveClass(fieldLayoutClasses.cell, fieldLayoutClasses.cellHelperHidden)
   })
 
@@ -762,7 +799,7 @@ describe('labelPlacement inside a table cell (#14)', () => {
     expect(screen.getByRole('group', { name: 'Line item 2 Start' })).toBeInTheDocument()
   })
 
-  it.each(['floating', 'stacked', 'start'] as const)(
+  it.each(['top', 'start'] as const)(
     '%s: a cell closes the notch and fills its box regardless of the form placement',
     (placement) => {
       const { container } = renderCell(
