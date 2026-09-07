@@ -135,7 +135,20 @@ A ruling is a judgement call recorded during implementation: `Ruling: <what> —
 - #90: the base `Autocomplete` mirrors MUI — a consumer's `renderValue` takes over chips entirely and `slotProps.chip.deleteIcon` wins — while `EmailListField` keeps pinning the icon (its own a11y contract) — cost if wrong: a consumer drops the name knowingly.
 - #90: `removeLabel` is a theme-settable default prop on `EzChipDeleteIcon`, one place to translate "Remove" for #23 — cost if wrong: an unused prop.
 
+## #139 — label placement in MUI's vocabulary
+
+From the [design spec](superpowers/specs/2026-09-07-label-placement-mui-vocabulary-design.md) (Steve, 2026-09-07):
+
+- `labelPlacement` takes `FormControlLabel`'s vocabulary, `'top' | 'start'`; `'floating'` and `'stacked'` are deleted — the axis says _where_ the label is; whether a `top` label floats is `InputLabel`'s `shrink`, a theme concern, exactly as in vanilla MUI — cost if wrong: a stock-theme consumer who wants static labels writes the same three theme lines a vanilla MUI consumer writes today.
+- `start` below `labelPlacementBreakpoint` applies no CSS — the box is MUI's own: floating under a stock theme, static under the preset — cost if wrong: a stock-theme `start` form shows floating labels on a phone and in-flow labels on a desktop; documented, and the preset never shows it.
+- The preset drops `EzForm.defaultProps.labelPlacement` and carries the description gap as `EzForm.styleOverrides.description` (`marginBottom: spacing(2)`), because under the preset every label is static and touches the description — cost if wrong: none; the theme overrides were already the half that reached bare `<MuiTextField>`s.
+- `Checkbox`/`Switch` `labelPlacement` _is_ MUI's `FormControlLabel` prop (`'end' | 'start' | 'top' | 'bottom'`), forwarded through `BoundField` `labelAs="control"` as `controlLabelProps`; they no longer take the form axis — cost if wrong: a consumer who passed the form axis to a Checkbox gets a type error naming the right values.
+- `'top'` is a real class value and the context default; `undefined` resolves to `'top'` — every field box keeps exactly one placement class, so tests and themes can still select "every box under `top`" — cost if wrong: nothing; `top` emits no rules.
+- `EzFieldLayout-cell` / `-cellHelperHidden` and `FieldArray layout="stacked" | "table"` are untouched — a different axis with the same word — cost if wrong: none.
+
 ## #9 + #66 — label placement axis
+
+> Superseded by #139 (2026-09-07): the axis is now `'top' | 'start'`; `'floating'` and `'stacked'` are deleted and floating is the theme's `InputLabel` `shrink`. The rulings below are kept as history — the ones about the box, the `EzForm` Root slot, the `start` grid and reading the axis in `useEzField` still hold.
 
 - Placement is its own axis (`labelPlacement: 'floating' | 'stacked' | 'start'`), not a fourth MUI `variant`: `TextFieldVariants` is a closed union with no `*PropsVariantOverrides` to augment and the runtime picks the input component from a fixed map, so a fourth value neither typechecks nor renders — cost if wrong: revisit if MUI ever adds the augmentation interface.
 - `floating` stays the **library** default; `createEzFormTheme()` sets `EzForm.defaultProps.labelPlacement = 'stacked'`. DESIGN.md's frame is "components ship unstyled; this file is the taste", so #9's "make it the default" is satisfied where ez-form has a default look, and a consumer on plain `createTheme()` gets no taste they did not ask for (PHILOSOPHY rule 2) — cost if wrong: one theme line for a consumer who expected stacked out of the box; imposing taste from `src/` is the mistake the philosophy names.
@@ -148,6 +161,8 @@ A ruling is a judgement call recorded during implementation: `Ruling: <what> —
 - The preset keeps **both** the theme-wide `MuiInputLabel`/`MuiOutlinedInput` stacking and the new `EzForm` default: the former reaches a consumer's own bare `<MuiTextField>` outside any `<Form>`, which the form-scoped axis cannot — cost if wrong: one redundant rule, agreeing with the other.
 
 ## #130 — `start`'s breakpoint fallback
+
+> Superseded by #139 (2026-09-07): the scoping under `theme.breakpoints.up(…)` stands, but below the breakpoint a `start` box is now MUI's own box, not `stackedBox` — `'stacked'` no longer exists.
 
 - Every `start`-only declaration is scoped under `theme.breakpoints.up(labelPlacementBreakpoint)`, so below the breakpoint a `start` box simply **is** `stackedBox` — replacing a fallback that applied the grid unconditionally and undid it under `down(…)` — because a hand-written reset list is a list you can forget from, and `alignItems` was forgotten: harmless row alignment in a grid, but the fallback re-declared the box as a flex column where `align-items` is the *cross* axis, so every control shrank to its intrinsic width on a phone (measured in Chrome at 380px: a Select 46px and a TextField 194px against `stacked`'s 349px, while the box itself was 349px in both) — cost if wrong: a theme overriding placement CSS must now out-specify a `@media (min-width…)` block to beat a `start` rule; `EzForm.styleOverrides.root` still reaches everything and its test still pins that.
 - The regression test asserts the **CSS shape** — that `align-items`, `display:grid`, `grid-template-columns`, `grid-column`, `grid-row` and `padding-top` appear on a `start` selector only inside a min-width block, and that the fallback box equals the `stacked` box declaration for declaration — rather than a computed width, because jsdom has no layout and evaluates no media queries, and a browser is not in the test gate — cost if wrong: a future defect that is not a leaked declaration is missed; the browser measurements are recorded on #130.

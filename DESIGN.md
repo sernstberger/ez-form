@@ -1,7 +1,7 @@
 ---
 version: alpha
 name: ez-form
-description: "The optional look of ez-form forms: a quiet, flat, blue-on-neutral system with stacked labels, hairline borders, an 8px radius and a soft focus ring, in a light and a dark scheme. Adapted from MUI's dashboard template. Components ship unstyled; this file is the taste, and src/theme/ezFormTheme.ts is its code form."
+description: "The optional look of ez-form forms: a quiet, flat, blue-on-neutral system with static labels above their inputs, hairline borders, an 8px radius and a soft focus ring, in a light and a dark scheme. Adapted from MUI's dashboard template. Components ship unstyled; this file is the taste, and src/theme/ezFormTheme.ts is its code form."
 
 colors:
   brand:
@@ -158,9 +158,9 @@ The look is MUI's dashboard template
 (`docs/data/material/getting-started/templates/shared-theme`, MIT), adapted for a
 form library: quiet, flat, one blue, neutral buttons, hairline borders, a soft focus
 ring, no ripple, no shadows except on floating surfaces. Two things the template
-does not do that this system insists on: **labels are stacked above their inputs**
-(no floating label, no notch, no label motion) and **motion respects
-`prefers-reduced-motion`** (WCAG 2.3.3).
+does not do that this system insists on: **labels are static above their inputs**
+(`InputLabel` permanently shrunk: no floating label, no notch, no label motion) and
+**motion respects `prefers-reduced-motion`** (WCAG 2.3.3).
 
 ## Colors
 
@@ -193,7 +193,7 @@ helper text, so it is `red.300` (6:1) here. The test asserts these numbers.
 Inter if the app loads it, otherwise the system sans — the preset ships no font.
 Body copy is 14px; headings are tight (1.2) and semibold (600); the field label is
 12px at weight 500 in `ink`, not muted — the label is the primary affordance of a
-stacked field and must not read as helper text.
+field and must not read as helper text.
 
 | Style     | Size    | Weight | Line height | Use                                     |
 | --------- | ------- | ------ | ----------- | --------------------------------------- |
@@ -232,22 +232,21 @@ Nothing is square, nothing is a circle except the 12px step dot.
 
 ### Inputs (TextField, Select, Autocomplete, NumberField, pickers)
 
-- Stacked label: `InputLabel` permanently shrunk, in normal flow, no transform, no
+- Static label: `InputLabel` permanently shrunk, in normal flow, no transform, no
   animation; the outline never notches (`notched: false` on `OutlinedInput` and
-  `PickersOutlinedInput`). The preset also sets
-  `EzForm.defaultProps.labelPlacement: 'stacked'` — the runtime axis (#9, #66) that
-  says the same thing per form and per field, and that a settings-style form flips
-  to `'start'` for a label column. The library's own default stays `'floating'`
-  (MUI's): components ship unstyled, and this file is where stacked becomes the
-  default. Both are set and both are wanted — the theme overrides reach a
-  consumer's own bare `<MuiTextField>` outside any `<Form>`, which the axis cannot.
-- `'start'` is **`'stacked'` plus a label column above `labelPlacementBreakpoint`**,
-  and the CSS says it that way: the label-column rules live inside
-  `theme.breakpoints.up(breakpoint)` and the box outside it is the stacked box, so a
-  phone gets full-width controls with nothing to reset (#130). A theme overriding the
+  `PickersOutlinedInput`). These overrides **are** the mechanism — whether a label
+  floats is `InputLabel`'s `shrink`, a theme concern in vanilla MUI, so it is a theme
+  concern here (#139). The runtime axis says only _where_ the label goes
+  (`labelPlacement: 'top' | 'start'`, default `'top'`); the preset sets no
+  `EzForm.defaultProps.labelPlacement`, because it has no opinion about where. It
+  also means these rules reach a consumer's own bare `<MuiTextField>` outside any
+  `<Form>`, which a form-scoped axis never could.
+- `'start'` is **a label column above `labelPlacementBreakpoint`**, and the CSS says
+  it that way: every `start` declaration lives inside `theme.breakpoints.up(breakpoint)`,
+  so below the breakpoint a `start` field applies no CSS at all and is MUI's own box —
+  full-width controls with nothing to reset (#130, #139). A theme overriding the
   placement rules through `EzForm.styleOverrides.root` therefore needs a matching
-  `@media (min-width…)` block to beat a `start` rule; the stacked-and-below rules are
-  reachable unconditionally.
+  `@media (min-width…)` block to beat a `start` rule. `'top'` emits nothing to beat.
 - Under `'start'`, a group field's legend (`RadioGroup`, `CheckboxGroup`, `Rating`,
   `Slider`, `ToggleButtonGroup`) is **floated** into the label column. A
   `<fieldset>`'s `<legend>` is a _rendered legend_, which CSS paints above the
@@ -256,7 +255,7 @@ Nothing is square, nothing is a circle except the 12px step dot.
   `spacing(1)` every other label gets — measured against a group's first option the
   two are within 1.5px, so there is no separate knob.
 - Under `'start'`, a **self-labelled** field — its label inside its control, with no
-  separate label element — keeps the stacked box and sits flush left, like its
+  separate label element — resets to MUI's own box and sits flush left, like its
   neighbours' label column, rather than in column 2 beside an empty label cell.
   `Checkbox` and `Switch` (label inside the `<label>` click target) and `FileField`
   (the picker button _is_ the label text) are the three today; the field declares it
@@ -266,10 +265,14 @@ Nothing is square, nothing is a circle except the 12px step dot.
   in the control column. The label column also takes a plain direct-child `<label>`
   from a consumer-built control (`BoundField labelAs="none"`, #28) — guarded by the
   same self-labelled predicate, since a self-labelled box's `<label>` is its control.
-- The form description gets `spacing(2)` beneath it under `'stacked'` and `'start'`,
-  where the next thing down is a line of label text that would otherwise touch it.
-  Not under `'floating'`, whose label is inside the outline and whose input box
-  already carries the same gap from MUI.
+- The form description gets `spacing(2)` beneath it, because under this preset every
+  label is static and the next thing down is a line of label text that would otherwise
+  touch it. That gap is the preset's — `EzForm.styleOverrides.description` — since it
+  follows from the preset's static labels, not from where the label sits. `src/` keeps
+  only the `start`-only half (`&:has(.EzFieldLayout-start) .EzForm-description`, inside
+  the same `up(breakpoint)` block), which the label column needs under any theme. Under a
+  stock theme and `'top'`, the label is inside the outline and MUI's input box already
+  carries the same gap.
 - Box: `canvas` background, 1px `hairline` border, `rounded.md`, 8px 12px padding,
   `minHeight` 40px. Hover: `gray.400` border. Focus: `brand.400` border plus a 3px
   ring of `brand.500` at 0.5 α. Error: `error` border.
@@ -366,7 +369,7 @@ dense desktop UIs only.
 ## Agent Prompt Guide
 
 "Use ez-form's preset: `createEzFormTheme()` inside a `ThemeProvider` with
-`CssBaseline`. Labels stacked above inputs, hairline `gray.300@0.4` borders, 8px
+`CssBaseline`. Labels static above inputs, hairline `gray.300@0.4` borders, 8px
 radius, 40px controls, neutral gray contained buttons, blue `brand.400` only for
 focus/checked/active. Dark scheme via `defaultColorScheme: 'dark'` or
 `palette: { mode: 'dark' }`. Override through `theme.components.Ez*` / `Mui*`, never
