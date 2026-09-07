@@ -30,6 +30,25 @@ describeFieldContract({
   getControl: () => screen.getByRole('combobox', { name: 'Role' }),
   expectDisabled: (control) => expect(control).toHaveAttribute('aria-disabled', 'true'),
   expectSubmitted: { role: 'user' },
+  exempt: {
+    enterSubmitsOnce:
+      "MUI Select's trigger is a select-only combobox (a `div[role=combobox]`, not a text " +
+      'input), and in that APG pattern Enter opens the listbox rather than submitting. ' +
+      'Baseline: a plain `<MuiSelect>` in a plain `<form onSubmit>` in this same jsdom ' +
+      'also reports zero submits, so there is no swallowed Enter here — the platform has ' +
+      'no implicit submission from this control. A keyboard user Tabs to the submit ' +
+      'button, which is the norm for a `<select>` too (#122).',
+  },
+  // Row 4's second pass: Enter on the open menu chooses the focused option and must not
+  // also submit. This is the half of row 4 a Select *can* have.
+  enterPicksOption: {
+    pick: async (user) => {
+      await user.click(screen.getByRole('combobox', { name: 'Role' }))
+      await user.keyboard('{Enter}')
+    },
+    expectPicked: () =>
+      expect(screen.getByRole('combobox', { name: 'Role' })).toHaveTextContent('Admin'),
+  },
   interact: async (user) => {
     await user.click(screen.getByRole('combobox', { name: 'Role' }))
     await user.click(await screen.findByRole('option', { name: 'User' }))
