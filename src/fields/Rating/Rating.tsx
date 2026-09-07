@@ -11,7 +11,8 @@ export type RatingProps = Omit<MuiRatingProps, 'name' | 'value' | 'defaultValue'
   label: ReactNode
   helperText?: ReactNode
   disabled?: boolean
-} & Pick<FieldRules<number | null>, 'required' | 'validate'> & LabelPlacementProps
+} & Pick<FieldRules<number | null>, 'required' | 'validate'> &
+  LabelPlacementProps
 
 /**
  * Form value is `number | null`; clicking the selected star clears to `null`.

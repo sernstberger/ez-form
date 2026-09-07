@@ -37,7 +37,9 @@ const examples: [name: string, element: ReactElement, settle?: () => Promise<voi
   [
     'Profile',
     <Profile />,
-    () => waitFor(() => expect(screen.getByLabelText(/display name/i)).toBeEnabled()),
+    async () => {
+      await waitFor(() => expect(screen.getByLabelText(/display name/i)).toBeEnabled())
+    },
   ],
   ['Loan', <Loan />],
   ['Insurance', <Insurance />],

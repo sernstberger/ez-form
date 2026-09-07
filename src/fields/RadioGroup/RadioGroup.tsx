@@ -18,7 +18,8 @@ export type RadioGroupProps = Omit<
   options: readonly Option[]
   helperText?: ReactNode
   disabled?: boolean
-} & Pick<FieldRules<Option['value']>, 'required' | 'validate'> & LabelPlacementProps
+} & Pick<FieldRules<Option['value']>, 'required' | 'validate'> &
+  LabelPlacementProps
 
 /**
  * One value across N radios. MUI radios emit strings, so the change handler

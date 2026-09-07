@@ -180,7 +180,8 @@ export type FileFieldProps = Omit<
    * one file (a cancelled dialog changes nothing), or a chip's delete click.
    */
   onChange?: (event: SyntheticEvent, value: FileFieldValue) => void
-} & Pick<FieldRules<FileFieldValue>, 'required' | 'validate'> & LabelPlacementProps
+} & Pick<FieldRules<FileFieldValue>, 'required' | 'validate'> &
+  LabelPlacementProps
 
 /**
  * "This effect has not run yet" marker for the rejection-revalidation effect below. A distinct

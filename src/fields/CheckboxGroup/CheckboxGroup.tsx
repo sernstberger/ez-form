@@ -21,7 +21,8 @@ export type CheckboxGroupProps = Omit<FormGroupProps, 'children' | 'onChange' | 
   onChange?: (event: ChangeEvent<HTMLInputElement>, value: Value[]) => void
   /** The event's element is Checkbox's root button, not the hidden input. */
   onBlur?: (event: FocusEvent<HTMLElement>) => void
-} & Pick<FieldRules<Value[]>, 'required' | 'validate'> & LabelPlacementProps
+} & Pick<FieldRules<Value[]>, 'required' | 'validate'> &
+  LabelPlacementProps
 
 /**
  * N checkboxes, one array. MUI has no component for this; this is its

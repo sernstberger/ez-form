@@ -38,10 +38,7 @@ import { createFieldFocusStore, FieldFocusContext } from './FieldFocusContext'
 import { createFormErrorFocusStore, FormErrorFocusContext } from './FormErrorFocusContext'
 import { flattenErrors } from './flattenErrors'
 import { LiveRegion, type LiveRegionProps } from './LiveRegion'
-import {
-  LabelPlacementContext,
-  type LabelPlacement,
-} from '../fields/LabelPlacementContext'
+import { LabelPlacementContext, type LabelPlacement } from '../fields/LabelPlacementContext'
 import { labelPlacementStyles } from '../fields/labelPlacementStyles'
 import { RequiredIndicatorContext } from './RequiredIndicatorContext'
 import { RuleMessagesContext } from './RuleMessagesContext'
@@ -238,8 +235,9 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
     ReactNode | false | ((requiredIndicator: 'asterisk' | 'optional') => ReactNode)
   /**
    * Where every field's label sits relative to its control (#9, #66). Its own
-   * axis, orthogonal to MUI's `variant` — `<TextField variant="filled">` under
-   * `labelPlacement="start"` is a filled box with its label in a left column.
+   * axis, orthogonal to MUI's `variant`: `variant` picks the box (outlined,
+   * filled, standard) and this picks where the label goes, so a filled field
+   * under `'start'` is a filled box with its label in a left column.
    *
    * - `'floating'` (default) — MUI's own: the label floats over the input and
    *   translates up on focus/fill, notching the outline.

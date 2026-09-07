@@ -73,7 +73,8 @@ export type NumberFieldProps = Omit<
    * @internal
    */
   valueScale?: { toDisplay: (stored: number) => number; toStored: (display: number) => number }
-} & Pick<FieldRules<number | null>, 'required' | 'validate'> & LabelPlacementProps
+} & Pick<FieldRules<number | null>, 'required' | 'validate'> &
+  LabelPlacementProps
 
 const bound = (rule: ValidationRule<number> | undefined): number | undefined =>
   rule === undefined ? undefined : typeof rule === 'number' ? rule : rule.value

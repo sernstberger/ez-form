@@ -80,7 +80,7 @@ describe('labelPlacement', () => {
     const { container } = renderForm({ labelPlacement: 'stacked' })
     const legend = box(container, 'stacked').querySelector(
       '.MuiOutlinedInput-notchedOutline legend',
-    ) as HTMLElement
+    )!
     expect(getComputedStyle(legend).maxWidth).toBe('0.01px')
   })
 
@@ -127,7 +127,12 @@ describe('labelPlacement', () => {
 
   it('a field’s own labelPlacement beats the form’s', () => {
     const { container } = render(
-      <Form schema={schema} defaultValues={defaultValues} onSubmit={() => {}} labelPlacement="start">
+      <Form
+        schema={schema}
+        defaultValues={defaultValues}
+        onSubmit={() => {}}
+        labelPlacement="start"
+      >
         <TextField name="email" label="Email" labelPlacement="floating" />
       </Form>,
     )

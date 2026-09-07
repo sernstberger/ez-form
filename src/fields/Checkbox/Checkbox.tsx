@@ -9,7 +9,8 @@ export type CheckboxProps = Omit<MuiCheckboxProps, 'name' | 'checked' | 'require
   name: string
   label: ReactNode
   helperText?: ReactNode
-} & BooleanFieldRules & LabelPlacementProps
+} & BooleanFieldRules &
+  LabelPlacementProps
 
 /**
  * @remarks When to use

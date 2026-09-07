@@ -22,7 +22,8 @@ export type ToggleButtonGroupProps = Omit<
   options: readonly Option[]
   helperText?: ReactNode
   disabled?: boolean
-} & Pick<FieldRules<Value | null | Value[]>, 'required' | 'validate'> & LabelPlacementProps
+} & Pick<FieldRules<Value | null | Value[]>, 'required' | 'validate'> &
+  LabelPlacementProps
 
 /**
  * Form value is `Option['value'] | null` under `exclusive`, else

@@ -9,7 +9,8 @@ export type SwitchProps = Omit<MuiSwitchProps, 'name' | 'checked' | 'required'> 
   name: string
   label: ReactNode
   helperText?: ReactNode
-} & BooleanFieldRules & LabelPlacementProps
+} & BooleanFieldRules &
+  LabelPlacementProps
 
 /**
  * @remarks When to use

@@ -38,7 +38,8 @@ export type OtpFieldProps = Omit<
   onBlur?: () => void
   /** See `OtpFieldControlProps['characterLabel']`; theme-defaultable via `EzOtpField`. */
   characterLabel?: OtpFieldControlProps['characterLabel']
-} & Pick<FieldRules<string>, 'required' | 'validate'> & LabelPlacementProps
+} & Pick<FieldRules<string>, 'required' | 'validate'> &
+  LabelPlacementProps
 
 /**
  * One-time-code input whose form value is the joined string (`''` when

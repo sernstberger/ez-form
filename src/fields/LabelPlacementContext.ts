@@ -106,9 +106,6 @@ export function useLabelPlacement(): LabelPlacementContextValue {
  * label and the rules that close the notch have to arrive together, and a box with
  * neither would show MUI's floating label over an un-notched outline.
  */
-export function fieldLayoutClassName(
-  placement: LabelPlacement,
-  extra?: string,
-): string {
+export function fieldLayoutClassName(placement: LabelPlacement, extra?: string): string {
   return `${fieldLayoutClasses.root} ${fieldLayoutClasses[placement]}${extra ? ` ${extra}` : ''}`
 }

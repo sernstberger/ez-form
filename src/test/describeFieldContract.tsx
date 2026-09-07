@@ -387,48 +387,59 @@ export function describeFieldContract<TIn extends FieldValues, TOut>(c: FieldCon
      * rests on "every family funnels through the same box", and a field that quietly
      * does not is precisely what this has to find.
      */
-    describe.each(['floating', 'stacked', 'start'] as const)('under labelPlacement=%s', (
-      placement,
-    ) => {
-      it('keeps the control named, described and marked required', async () => {
-        const user = userEvent.setup()
-        render(
-          inForm(c.render({ helperText: 'Some help', ...errorProps }), false, () => {}, placement),
-        )
-        // The name, computed by the accname algorithm on the control itself —
-        // not `toHaveAttribute`, which a wrapper named around an anonymous control
-        // satisfies and which is the bug #99/#100 were. `getControl` rather than
-        // `getByRole(role, { name })`: a `labelAs="legend"` field's fieldset and its
-        // inner `role="group"` share one name, so only the field knows which element
-        // is the control (the same disambiguation `FieldFrame` already documents).
-        expect(c.getControl()).toHaveAccessibleName(new RegExp(c.label))
-        expect(c.getControl()).toHaveAccessibleDescription('Some help')
-        if (c.errorProps === undefined && !c.requiredNotAnnounced)
-          expect(c.getControl()).toBeRequired()
-        // And the error still reaches `aria-describedby` and the live region.
-        await user.click(screen.getByRole('button', { name: 'Go' }))
-        expect(await screen.findByRole('alert')).toHaveTextContent(errorMessage)
-        expect(c.getControl()).toHaveAccessibleDescription(errorMessage)
-        expect(c.getControl()).toHaveAttribute('aria-invalid', 'true')
-      })
+    describe.each(['floating', 'stacked', 'start'] as const)(
+      'under labelPlacement=%s',
+      (placement) => {
+        it('keeps the control named, described and marked required', async () => {
+          const user = userEvent.setup()
+          render(
+            inForm(
+              c.render({ helperText: 'Some help', ...errorProps }),
+              false,
+              () => {},
+              placement,
+            ),
+          )
+          // The name, computed by the accname algorithm on the control itself —
+          // not `toHaveAttribute`, which a wrapper named around an anonymous control
+          // satisfies and which is the bug #99/#100 were. `getControl` rather than
+          // `getByRole(role, { name })`: a `labelAs="legend"` field's fieldset and its
+          // inner `role="group"` share one name, so only the field knows which element
+          // is the control (the same disambiguation `FieldFrame` already documents).
+          expect(c.getControl()).toHaveAccessibleName(new RegExp(c.label))
+          expect(c.getControl()).toHaveAccessibleDescription('Some help')
+          if (c.errorProps === undefined && !c.requiredNotAnnounced)
+            expect(c.getControl()).toBeRequired()
+          // And the error still reaches `aria-describedby` and the live region.
+          await user.click(screen.getByRole('button', { name: 'Go' }))
+          expect(await screen.findByRole('alert')).toHaveTextContent(errorMessage)
+          expect(c.getControl()).toHaveAccessibleDescription(errorMessage)
+          expect(c.getControl()).toHaveAttribute('aria-invalid', 'true')
+        })
 
-      it('carries the placement classes on its FormControl root', () => {
-        const { container } = render(inForm(c.render({}), false, () => {}, placement))
-        const box = container.querySelector(`.${fieldLayoutClasses[placement]}`)
-        expect(box).not.toBeNull()
-        // The rules select `.MuiFormControl-root` descendants of the form; a field
-        // whose class landed on some other element would be classed but unstyled.
-        expect(box).toHaveClass('MuiFormControl-root')
-        expect(box).toHaveClass(fieldLayoutClasses.root)
-      })
+        it('carries the placement classes on its FormControl root', () => {
+          const { container } = render(inForm(c.render({}), false, () => {}, placement))
+          const box = container.querySelector(`.${fieldLayoutClasses[placement]}`)
+          expect(box).not.toBeNull()
+          // The rules select `.MuiFormControl-root` descendants of the form; a field
+          // whose class landed on some other element would be classed but unstyled.
+          expect(box).toHaveClass('MuiFormControl-root')
+          expect(box).toHaveClass(fieldLayoutClasses.root)
+        })
 
-      it('has no accessibility violations', async () => {
-        const { container } = render(
-          inForm(c.render({ helperText: 'Some help', ...errorProps }), false, () => {}, placement),
-        )
-        await expectNoA11yViolations(container)
-      })
-    })
+        it('has no accessibility violations', async () => {
+          const { container } = render(
+            inForm(
+              c.render({ helperText: 'Some help', ...errorProps }),
+              false,
+              () => {},
+              placement,
+            ),
+          )
+          await expectNoA11yViolations(container)
+        })
+      },
+    )
 
     it('has no accessibility violations in the error state', async () => {
       const user = userEvent.setup()

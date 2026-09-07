@@ -22,7 +22,8 @@ export type SliderProps = Omit<
   /** One prop for both: the slider's bound and the validation message. */
   min?: ValidationRule<number>
   max?: ValidationRule<number>
-} & Pick<FieldRules<SliderValue>, 'validate'> & LabelPlacementProps
+} & Pick<FieldRules<SliderValue>, 'validate'> &
+  LabelPlacementProps
 
 const bound = (rule: ValidationRule<number> | undefined): number | undefined =>
   rule === undefined ? undefined : typeof rule === 'number' ? rule : rule.value
