@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+### Breaking
+
+- `labelPlacement` takes MUI `FormControlLabel`'s vocabulary: `'top' | 'start'`, default
+  `'top'`. `'floating'` and `'stacked'` are removed. The axis now says only _where_ a label
+  sits; whether a `top` label floats is `InputLabel`'s `shrink` — a theme concern, as in
+  vanilla MUI. `'top'` emits no CSS of its own, and `'start'` emits none below
+  `labelPlacementBreakpoint` either, so a field under a stock theme is MUI's own box.
+  - `createEzFormTheme()` no longer sets `EzForm.defaultProps.labelPlacement`; its
+    `MuiInputLabel`/`MuiOutlinedInput` overrides are what make labels static, and they
+    reach a bare `<MuiTextField>` outside any `<Form>` as well. The form description's
+    gap moves to `EzForm.styleOverrides.description` in the preset, with a `start`-only
+    rule kept in `src/`.
+  - `Checkbox` and `Switch` `labelPlacement` is now MUI's `FormControlLabel.labelPlacement`
+    (`'end' | 'start' | 'top' | 'bottom'`, default `'end'`) rather than the form axis, so
+    a label can finally be placed before a switch.
+  - `BoundField` gains `controlLabelProps` (`Omit<FormControlLabelProps, 'control' | 'label' | 'required'>`),
+    read under `labelAs="control"` only; that is how `Checkbox`/`Switch` forward the above.
+  - `fieldLayoutClasses.floating` and `.stacked` are removed; the keys are `root`, `top`,
+    `start`, `selfLabelled`, `cell`, `cellHelperHidden`. `FieldArray`'s
+    `layout="stacked" | "table"` is a different axis and is unchanged.
+
+  Migration: replace `labelPlacement="floating"` and `labelPlacement="stacked"` with
+  `labelPlacement="top"`, and drop them entirely where they only restated the default. If
+  you were on a stock `createTheme()` and relied on `'stacked'` for static labels, set
+  `MuiInputLabel.defaultProps` `shrink`/`disableAnimation` and `MuiOutlinedInput.defaultProps.notched: false`
+  yourself, or adopt `createEzFormTheme()` — #139.
+
 ### Added
 
 - `ReadOnlyField` accepts `value: unknown` (with `label` then required, since there is
