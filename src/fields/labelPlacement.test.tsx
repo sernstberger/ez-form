@@ -185,9 +185,11 @@ describe('labelPlacement', () => {
   })
 
   it('under createEzFormTheme a top label is static — the theme did it, not the axis', () => {
-    // The other half of the same ruling: static labels are the preset's, reached the
-    // way a vanilla MUI consumer reaches them (`MuiInputLabel: { shrink,
-    // disableAnimation }` + overrides), not a value of this axis.
+    // The other half of the same ruling: static labels are the preset's, not a value
+    // of this axis. Since #142 the preset reaches them through MUI's own variant
+    // mechanism — `MuiTextField.defaultProps.variant: 'stacked'` plus `MuiInputLabel`
+    // style rules keyed on that variant — rather than theme-wide `shrink` /
+    // `disableAnimation` props. Either way the axis emits nothing for `top`.
     const { container } = renderForm({}, createEzFormTheme({ defaultColorScheme: 'light' }))
     const label = box(container, 'top').querySelector('label') as HTMLElement
     const style = getComputedStyle(label)
@@ -196,9 +198,14 @@ describe('labelPlacement', () => {
     // Still MUI's flex column: the theme moves the label, it does not re-lay-out
     // the field.
     expect(getComputedStyle(box(container, 'top')).display).toBe('inline-flex')
-    // …and it closes the notch too, since there is no label on the border any more.
+    // …and the notch never opens, because no `label` reaches the input at all: MUI's
+    // TextField passes `label` to the input only under `variant === 'outlined'`, so
+    // `NotchedOutline` renders with `withLabel` false and the legend holds the
+    // zero-width placeholder span instead of the label text. That is why the preset
+    // needs no `notched: false` (#142).
     const legend = box(container, 'top').querySelector('.MuiOutlinedInput-notchedOutline legend')!
-    expect(getComputedStyle(legend).maxWidth).toBe('0.01px')
+    expect(legend.textContent).not.toContain('Email')
+    expect(legend.querySelector('span')).toHaveAttribute('aria-hidden', 'true')
   })
 
   it('start lays the field out as a two-column grid above the breakpoint', () => {

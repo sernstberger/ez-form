@@ -70,3 +70,26 @@ export const Rules: Story = {
     await canvas.findByText('Age is required.')
   },
 }
+
+/**
+ * MUI's `variant`, reopened (#142). The preset's default is `stacked` — ez-form's own
+ * variant, whose label sits above the input with no float and no notch — and any field
+ * opts back to MUI's own look with `variant="outlined"` / `"standard"` / `"filled"`.
+ *
+ * A consumer adds their own the same way the MUI docs will once this lands upstream:
+ * `declare module '@mui/material/TextField' { interface TextFieldPropsVariantOverrides
+ * { dashed: true } }` in a `.d.ts`, then a `theme.components.MuiTextField.variants`
+ * entry for the look. A custom variant renders `OutlinedInput` unless
+ * `slots.input` says otherwise. (No such augmentation is declared in `src/`: a module
+ * augmentation is global, so a demo one would leak into every file in the library.)
+ */
+export const Variants: Story = {
+  render: () => (
+    <>
+      <TextField name="email" label="Stacked (the preset's default)" />
+      <TextField name="nick" label="Outlined" variant="outlined" />
+      <TextField name="nick" label="Standard" variant="standard" />
+      <TextField name="nick" label="Filled" variant="filled" />
+    </>
+  ),
+}
