@@ -35,6 +35,14 @@ export const fieldLayoutClasses = generateUtilityClasses('EzFieldLayout', [
   'floating',
   'stacked',
   'start',
+  // The two below are *not* placements and `LabelPlacement` does not name them:
+  // they mark a field rendered inside a `<FieldArray layout="table">` cell (#14),
+  // where its own label is visually hidden and the row + column headers name the
+  // control, and — under `cellErrors="summary"` — its helper text is hidden too.
+  // Internal layout state, applied by `useEzField` from `FieldCellContext`, never
+  // by a consumer prop; a placement class is always present alongside them.
+  'cell',
+  'cellHelperHidden',
 ])
 
 /**

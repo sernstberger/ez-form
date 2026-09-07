@@ -3,8 +3,10 @@ import { formControlLabelClasses } from '@mui/material/FormControlLabel'
 import { formHelperTextClasses } from '@mui/material/FormHelperText'
 import { formLabelClasses } from '@mui/material/FormLabel'
 import { outlinedInputClasses } from '@mui/material/OutlinedInput'
+import { pickersOutlinedInputClasses } from '@mui/x-date-pickers/PickersTextField'
 import { fieldLayoutClasses } from './LabelPlacementContext'
 import { formClasses } from '../Form/formClasses'
+import { visuallyHidden } from '../visuallyHidden'
 
 /**
  * The label placement rules (#9, #66), as one style object for `<Form>`'s `EzForm`
@@ -69,10 +71,11 @@ const unfloatLabel: CSSObject = {
  * already has in the preset.
  */
 const closeNotch: CSSObject = {
-  [`& .${outlinedInputClasses.notchedOutline} legend`]: {
-    maxWidth: '0.01px',
-    '& > span': { visibility: 'hidden' },
-  },
+  [`& .${outlinedInputClasses.notchedOutline} legend, & .${pickersOutlinedInputClasses.notchedOutline} legend`]:
+    {
+      maxWidth: '0.01px',
+      '& > span': { visibility: 'hidden' },
+    },
 }
 
 /**
@@ -195,6 +198,51 @@ const controlLabelOptOut = (theme: Theme): CSSObject => ({
 })
 
 /**
+ * A field inside a `<FieldArray layout="table">` cell (#14).
+ *
+ * The column header is the visible label, so the field's own label is taken out of
+ * sight but not out of the tree — it is still the `<label for>` / legend the field
+ * is built around, and `aria-labelledby` (row header + column header, set by
+ * `useEzField`) is what names the control. The notch closes for the same reason
+ * `stacked` closes it: there is no label on the border to make room for. The box
+ * fills its cell, and any `start` grid is undone — a hidden label owns no column.
+ *
+ * Selected by **two** classes (`root` + `cell`) on purpose: that outranks the
+ * single-class placement rules — including `start`'s, which sit inside a
+ * `min-width` media query at the same single-class specificity — so a cell wins
+ * regardless of the placement the form around it uses and regardless of source
+ * order. The helper text is hidden by a separate class, `cellHelperHidden`, so
+ * `cellErrors="inline"` simply omits it rather than fighting the recipe with resets.
+ *
+ * `FormControlLabel`'s text (`Checkbox`/`Switch`) is hidden too: the `<label>` stays
+ * the click target around the control, and the checkbox is named by its hidden text
+ * plus the cell's `aria-labelledby` where the field routes it.
+ */
+const cellBox: CSSObject = {
+  [`& .${fieldLayoutClasses.root}.${fieldLayoutClasses.cell}`]: {
+    display: 'inline-flex',
+    width: '100%',
+    marginBottom: 0,
+    gridTemplateColumns: 'none',
+    alignItems: 'normal',
+    '& > *': { gridColumn: 'auto' },
+    [`& .${formLabelClasses.root}, & .${formControlLabelClasses.label}`]: {
+      ...visuallyHidden,
+      gridColumn: 'auto',
+      gridRow: 'auto',
+      marginBottom: 0,
+      paddingTop: 0,
+    },
+    // A floated legend (`start`'s #131 rule) would otherwise keep its column width.
+    '& > legend': { float: 'none', width: 'auto' },
+    ...closeNotch,
+    [`& .${formHelperTextClasses.root}`]: { marginLeft: 0, marginRight: 0 },
+  },
+  [`& .${fieldLayoutClasses.root}.${fieldLayoutClasses.cellHelperHidden} .${formHelperTextClasses.root}`]:
+    visuallyHidden,
+}
+
+/**
  * Every placement rule, scoped to the field boxes inside this form.
  *
  * `floating` gets no rules at all: it *is* MUI's own layout, and a rule that
@@ -250,5 +298,6 @@ export function labelPlacementStyles(
         ...controlLabelOptOut(theme),
       },
     },
+    ...cellBox,
   }
 }
