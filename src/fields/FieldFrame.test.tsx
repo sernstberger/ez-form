@@ -1,8 +1,11 @@
 import type { ReactElement } from 'react'
 import { render, screen } from '@testing-library/react'
-import type { DefaultValues, FieldValues } from 'react-hook-form'
+import { expectTypeOf } from 'vitest'
+import type { DefaultValues, FieldValues, RefCallBack } from 'react-hook-form'
 import { z } from 'zod'
 import { Form } from '../Form'
+import type { BoundField } from './FieldFrame'
+import type { UseEzFieldReturn } from './useEzField'
 import { Checkbox } from './Checkbox'
 import { CheckboxGroup } from './CheckboxGroup'
 import { RadioGroup } from './RadioGroup'
@@ -227,3 +230,43 @@ describe('FieldFrame legend', () => {
     expect(screen.getByRole('radiogroup', { name: 'Visible' })).toBeInTheDocument()
   })
 })
+
+/**
+ * #28: `useEzField`/`BoundField` carry the field's value type, so `field.value` is
+ * `TValue | undefined` and `field.onChange` rejects a value of the wrong shape. Before
+ * this, `UseEzFieldReturn` was a bare `UseControllerReturn`, whose `TFieldValues`
+ * defaults to `FieldValues` (`Record<string, any>`) — so `field.value` was `any` and
+ * every assertion below would have passed on nothing.
+ *
+ * Never called: these are compile-time assertions, and the `onChange` lines would
+ * throw at runtime on the empty object they are declared against. `pnpm typecheck`
+ * is what runs them — each `@ts-expect-error` fails it as an *unused* directive the
+ * moment the type widens back to `any`. Verified by temporarily restoring `any`:
+ * 2 `expectTypeOf` errors and 3 unused-directive errors.
+ */
+function typeAssertions() {
+  // `TValue | undefined`, not `TValue`: a form with no `defaultValues` entry for the
+  // field renders it with `value === undefined`, which is what every `?? null` /
+  // `?? ''` fallback in the fields exists for.
+  expectTypeOf<BoundField<boolean>['field']['value']>().toEqualTypeOf<boolean | undefined>()
+  expectTypeOf<UseEzFieldReturn<number | null>['field']['value']>().toEqualTypeOf<
+    number | null | undefined
+  >()
+  // The `ref` forked for #98 keeps hookform's own type.
+  expectTypeOf<BoundField<boolean>['field']['ref']>().toEqualTypeOf<RefCallBack>()
+  expectTypeOf<BoundField<boolean>['field']['name']>().toEqualTypeOf<string>()
+
+  const bound = {} as BoundField<boolean>
+  bound.field.onChange(true)
+  // @ts-expect-error a number is not this field's value type
+  bound.field.onChange(42)
+
+  const f = {} as UseEzFieldReturn<string[]>
+  f.field.onChange(['a'])
+  // @ts-expect-error a bare string is not `string[]`
+  f.field.onChange('a')
+  // @ts-expect-error `field.value` is not `any`
+  const wrong: number = f.field.value
+  void wrong
+}
+void typeAssertions

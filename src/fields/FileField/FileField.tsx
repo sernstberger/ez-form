@@ -306,7 +306,7 @@ export function FileField(inProps: FileFieldProps) {
   const { trigger } = useEzFormContext('FileField')
   const id = useId()
   const text = f.helperText(helperText)
-  const value = f.field.value as FileFieldValue | undefined
+  const value = f.field.value
   const files: File[] = Array.isArray(value) ? value : value ? [value] : []
   const isDisabled = mergeDisabled(disabled, f.field.disabled)
   const [dragActive, setDragActive] = useState(false)

@@ -122,7 +122,7 @@ export function Slider({
           min={minBound}
           max={bound(max)}
           // `?? 0`: a form with no default for this field still renders a controlled slider.
-          value={(field.value as SliderValue | undefined) ?? minBound ?? 0}
+          value={field.value ?? minBound ?? 0}
           onChange={(e, value, activeThumb) => {
             field.onChange(value)
             onChange?.(e, value, activeThumb)

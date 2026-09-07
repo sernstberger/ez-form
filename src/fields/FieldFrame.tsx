@@ -3,15 +3,21 @@ import FormControl from '@mui/material/FormControl'
 import FormControlLabel from '@mui/material/FormControlLabel'
 import FormHelperText from '@mui/material/FormHelperText'
 import FormLabel from '@mui/material/FormLabel'
-import type { ControllerRenderProps } from 'react-hook-form'
-import { useEzField, type InputA11y } from './useEzField'
+import { useEzField, type InputA11y, type TypedControllerRenderProps } from './useEzField'
 import { mergeDisabled } from './mergeDisabled'
 import type { FieldRules } from '../rules'
 import { hasLabel } from '../devWarn'
 
-/** What the frame hands to `renderControl`. The control composes its own handlers after `field.onChange`. */
-export interface BoundField {
-  field: ControllerRenderProps
+/**
+ * What the frame hands to `renderControl`. The control composes its own handlers
+ * after `field.onChange`.
+ *
+ * Generic over the frame's own `TValue`, so `field.value` is the field's value type
+ * (`boolean` for Checkbox, `Value[]` for CheckboxGroup, …) rather than `any`, and
+ * `field.onChange` rejects a value of the wrong shape (#28).
+ */
+export interface BoundField<TValue = unknown> {
+  field: TypedControllerRenderProps<TValue>
   invalid: boolean
   required: boolean
   /** Resolved against the helper text: `aria-describedby` is set only when there is text. */
@@ -74,7 +80,7 @@ export interface FieldFrameProps<TValue> {
    * all, before *or* after a failed submit.
    */
   'aria-describedby'?: string
-  renderControl: (bound: BoundField) => ReactElement
+  renderControl: (bound: BoundField<TValue>) => ReactElement
 }
 
 /**
@@ -108,7 +114,7 @@ export function FieldFrame<TValue>({
   // alone would be worse than none. Shared with `warnMissingLabel`, so the same input
   // that warns is exactly the input that gets no legend.
   const labelled = hasLabel(label)
-  const bound: BoundField = {
+  const bound: BoundField<TValue> = {
     field: f.field,
     invalid: f.invalid,
     required: f.required,
