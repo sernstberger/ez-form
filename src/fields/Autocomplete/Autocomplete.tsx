@@ -7,7 +7,7 @@ import MuiAutocomplete, {
   type AutocompleteValue,
 } from '@mui/material/Autocomplete'
 import MuiTextField, { type TextFieldProps as MuiTextFieldProps } from '@mui/material/TextField'
-import { customVariantSlots, type EzTextFieldVariants } from '../textFieldVariants'
+import { VariantInput, type EzTextFieldVariants } from '../textFieldVariants'
 import Chip, { type ChipProps } from '@mui/material/Chip'
 import { mergeSlotProps } from '@mui/material/utils'
 import { ChipDeleteIcon } from '../ChipDeleteIcon'
@@ -54,6 +54,20 @@ export type AutocompleteProps<
     name: string
     label?: ReactNode
     helperText?: ReactNode
+    /**
+     * UPSTREAM SHIM (#142). The rendered MUI `TextField`'s `variant` — the same
+     * top-level prop every other box input in ez-form takes, so a page can set it
+     * uniformly across families. `EzTextFieldVariants` is MUI's `TextFieldVariants`
+     * plus whatever augments `TextFieldPropsVariantOverrides` (ez-form's
+     * `'stacked'`, and any variant a consumer declares).
+     *
+     * `textFieldProps.variant` is the same prop one level down and **wins** if both
+     * are set, matching the `{...params} {...textFieldProps}` spread order the whole
+     * component already follows — this prop is the shorthand, `textFieldProps` the
+     * escape hatch. Left unset entirely, the theme's `MuiTextField.defaultProps.variant`
+     * decides, which `createEzFormTheme()` sets to `'stacked'`.
+     */
+    variant?: EzTextFieldVariants
     /**
      * What the form stores for a chosen option. Defaults to `option.value`
      * (the same shape Select stores); return the option itself to store objects.
@@ -118,6 +132,7 @@ export function Autocomplete<
   options,
   getOptionValue = (o) => o.value as TValue,
   onChange,
+  variant,
   textFieldProps,
   inputProps,
   multiple,
@@ -275,11 +290,16 @@ export function Autocomplete<
           {...params}
           {...textFieldProps}
           // UPSTREAM SHIM (#142). The one MUI boundary: the cast widens back to MUI's
-          // closed union, and `customVariantSlots` supplies the `slots.input` its
-          // `variantComponent` map has no entry for. `params` carries no `slots`, so
-          // the consumer's `textFieldProps.slots` is the only other source.
-          variant={textFieldProps?.variant as MuiTextFieldProps['variant']}
-          slots={customVariantSlots(textFieldProps?.variant, textFieldProps?.slots)}
+          // closed union, and `VariantInput` supplies the `slots.input` MUI's
+          // `variantComponent` map has no entry for under a custom variant, while
+          // resolving the three built-ins itself. `params` carries no `slots`, so
+          // the consumer's `textFieldProps.slots` is the only other source, and it
+          // is spread after so `slots.input` still wins.
+          //
+          // `textFieldProps.variant` wins over the top-level `variant`: same
+          // precedence as the `{...params} {...textFieldProps}` spread above.
+          variant={(textFieldProps?.variant ?? variant) as MuiTextFieldProps['variant']}
+          slots={{ input: VariantInput, ...textFieldProps?.slots }}
           // On the rendered TextField, not on `MuiAutocomplete`: Autocomplete
           // renders an outer `MuiAutocomplete-root` div around the TextField, and
           // the `FormControl` box the placement rules select is the TextField's.

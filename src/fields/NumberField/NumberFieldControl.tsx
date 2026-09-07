@@ -27,7 +27,7 @@ import {
   normalizeForeignShape,
   type Separators,
 } from './groupWhileTyping'
-import { customVariantSlots, type EzTextFieldVariants } from '../textFieldVariants'
+import { VariantInput, type EzTextFieldVariants } from '../textFieldVariants'
 
 export interface NumberFieldInputProps {
   'aria-invalid'?: true
@@ -188,12 +188,13 @@ function NumberInput({
       disabled={disabled}
       required={required}
       // UPSTREAM SHIM (#142). The one MUI boundary: the cast widens back to MUI's
-      // closed union, and `customVariantSlots` supplies the `slots.input` its own
-      // `variantComponent` map has no entry for. This component owns `slots.input`'s
+      // closed union, and `VariantInput` supplies the `slots.input` its own
+      // `variantComponent` map has no entry for under a custom variant, while
+      // resolving the three built-ins itself. This component owns `slots.input`'s
       // absence deliberately (see `htmlInput` below), so there is no consumer
-      // `slots` to merge — `undefined` is the whole external side.
+      // `slots` to merge.
       variant={variant as MuiTextFieldProps['variant']}
-      slots={customVariantSlots(variant, undefined)}
+      slots={{ input: VariantInput }}
       slotProps={{
         formHelperText: helperTextProps,
         inputLabel: { required: labelRequired },

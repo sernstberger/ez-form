@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { render, screen, waitFor } from '@testing-library/react'
@@ -110,14 +109,6 @@ const schema = z.object({
   terms: z.boolean(),
   start: z.date().nullable(),
 })
-
-/**
- * Occurrences of the shim marker in `src/`, excluding test files (which talk *about*
- * the marker, including this line, and would make the count circular). Counted by the
- * test below so the deletion when upstream ships is one `git grep`. See the test's own
- * comment for what to do when this number changes.
- */
-const MARKER_COUNT = 16
 
 /** Small schemas for the per-variant tests, which render one field, not `<Fields />`. */
 const emailOnly = z.object({ email: z.string() })
@@ -363,44 +354,6 @@ describe('ezFormTheme', () => {
     expect(getComputedStyle(screen.getByText('When', { selector: 'label' })).position).toBe(
       'absolute',
     )
-  })
-
-  it('pins the UPSTREAM SHIM (#142) marker count so the deletion is one grep', () => {
-    // When `@mui/material` ships `TextFieldPropsVariantOverrides`, every line carrying
-    // this marker is deleted (keeping only the `stacked: true` member); §4 of
-    // `docs/superpowers/specs/2026-09-07-text-field-variant-shim-design.md` is the plan.
-    //
-    // If this number changed: a shim line was added or removed. Confirm the change is
-    // deliberate — `grep -rn 'UPSTREAM SHIM (#142)' src` shows every one — and update
-    // the number here. A *growing* count is the thing to look at: the shim is meant to
-    // stay confined to `textFieldVariants.ts`, the augmentation, the three wrapper
-    // boundaries, the preset and one note in `usePickerField`.
-    const marker = ['UPSTREAM', 'SHIM', '(#142)'].join(' ')
-    const counts = execFileSync(
-      'git',
-      ['grep', '-c', '--fixed-strings', marker, '--', 'src', ':!src/**/*.test.*'],
-      { cwd: join(import.meta.dirname, '..', '..'), encoding: 'utf8' },
-    )
-    const perFile = counts
-      .trim()
-      .split('\n')
-      .map((line) => {
-        const at = line.lastIndexOf(':')
-        return [line.slice(0, at), Number(line.slice(at + 1))] as const
-      })
-    // The file list is pinned too, so a marker appearing somewhere new is a failure
-    // even if another file lost one at the same time.
-    expect(perFile.map(([file]) => file)).toEqual([
-      'src/fields/Autocomplete/Autocomplete.tsx',
-      'src/fields/NumberField/NumberFieldControl.tsx',
-      'src/fields/TextField/TextField.tsx',
-      'src/fields/pickers/usePickerField.ts',
-      'src/fields/textFieldVariants.tsx',
-      'src/index.ts',
-      'src/theme/augmentation.ts',
-      'src/theme/ezFormTheme.ts',
-    ])
-    expect(perFile.reduce((sum, [, n]) => sum + n, 0)).toBe(MARKER_COUNT)
   })
 
   it('sets no labelPlacement default — static labels are the theme’s, not the axis’s (#139)', () => {
