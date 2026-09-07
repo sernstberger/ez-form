@@ -415,10 +415,19 @@ function DocumentUploads() {
 
 Rows update live while the array is mounted. When it unmounts — which `<Wizard>` does to every
 step but the current one — the last-known rows are latched and keep being returned, which is
-what makes the cross-step case work at all. The latch is one-way for the life of the `<Form>`:
-an array removed from the form permanently (behind a feature flag, not a wizard step) keeps
-reporting its last rows. Reading a name no `<FieldArray>` in the form owns renders nothing and
-warns in development.
+what makes the cross-step case work at all. The latch is one-way for the life of the `<Form>`,
+which costs you two things: an array removed from the form permanently (behind a feature flag,
+not a wizard step) keeps reporting its last rows, and a `reset()` while the owning array is
+unmounted leaves a reader on the pre-reset rows until that array mounts again. Reading a name
+this form's schema has no key for renders nothing and warns in development.
+
+**Ids are stable per `<FieldArray>` mount, not for the life of the form.** They are hookform's,
+and hookform mints them when the hook mounts and re-mints on array-level replacement, so an
+array whose step unmounts and mounts again hands out a new set. Within one mount they are
+stable across add, remove and reorder, which is what makes them the right React `key`. Across
+a remount, a reader keyed by them re-mounts its rows — invisible for per-row content on another
+step, but a persistent side panel will reset its rows' own component state when the owning step
+is revisited. Never persist an id or send it to a server as a row identifier.
 
 **Key by `row.id`, not by index.** The hand-rolled version of this is a `useWatch` on the array
 plus a `.map()` keyed by index, and it looks right for a long time, which is what makes it

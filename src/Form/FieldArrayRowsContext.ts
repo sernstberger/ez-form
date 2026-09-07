@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useSyncExternalStore } from 'react'
-import { devWarn } from '../devWarn'
+import { createContext, useCallback, useContext, useEffect, useSyncExternalStore } from 'react'
+import { warnUnknownFieldArrayName } from '../devWarn'
+import { useEzFormContext } from '../useEzFormContext'
 import type { FieldArrayRow } from '../FieldArray/FieldArrayRow'
 
 export interface FieldArrayRowsStore {
@@ -58,10 +59,34 @@ export interface FieldArrayRowsStore {
  * when the array unmounts.
  *
  * **The latch is one-way, for the life of the `<Form>` instance**, exactly as
- * `ErrorSummaryContext`'s is. An array *permanently* removed from the form — behind a prop or
- * a feature flag, not a wizard step — keeps reporting its last rows to a reader that outlives
- * it. This is the intended trade (the alternative is the cross-step case above answering
- * `[]`), and it is cheap to avoid the same way: remount the `<Form>`.
+ * `ErrorSummaryContext`'s is, and it has two costs worth naming:
+ *
+ * - An array *permanently* removed from the form — behind a prop or a feature flag, not a
+ *   wizard step — keeps reporting its last rows to a reader that outlives it.
+ * - A `reset()` (or a `values` prop change) while the owning array is unmounted replaces the
+ *   array's values without anything re-publishing, so a reader keeps the pre-reset row count
+ *   and paths until that array mounts again and publishes afresh. On a wizard this resolves
+ *   the moment the user visits the step; for a reader that must be right immediately after a
+ *   reset, read the values with `useWatch` instead.
+ *
+ * Both are the intended trade — the alternative is the cross-step case above answering `[]` —
+ * and both are cheap to avoid the same way: remount the `<Form>`.
+ *
+ * **Ids are stable per `<FieldArray>` mount, not for the life of the form.** They are
+ * hookform's, and hookform mints them when the hook mounts and re-mints on array-level
+ * replacement (`replace`, a `reset`), so an array whose step unmounts and mounts again hands
+ * out a new set. Within one mount they are stable across append/remove/move, which is what
+ * makes them the right React `key`; across a remount a reader keyed by them re-mounts its
+ * rows, which for per-row content on another step is invisible, and for a persistent side
+ * panel means its rows' own component state resets when the owning step is revisited. Do not
+ * persist an id or send it to a server as a row identifier.
+ *
+ * Ruling: this stays a separate store rather than the generic `createSyncStore<T>` #126
+ * anticipates, even though it is the fourth with `FieldFocusContext`'s shape and #14's
+ * cell-labels registry will be the fifth — two lanes are editing `Form.tsx` right now, and an
+ * extraction is worth doing once, against all five real call sites, rather than twice against
+ * four and then five. Tracked in #134. Cost if wrong: the seven lines of `Set` +
+ * subscribe/unsubscribe boilerplate are duplicated one more time until that lands.
  */
 export const FieldArrayRowsContext = createContext<FieldArrayRowsStore | null>(null)
 
@@ -107,10 +132,10 @@ export function useRegisterFieldArrayRows(): FieldArrayRowsStore['register'] {
   return useContext(FieldArrayRowsContext)?.register ?? noopRegister
 }
 
-// A shared empty result, so an unregistered name returns a referentially stable value and a
-// reader of one does not re-render whenever some *other* array in the form changes.
+// One shared empty array, so the snapshot for a name nothing has published is referentially
+// stable across renders — `useSyncExternalStore` compares snapshots and a fresh `[]` each time
+// would re-render forever.
 const noRows: readonly FieldArrayRow[] = []
-const noRowsMap: Record<string, readonly FieldArrayRow[]> = {}
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 const noopSubscribe = () => () => {}
 
@@ -152,37 +177,22 @@ const noopSubscribe = () => () => {}
  */
 export function useFieldArrayRows(name: string): readonly FieldArrayRow[] {
   const store = useContext(FieldArrayRowsContext)
-  const getRows = store?.getRows ?? (() => noRowsMap)
-  const rows = useSyncExternalStore(store?.subscribe ?? noopSubscribe, getRows, getRows)[name]
+  const { control } = useEzFormContext('useFieldArrayRows')
 
-  // The check runs after a commit *and* a macrotask, not during render, and asks the store
-  // again rather than trusting the `rows` this render read.
-  //
-  // Two things make a render-time check wrong. On a form's first render neither this reader
-  // nor the `<FieldArray>` that owns the name has committed, so the registry is still empty
-  // and every correctly-spelled array would warn. Deferring to an effect fixes only half of
-  // that: React runs effects in tree order, so a reader rendered *above* its array still runs
-  // first and still sees nothing. The timeout drops the check past the whole commit's effects,
-  // where "no array has ever registered this name" is finally the same statement as "nothing
-  // in this form owns it".
-  //
-  // Dev-only, so the timer exists only in a build that can warn. The check is written inline
-  // rather than imported from `devWarn.ts` (which keeps its own `isDev` private) for the
-  // reason that file records: `process.env.NODE_ENV` is the substitution every bundler makes
-  // before dead-code elimination, so this whole effect body drops from a production build.
+  // Selects *this* name out of the map rather than snapshotting the whole thing, so a reader
+  // of one array is not re-rendered by every other array's appends. `?? noRows` inside the
+  // selector keeps the snapshot referentially stable for a name nothing has published:
+  // `useSyncExternalStore` re-reads on every render and would loop on a fresh `[]`.
+  const getSnapshot = useCallback(() => store?.getRows()[name] ?? noRows, [store, name])
+  const rows = useSyncExternalStore(store?.subscribe ?? noopSubscribe, getSnapshot, getSnapshot)
+
+  // Asks whether the *name* is one this form knows (#108), not whether an array has published
+  // rows for it yet — see `warnUnknownFieldArrayName` for why those differ and why only the
+  // first is answerable here. The schema keys behind it are fixed when the resolver is built,
+  // before anything registers, so a plain effect is early enough and no deferral is needed.
   useEffect(() => {
-    if (process.env.NODE_ENV === 'production') return
-    const timer = setTimeout(() => {
-      if (store?.getRows()[name] !== undefined) return
-      devWarn(
-        `field-array-rows:${name}`,
-        `ez-form: useFieldArrayRows("${name}") — this form has no <FieldArray name="${name}">. ` +
-          'It renders nothing. Check the name against the array that owns those rows; the ' +
-          'array does not have to be mounted right now, but it must belong to the same <Form>.',
-      )
-    }, 0)
-    return () => clearTimeout(timer)
-  }, [store, name])
+    warnUnknownFieldArrayName(name, control)
+  }, [name, control])
 
-  return rows ?? noRows
+  return rows
 }

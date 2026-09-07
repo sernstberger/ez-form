@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -220,8 +221,14 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
   // mints ids per hook instance and keeps only one live subscription per name, so the second
   // reader gets ids matching nothing and a list frozen at mount. See FieldArrayRowsContext,
   // which also records why the registry keeps publishing after this array unmounts.
+  //
+  // `useLayoutEffect`, so the registry is current before the browser paints. A reader mounted
+  // alongside this array re-renders from the store's notification; with a passive effect that
+  // notification lands after paint, and an update React does not process synchronously — a
+  // `replace`, a `reset`, a `setValue` on the array — would show the reader one commit of
+  // stale rows first. Publishing during the layout phase closes that window.
   const registerRows = useRegisterFieldArrayRows()
-  useEffect(() => {
+  useLayoutEffect(() => {
     registerRows(name, rows)
   }, [registerRows, name, rows])
 

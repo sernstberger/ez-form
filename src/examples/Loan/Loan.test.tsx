@@ -366,7 +366,7 @@ describe('Loan', () => {
     await expectNoA11yViolations(container)
   })
 
-  it('keeps a document attached to its own co-applicant after an earlier row is removed (#79)', async () => {
+  it('the Documents step follows a co-applicant removal made two steps back (#79)', async () => {
     const user = userEvent.setup({ delay: null })
     render(<Loan />)
     await fillLoanStep(user)

@@ -89,6 +89,12 @@ const paths = () => screen.getByTestId('paths').textContent.split(',').filter(Bo
 const readerRowLabels = () =>
   screen.getAllByRole('textbox', { name: /^Note for / }).map((el) => el.getAttribute('name'))
 
+/** A wizard whose array step is never shown, so nothing ever publishes `applicants`. */
+const hiddenArraySteps = [
+  { id: 'hidden', label: 'Hidden', when: () => false },
+  { id: 'notes', label: 'Notes' },
+] as const satisfies WizardStepDef<Values>[]
+
 describe('useFieldArrayRows', () => {
   beforeEach(resetDevWarnings)
 
@@ -185,18 +191,16 @@ describe('useFieldArrayRows', () => {
     ).toBe(second)
   })
 
-  it('warns and renders nothing for a name no FieldArray in this form owns', async () => {
+  it('warns and renders nothing for a name the form has no schema key for', async () => {
     const warn = vi.spyOn(console, 'warn')
-    expectConsole('warn', /useFieldArrayRows\("nope"\)/)
-    render(<Applicants notesName="nope" />)
+    expectConsole('warn', /useFieldArrayRows\("aplicants"\)/)
+    render(<Applicants notesName="aplicants" />)
     expect(ids()).toEqual([])
     expect(paths()).toEqual([])
     expect(screen.queryByRole('textbox', { name: /^Note for / })).not.toBeInTheDocument()
-    // The warning is deferred past the commit's effects (see the hook), so it has not fired
-    // yet at this point — waiting for it is the assertion that it fires at all.
     await waitFor(() =>
       expect(
-        warn.mock.calls.some((args) => String(args[0]).includes('useFieldArrayRows("nope")')),
+        warn.mock.calls.some((args) => String(args[0]).includes('useFieldArrayRows("aplicants")')),
       ).toBe(true),
     )
   })
@@ -212,7 +216,35 @@ describe('useFieldArrayRows', () => {
     )
     await waitFor(() => expect(ids()).toHaveLength(2))
     // Nothing asserted here beyond the absence of output: `expectConsole`'s afterEach fails
-    // the test if the hook warned, which a render-time or effect-time check would have.
+    // the test if the hook warned, which a render-time check would have.
+  })
+
+  it('does not warn when the owning array has never mounted at all', async () => {
+    // The array lives on a step `when` hides, so nothing has ever published `applicants` and
+    // the registry is empty for the whole life of this form. The name is still perfectly
+    // correct — the schema says so — which is why the check asks about the *name* (#108)
+    // rather than about what has registered. An "ever registered" check warns here.
+    render(
+      <Form schema={schema} defaultValues={twoRows} onSubmit={() => {}}>
+        <Wizard steps={hiddenArraySteps}>
+          <WizardStep id="hidden">
+            <FieldArray
+              name="applicants"
+              label="Applicants"
+              emptyRow={() => ({ name: '', note: '' })}
+            >
+              {(row) => <TextField name={row.name('name')} label={`Name ${row.index + 1}`} />}
+            </FieldArray>
+          </WizardStep>
+          <WizardStep id="notes">
+            <Notes />
+          </WizardStep>
+          <WizardNav />
+        </Wizard>
+      </Form>,
+    )
+    await waitFor(() => expect(screen.getByTestId('ids')).toBeInTheDocument())
+    expect(ids()).toEqual([])
   })
 })
 
