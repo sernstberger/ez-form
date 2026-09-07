@@ -26,6 +26,7 @@ export function DatePicker({
   onChange,
   onError,
   slotProps,
+  variant,
   // Out of `rest`, which reaches the picker root: the box the placement rules
   // select is the text field's `FormControl`, so the hook routes both there
   // through `slotProps.textField` (#9, #66).
@@ -48,6 +49,7 @@ export function DatePicker({
     onChange,
     onError,
     slotProps,
+    variant,
     labelPlacement,
     className,
   })

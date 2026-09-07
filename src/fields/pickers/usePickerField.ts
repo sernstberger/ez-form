@@ -7,8 +7,10 @@ import {
   type ReactNode,
 } from 'react'
 import { mergeSlotProps } from '@mui/material/utils'
+import type { TextFieldVariants } from '@mui/material/TextField'
 import type { PickerChangeHandlerContext } from '@mui/x-date-pickers/models'
 import type { FieldValues, Validate } from 'react-hook-form'
+import { PickersVariantInput, type EzTextFieldVariants } from '../textFieldVariants'
 import { useEzField } from '../useEzField'
 import { useFieldCell } from '../FieldCellContext'
 import { isPlainKey, preventMuiDefault } from '../../keys'
@@ -28,6 +30,18 @@ export interface PickerFieldProps<TValue, TError extends string | null> {
   errorMessages?: PickerErrorMessages<TError>
   required?: FieldRules<TValue>['required']
   validate?: FieldRules<TValue>['validate']
+  /**
+   * UPSTREAM SHIM (#142). The rendered `PickersTextField`'s `variant` — the same
+   * top-level prop every other box input in ez-form takes. `EzTextFieldVariants` is
+   * MUI's `TextFieldVariants` plus whatever augments `TextFieldPropsVariantOverrides`
+   * (ez-form's `'stacked'`, and any variant a consumer declares). Left unset, the
+   * theme's `MuiPickersTextField.defaultProps.variant` decides, which
+   * `createEzFormTheme()` sets to `'stacked'`.
+   *
+   * A consumer's own `slotProps.textField.variant` wins over this: it is the same
+   * prop one level down, and this is the shorthand.
+   */
+  variant?: EzTextFieldVariants
   /**
    * This picker's own label placement, overriding the form's (#9, #66). The
    * classes go on `slotProps.textField` rather than the picker root, because the
@@ -98,25 +112,22 @@ interface ConsumerTextFieldSlotProps {
     /**
      * MUI X's `PickersInputBase` — the element that actually carries
      * `role="group"`. See the `input` merge below for why the name has to go here.
-     *
-     * UPSTREAM SHIM (#142) — a note, not a shim, about why `variant` is absent from
-     * this interface. The pickers deliberately keep MUI X's own closed `variant`
-     * type on `slotProps.textField`: widening it would mean re-declaring
-     * `PickersTextFieldProps`' three-arm discriminated union through every picker's
-     * generic `slotProps`, which is the re-implementation PHILOSOPHY rule 1
-     * forbids for a prop that already has a working channel.
-     *
-     * That channel is the theme. `PickersTextField` resolves its input as
-     * `slots?.input ?? VARIANT_COMPONENT[variant]` (PickersTextField.js) — the
-     * same shape `TextField` uses — so `createEzFormTheme()`'s
-     * `MuiPickersTextField.defaultProps` pairs `variant: 'stacked'` with
-     * `slots.input: PickersOutlinedInput` and all four pickers get the static
-     * label with no per-field plumbing. A consumer who wants one picker back on
-     * MUI's floating label passes `slotProps={{ textField: { variant: 'outlined' } }}`,
-     * which MUI X's own type already accepts.
      */
     input?: object
   }
+  /**
+   * UPSTREAM SHIM (#142). MUI X types this on `slotProps.textField` as its own
+   * closed three-arm union, which `PickerFieldProps.variant` widens. Read here so a
+   * consumer's own value wins over the top-level prop; see the `variant` merge below
+   * for the one cast at the MUI X boundary.
+   */
+  variant?: EzTextFieldVariants
+  /**
+   * A consumer's own `slots` for the text field, spread *after* the shim's
+   * `{ input: PickersVariantInput }` so `slots.input` still wins — the upstream
+   * escape hatch, exactly as on `TextField`.
+   */
+  slots?: Record<string, unknown>
   onPaste?: (event: ClipboardEvent<HTMLDivElement>) => void
   onClear?: (event: MouseEvent) => void
 }
@@ -164,6 +175,7 @@ export function usePickerField<
     onError,
     onClear,
     slotProps,
+    variant,
     labelPlacement,
     className,
   }: PickerFieldProps<TValue, TError> & PickerHandlers<TValue, TError, TSlotProps, TContext>,
@@ -359,6 +371,21 @@ export function usePickerField<
         // Before the consumer's spread, so a consumer `id` still wins; see `fieldId`.
         id: fieldId,
         ...consumerTextField,
+        // UPSTREAM SHIM (#142). The one MUI X boundary. `PickersTextField` resolves
+        // its input as `slots?.input ?? VARIANT_COMPONENT[variant]`
+        // (PickersTextField.js) — the same shape `TextField` uses — so a variant
+        // outside MUI X's own closed union only needs `slots.input` filled in.
+        // `PickersVariantInput` resolves the three built-ins itself and falls back to
+        // `PickersOutlinedInput`, so it is the right slot value whatever the variant
+        // is, including the theme's default.
+        //
+        // The cast is confined to this line: `PickersTextFieldProps['variant']` is a
+        // closed union and re-declaring it through every picker's generic `slotProps`
+        // is the re-implementation PHILOSOPHY rule 1 forbids. A consumer's own
+        // `slotProps.textField.variant` wins over the top-level prop — same
+        // precedence as `id` above. Both lines go when upstream ships.
+        variant: (consumerTextField?.variant ?? variant) as TextFieldVariants,
+        slots: { input: PickersVariantInput, ...consumerTextField?.slots },
         // After the spread, because the placement classes are binding-owned: the
         // hook has already joined the consumer's own `className` (the flat prop
         // and this slot's, in that order) into it, so nothing is dropped (#9, #66).

@@ -505,7 +505,7 @@ const components: ThemeOptions['components'] = {
   // widens the *prop* type, not the alias — and goes when upstream ships.
   //
   // `slots.input` is the other half of the shim and is **not** optional here.
-  // ez-form's own wrappers fill it in via `customVariantSlots`, but this default
+  // ez-form's own wrappers pass the same `VariantInput` themselves, but this default
   // variant also reaches a consumer's own bare `<MuiTextField>` under this preset,
   // and there nothing else supplies it: MUI resolves the input as
   // `slots.input ?? variantComponent[variant]`, and `variantComponent['stacked']`
@@ -518,7 +518,9 @@ const components: ThemeOptions['components'] = {
   // a bare `<MuiTextField variant="filled">` too and force it onto the outlined box.
   // `VariantInput` resolves the input from the variant in scope instead, so the three
   // built-ins keep their own inputs under this preset and only a custom variant falls
-  // back. Pinned by the built-in-variant tests in `ezFormTheme.test.tsx`.
+  // back. Pinned by the built-in-variant tests in `ezFormTheme.test.tsx`. It is the
+  // *same* component every field in `src/` passes as its own `slots.input`, so there
+  // is one mechanism here and not two.
   MuiTextField: {
     defaultProps: { variant: 'stacked' as TextFieldVariants, slots: { input: VariantInput } },
   },

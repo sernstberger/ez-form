@@ -1,6 +1,6 @@
 import MuiTextField, { type TextFieldProps as MuiTextFieldProps } from '@mui/material/TextField'
 import { mergeSlotProps, useForkRef } from '@mui/material/utils'
-import { customVariantSlots, type EzTextFieldVariants } from '../textFieldVariants'
+import { VariantInput, type EzTextFieldVariants } from '../textFieldVariants'
 import { useEzField } from '../useEzField'
 import type { LabelPlacementProps } from '../LabelPlacementContext'
 import { mergeDisabled } from '../mergeDisabled'
@@ -192,11 +192,14 @@ export function TextField({
       type={type}
       autoComplete={autoComplete}
       // UPSTREAM SHIM (#142). The one MUI boundary: MUI's prop type is the closed
-      // union, so a custom variant is cast through here, and `customVariantSlots`
-      // supplies the `slots.input` MUI's own `variantComponent` map cannot. Both
+      // union, so a widened variant is cast through here, and `VariantInput`
+      // supplies the `slots.input` MUI's own `variantComponent` map cannot answer
+      // for a custom one — it resolves the built-ins itself, so it is the right
+      // slot value whatever the variant is, including the theme's default. The
+      // consumer's own `slots` is spread after, so `slots.input` still wins. Both
       // lines go when upstream ships.
       variant={variant as MuiTextFieldProps['variant']}
-      slots={customVariantSlots(variant, slots)}
+      slots={{ input: VariantInput, ...slots }}
       slotProps={{
         ...slotProps,
         // Not `mergeSlotProps`: that exists to let the consumer's value win, which is

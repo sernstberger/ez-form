@@ -2,6 +2,7 @@ import type { FocusEventHandler, ReactNode } from 'react'
 import type { NumberField as BaseNumberField } from '@base-ui/react/number-field'
 import type { ValidationRule } from 'react-hook-form'
 import { NumberFieldControl, type NumberFieldInputProps } from './NumberFieldControl'
+import type { EzTextFieldVariants } from '../textFieldVariants'
 import { useEzField } from '../useEzField'
 import type { LabelPlacementProps } from '../LabelPlacementContext'
 import { mergeDisabled } from '../mergeDisabled'
@@ -38,6 +39,17 @@ export type NumberFieldProps = Omit<
   helperText?: ReactNode
   size?: 'small' | 'medium'
   disabled?: boolean
+  /**
+   * UPSTREAM SHIM (#142). The rendered `TextField`'s `variant` — the same top-level
+   * prop every other box input in ez-form takes. These props derive from Base UI's
+   * `NumberField.Root`, which has no `variant` of its own, so this is declared here
+   * and threaded to `NumberFieldControl`, which owns the `TextField` boundary.
+   * `EzTextFieldVariants` is MUI's `TextFieldVariants` plus whatever augments
+   * `TextFieldPropsVariantOverrides` (ez-form's `'stacked'`, and any variant a
+   * consumer declares). Left unset, the theme's `MuiTextField.defaultProps.variant`
+   * decides, which `createEzFormTheme()` sets to `'stacked'`.
+   */
+  variant?: EzTextFieldVariants
   /**
    * Mobile keyboard hint on the visible input. Defaults to `'decimal'`, or `'numeric'`
    * when the field is integer-only (no fractional `step`, and no `format` with a
@@ -143,6 +155,7 @@ export function NumberField({
   onValueChange,
   onBlur,
   onFocus,
+  variant,
   allowOutOfRange = true,
   step,
   format,
@@ -205,6 +218,7 @@ export function NumberField({
         // what the form holds and what `onSubmit` will receive.
         onValueChange?.(stored, details)
       }}
+      variant={variant}
       min={bound(min)}
       max={bound(max)}
       allowOutOfRange={allowOutOfRange}

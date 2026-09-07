@@ -9,14 +9,18 @@
  * `Chip` / `FormHelperText` already do); the interface itself is declared in
  * `src/theme/augmentation.ts` until `@mui/material` exports it.
  *
- * The runtime side is one line: MUI resolves the input as
- * `slots.input ?? variantComponent[variant]` (`TextField.js`), so a custom
- * variant only needs `slots.input` filled in. See `customVariantSlots`.
+ * The runtime side is one component. MUI resolves the input as
+ * `slots.input ?? variantComponent[variant]` (`TextField.js`), so filling in
+ * `slots.input` is the whole fix — and `VariantInput` below is a single slot
+ * value that works for *every* variant, so there is one mechanism and not two:
+ * every `<MuiTextField>` in `src/` passes `slots={{ input: VariantInput, ...slots }}`,
+ * and the preset sets the same thing as `MuiTextField.defaultProps.slots` for a
+ * consumer's own bare `<MuiTextField>`.
  *
- * Deletion plan: `grep -rn 'UPSTREAM SHIM (#142)' src` — when upstream ships,
- * `EzTextFieldVariants` becomes an alias of MUI's own `TextFieldVariants`,
- * `customVariantSlots` and its call sites go, and the casts at each
- * `<MuiTextField>` boundary go with them.
+ * Deletion plan: when upstream ships, `EzTextFieldVariants` becomes an alias of
+ * MUI's own `TextFieldVariants`, this file's two components and the
+ * `slots={{ input: … }}` lines go, and the casts at each `<MuiTextField>`
+ * boundary go with them.
  */
 import { forwardRef, type ElementType } from 'react'
 import FilledInput from '@mui/material/FilledInput'
@@ -48,85 +52,10 @@ export type EzTextFieldVariants = OverridableStringUnion<
   TextFieldPropsVariantOverrides
 >
 
-/** The three MUI renders from its own `variantComponent` map. */
-const BUILT_IN_TEXT_FIELD_VARIANTS = ['outlined', 'standard', 'filled'] as const
-
 /**
- * Whether MUI's own `variantComponent[variant]` lookup will find an input for
- * this variant — i.e. whether it renders without help.
- */
-export function isBuiltInTextFieldVariant(
-  variant: EzTextFieldVariants | undefined,
-): variant is TextFieldVariants {
-  return (BUILT_IN_TEXT_FIELD_VARIANTS as readonly string[]).includes(variant as string)
-}
-
-/**
- * Fills in `slots.input` for a custom variant, and leaves `slots` untouched for
- * a built-in or absent one (MUI's own map answers those).
- *
- * The fallback mirrors the upstream patch's `variantComponent[variant] ??
- * OutlinedInput`: the outlined box is the structure the other two are variations
- * of, so a custom variant starts from a shape a theme can restyle rather than
- * from nothing. The notch never opens for it — `TextField` passes `label` to the
- * input only under `variant === 'outlined'` (`TextField.js`), so
- * `NotchedOutline` renders with `withLabel` false and the legend stays collapsed
- * whatever `notched` says.
- *
- * The consumer's own `slots.input` wins: it is spread *after* the fallback, so
- * `slots={{ input: MyInput }}` is how a custom variant chooses another input,
- * exactly as it would upstream.
- *
- * Deliberately `OutlinedInput` and not `VariantInput` below, even though both exist
- * for the same shim. They answer different questions, and using one for both would
- * make each worse:
- *
- * - This function already knows the variant — it is the argument — and it returns
- *   *nothing at all* for a built-in one, leaving MUI's own map to answer. So there is
- *   no variant left to switch on by the time a value is needed; `VariantInput` here
- *   would re-derive from context a variant this function was handed directly.
- * - `VariantInput` exists only because a *theme's* `defaultProps.slots` is a constant
- *   that cannot be keyed on the variant. That is a limitation of the theme channel,
- *   not of this one.
- *
- * Both fall back to the same `OutlinedInput` for a custom variant, which is the one
- * behaviour that has to agree, and both are deleted together.
- */
-export function customVariantSlots<S extends { input?: ElementType } | undefined>(
-  variant: EzTextFieldVariants | undefined,
-  slots: S,
-  fallback: ElementType = OutlinedInput,
-): S | (S & { input: ElementType }) {
-  if (isBuiltInTextFieldVariant(variant) || variant === undefined) return slots
-  return { input: fallback, ...slots }
-}
-
-/**
- * UPSTREAM SHIM (#142). The `slots.input` a *theme* sets, as opposed to the one
- * `customVariantSlots` sets per field.
- *
- * A theme's `defaultProps.slots` is a plain object that MUI's `resolveProps` merges
- * as `{ ...defaultProps.slots, ...consumerSlots }` — it cannot be keyed on the
- * resolved `variant`, and `theme.components.*.variants` only ever contributes
- * `style`, never `slots`. So a constant `OutlinedInput` there reaches *every* bare
- * `<MuiTextField>` under the preset, forcing the `filled` and `standard` variants onto
- * the outlined box as well. This component is the fix: one slot value that resolves
- * the input itself, at render, from the variant in scope.
- *
- * `builtInInputs` is a copy of MUI's own `variantComponent` map (`TextField.js`) —
- * the same map the upstream patch keeps and falls back from, which is why copying it
- * here is the shim mirroring upstream rather than a re-implementation. Anything not
- * in it is a custom variant and gets `OutlinedInput`, exactly as
- * `customVariantSlots` does.
- *
- * The variant is read from `FormControl` context rather than from props: MUI's
- * `useSlot` does **not** forward `variant` into the input slot's props (verified by
- * probe — the slot receives no `variant` key at all), while `TextField` does pass it
- * to the `FormControl` root, and every `InputBase`-derived input already reads it
- * from that context for its own styling.
- *
- * Deleted with the rest of the shim: once `TextField` renders `OutlinedInput` for an
- * unknown variant itself, the theme needs no `slots.input` at all.
+ * A copy of MUI's own `variantComponent` map (`TextField.js`) — the same map the
+ * upstream patch keeps and falls back from, which is why copying it here is the
+ * shim mirroring upstream rather than a re-implementation.
  */
 const builtInInputs: Record<string, ElementType> = {
   standard: Input,
@@ -134,6 +63,39 @@ const builtInInputs: Record<string, ElementType> = {
   outlined: OutlinedInput,
 }
 
+/**
+ * The one `slots.input` every text field in `src/` passes, and the one the preset
+ * sets as `MuiTextField.defaultProps.slots.input`. It resolves the input itself,
+ * at render, from the variant in scope: MUI's own input for each of the three
+ * built-ins, and `OutlinedInput` for anything else.
+ *
+ * A constant `OutlinedInput` cannot do this job. `defaultProps.slots` is a plain
+ * object that MUI's `resolveProps` merges wholesale, and `theme.components.*.variants`
+ * only ever contributes `style`, never `slots` — so a constant there would reach a
+ * bare `<MuiTextField>` asking for the filled variant too, and force it onto the
+ * outlined box. The
+ * same is true of the per-field route, where the variant may be the theme's default
+ * and not a prop this component can see. Resolving at render is what makes one slot
+ * value correct for both.
+ *
+ * `OutlinedInput` is the fallback because it mirrors the upstream patch's
+ * `variantComponent[variant] ?? OutlinedInput`: the outlined box is the structure the
+ * other two are variations of, so a custom variant starts from a shape a theme can
+ * restyle rather than from nothing. The notch never opens for it — `TextField` passes
+ * `label` to the input only under `variant === 'outlined'` (`TextField.js`), so
+ * `NotchedOutline` renders with `withLabel` false and the legend stays collapsed
+ * whatever `notched` says.
+ *
+ * The variant is read from `FormControl` context rather than from props: MUI's
+ * `useSlot` does **not** forward `variant` into the input slot's props (verified by
+ * probe — the slot receives no `variant` key at all), while `TextField` does pass it
+ * to the `FormControl` root, and every `InputBase`-derived input already reads it
+ * from that context for its own styling.
+ *
+ * A consumer's own `slots.input` still wins everywhere, because every call site
+ * spreads the consumer's `slots` *after* this one: `slots={{ input: MyInput }}` is
+ * how a custom variant chooses another input, exactly as it would upstream.
+ */
 export const VariantInput = forwardRef<unknown, Record<string, unknown>>(
   function VariantInput(props, ref) {
     const variant = useFormControl()?.variant
@@ -142,10 +104,22 @@ export const VariantInput = forwardRef<unknown, Record<string, unknown>>(
   },
 )
 VariantInput.displayName = 'EzVariantInput'
+/**
+ * The marker MUI's own `Input` / `FilledInput` / `OutlinedInput` all carry
+ * (`Input.muiName = 'Input'`). `FormControl` scans its *children* for it to derive
+ * the initial `filled` state before any effect runs —
+ * `if (!isMuiElement(child, ['Input', 'Select'])) return` (FormControl.js) — and it
+ * is the element in the slot, not the component it renders, that the scan sees. So
+ * without this a field with a value renders its label unshrunk on the server and on
+ * the first client paint, which is exactly the SSR regression pinned by "shrinks the
+ * label on the server render for a field that already has a value" in
+ * `NumberField.test.tsx`. Standing in for a MUI input means carrying its marker.
+ */
+;(VariantInput as { muiName?: string }).muiName = 'Input'
 
 /**
- * UPSTREAM SHIM (#142). The pickers' twin of `VariantInput`, over MUI X's own
- * `VARIANT_COMPONENT` map (`PickersTextField.js`).
+ * The pickers' twin of `VariantInput`, over MUI X's own `VARIANT_COMPONENT` map
+ * (`PickersTextField.js`).
  *
  * The same context read works here: `PickersTextFieldRoot` is a
  * `styled(FormControl)` — MUI's own `FormControl` — and `PickersTextField` passes the
@@ -167,3 +141,5 @@ export const PickersVariantInput = forwardRef<unknown, Record<string, unknown>>(
   },
 )
 PickersVariantInput.displayName = 'EzPickersVariantInput'
+/** Same marker, same reason: MUI X's three picker inputs all set `muiName = 'Input'` too. */
+;(PickersVariantInput as { muiName?: string }).muiName = 'Input'

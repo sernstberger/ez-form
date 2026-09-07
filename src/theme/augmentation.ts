@@ -303,7 +303,7 @@ declare module '@mui/material/styles' {
  *
  * `stacked` is ez-form's own variant: the label sits above the input in normal
  * flow, with no float and no notch. Under a stock `createTheme()` it renders
- * MUI's `OutlinedInput` (`customVariantSlots` in `src/fields/textFieldVariants.ts`)
+ * MUI's `OutlinedInput` (`VariantInput` in `src/fields/textFieldVariants.tsx`)
  * with a permanently closed notch; the *look* is `createEzFormTheme()`'s, which
  * keys its static-label rules on this variant.
  */

@@ -17,6 +17,15 @@ export type DateFieldProps = Omit<
   | 'helperText'
   | 'onBlur'
   | 'onPaste'
+  // UPSTREAM SHIM (#142). `DateField` *is* the text field, so MUI X types a flat
+  // `variant` on it as its own closed three-arm union. `PickerFieldProps` re-declares
+  // it as the widened `EzTextFieldVariants`; without this `Omit` the two intersect to
+  // the closed union again and a `stacked` variant would not typecheck. The value is
+  // routed through `slotProps.textField` either way (see `usePickerField`), which is
+  // the channel MUI X resolves *last* — a flat `variant` here would be overridden by
+  // it, so this is also the only spelling that cannot disagree with itself. Goes when
+  // upstream ships.
+  | 'variant'
 > &
   PickerFieldProps<PickerValidDate | null, DateValidationError>
 
@@ -76,6 +85,7 @@ export function DateField({
   onError,
   onClear,
   slotProps,
+  variant,
   // Out of `rest`, which reaches the picker root: the box the placement rules
   // select is the text field's `FormControl`, so the hook routes both there
   // through `slotProps.textField` (#9, #66).
@@ -100,6 +110,7 @@ export function DateField({
     onError,
     onClear,
     slotProps,
+    variant,
     labelPlacement,
     className,
   })
