@@ -3,7 +3,7 @@ import ToggleButton from '@mui/material/ToggleButton'
 import MuiToggleButtonGroup, {
   type ToggleButtonGroupProps as MuiToggleButtonGroupProps,
 } from '@mui/material/ToggleButtonGroup'
-import { FieldFrame } from '../FieldFrame'
+import { BoundField } from '../BoundField'
 import type { LabelPlacementProps } from '../LabelPlacementContext'
 import { mergeDisabled } from '../mergeDisabled'
 import type { Option } from '../Option'
@@ -46,7 +46,7 @@ export function ToggleButtonGroup({
 }: ToggleButtonGroupProps) {
   warnDuplicateOptions('ToggleButtonGroup', name, options)
   return (
-    <FieldFrame<Value | null | Value[]>
+    <BoundField<Value | null | Value[]>
       componentName="ToggleButtonGroup"
       name={name}
       label={label}
@@ -63,7 +63,7 @@ export function ToggleButtonGroup({
       // control rather than replaced by it — read, not destructured, so the
       // (inert) copy on MUI's root through `rest` is unchanged (#102).
       aria-describedby={rest['aria-describedby']}
-      renderControl={({ field, inputA11y, labelId }) => (
+      render={({ field, inputA11y, labelId }) => (
         <MuiToggleButtonGroup
           {...rest}
           {...inputA11y}

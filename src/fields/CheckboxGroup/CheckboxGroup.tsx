@@ -2,7 +2,7 @@ import type { ChangeEvent, FocusEvent, ReactNode } from 'react'
 import Checkbox from '@mui/material/Checkbox'
 import FormControlLabel from '@mui/material/FormControlLabel'
 import FormGroup, { type FormGroupProps } from '@mui/material/FormGroup'
-import { FieldFrame } from '../FieldFrame'
+import { BoundField } from '../BoundField'
 import type { LabelPlacementProps } from '../LabelPlacementContext'
 import type { Option } from '../Option'
 import type { FieldRules } from '../../rules'
@@ -45,7 +45,7 @@ export function CheckboxGroup({
 }: CheckboxGroupProps) {
   warnDuplicateOptions('CheckboxGroup', name, options)
   return (
-    <FieldFrame<Value[]>
+    <BoundField<Value[]>
       componentName="CheckboxGroup"
       name={name}
       label={label}
@@ -62,7 +62,7 @@ export function CheckboxGroup({
       // control rather than replaced by it — read, not destructured, so the
       // (inert) copy on MUI's root through `rest` is unchanged (#102).
       aria-describedby={rest['aria-describedby']}
-      renderControl={({ field, inputA11y, labelId }) => {
+      render={({ field, inputA11y, labelId }) => {
         const selected: Value[] = Array.isArray(field.value) ? field.value : []
         return (
           // No `aria-required`: ARIA does not support it on `role="group"`
