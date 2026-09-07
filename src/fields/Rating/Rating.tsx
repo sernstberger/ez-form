@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import MuiRating, { type RatingProps as MuiRatingProps } from '@mui/material/Rating'
-import { FieldFrame } from '../FieldFrame'
+import { BoundFieldBase } from '../BoundField'
 import type { LabelPlacementProps } from '../LabelPlacementContext'
 import { mergeDisabled } from '../mergeDisabled'
 import type { FieldRules } from '../../rules'
@@ -57,7 +57,7 @@ export function Rating({
   ...rest
 }: RatingProps) {
   return (
-    <FieldFrame<number | null>
+    <BoundFieldBase<number | null>
       componentName="Rating"
       name={name}
       label={label}
@@ -74,7 +74,7 @@ export function Rating({
       // control rather than replaced by it — read, not destructured, so the
       // (inert) copy on MUI's root through `rest` is unchanged (#102).
       aria-describedby={rest['aria-describedby']}
-      renderControl={({ field, required: isRequired, inputA11y, labelId }) => (
+      render={({ field, required: isRequired, inputA11y, labelId }) => (
         <RatingControl
           {...rest}
           {...inputA11y}

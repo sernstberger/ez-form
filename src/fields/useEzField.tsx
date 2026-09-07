@@ -169,7 +169,7 @@ export type UseEzFieldReturn<TValue = unknown> = Omit<UseControllerReturn, 'fiel
    * The id is pinned because every field using this points its control's
    * `aria-describedby` at that id and the two must agree — `TextField` and
    * `Autocomplete` through `describedBy` on `slotProps.htmlInput`, `NumberField`
-   * and `OtpField` through `describedBy` on their `inputProps`, the `FieldFrame`
+   * and `OtpField` through `describedBy` on their `inputProps`, the `BoundField`
    * family through `bound.inputA11y`.
    *
    * `Autocomplete` used to opt out of the pin (a `pinId: false` option) on the

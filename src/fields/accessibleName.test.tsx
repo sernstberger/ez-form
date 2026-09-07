@@ -33,7 +33,7 @@ import { ZipField } from './ZipField'
  * `<input>` stays unnamed, and axe reports clean (the wrapper *is* named). So every
  * assertion here queries by accessible name and never by attribute presence.
  *
- * Fields rendered through `FieldFrame` have a second, different mechanism (an empty
+ * Fields rendered through `BoundField` have a second, different mechanism (an empty
  * legend's `aria-labelledby` outranking `aria-label`) and are covered by #100.
  *
  * The picker family is here too, added by #102: the same wrapper bug reached them

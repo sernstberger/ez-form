@@ -637,7 +637,7 @@ export function describeFieldContract<TIn extends FieldValues, TOut>(c: FieldCon
           // satisfies and which is the bug #99/#100 were. `getControl` rather than
           // `getByRole(role, { name })`: a `labelAs="legend"` field's fieldset and its
           // inner `role="group"` share one name, so only the field knows which element
-          // is the control (the same disambiguation `FieldFrame` already documents).
+          // is the control (the same disambiguation `BoundField` already documents).
           expect(c.getControl()).toHaveAccessibleName(new RegExp(c.label))
           expect(c.getControl()).toHaveAccessibleDescription('Some help')
           if (c.errorProps === undefined && !c.requiredNotAnnounced)

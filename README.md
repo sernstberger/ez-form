@@ -130,6 +130,7 @@ React 18 and React 19 are both supported, `ref` included: `<Form ref>` (the form
 | `FormErrorSummary`                             | —                                             | `title?` (default "There is a problem"), `slotProps?` (`heading`, `list`, `item`, `link`); lists the last failed validation's errors as focusable links, GOV.UK-style — see "Error summary" below                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `LiveRegion`                                   | —                                             | `message`, `announcementKey?` (bump to re-announce identical text), `politeness?` (`polite`/`assertive`), `visuallyHidden?` (default `true`), `component?`; the shared announcement region. `<Form>` renders one for submit status — see "Announcements" below                                                                                                                                                                                                                                                                                                                                                                     |
 | `FieldArray`                                   | hookform `useFieldArray`                      | `name`, `label` (array legend), `emptyRow`, `singular?`/`rowLabel?`, `minRows?`/`maxRows?`, `addLabel?`/`removeLabel?`, `reorder?`, `slotProps?`; children is a render prop `(row) => ...` given `row.name('field')` for the array path. Rows are keyed by hookform's `field.id`; Add/Remove/Move move focus and announce in a `role="status"` region                                                                                                                                                                                                                                                                              |
+| `BoundField`                                   | your own control                              | `name`, `render: (bound) => ReactElement`; `label?`, `helperText?`, `rules?`, `disabled?`, `labelAs?` (`'none'` default / `'control'` / `'legend'`), `componentName?`, `labelPlacement?`. Binds a control ez-form does not wrap: `render` gets `bound.field` (typed over the field's value), `bound.inputA11y`, `bound.nameA11y`, `bound.labelId`/`controlId`, `bound.displayLabel`, `bound.helperText`. See [Wrap your own control](#wrap-your-own-control)                                                                                                                                                                       |
 
 `Form`'s `title` / `description` give the form its accessible name and instructions (wired to the `<form>` via `aria-labelledby` / `aria-describedby`); `slotProps.title.component` sets the heading level (default `h2`). `FormSection` groups fields in a `<fieldset>` named by its `title` (`<legend>`, heading level configurable via `slotProps.legend.component`, default `h3`); `description` is helper text wired via `aria-describedby`.
 
@@ -1622,6 +1623,143 @@ Storybook's **Fields/AddressField → WithGooglePlaces** story is the live one. 
 Every default is listed in the [Mobile keyboards & autofill](#mobile-keyboards--autofill) table above, and each is overridable by your own `autoComplete` prop. Two details specific to these fields:
 
 `inputMode="numeric"` on `ZipField` brings up the numeric keypad on mobile without changing the underlying `type` (still `text`, so a leading zero like `02134` is never dropped). `StateSelect`'s `autoComplete` reaches the hidden native `<input>` MUI's `Select` renders for autofill via `slotProps.htmlInput` — the same slot a plain `TextField` uses (MUI 9 has no `SelectProps`/native `inputProps` shortcut for this).
+
+## Wrap your own control
+
+`<BoundField>` binds a control ez-form does not wrap — a third-party widget, a plain DOM
+element, one of your own components. It renders the same `FormControl` box and helper text
+every field does; the control itself comes from a `render` prop, which receives everything
+the binding knows about the field.
+
+```tsx
+import { BoundField } from 'ez-form'
+
+function NicknameField({ name, label }: { name: string; label: string }) {
+  return (
+    <BoundField<string>
+      name={name}
+      label={label}
+      componentName="NicknameField"
+      rules={{ required: true }}
+      helperText="What should we call you?"
+      render={(bound) => (
+        <>
+          <label htmlFor={bound.controlId} id={bound.labelId}>
+            {bound.displayLabel}
+          </label>
+          <input
+            type="text"
+            id={bound.controlId}
+            name={bound.field.name}
+            ref={bound.field.ref}
+            value={bound.field.value ?? ''}
+            disabled={bound.field.disabled}
+            required={bound.required}
+            onChange={(e) => bound.field.onChange(e.target.value)}
+            onBlur={bound.field.onBlur}
+            {...bound.nameA11y}
+            {...bound.inputA11y}
+          />
+        </>
+      )}
+    />
+  )
+}
+```
+
+That component is now a field like any other: it validates through the form's schema and
+`rules`, disables under `<Form disabled>`, shows its error as helper text in a live region,
+takes focus after a failed submit, appears in `<FormErrorSummary>`, and follows the form's
+`requiredIndicator`.
+
+**`labelPlacement` works, with one thing to know about `'start'`.** It lays the field out
+as a two-column grid, and the label column takes a plain **direct-child `<label>`** — which
+is exactly what the example above renders — so a `labelAs="none"` field lines up with its
+neighbours with nothing extra from you.
+
+The exception is a control that is _self-labelled_: its label lives inside the control (a
+button whose text is the label, the way `FileField`'s picker works), so there is no separate
+label element to put in column 1, and leaving the grid in place would park the control beside
+an empty label column. Say so with `fieldLayoutClasses.selfLabelled`, and the field opts out
+of the grid and sits flush left:
+
+```tsx
+import { BoundField, fieldLayoutClasses } from 'ez-form'
+;<BoundField
+  name="avatar"
+  label="Avatar"
+  className={fieldLayoutClasses.selfLabelled}
+  render={(bound) => <MyButtonThatIsItsOwnLabel {...bound.inputA11y} ref={bound.field.ref} />}
+/>
+```
+
+`labelAs="control"` sets that class for you — MUI's `FormControlLabel` puts the label inside
+the click target — so `Checkbox` and `Switch` already behave this way. `'floating'` and
+`'stacked'` are unaffected either way.
+
+### Four things `render` must forward
+
+The rest of `bound` is optional. These are not, and each one fails silently:
+
+| Forward                                                            | Or else                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bound.field.ref`                                                  | Nothing focuses the control after a failed submit, and `<FormErrorSummary>`'s link to this field goes nowhere.                                                                                                                                                                                            |
+| `bound.inputA11y`                                                  | The error renders but no screen reader ever associates it with the control (`aria-describedby`, `aria-invalid`).                                                                                                                                                                                          |
+| `bound.nameA11y`                                                   | A field named only by `aria-label` / `aria-labelledby` leaves the name on the `FormControl` wrapper — a `<div>` — while the real control stays anonymous. axe reports clean.                                                                                                                              |
+| `bound.displayLabel` **or** `bound.nameA11y` — one of them, always | Under the default `labelAs="none"` the frame renders **no label element**, so a `label` you passed to `<BoundField>` names nothing until `render` puts it somewhere. The control ends up anonymous, and the dev warning cannot tell you: it checks the props you passed, sees a `label`, and stays quiet. |
+
+The first three go on **the element that carries the role** — the `<input>`, the combobox,
+the `role="group"` — not on a wrapper around it. The third is the one that has actually
+shipped broken here: 15 of 17 fields in this library were once named that way and every test
+passed, which is why `describeFieldContract` now asserts accessible _names_ rather than
+attributes.
+
+The fourth is the trap specific to `labelAs="none"`, and it is worth restating: **under
+`'none'`, naming the control is yours.** Render `bound.displayLabel` in a `<label
+htmlFor={bound.controlId}>` (with `id={bound.labelId}`) and give the control
+`id={bound.controlId}`; or, for a field with no visible label, spread `bound.nameA11y` on
+the control. Passing `label` to `<BoundField>` and forgetting to render it is the one way to
+get an unnamed field that no warning catches — every other path either renders the label
+itself or has no label to render, which is what makes the warning reliable there.
+
+`bound.inputA11y`'s `aria-describedby` is already **merged**: if you pass an
+`aria-describedby` of your own to `<BoundField>`, it arrives joined with the helper text's
+id rather than replaced by it, because an accessible description is a list.
+
+### `labelAs`: who renders the label
+
+| `labelAs`          | The frame renders                                                                                      | Use it for                                        | Under `start`                                                                                                                 |
+| ------------------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `'none'` (default) | No label element. `bound.displayLabel`, `labelId`, `controlId` and `labelRequired` are yours to place. | A control that owns its own label — most of them. | In the grid; a direct-child `<label>` takes column 1. Add `fieldLayoutClasses.selfLabelled` if your control is its own label. |
+| `'control'`        | MUI `FormControlLabel`: a `<label>` wrapping your control, label text beside it.                       | A single checkbox- or switch-shaped input.        | Opts out of the grid — the class is set for you.                                                                              |
+| `'legend'`         | `<fieldset>` + `<legend>`. Point your group at `bound.labelId` with `aria-labelledby`.                 | A group of controls under one name.               | In the grid; the legend floats into column 1.                                                                                 |
+
+`'none'` is the default because a control the frame knows nothing about is one it cannot
+choose label markup for. Under it, pair your `<label htmlFor={bound.controlId}>` with
+`id={bound.controlId}` on the control — the two ids come from one place so they cannot drift.
+Read `bound.displayLabel` rather than your own `label` prop, so `requiredIndicator="optional"`
+appends its suffix, and `bound.labelRequired` so the asterisk follows the form's setting.
+
+`bound.labelId` is `undefined` when there is no label. Keep it that way — an
+`aria-labelledby` pointing at an empty element outranks `aria-label` in the accessible-name
+algorithm and leaves the control with no name at all.
+
+### Typing
+
+`<BoundField<TValue>>` flows the field's value type through to `bound.field.value`
+(`TValue | undefined` — a form with no `defaultValues` entry renders `undefined`) and to
+`bound.field.onChange`, which then rejects a value of the wrong shape. State it explicitly, or
+let it infer from `rules`.
+
+### `componentName`
+
+Optional, `'BoundField'` by default. Set it to your own component's name and the
+"must be rendered inside `<Form>`" error and the [developer warnings](#developer-warnings)
+name something a consumer can find:
+
+```
+ez-form: <NicknameField name="nickname"> has no accessible name.
+```
 
 ## Developer warnings
 

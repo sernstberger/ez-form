@@ -231,7 +231,7 @@ describe('labelPlacement', () => {
   it('start puts a Select’s label in column 1 even though it is a <div>', () => {
     // The label's element varies by field: `TextField` renders `<label>`, `Select`
     // renders a `<div>` (there is no `htmlFor` target — the combobox is named
-    // through `aria-labelledby`), `FieldFrame`'s legend frame renders `<legend>`.
+    // through `aria-labelledby`), `BoundField`'s legend frame renders `<legend>`.
     // A tag-based column rule would leave a Select's label in column 2 stacked on
     // top of its own control, which looks like a broken row and nothing else fails.
     const { container } = renderForm({ labelPlacement: 'start' })
@@ -266,7 +266,7 @@ describe('labelPlacement', () => {
   })
 
   it('start floats a legend so it joins the grid instead of sitting above it', () => {
-    // #131. A `legend` field (`FieldFrame`'s `labelAs="legend"` — RadioGroup,
+    // #131. A `legend` field (`BoundField`'s `labelAs="legend"` — RadioGroup,
     // CheckboxGroup, Rating, Slider, ToggleButtonGroup) renders its box as a
     // `<fieldset>`, and a `<fieldset>`'s `<legend>` is a *rendered legend*: CSS pulls
     // it out of the fieldset's formatting context and paints it above the content
@@ -424,8 +424,11 @@ describe('labelPlacement', () => {
     expect(optOut).toContain('display:inline-flex')
     expect(optOut).toContain('grid-template-columns:none')
     expect(optOut).toMatch(new RegExp(`${compound}>\\*[^{]*\\{grid-column:auto;\\}`))
-    // Checkbox and Switch still reach the same block through their frame's
-    // `FormControlLabel` until `FieldFrame` carries the class itself (#28).
+    // `BoundField`'s `labelAs="control"` now puts the class on the root itself (#28),
+    // so Checkbox and Switch are explicit. The `:has(> .MuiFormControlLabel-root)` half
+    // stays as the second arm of the same rule — it still covers a consumer's own
+    // `FormControlLabel` inside a `render` prop — and is deletable in a follow-up once
+    // nothing relies on it.
     expect(optOut).toContain(`:has(> .${formControlLabelClasses.root})`)
     // And, like every other `start`-only rule, it exists only above the breakpoint:
     // below it there is no grid to opt out of.

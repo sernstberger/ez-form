@@ -100,10 +100,16 @@ const stackedBox = (theme: Theme): CSSObject => ({
  * contract — the field declares it on its root (`FileField` does: its picker
  * `Button component="label"` is the label text and the control in one element; a
  * consumer's own control with its label inside can too). The
- * `:has(> .MuiFormControlLabel-root)` form is how `FieldFrame`'s `labelAs="control"`
- * frame (`Checkbox`, `Switch`) is recognised until it carries the class itself
- * (#28's `labelAs="none"` is the same shape and should carry it too), after which
- * that half is redundant.
+ * `:has(> .MuiFormControlLabel-root)` form is the second arm of the same rule.
+ * `BoundField`'s `labelAs="control"` frame (`Checkbox`, `Switch`) now carries the class
+ * itself (#28), so that arm is no longer what recognises them — it still covers a
+ * consumer's own `FormControlLabel` rendered inside a `BoundField` `render` prop, and is
+ * deletable once nothing relies on it.
+ *
+ * `labelAs="none"` is deliberately **not** self-labelled: the shape it documents is a
+ * plain direct-child `<label>` paired to the control by `htmlFor`/`controlId`, which the
+ * column-1 selector below now matches — an ordinary two-part field that belongs in the
+ * grid. A consumer whose custom control really is self-labelled adds the class.
  *
  * Deliberately *not* `:not(:has(.MuiFormLabel-root))`: a label-less `TextField`
  * named by `aria-label` has no label element either, and its control belongs in the
@@ -169,7 +175,7 @@ const startBox = (theme: Theme, labelWidth: string | number): CSSObject => ({
     // border box; `theme.spacing(1)` is the outlined input's own vertical padding.
     paddingTop: theme.spacing(1),
   },
-  // A `legend` label (`FieldFrame`'s `labelAs="legend"`: RadioGroup, CheckboxGroup,
+  // A `legend` label (`BoundField`'s `labelAs="legend"`: RadioGroup, CheckboxGroup,
   // Rating, Slider, ToggleButtonGroup) needs one rule more than the others (#131).
   //
   // Its box is a `<fieldset>`, and a `<fieldset>`'s `<legend>` is a *rendered
@@ -201,7 +207,7 @@ const startBox = (theme: Theme, labelWidth: string | number): CSSObject => ({
   // Selected by *not being* `.MuiFormLabel-root` rather than by tag alone, because
   // the label's element varies by field: a `TextField` renders `<label>`, a `Select`
   // renders a `<div>` (there is no `htmlFor` target — the combobox is named through
-  // `aria-labelledby`), and `FieldFrame`'s legend frame renders `<legend>`. A
+  // `aria-labelledby`), and `BoundField`'s legend frame renders `<legend>`. A
   // tag-only rule would put a `Select`'s label in column 2 with its own control.
   // `:not(label)` is the complement of the plain-`label` half above; it needs no
   // self-labelled guard, because on a self-labelled box the opt-out resets every
@@ -213,7 +219,7 @@ const startBox = (theme: Theme, labelWidth: string | number): CSSObject => ({
 /**
  * A self-labelled field opts out of the grid.
  *
- * Its label is already inside its control — `Checkbox` and `Switch` (`FieldFrame`'s
+ * Its label is already inside its control — `Checkbox` and `Switch` (`BoundField`'s
  * `labelAs="control"`) inside the single `<label>` that *is* the click target,
  * `FileField` as the text of the picker `Button component="label"` — so there is no
  * separate label element to put in column 1. Pulling one out would either break the
