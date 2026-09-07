@@ -1,6 +1,8 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ComponentProps,
@@ -19,6 +21,17 @@ import { useEzFormContext } from '../useEzFormContext'
 import { cx } from '../cx'
 import { FormSection, type FormSectionProps } from '../FormSection'
 import { LiveRegion, type LiveRegionProps } from '../Form/LiveRegion'
+import { useRegisterFieldArrayRows } from '../Form/FieldArrayRowsContext'
+// In its own module so `Form/FieldArrayRowsContext` can name it without importing this
+// component (which imports that context back), and re-exported here because this is the
+// module consumers of the render prop already take it from. The row *slot* below is
+// `FieldArrayRowRoot` rather than `FieldArrayRow` for the same reason: TypeScript keeps a type
+// and a value of one name apart, but the declaration build cannot emit the collision — it
+// fails to name the `styled` const's inferred type ("cannot be named without a reference to
+// MUIStyledCommonProps").
+import type { FieldArrayRow } from './FieldArrayRow'
+
+export type { FieldArrayRow }
 
 // `errorText`, not `error`: MUI reserves `error` (with `active`, `checked`,
 // `disabled`, `required`, …) as a *global state* class, so
@@ -36,16 +49,6 @@ export const fieldArrayClasses = generateUtilityClasses('EzFieldArray', [
   'status',
   'errorText',
 ])
-
-/** What the `children` render prop receives for one row. */
-export interface FieldArrayRow {
-  /** Zero-based position in the array. */
-  index: number
-  /** hookform's stable `field.id` — the React `key` for the row, already applied. */
-  id: string
-  /** Builds the full form path for a field in this row: `name('email')` → `applicants.0.email`. */
-  name: (field: string) => string
-}
 
 export interface FieldArrayProps<TRow = Record<string, unknown>> extends Pick<
   UseFieldArrayProps,
@@ -115,7 +118,7 @@ export interface FieldArrayProps<TRow = Record<string, unknown>> extends Pick<
 }
 
 const FieldArrayRoot = styled(FormSection, { name: 'EzFieldArray', slot: 'Root' })({})
-const FieldArrayRow = styled(FormSection, { name: 'EzFieldArray', slot: 'Row' })({})
+const FieldArrayRowRoot = styled(FormSection, { name: 'EzFieldArray', slot: 'Row' })({})
 // The row's buttons sit on one line rather than stacking as block-level
 // children — the component's minimum layout, so it lives on the styled slot's
 // default style block rather than as `sx`, and stays overridable via
@@ -199,6 +202,35 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
   const { getValues } = useEzFormContext('FieldArray')
   const { fields, append, remove, move } = useFieldArray({ name, rules, shouldUnregister })
   const { errors } = useFormState()
+
+  // The one authoritative row list for this array name, built once and used for both the
+  // rendered rows and the registry below, so the two cannot describe different rows.
+  const rows = useMemo<readonly FieldArrayRow[]>(
+    () =>
+      fields.map((field, index) => ({
+        index,
+        id: field.id,
+        name: (f: string) => `${name}.${index}.${f}`,
+      })),
+    [fields, name],
+  )
+
+  // Publish to the form's registry so `useFieldArrayRows(name)` elsewhere — typically a later
+  // wizard step rendering one field per row of this array — sees the same stable ids this
+  // component keys its rows by. A second `useFieldArray` on this name would not: hookform
+  // mints ids per hook instance and keeps only one live subscription per name, so the second
+  // reader gets ids matching nothing and a list frozen at mount. See FieldArrayRowsContext,
+  // which also records why the registry keeps publishing after this array unmounts.
+  //
+  // `useLayoutEffect`, so the registry is current before the browser paints. A reader mounted
+  // alongside this array re-renders from the store's notification; with a passive effect that
+  // notification lands after paint, and an update React does not process synchronously — a
+  // `replace`, a `reset`, a `setValue` on the array — would show the reader one commit of
+  // stale rows first. Publishing during the layout phase closes that window.
+  const registerRows = useRegisterFieldArrayRows()
+  useLayoutEffect(() => {
+    registerRows(name, rows)
+  }, [registerRows, name, rows])
 
   // `seq` is not decoration: it becomes the region's `announcementKey`, so every
   // announcement mounts a *fresh* node. Clearing then setting the text in one
@@ -343,18 +375,19 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
 
   return (
     <FieldArrayRoot title={label} className={fieldArrayClasses.root}>
-      {fields.map((field, index) => {
+      {rows.map((row) => {
+        const { index, id } = row
         const rowName = nameRow(index)
         const rowAriaName = nameRowForAria(index)
         return (
-          <FieldArrayRow
-            key={field.id}
+          <FieldArrayRowRoot
+            key={id}
             {...rowSlotProps}
             title={rowName}
-            ref={(el: HTMLFieldSetElement | null) => setRowRef(field.id, el)}
+            ref={(el: HTMLFieldSetElement | null) => setRowRef(id, el)}
             className={cx(fieldArrayClasses.row, rowSlotProps?.className)}
           >
-            {children({ index, id: field.id, name: (f) => `${name}.${index}.${f}` })}
+            {children(row)}
             <FieldArrayActions
               {...actionsSlotProps}
               className={cx(fieldArrayClasses.actions, actionsSlotProps?.className)}
@@ -396,7 +429,7 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
                 </>
               )}
             </FieldArrayActions>
-          </FieldArrayRow>
+          </FieldArrayRowRoot>
         )
       })}
       <FieldArrayAdd

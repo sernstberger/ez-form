@@ -386,6 +386,66 @@ An **array-level** message renders under the Add button as a `role="alert"`: zod
 `form.setError('applicants.root', { message })`. Per-row field errors stay on their
 own fields as normal helper text.
 
+### Per-row content outside the array
+
+Sometimes a row needs content somewhere the `<FieldArray>` isn't: one upload field per
+co-applicant on a later wizard step, a per-row summary line, an entry in a side panel.
+`useFieldArrayRows(name)` gives you that array's rows — the same `{ index, id, name }` the
+render prop receives — without owning add, remove or reorder, which stay with the
+`<FieldArray>` that declares the array.
+
+```tsx
+function DocumentUploads() {
+  const coApplicants = useFieldArrayRows('coApplicants')
+  return (
+    <>
+      <FileField name="applicantDocuments" label="Upload applicant documents" multiple />
+      {coApplicants.map((row) => (
+        <FileField
+          key={row.id}
+          name={row.name('documents')}
+          label={`Upload documents for co-applicant ${row.index + 1}`}
+          multiple
+        />
+      ))}
+    </>
+  )
+}
+```
+
+Rows update live while the array is mounted. When it unmounts — which `<Wizard>` does to every
+step but the current one — the last-known rows are latched and keep being returned, which is
+what makes the cross-step case work at all. The latch is one-way for the life of the `<Form>`,
+which costs you two things: an array removed from the form permanently (behind a feature flag,
+not a wizard step) keeps reporting its last rows, and a `reset()` while the owning array is
+unmounted leaves a reader on the pre-reset rows until that array mounts again. Reading a name
+this form's schema has no key for renders nothing and warns in development.
+
+**Ids are stable per `<FieldArray>` mount, not for the life of the form.** They are hookform's,
+and hookform mints them when the hook mounts and re-mints on array-level replacement, so an
+array whose step unmounts and mounts again hands out a new set. Within one mount they are
+stable across add, remove and reorder, which is what makes them the right React `key`. Across
+a remount, a reader keyed by them re-mounts its rows — invisible for per-row content on another
+step, but a persistent side panel will reset its rows' own component state when the owning step
+is revisited. Never persist an id or send it to a server as a row identifier.
+
+**Key by `row.id`, not by index.** The hand-rolled version of this is a `useWatch` on the array
+plus a `.map()` keyed by index, and it looks right for a long time, which is what makes it
+worth spelling out. Because ez-form fields are controlled, an index-keyed list still shows the
+correct _values_ after a row is removed — React re-uses the first row's component to render the
+survivor and re-renders it with the survivor's value. What it silently gets wrong is component
+**identity**: remove co-applicant 1 and the component that was mounted for them is now
+rendering co-applicant 2, so anything that row's own component holds outside form state — a
+collapsed panel, a scroll position, an in-flight upload, a `useRef` — belongs to the wrong
+person. Keying by `row.id` unmounts the removed row's component and lets the survivor keep its
+own. A plain `useWatch` never sees hookform's `field.id`s, only the current values, which is
+why this hook exists.
+
+Calling hookform's `useFieldArray` a second time on the same name is not the answer either, and
+fails silently: it mints its own ids per hook instance (so they match nothing the array uses),
+and only one instance per name stays subscribed, so the second one stops updating after the
+first append. hookform documents the rule — one `useFieldArray` per name.
+
 Themeable under `EzFieldArray` (`defaultProps`, `styleOverrides` for `root` | `row`
 | `actions` | `add` | `remove` | `move` | `status` | `error`) and exported as
 `fieldArrayClasses`. Note the class for the error slot is `fieldArrayClasses.errorText`:
