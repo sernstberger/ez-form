@@ -36,8 +36,13 @@ import { fieldLayoutClasses } from './LabelPlacementContext'
  */
 const unfloatLabel: CSSObject = {
   position: 'relative',
+  // Deliberately no `transformOrigin` reset alongside this. MUI's own is the
+  // physical `top left`, which the RTL stylis plugin does not flip (it rewrites
+  // property names, not values) — and with no transform there is nothing for an
+  // origin to apply to, so the rule is both inert and the only physical value the
+  // placement CSS would otherwise carry. Everything else here is direction-neutral,
+  // which is why `start` mirrors correctly under an RTL theme.
   transform: 'none',
-  transformOrigin: 'top left',
   maxWidth: '100%',
   padding: 0,
   // MUI truncates the floating label to one line; in flow it can wrap like any
@@ -75,11 +80,13 @@ const closeNotch: CSSObject = {
  * The helper text's `marginLeft` is MUI's inset for a *floating* label's 14px
  * origin; with the label in flow there is nothing to line up with.
  */
+const stackedLabel = (theme: Theme): CSSObject => ({
+  ...unfloatLabel,
+  marginBottom: theme.spacing(0.5),
+})
+
 const stackedBox = (theme: Theme): CSSObject => ({
-  [`& .${formLabelClasses.root}`]: {
-    ...unfloatLabel,
-    marginBottom: theme.spacing(0.5),
-  },
+  [`& .${formLabelClasses.root}`]: stackedLabel(theme),
   ...closeNotch,
   [`& .${formHelperTextClasses.root}`]: { marginLeft: 0, marginRight: 0 },
 })
@@ -94,10 +101,12 @@ const stackedBox = (theme: Theme): CSSObject => ({
  * that right no matter how many extra children a field renders (`FileField`'s file
  * list, `AddressField`'s status region).
  *
- * `alignItems: 'baseline'` on the label alone, not the grid: the control is the
- * tall thing in the row and the label should sit on its first text baseline, but a
- * multiline `TextareaField` or a wrapping `Autocomplete` must still be free to grow
- * down from there.
+ * `alignItems: 'start'` rather than `'baseline'` or the grid default `'stretch'`:
+ * a multiline `TextareaField` or a wrapping `Autocomplete` grows down from the top
+ * of its row, and the label must stay put at the top rather than being stretched
+ * to the control's height or dragged down to a baseline that moves as the control
+ * grows. The label's own `paddingTop` is what lines it up with the control's first
+ * line of text.
  */
 const startBox = (theme: Theme, labelWidth: string | number): CSSObject => ({
   display: 'grid',
@@ -114,8 +123,15 @@ const startBox = (theme: Theme, labelWidth: string | number): CSSObject => ({
     paddingTop: theme.spacing(1),
   },
   ...closeNotch,
-  // Everything that is not the label goes in column 2, stacked in source order.
-  '& > *:not(label):not(legend)': { gridColumn: 2 },
+  // Everything that is not the label goes in column 2, stacked in source order —
+  // the control, the helper text, and whatever else a field renders.
+  //
+  // Selected by *not being* `.MuiFormLabel-root` rather than by tag, because the
+  // label's element varies by field: a `TextField` renders `<label>`, a `Select`
+  // renders a `<div>` (there is no `htmlFor` target — the combobox is named through
+  // `aria-labelledby`), and `FieldFrame`'s legend frame renders `<legend>`. A
+  // tag-based rule would put a `Select`'s label in column 2 with its own control.
+  '& > *:not(.MuiFormLabel-root)': { gridColumn: 2 },
   [`& .${formHelperTextClasses.root}`]: { marginLeft: 0, marginRight: 0 },
 })
 
@@ -128,13 +144,21 @@ const startBox = (theme: Theme, labelWidth: string | number): CSSObject => ({
  * a checkbox row in a `start` form still lines up flush left with its neighbours'
  * label column rather than being indented into column 2.
  */
-const controlLabelOptOut: CSSObject = {
+const controlLabelOptOut = (theme: Theme): CSSObject => ({
   [`&:has(> .${formControlLabelClasses.root})`]: {
     display: 'inline-flex',
     gridTemplateColumns: 'none',
     '& > *': { gridColumn: 'auto' },
+    // The grid placement `startBox` set is on this same, more specific selector,
+    // so it has to be undone here rather than by the `& > *` reset above.
+    [`& .${formLabelClasses.root}`]: {
+      ...stackedLabel(theme),
+      gridColumn: 'auto',
+      gridRow: 'auto',
+      paddingTop: 0,
+    },
   },
-}
+})
 
 /**
  * Every placement rule, scoped to the field boxes inside this form.
@@ -152,7 +176,7 @@ export function labelPlacementStyles(
     [`& .${fieldLayoutClasses.stacked}`]: stackedBox(theme),
     [`& .${fieldLayoutClasses.start}`]: {
       ...startBox(theme, labelWidth),
-      ...controlLabelOptOut,
+      ...controlLabelOptOut(theme),
       // Below the breakpoint the label column is gone and the box is stacked
       // again. Stated as an override of the grid rather than as a second
       // `@media` around the grid, so a theme raising the breakpoint through
@@ -162,6 +186,17 @@ export function labelPlacementStyles(
         gridTemplateColumns: 'none',
         '& > *': { gridColumn: 'auto' },
         ...stackedBox(theme),
+        // After `stackedBox`, and re-stating its label rule with the grid
+        // placement undone: `startBox` set `gridColumn`/`gridRow`/`paddingTop` on
+        // this same selector, which is more specific than `& > *`, so clearing
+        // them there is not enough — the label would keep a `grid-column` and the
+        // column's top padding inside what is now a flex box.
+        [`& .${formLabelClasses.root}`]: {
+          ...stackedLabel(theme),
+          gridColumn: 'auto',
+          gridRow: 'auto',
+          paddingTop: 0,
+        },
       },
     },
   }

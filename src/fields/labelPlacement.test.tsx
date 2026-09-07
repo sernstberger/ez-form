@@ -98,6 +98,30 @@ describe('labelPlacement', () => {
     expect(getComputedStyle(box(container, 'start')).gridTemplateColumns).toBe('18ch 1fr')
   })
 
+  it('start puts a Select’s label in column 1 even though it is a <div>', () => {
+    // The label's element varies by field: `TextField` renders `<label>`, `Select`
+    // renders a `<div>` (there is no `htmlFor` target — the combobox is named
+    // through `aria-labelledby`), `FieldFrame`'s legend frame renders `<legend>`.
+    // A tag-based column rule would leave a Select's label in column 2 stacked on
+    // top of its own control, which looks like a broken row and nothing else fails.
+    const { container } = renderForm({ labelPlacement: 'start' })
+    const selectBox = box(container, 'start', 1)
+    const label = selectBox.querySelector('.MuiFormLabel-root')!
+    expect(label.tagName).toBe('DIV')
+    expect(getComputedStyle(label).gridColumn).toBe('1')
+    // And the control it names is beside it, not under it.
+    const control = selectBox.querySelector('.MuiInputBase-root')!
+    expect(getComputedStyle(control).gridColumn).toBe('2')
+  })
+
+  it('start keeps the helper text in the control’s column, not a third one', () => {
+    // The reason the box is a grid rather than `flex-direction: row`: it has three
+    // children, and a row would have put the helper text beside the control.
+    const { container } = renderForm({ labelPlacement: 'start' })
+    const helper = box(container, 'start').querySelector('.MuiFormHelperText-root')!
+    expect(getComputedStyle(helper).gridColumn).toBe('2')
+  })
+
   it('start collapses to stacked below labelPlacementBreakpoint', () => {
     // jsdom does not evaluate media queries, so the assertion is on the emitted
     // rule: the breakpoint has to come from the theme (`theme.breakpoints.down`),
@@ -115,6 +139,20 @@ describe('labelPlacement', () => {
     expect(emitted()).toContain('899.95px')
   })
 
+  it('the breakpoint fallback undoes the grid on the label too, not just the box', () => {
+    // `startBox` puts `grid-column`/`grid-row`/`padding-top` on `.MuiFormLabel-root`
+    // itself, which outranks the `& > *: grid-column auto` reset. Clearing only the
+    // box would leave the label carrying a column and the label-column's top padding
+    // inside what is now a flex column — visible as a stray indent on a phone, and
+    // invisible to jsdom, which does not evaluate media queries. So the assertion is
+    // on the emitted rule: inside the media block the label is reset explicitly.
+    renderForm({ labelPlacement: 'start' })
+    const css = [...document.querySelectorAll('style')].map((s) => s.textContent ?? '').join('\n')
+    const media = css.slice(css.indexOf('599.95px'))
+    expect(media).toContain('grid-column:auto')
+    expect(media).toContain('grid-row:auto')
+  })
+
   it('start leaves Checkbox alone: its label is already beside its control', () => {
     // The checkbox's label lives inside the single `<label>` that *is* the click
     // target. Pulling it into a left column would either break that target or
@@ -123,6 +161,14 @@ describe('labelPlacement', () => {
     const checkbox = box(container, 'start', 2)
     expect(checkbox.querySelector('.MuiFormControlLabel-root')).not.toBeNull()
     expect(getComputedStyle(checkbox).display).toBe('inline-flex')
+    // And the grid placement is really undone, not merely overridden on the box:
+    // `startBox` sets `grid-column` on `.MuiFormLabel-root` itself, which is more
+    // specific than the `& > *` reset, so a leftover would survive into the flex
+    // box. There is no `MuiFormLabel-root` inside a `FormControlLabel` frame, so
+    // the check that matters is that nothing in it carries a column.
+    checkbox.querySelectorAll('*').forEach((el) => {
+      expect(getComputedStyle(el as HTMLElement).gridColumn).not.toBe('1')
+    })
   })
 
   it('a field’s own labelPlacement beats the form’s', () => {
