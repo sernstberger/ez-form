@@ -68,3 +68,40 @@ export const ImmediateEffect: Story = {
     )
   },
 }
+
+/**
+ * MUI's own `FormControlLabel.labelPlacement` (#139): where the label sits relative to the
+ * track. `'end'` is MUI's default and the one you get by leaving the prop off; the other
+ * three are here so the four can be compared side by side. `'start'` is the settings-row
+ * shape — label on the left, switch on the right — which is what this prop was added for.
+ *
+ * Not to be confused with `<Form labelPlacement>`, which is a different axis for a different
+ * shape of field — a `Switch` puts its label inside the click target, so it opts out of that
+ * one entirely (`fieldLayoutClasses.selfLabelled`, #133).
+ */
+export const LabelPlacement: Story = {
+  parameters: {
+    form: {
+      schema: z.object({
+        end: z.boolean(),
+        start: z.boolean(),
+        top: z.boolean(),
+        bottom: z.boolean(),
+      }),
+      defaultValues: { end: false, start: false, top: false, bottom: false },
+    },
+  } satisfies FormParameters,
+  render: () => (
+    // Stories may style (PHILOSOPHY rule 2); `src/` may not.
+    <Stack direction="row" spacing={4} sx={{ alignItems: 'flex-start' }}>
+      {(['end', 'start', 'top', 'bottom'] as const).map((placement) => (
+        <Switch
+          key={placement}
+          name={placement}
+          label={`labelPlacement="${placement}"`}
+          labelPlacement={placement}
+        />
+      ))}
+    </Stack>
+  ),
+}

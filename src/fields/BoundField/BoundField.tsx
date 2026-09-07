@@ -246,8 +246,8 @@ export interface BoundFieldProps<TValue> {
  * `resolveProps` makes no distinction between "not passed" and "not applicable". With
  * the call in the shared component, an `EzBoundField.defaultProps.helperText` rendered
  * helper text under a plain `<Checkbox name="f" label="Visible" />`, and a
- * `defaultProps.labelPlacement` re-laid-out a Checkbox inside a `floating` form. Both
- * measured, both wrong: a consumer setting a default for *their own* wrapped controls
+ * `defaultProps.labelPlacement` re-laid-out that same Checkbox against its form's own
+ * placement. Both measured, both wrong: a consumer setting a default for *their own* wrapped controls
  * has said nothing about this library's Checkbox.
  *
  * So `EzBoundField.defaultProps` reaches the public path only. The seven fields import

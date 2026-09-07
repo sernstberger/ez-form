@@ -493,8 +493,8 @@ describe('BoundField render prop', () => {
  * The class half is asserted on the DOM; the CSS half has to be asserted on the
  * *emitted rule text*, because jsdom has no layout engine and evaluates no media
  * queries — every `start`-only declaration lives inside a `@media (min-width…)` block
- * (#130), so `getComputedStyle` on a box reports the stacked fallback and would report
- * a pass whatever the grid said. Same technique as `labelPlacement.test.tsx`.
+ * (#130), so `getComputedStyle` on a box reports the below-the-breakpoint fallback and
+ * would report a pass whatever the grid said. Same technique as `labelPlacement.test.tsx`.
  */
 describe('BoundField under labelPlacement="start"', () => {
   /** Every rule in the document whose selector mentions `needle`. */
@@ -762,10 +762,7 @@ describe('BoundField controlLabelProps', () => {
         />
       </Form>,
     )
-    expect(screen.getByRole('checkbox', { name: 'Terms' })).toHaveAttribute(
-      'aria-required',
-      'true',
-    )
+    expect(screen.getByRole('checkbox', { name: 'Terms' })).toHaveAttribute('aria-required', 'true')
     expect(container.querySelector('[class*="asterisk"]')).toBeNull()
   })
 
