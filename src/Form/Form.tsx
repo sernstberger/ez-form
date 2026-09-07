@@ -232,18 +232,22 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
   requiredIndicatorText?:
     ReactNode | false | ((requiredIndicator: 'asterisk' | 'optional') => ReactNode)
   /**
-   * Where every field's label sits relative to its control (#9, #66). Its own
+   * Where every field's label sits relative to its control (#9, #66, #139) —
+   * MUI's own vocabulary, borrowed from `FormControlLabel.labelPlacement`. Its own
    * axis, orthogonal to MUI's `variant`: `variant` picks the box (outlined,
    * filled, standard) and this picks where the label goes, so a filled field
    * under `'start'` is a filled box with its label in a left column.
    *
-   * - `'floating'` (default) — MUI's own: the label floats over the input and
-   *   translates up on focus/fill, notching the outline.
-   * - `'stacked'` — the label sits above the control in normal flow, with no
-   *   motion and no notch. `createEzFormTheme()` sets this as its default; the
-   *   library's own default stays MUI's, because `src/` ships unstyled.
+   * - `'top'` (default) — the label is above the control, MUI's own arrangement.
+   *   Emits no CSS whatsoever.
    * - `'start'` — the label sits in a column beside the control, collapsing back
-   *   to `'stacked'` below `labelPlacementBreakpoint`.
+   *   to `'top'` below `labelPlacementBreakpoint`.
+   *
+   * **Whether a `'top'` label floats is the theme's, not this prop's.** It is
+   * `InputLabel`'s `shrink` / `disableAnimation` and `OutlinedInput`'s `notched`,
+   * exactly as in vanilla MUI: under `createTheme()` the label floats over the
+   * input and translates up on focus/fill; under `createEzFormTheme()` it stands
+   * still above the input with no notch. Three theme lines flip it either way.
    *
    * Form-wide, because it is a layout convention rather than a per-field choice;
    * a single row that has to differ passes its own `labelPlacement`. Theme-
@@ -252,9 +256,9 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
    */
   labelPlacement?: LabelPlacement
   /**
-   * The breakpoint below which `labelPlacement="start"` collapses to `'stacked'`
-   * — a two-column settings form has no room for a label column on a phone.
-   * Names the *smallest* size that still gets columns; default `'sm'`.
+   * The breakpoint below which `labelPlacement="start"` collapses to `'top'` — a
+   * two-column settings form has no room for a label column on a phone. Names the
+   * *smallest* size that still gets columns; default `'sm'`.
    */
   labelPlacementBreakpoint?: Breakpoint
   /** The label column's width under `labelPlacement="start"`. Default `'12rem'`. */
@@ -345,7 +349,7 @@ function FormImpl<TIn extends FieldValues, TOut>(
     requiredIndicator = 'asterisk',
     optionalText = '(optional)',
     requiredIndicatorText = defaultRequiredIndicatorText,
-    labelPlacement = 'floating',
+    labelPlacement = 'top',
     labelPlacementBreakpoint = 'sm',
     labelWidth = '12rem',
     submitPendingText = 'Submitting…',

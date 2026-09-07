@@ -9,29 +9,37 @@ import { formClasses } from '../Form/formClasses'
 import { visuallyHidden } from '../visuallyHidden'
 
 /**
- * The label placement rules (#9, #66), as one style object for `<Form>`'s `EzForm`
- * Root slot.
+ * The label placement rules (#9, #66, #139), as one style object for `<Form>`'s
+ * `EzForm` Root slot.
  *
  * They live here, on the form, rather than on each field, because every ez-form
  * field's root is the *same* box: a `.MuiFormControl-root` whose children are, in
  * order, the label, the control and `FormHelperText`. MUI gives it
- * `display: inline-flex; flex-direction: column`, so `stacked` and `start` are a
- * layout change on that one box and nothing about the markup — and therefore
- * nothing about `<label for>`, `aria-labelledby` or `aria-describedby` — moves.
- * Registering them once on the form's own styled slot keeps `TextField`, `Select`
- * and `Autocomplete` the pure pass-throughs they are meant to be (PHILOSOPHY rule
- * 2's last row: a pass-through field registers no `Ez*` key), and leaves the whole
- * set reachable from `theme.components.EzForm.styleOverrides.root`.
+ * `display: inline-flex; flex-direction: column`, so `start` is a layout change on
+ * that one box and nothing about the markup — and therefore nothing about
+ * `<label for>`, `aria-labelledby` or `aria-describedby` — moves. Registering them
+ * once on the form's own styled slot keeps `TextField`, `Select` and `Autocomplete`
+ * the pure pass-throughs they are meant to be (PHILOSOPHY rule 2's last row: a
+ * pass-through field registers no `Ez*` key), and leaves the whole set reachable
+ * from `theme.components.EzForm.styleOverrides.root`.
+ *
+ * **`start` above the breakpoint is the only thing this file emits.** `top` emits
+ * nothing, and below the breakpoint `start` emits nothing either: in both cases the
+ * box is MUI's own, floating label and all under a stock theme, static under
+ * `createEzFormTheme()`. Whether a top label floats is `InputLabel`'s `shrink`, a
+ * theme question, not this axis's (#139).
  */
 
 /**
  * Un-float the label: out of the absolute positioning MUI gives it, into normal
- * flow above the control, with no transform and no animation.
+ * flow, with no transform and no animation.
  *
- * This is the same end state `createEzFormTheme()` reaches through
- * `MuiInputLabel: { shrink: true, disableAnimation: true }` plus overrides
- * (`src/theme/ezFormTheme.ts`), expressed so it can be scoped to one placement
- * instead of the whole theme.
+ * Used **only inside `startBox`**, where it is layout rather than taste: a label
+ * that has to occupy grid column 1 has to be in flow, whatever the theme thinks
+ * about floating. `createEzFormTheme()` reaches the same end state theme-wide
+ * through `MuiInputLabel: { shrink: true, disableAnimation: true }` plus overrides
+ * (`src/theme/ezFormTheme.ts`); that is the mechanism for a *static top* label, and
+ * this is not a second copy of it — it is the grid column's requirement.
  *
  * `maxWidth: '100%'` because MUI's floating label is sized for the *shrunk* 75%
  * transform (`maxWidth: 'calc(133% - …)'`); with the transform gone that
@@ -66,9 +74,13 @@ const unfloatLabel: CSSObject = {
  * is set, and its notched legend is `max-width: 100%` with a visible span; the
  * un-notched one is `max-width: 0.01px` with a hidden span. Reaching that state in
  * CSS rather than by threading `slotProps.input.notched` through every field keeps
- * the three pass-through fields free of binding-owned `slotProps` — and it is the
- * same precedence `theme.components.MuiOutlinedInput.defaultProps = { notched: false }`
- * already has in the preset.
+ * the three pass-through fields free of binding-owned `slotProps`.
+ *
+ * Like `unfloatLabel`, used **only inside `startBox`** (and by `cellBox`): with the
+ * label pulled out to column 1 there is nothing on the border to make room for, so
+ * a notch left open would be a gap in the outline with no label in it. A *top*
+ * label's notch is the theme's business — the preset closes it theme-wide with
+ * `MuiOutlinedInput.defaultProps = { notched: false }`.
  */
 const closeNotch: CSSObject = {
   [`& .${outlinedInputClasses.notchedOutline} legend, & .${pickersOutlinedInputClasses.notchedOutline} legend`]:
@@ -77,23 +89,6 @@ const closeNotch: CSSObject = {
       '& > span': { visibility: 'hidden' },
     },
 }
-
-/**
- * The `stacked` box: label above the control, helper text under it, flush left.
- *
- * The helper text's `marginLeft` is MUI's inset for a *floating* label's 14px
- * origin; with the label in flow there is nothing to line up with.
- */
-const stackedLabel = (theme: Theme): CSSObject => ({
-  ...unfloatLabel,
-  marginBottom: theme.spacing(0.5),
-})
-
-const stackedBox = (theme: Theme): CSSObject => ({
-  [`& .${formLabelClasses.root}`]: stackedLabel(theme),
-  ...closeNotch,
-  [`& .${formHelperTextClasses.root}`]: { marginLeft: 0, marginRight: 0 },
-})
 
 /**
  * What makes a field box *self-labelled*: its label lives inside its control, so
@@ -236,23 +231,38 @@ const startBox = (theme: Theme, labelWidth: string | number): CSSObject => ({
  *
  * Only ever emitted inside the `up(breakpoint)` block, so it undoes `startBox` and
  * nothing else: below the breakpoint there is no grid for it to opt out of.
+ *
+ * It resets **to MUI's own box**, not to some second static-label recipe (#139):
+ * every declaration here is either MUI's initial value or the property's `unset`,
+ * so a `Checkbox` in a `start` form renders exactly as it does under `top` —
+ * floating-label theme or preset, whichever the consumer chose. That is why the
+ * `unfloatLabel` declarations `startBox` put on the label are unset here rather
+ * than re-stated.
  */
-const selfLabelledOptOut = (theme: Theme): CSSObject => ({
+const selfLabelledOptOut: CSSObject = {
   [selfLabelledSelectors.map((s) => `&${s}`).join(', ')]: {
     display: 'inline-flex',
     gridTemplateColumns: 'none',
     alignItems: 'normal',
     '& > *': { gridColumn: 'auto' },
     // The grid placement `startBox` set is on this same, more specific selector,
-    // so it has to be undone here rather than by the `& > *` reset above.
+    // so it has to be undone here rather than by the `& > *` reset above. `unset`
+    // rather than a value, so what is left is whatever MUI and the theme say.
     [`& .${formLabelClasses.root}`]: {
-      ...stackedLabel(theme),
+      position: 'unset',
+      transform: 'unset',
+      maxWidth: 'unset',
+      padding: 'unset',
+      whiteSpace: 'unset',
+      pointerEvents: 'unset',
+      transition: 'unset',
+      marginBottom: 'unset',
       gridColumn: 'auto',
       gridRow: 'auto',
-      paddingTop: 0,
+      paddingTop: 'unset',
     },
   },
-})
+}
 
 /**
  * A field inside a `<FieldArray layout="table">` cell (#14).
@@ -261,8 +271,9 @@ const selfLabelledOptOut = (theme: Theme): CSSObject => ({
  * sight but not out of the tree — it is still the `<label for>` / legend the field
  * is built around, and `aria-labelledby` (row header + column header, set by
  * `useEzField`) is what names the control. The notch closes for the same reason
- * `stacked` closes it: there is no label on the border to make room for. The box
- * fills its cell, and any `start` grid is undone — a hidden label owns no column.
+ * `start` closes it: there is no visible label on the border to make room for. The
+ * box fills its cell, and any `start` grid is undone — a hidden label owns no
+ * column.
  *
  * Selected by **two** classes (`root` + `cell`) on purpose: that outranks the
  * single-class placement rules — including `start`'s, which sit inside a
@@ -302,22 +313,24 @@ const cellBox: CSSObject = {
 /**
  * Every placement rule, scoped to the field boxes inside this form.
  *
- * `floating` gets no rules at all: it *is* MUI's own layout, and a rule that
- * re-stated it would be a theme-unreachable copy of something upstream ships
- * (PHILOSOPHY rule 1).
+ * **`start` above the breakpoint is all of it** (#139). `top` gets no rules at
+ * all: it *is* MUI's own layout, and a rule that re-stated it would be a
+ * theme-unreachable copy of something upstream ships (PHILOSOPHY rule 1). Whether
+ * a `top` label floats or stands still is `InputLabel`'s `shrink` — the theme's,
+ * and `createEzFormTheme()` is where this repo's opinion about it lives. Below the
+ * breakpoint `start` gets no rules either: the box is MUI's own there too, so a
+ * `start` form on a phone looks like the same form under `top`.
  *
- * **`start` is `stacked` plus a label column above the breakpoint** — that is the
- * shape, and it is deliberate (#130). The first version instead applied the grid
- * unconditionally and undid it under `theme.breakpoints.down(…)`, which meant the
- * fallback carried a hand-written list of declarations to reset. A list you have to
- * remember to extend is a list you can forget from, and `alignItems` was forgotten:
- * in the grid it is row alignment and keeps a tall control's label at the top, but
- * the fallback re-declared the box as a flex column, where `align-items` is the
- * *cross* axis — so `start` shrank every control to its intrinsic width on a phone
- * (a Select measured 46px against `stacked`'s 349px at 380px). Scoping the
- * `start`-only rules under `up(…)` means the box below the breakpoint simply *is*
- * `stackedBox`, so there is nothing to reset and a declaration added to `startBox`
- * tomorrow cannot leak past the breakpoint either.
+ * Scoping every `start` declaration under `up(…)`, rather than applying the grid
+ * unconditionally and undoing it under `down(…)`, is deliberate (#130). The undo
+ * version carried a hand-written list of declarations to reset, and a list you have
+ * to remember to extend is a list you can forget from: `alignItems` was forgotten,
+ * and because the fallback re-declared the box as a flex column — where
+ * `align-items` is the *cross* axis, not row alignment — `start` shrank every
+ * control to its intrinsic width on a phone (a Select measured 46px against 349px
+ * at 380px). With the rules only ever emitted above the breakpoint there is
+ * nothing to reset, and a declaration added to `startBox` tomorrow cannot leak past
+ * it either.
  */
 export function labelPlacementStyles(
   theme: Theme,
@@ -325,34 +338,37 @@ export function labelPlacementStyles(
   labelWidth: string | number,
 ): CSSObject {
   return {
-    // A gap between the form's description and the first field, for the two
-    // placements whose label is in normal flow (#131).
+    [`& .${fieldLayoutClasses.start}`]: {
+      [theme.breakpoints.up(labelPlacementBreakpoint)]: {
+        ...startBox(theme, labelWidth),
+        ...selfLabelledOptOut,
+      },
+    },
+    // A gap between the form's description and the first field, `start` only and
+    // only where `start` is actually a column layout (#131, #139).
     //
-    // Under `floating` the first thing below the description is the *input box*, and
-    // its label sits inside the outline, so MUI's own spacing already reads as a gap
-    // (16px measured). Under `stacked` and `start` the first thing below it is a
-    // line of label text flush against the description's own last line — measured at
-    // 0px, text touching text.
+    // With a label in column 1 the first thing below the description is a line of
+    // label text, flush against the description's own last line — measured at 0px,
+    // text touching text. Everywhere else the axis emits nothing, so the box is
+    // MUI's, and how much room the description needs is the theme's question: the
+    // preset carries it as `EzForm.styleOverrides.description`, because under the
+    // preset every label is static. Under a stock theme the label floats inside the
+    // outline and MUI's own spacing already reads as a gap (16px measured).
     //
-    // Keyed on the form carrying a non-floating field rather than on the description
+    // Keyed on the form containing a `start` field rather than on the description
     // being that field's sibling: `<Form>` renders its description above three
     // context providers, and a consumer's children are normally inside their own
     // `<Stack>`, so a `+` or `~` selector between the two almost never matches. This
     // is a form-level layout question anyway, which is why it sits in this file with
-    // the rest of the placement CSS rather than on the description slot.
+    // the rest of the placement CSS rather than on the description slot. It cannot
+    // nest inside the rule above for the same reason: `&` there is the field box,
+    // and the description is not inside it.
     //
     // `theme.spacing(2)` matches the `columnGap` `start` already uses; a theme
     // changes it through `EzForm.styleOverrides.root` like every other rule here.
-    [`&:has(.${fieldLayoutClasses.stacked}) .${formClasses.description}, &:has(.${fieldLayoutClasses.start}) .${formClasses.description}`]:
-      { marginBottom: theme.spacing(2) },
-    [`& .${fieldLayoutClasses.stacked}`]: stackedBox(theme),
-    [`& .${fieldLayoutClasses.start}`]: {
-      // The fallback, stated once as the base rule rather than as an override:
-      // below the breakpoint a `start` field is a `stacked` field, exactly.
-      ...stackedBox(theme),
-      [theme.breakpoints.up(labelPlacementBreakpoint)]: {
-        ...startBox(theme, labelWidth),
-        ...selfLabelledOptOut(theme),
+    [theme.breakpoints.up(labelPlacementBreakpoint)]: {
+      [`&:has(.${fieldLayoutClasses.start}) .${formClasses.description}`]: {
+        marginBottom: theme.spacing(2),
       },
     },
     ...cellBox,

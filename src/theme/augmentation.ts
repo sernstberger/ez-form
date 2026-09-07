@@ -163,11 +163,12 @@ declare module '@mui/material/styles' {
       styleOverrides?: ComponentsOverrides<Theme>['EzNumberField']
     }
     /**
-     * Also the home of the label-placement axis (#9, #66):
+     * Also the home of the label-placement axis (#9, #66, #139):
      * `defaultProps.labelPlacement` / `labelPlacementBreakpoint` / `labelWidth`
      * arrive for free through `Partial<FormProps>`, and the placement *rules* are
      * registered on this component's `root` slot, so `styleOverrides.root` is what
-     * a theme edits to change how `stacked` or `start` look.
+     * a theme edits to change how `start` looks. (`top` emits no rules — whether a
+     * top label floats is `MuiInputLabel`'s `shrink`, not this key's.)
      *
      * `EzFieldLayout` is deliberately **not** a component key of its own: it names
      * only the classes those rules select (`fieldLayoutClasses`), and giving it a
