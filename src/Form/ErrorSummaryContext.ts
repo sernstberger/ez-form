@@ -29,11 +29,10 @@ import { createContext, useContext, useSyncExternalStore } from 'react'
  * cheap to avoid — remount the `<Form>`, or leave the summary mounted and let it render null
  * on its own, which is what it already does when there is nothing to show.
  *
- * Ruling: a subscription store rather than `useState` on `<Form>` — a summary mounting must
- * not re-render every field of the form (the same reason `FieldFocusContext` is a store; its
- * own ruling records that publishing such a map as form state "disturbed the Wizard's
- * failed-submit focus race"). Cost if wrong: a hand-rolled store — ~15 lines — instead of a
- * hook.
+ * A subscription store rather than `useState` on `<Form>`, for the reason recorded once in
+ * `FieldFocusContext` — a summary mounting must not re-render every field of the form. That
+ * file also records why these registries stay separate stores rather than sharing a generic
+ * one (#126). What is specific to *this* store is the latch described above.
  */
 export interface ErrorSummaryStore {
   /**
