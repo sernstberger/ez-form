@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useContext,
   useEffect,
   useId,
   useLayoutEffect,
@@ -7,6 +8,7 @@ import {
   useRef,
   useState,
   type ComponentProps,
+  type KeyboardEvent,
   type ReactNode,
 } from 'react'
 import Button, { type ButtonProps } from '@mui/material/Button'
@@ -41,6 +43,8 @@ import type { FieldArrayRow } from './FieldArrayRow'
 
 export type { FieldArrayRow }
 import { FieldCellContext, type FieldCellContextValue } from '../fields/FieldCellContext'
+import { FieldFocusContext } from '../Form/FieldFocusContext'
+import { isPlainKey } from '../keys'
 import { visuallyHidden } from '../visuallyHidden'
 
 // `errorText`, not `error`: MUI reserves `error` (with `active`, `checked`,
@@ -318,11 +322,29 @@ function denseFieldTheme(theme: Theme, size: 'small' | 'medium'): Theme {
 
 /** Where focus should land once React has rendered the new row list. */
 type PendingFocus =
-  /** The row that was just appended, identified at commit time (see `handleAdd`). */
-  | { kind: 'appended' }
+  /**
+   * The row that was just appended, identified at commit time (see `handleAdd`). With a
+   * `columnKey` (Enter on a table's last row, #14) focus lands in that column's cell rather
+   * than the row's first control.
+   */
+  | { kind: 'appended'; columnKey?: string }
   | { kind: 'row'; index: number }
   | { kind: 'move'; index: number; direction: 'up' | 'down' }
   | { kind: 'add' }
+
+/** The first thing in a row (or cell) that Tab would stop on. */
+const FOCUSABLE =
+  'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+
+/** The data cell for `columnKey` inside a row element. */
+const cellIn = (row: HTMLElement, columnKey: string): HTMLElement | null =>
+  [...row.querySelectorAll<HTMLElement>('td[data-column]')].find(
+    (td) => td.dataset.column === columnKey,
+  ) ?? null
+
+/** The data cell (`<td data-column>`) an event target sits in, if any — never the actions cell. */
+const cellOf = (target: EventTarget | null): HTMLElement | null =>
+  target instanceof Element ? target.closest<HTMLElement>('td[data-column]') : null
 
 /**
  * A repeating group of fields over a hookform `useFieldArray`, with Add,
@@ -376,7 +398,12 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
   } = useDefaultProps({ props: inProps, name: 'EzFieldArray' })
   // The guard, plus `getValues` for the post-update row count; `useFieldArray`
   // reads `control` from context itself.
-  const { getValues } = useEzFormContext('FieldArray')
+  const { getValues, setFocus } = useEzFormContext('FieldArray')
+  // Read *imperatively* at keydown time (`getIds()`), never subscribed: `useFocusTargetIds()`
+  // would re-render this component — and with it every row's fields — on each cell's
+  // registration, which is the exact re-render FieldFocusContext's ruling exists to prevent.
+  // The keyboard model only needs the map at the moment a key is pressed.
+  const focusStore = useContext(FieldFocusContext)
   warnFieldArrayLayout(name, layout, children !== undefined, columns !== undefined)
   const { fields, append, remove, move } = useFieldArray({ name, rules, shouldUnregister })
   const { errors } = useFormState()
@@ -470,11 +497,14 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
       opposite?.focus()
       return
     }
-    row
-      .querySelector<HTMLElement>(
-        'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
-      )
-      ?.focus()
+    // Enter on a table's last row appends and lands in the *same column* (#14); the cell is
+    // found in the DOM because the new row's fields register their focus targets in this very
+    // commit, after this effect's closure captured the ids.
+    const cell =
+      pendingFocus.kind === 'appended' && pendingFocus.columnKey !== undefined
+        ? cellIn(row, pendingFocus.columnKey)
+        : null
+    ;(cell ?? row).querySelector<HTMLElement>(FOCUSABLE)?.focus()
   }, [pendingFocus, fields])
 
   /** What one row is called — `Applicant`, `Line item` — before its number. */
@@ -503,7 +533,8 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
   /** Rows *now*, read after a hookform mutation has applied rather than from `fields`. */
   const rowCount = () => (getValues(name) as unknown[] | undefined)?.length ?? 0
 
-  const handleAdd = () => {
+  /** Add. `columnKey` is Enter-on-the-last-row's request to land in that column (#14). */
+  const handleAdd = (columnKey?: string) => {
     const row = typeof emptyRow === 'function' ? (emptyRow as () => TRow)() : emptyRow
     // hookform focuses the input it registered for the new row; this component
     // focuses the row's first focusable control itself, in the effect above.
@@ -511,7 +542,7 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
     // Resolve the target at commit time rather than storing `fields.length`
     // from this render's closure: a double invoke would read the same stale
     // length twice and aim at a row that is no longer the appended one.
-    setPendingFocus({ kind: 'appended' })
+    setPendingFocus({ kind: 'appended', columnKey })
     // The count comes from the form's values, which `append` has already
     // written, not from this render's `fields.length`: two Adds (or a Remove
     // then an Add) landing in one batch run against the same stale closure and
@@ -640,6 +671,65 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
     ))
 
   /**
+   * Moves focus into `column`'s cell on row `index` (#14): hookform's `setFocus` where the
+   * cell's field registered a focus target under the expected name (the #98 registry, read
+   * imperatively), else the first focusable thing in the cell — a column whose control is
+   * bound under a different name than `field ?? key`, or a cell holding no ez-form field.
+   */
+  const focusCell = (index: number, column: FieldArrayColumn<TRow>) => {
+    const target = fields[index]
+    const rowEl = target && rowRefs.current.get(target.id)
+    const cell = rowEl ? cellIn(rowEl, column.key) : null
+    if (!cell) return
+    const fieldName = `${name}.${index}.${column.field ?? column.key}`
+    const id = focusStore?.getIds()[fieldName]
+    const registered = id ? document.getElementById(id) : null
+    if (registered && cell.contains(registered)) {
+      setFocus(fieldName)
+      if (cell.contains(document.activeElement)) return
+    }
+    cell.querySelector<HTMLElement>(FOCUSABLE)?.focus()
+  }
+
+  /**
+   * The table's keyboard model (#4 of the design spec): one handler on `<TableBody>`, the
+   * pattern #116 used on the Wizard step's fieldset, with the same exclusions (`isPlainKey`).
+   *
+   * - Enter, plain, in a data cell: same column, next row; on the last row, append (under
+   *   `maxRows`) and land in that column once the row mounts; at the cap, stay. Always
+   *   `preventDefault`, so Enter **never** submits from a cell — the one documented,
+   *   table-scoped exception to `describeFieldContract`'s "Enter submits once".
+   * - ArrowDown / ArrowUp, plain, when the control did not consume the key: same column, one
+   *   row down / up, no wrap. `Select`, `Autocomplete`, the pickers, `Slider` and `Radio`
+   *   all `preventDefault` the arrows they use, so `isPlainKey` leaves those alone — a closed
+   *   Select opens its menu, as MUI intends, rather than changing rows.
+   * - Tab, Left/Right, Escape: untouched. Keys in the actions cell: untouched (`cellOf`).
+   *
+   * The pickers need one thing more: MUI X's `PickersInputBase` submits the form itself on
+   * Enter, before this handler sees the event. `usePickerField` disarms that from inside the
+   * picker when it is in a cell — see the `cell` note there and `preventMuiDefault`.
+   */
+  const handleTableKeyDown = (event: KeyboardEvent<HTMLTableSectionElement>) => {
+    const cell = cellOf(event.target)
+    if (!cell) return
+    const column = columns?.find((c) => c.key === cell.dataset.column)
+    const index = Number(cell.closest('tr')?.dataset.rowIndex)
+    if (!column || Number.isNaN(index)) return
+    if (isPlainKey(event, 'Enter')) {
+      event.preventDefault()
+      if (index < fields.length - 1) focusCell(index + 1, column)
+      else if (!atMax) handleAdd(column.key)
+      return
+    }
+    const down = isPlainKey(event, 'ArrowDown')
+    if (!down && !isPlainKey(event, 'ArrowUp')) return
+    const to = down ? index + 1 : index - 1
+    if (to < 0 || to >= fields.length) return
+    event.preventDefault()
+    focusCell(to, column)
+  }
+
+  /**
    * `layout="table"` (#14). Headers name the columns (`scope="col"`), a hidden `<th
    * scope="row">` names each row, and every data cell points at its column through
    * `headers`. The controls inside learn the two header ids from `FieldCellContext`,
@@ -699,7 +789,7 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
           </FieldArrayTableRow>
         </FieldArrayTableHead>
         <ThemeProvider theme={denseTheme}>
-          <TableBody>
+          <TableBody onKeyDown={handleTableKeyDown}>
             {rows.map((row) => {
               const { index, id } = row
               const rowAriaName = nameRowForAria(index)
@@ -707,6 +797,7 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
                 <FieldArrayTableRow
                   key={id}
                   {...tableRowSlotProps}
+                  data-row-index={index}
                   ref={(el: HTMLTableRowElement | null) => setRowRef(id, el)}
                   className={cx(fieldArrayClasses.tableRow, tableRowSlotProps?.className)}
                 >
@@ -735,6 +826,7 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
                         key={column.key}
                         align={column.align}
                         {...cellSlotProps}
+                        data-column={column.key}
                         headers={columnHeaderId(column.key)}
                         className={cx(fieldArrayClasses.cell, cellSlotProps?.className)}
                       >
@@ -772,7 +864,7 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
         {...addProps}
         disabled={atMax || addProps.disabled}
         className={cx(fieldArrayClasses.add, addProps.className)}
-        onClick={handleAdd}
+        onClick={() => handleAdd()}
       >
         {addLabel}
       </FieldArrayAdd>

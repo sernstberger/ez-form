@@ -2,6 +2,7 @@ import {
   useRef,
   type ClipboardEvent,
   type FocusEvent,
+  type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
 } from 'react'
@@ -9,6 +10,8 @@ import { mergeSlotProps } from '@mui/material/utils'
 import type { PickerChangeHandlerContext } from '@mui/x-date-pickers/models'
 import type { FieldValues, Validate } from 'react-hook-form'
 import { useEzField } from '../useEzField'
+import { useFieldCell } from '../FieldCellContext'
+import { isPlainKey, preventMuiDefault } from '../../keys'
 import type { LabelPlacement } from '../LabelPlacementContext'
 import { mergeDisabled } from '../mergeDisabled'
 import { useRuleMessages } from '../../Form/RuleMessagesContext'
@@ -88,6 +91,7 @@ interface ConsumerTextFieldSlotProps {
   /** The consumer's own description, for the same reason and by the same route. */
   'aria-describedby'?: string
   onBlur?: (event: FocusEvent<HTMLDivElement>) => void
+  onKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void
   slotProps?: Record<string, unknown> & {
     formHelperText?: object
     inputLabel?: { required?: boolean }
@@ -254,6 +258,15 @@ export function usePickerField<
     'aria-labelledby': consumerTextField?.['aria-labelledby'],
   })
   const text = f.helperText(helperText)
+  // Inside a `<FieldArray layout="table">` cell Enter belongs to the table (#14), and this
+  // is the one component that would otherwise take it: `PickersInputBase` submits the form
+  // itself on Enter whenever the form has a submit button — `closestForm.requestSubmit(
+  // submitTrigger)` — guarded by `event.defaultMuiPrevented`, which it checks *after* calling
+  // the consumer's `onKeyDown` (`useField.js`: `onKeyDown?.(event); rootProps.onKeyDown(
+  // event)`, then `PickersInputBase.js` `handleKeyDown`). So this is the one place that can
+  // disarm it; the table's own handler, further up, sees the same dispatch only after the
+  // submit would already have been requested. Outside a cell nothing changes.
+  const cell = useFieldCell()
   /**
    * The field id `PickersTextField` would otherwise generate for itself, pinned so the
    * helper-text id it derives (`${id}-helper-text`, PickersTextField.js) is knowable
@@ -362,6 +375,11 @@ export function usePickerField<
         onPaste: (event: ClipboardEvent<HTMLDivElement>) => {
           handlePaste(event)
           consumerTextField?.onPaste?.(event)
+        },
+        // See `cell` above. Same "form's handler first" ordering as onBlur/onPaste.
+        onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => {
+          if (cell && isPlainKey(event, 'Enter')) preventMuiDefault(event)
+          consumerTextField?.onKeyDown?.(event)
         },
         // #83: the clear button, when a consumer opts into `clearable`. MUI X's
         // `useField.js` `handleClear` runs `onClear?.(event)` and *then*

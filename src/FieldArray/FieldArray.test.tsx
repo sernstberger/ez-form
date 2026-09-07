@@ -875,6 +875,109 @@ describe('FieldArray', () => {
       )
     })
 
+    /*
+     * The keyboard model (spec §4). `onSubmit` is the tell for "Enter submitted": every row
+     * here is valid, so a submit that got through would reach it.
+     */
+    describe('keyboard', () => {
+      it('Enter moves to the same column in the next row and never submits', async () => {
+        const user = userEvent.setup()
+        const onSubmit = vi.fn()
+        render(<Lines rows={[line('A'), line('B')]} onSubmit={onSubmit} />)
+        await user.click(cellControl(1, 'Qty'))
+        await user.keyboard('{Enter}')
+        await waitFor(() => expect(cellControl(2, 'Qty')).toHaveFocus())
+        // Also from a Select cell: Enter on a *closed* Select opens its menu (MUI prevents
+        // it), so the table leaves it alone — no row change, no submit. Focused, not
+        // clicked: a click opens the menu on mousedown already. The open menu is a Modal
+        // that hides the rest of the page from the a11y tree, so the row check waits for it
+        // to close.
+        const category = cellControl(1, 'Category')
+        // `act`: focusing flips `FormControl`'s focused state, a React update.
+        act(() => category.focus())
+        await user.keyboard('{Enter}')
+        expect(await screen.findByRole('listbox')).toBeInTheDocument()
+        await user.keyboard('{Escape}')
+        await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
+        expect(category).toHaveFocus()
+        expect(onSubmit).not.toHaveBeenCalled()
+      })
+
+      it('Enter on the last row appends a row and lands in the same column; at maxRows it stays', async () => {
+        const user = userEvent.setup()
+        const onSubmit = vi.fn()
+        render(<Lines rows={[line('A')]} maxRows={2} onSubmit={onSubmit} />)
+        await user.click(cellControl(1, 'Qty'))
+        await user.keyboard('{Enter}')
+        await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(2))
+        await waitFor(() => expect(cellControl(2, 'Qty')).toHaveFocus())
+        await waitFor(() => expect(statusRegion()).toHaveTextContent('Row 2 added'))
+        // At the cap: nothing appends, focus stays, and still no submit.
+        await user.keyboard('{Enter}')
+        expect(screen.getAllByRole('rowheader')).toHaveLength(2)
+        expect(cellControl(2, 'Qty')).toHaveFocus()
+        expect(onSubmit).not.toHaveBeenCalled()
+      })
+
+      it("Enter in a picker cell does not submit either (MUI X's own requestSubmit is disarmed)", async () => {
+        const user = userEvent.setup()
+        const onSubmit = vi.fn()
+        render(<Lines rows={[line('A'), line('B')]} onSubmit={onSubmit} />)
+        // MUI X's `PickersInputBase` calls `form.requestSubmit(submitButton)` on Enter when
+        // the form has a submit button — this form does — guarded only by
+        // `defaultMuiPrevented`. The table's capture handler sets that flag for picker cells.
+        await user.click(cellControl(1, 'Due'))
+        await user.keyboard('{Enter}')
+        await waitFor(() =>
+          expect(cellControl(2, 'Due').contains(document.activeElement)).toBe(true),
+        )
+        expect(onSubmit).not.toHaveBeenCalled()
+      })
+
+      it('ArrowDown / ArrowUp move rows in the same column, without wrapping', async () => {
+        const user = userEvent.setup()
+        render(<Lines rows={[line('A'), line('B')]} />)
+        await user.click(cellControl(1, 'SKU'))
+        // Top row: ArrowUp has nowhere to go and is left to the control.
+        await user.keyboard('{ArrowUp}')
+        expect(cellControl(1, 'SKU')).toHaveFocus()
+        await user.keyboard('{ArrowDown}')
+        await waitFor(() => expect(cellControl(2, 'SKU')).toHaveFocus())
+        // Bottom row: ArrowDown does not wrap.
+        await user.keyboard('{ArrowDown}')
+        expect(cellControl(2, 'SKU')).toHaveFocus()
+        await user.keyboard('{ArrowUp}')
+        await waitFor(() => expect(cellControl(1, 'SKU')).toHaveFocus())
+      })
+
+      it('ArrowDown on a closed Select opens its menu — MUI consumed the key, so the row stays', async () => {
+        const user = userEvent.setup()
+        render(<Lines rows={[line('A'), line('B')]} />)
+        const category = cellControl(1, 'Category')
+        // `act`: focusing flips `FormControl`'s focused state, a React update.
+        act(() => category.focus())
+        await user.keyboard('{ArrowDown}')
+        // Measured: `SelectInput`'s `handleKeyDown` treats ArrowDown as an open key and
+        // `preventDefault`s it, which is exactly the signal `isPlainKey` defers to. This is
+        // the exclusion working, not a gap.
+        expect(await screen.findByRole('listbox')).toBeInTheDocument()
+        await user.keyboard('{Escape}')
+        await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
+        expect(category).toHaveFocus()
+      })
+
+      it("keys in the actions column are the buttons' own", async () => {
+        const user = userEvent.setup()
+        const onSubmit = vi.fn()
+        render(<Lines rows={[line('A'), line('B')]} onSubmit={onSubmit} />)
+        screen.getByRole('button', { name: 'Remove Line item 2' }).focus()
+        await user.keyboard('{Enter}')
+        // Enter on a button is a click: the row is removed, nothing else moves.
+        await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(1))
+        expect(onSubmit).not.toHaveBeenCalled()
+      })
+    })
+
     it.each(['summary', 'inline'] as const)(
       'has no a11y violations at rest and in error (cellErrors=%s)',
       async (cellErrors) => {
