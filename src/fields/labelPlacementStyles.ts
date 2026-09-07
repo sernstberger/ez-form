@@ -93,6 +93,35 @@ const stackedBox = (theme: Theme): CSSObject => ({
 })
 
 /**
+ * What makes a field box *self-labelled*: its label lives inside its control, so
+ * there is no separate label element for `start`'s column 1 (#133).
+ *
+ * Two ways to say it, one meaning. `fieldLayoutClasses.selfLabelled` is the
+ * contract — the field declares it on its root (`FileField` does: its picker
+ * `Button component="label"` is the label text and the control in one element; a
+ * consumer's own control with its label inside can too). The
+ * `:has(> .MuiFormControlLabel-root)` form is how `FieldFrame`'s `labelAs="control"`
+ * frame (`Checkbox`, `Switch`) is recognised until it carries the class itself
+ * (#28's `labelAs="none"` is the same shape and should carry it too), after which
+ * that half is redundant.
+ *
+ * Deliberately *not* `:not(:has(.MuiFormLabel-root))`: a label-less `TextField`
+ * named by `aria-label` has no label element either, and its control belongs in the
+ * control column, aligned with its neighbours' — only the component knows which of
+ * the two it is, so the component says.
+ *
+ * Kept as a list rather than one `:is(…)` so the two selectors built from it carry
+ * no comma inside a pseudo-class: stylis splits selector lists on commas.
+ */
+const selfLabelledSelectors = [
+  `.${fieldLayoutClasses.selfLabelled}`,
+  `:has(> .${formControlLabelClasses.root})`,
+]
+
+/** `&:not(a):not(b)` — a box that is not self-labelled. */
+const notSelfLabelled = selfLabelledSelectors.map((s) => `:not(${s})`).join('')
+
+/**
  * The `start` box: a two-column grid, label in column 1, control and helper text
  * in column 2.
  *
@@ -118,7 +147,20 @@ const startBox = (theme: Theme, labelWidth: string | number): CSSObject => ({
   gridTemplateColumns: `${typeof labelWidth === 'number' ? `${labelWidth}px` : labelWidth} 1fr`,
   columnGap: theme.spacing(2),
   alignItems: 'start',
-  [`& .${formLabelClasses.root}`]: {
+  // Column 1 is the label. Selected as `.MuiFormLabel-root` for every ez-form field,
+  // and additionally as a plain direct-child `<label>` for a consumer-built control
+  // (a public `BoundField labelAs="none"` whose consumer renders `<label htmlFor>`
+  // + `<input>` themselves, #28): without that a plain label fell through to the
+  // column-2 rule below and sat beside an empty label column. An ez-form field's
+  // `<label>` already carries `.MuiFormLabel-root`, so for it the second selector
+  // changes nothing.
+  //
+  // The plain-`label` half is guarded by `notSelfLabelled`, because a self-labelled
+  // box's direct-child `<label>` *is its control*: `FileField`'s picker Button and a
+  // Checkbox's `FormControlLabel` are both `<label>`s, and this block would restyle
+  // them (`padding: 0`, `transition: none`, a top padding) before the opt-out below
+  // could undo the grid placement.
+  [`& .${formLabelClasses.root}, &${notSelfLabelled} > label`]: {
     ...unfloatLabel,
     gridColumn: 1,
     gridRow: 1,
@@ -156,29 +198,38 @@ const startBox = (theme: Theme, labelWidth: string | number): CSSObject => ({
   // Everything that is not the label goes in column 2, stacked in source order —
   // the control, the helper text, and whatever else a field renders.
   //
-  // Selected by *not being* `.MuiFormLabel-root` rather than by tag, because the
-  // label's element varies by field: a `TextField` renders `<label>`, a `Select`
+  // Selected by *not being* `.MuiFormLabel-root` rather than by tag alone, because
+  // the label's element varies by field: a `TextField` renders `<label>`, a `Select`
   // renders a `<div>` (there is no `htmlFor` target — the combobox is named through
   // `aria-labelledby`), and `FieldFrame`'s legend frame renders `<legend>`. A
-  // tag-based rule would put a `Select`'s label in column 2 with its own control.
-  '& > *:not(.MuiFormLabel-root)': { gridColumn: 2 },
+  // tag-only rule would put a `Select`'s label in column 2 with its own control.
+  // `:not(label)` is the complement of the plain-`label` half above; it needs no
+  // self-labelled guard, because on a self-labelled box the opt-out resets every
+  // child's column anyway.
+  [`& > *:not(.${formLabelClasses.root}):not(label)`]: { gridColumn: 2 },
   [`& .${formHelperTextClasses.root}`]: { marginLeft: 0, marginRight: 0 },
 })
 
 /**
- * `Checkbox` and `Switch` (`FieldFrame`'s `labelAs="control"`) opt out of the grid.
+ * A self-labelled field opts out of the grid.
  *
- * Their label is already beside the control, inside the single `<label>` that *is*
- * the click target — pulling it into a left column would either break that target
- * or duplicate the label. They take the helper-text alignment and nothing else, so
- * a checkbox row in a `start` form still lines up flush left with its neighbours'
- * label column rather than being indented into column 2.
+ * Its label is already inside its control — `Checkbox` and `Switch` (`FieldFrame`'s
+ * `labelAs="control"`) inside the single `<label>` that *is* the click target,
+ * `FileField` as the text of the picker `Button component="label"` — so there is no
+ * separate label element to put in column 1. Pulling one out would either break the
+ * click target or duplicate the label, and leaving the grid in place puts the control
+ * in column 2 beside an *empty* label column, a permanent `labelWidth` gutter (#133).
+ * They take the helper-text alignment and nothing else, so such a row in a `start`
+ * form still lines up flush left with its neighbours' label column.
+ *
+ * Keyed on `selfLabelledSelectors` — see there for why it is a class the field
+ * declares and not a heuristic on the missing label element.
  *
  * Only ever emitted inside the `up(breakpoint)` block, so it undoes `startBox` and
  * nothing else: below the breakpoint there is no grid for it to opt out of.
  */
-const controlLabelOptOut = (theme: Theme): CSSObject => ({
-  [`&:has(> .${formControlLabelClasses.root})`]: {
+const selfLabelledOptOut = (theme: Theme): CSSObject => ({
+  [selfLabelledSelectors.map((s) => `&${s}`).join(', ')]: {
     display: 'inline-flex',
     gridTemplateColumns: 'none',
     alignItems: 'normal',
@@ -247,7 +298,7 @@ export function labelPlacementStyles(
       ...stackedBox(theme),
       [theme.breakpoints.up(labelPlacementBreakpoint)]: {
         ...startBox(theme, labelWidth),
-        ...controlLabelOptOut(theme),
+        ...selfLabelledOptOut(theme),
       },
     },
   }

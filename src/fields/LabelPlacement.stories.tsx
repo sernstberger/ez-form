@@ -12,6 +12,7 @@ import { Select } from './Select'
 import { Checkbox } from './Checkbox'
 import { RadioGroup } from './RadioGroup'
 import { NumberField } from './NumberField'
+import { FileField } from './FileField'
 import type { LabelPlacement } from './LabelPlacementContext'
 
 /**
@@ -31,6 +32,7 @@ const schema = z.object({
   seats: z.number().nullable(),
   billing: z.string(),
   newsletter: z.boolean(),
+  logo: z.instanceof(File).nullable(),
 })
 
 const defaultValues = {
@@ -39,6 +41,7 @@ const defaultValues = {
   seats: null,
   billing: 'monthly',
   newsletter: false,
+  logo: null,
 }
 
 const onSubmit = fn()
@@ -66,6 +69,9 @@ function SettingsFields() {
         ]}
       />
       <Checkbox name="newsletter" label="Send me product news" />
+      {/* Self-labelled like the checkbox: the button is the label, so under `start`
+          it sits flush left rather than beside an empty label column (#133). */}
+      <FileField name="logo" label="Company logo" accept="image/*" />
     </>
   )
 }

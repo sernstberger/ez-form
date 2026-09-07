@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
 import { Form } from '../../Form'
 import { FileField, fileFieldClasses } from './FileField'
+import { fieldLayoutClasses } from '../LabelPlacementContext'
 import { describeFieldContract } from '../../test/describeFieldContract'
 import { expectTargetSize } from '../../test/targetSize'
 import { expectNoA11yViolations } from '../../test/axe'
@@ -400,6 +401,54 @@ const dataTransfer = (files: File[]) => ({ files, items: [], types: ['Files'] })
 // A widening cast (Element -> HTMLElement), not a non-null one.
 // eslint-disable-next-line @typescript-eslint/non-nullable-type-assertion-style
 const dropZone = () => document.querySelector(`.${fileFieldClasses.dropZone}`) as HTMLElement
+
+describe('FileField under labelPlacement="start" (#133)', () => {
+  it.each([
+    ['button', false],
+    ['dropzone', true],
+  ])(
+    '%s mode: declares itself self-labelled, so start keeps the stacked box',
+    async (_mode, dropzone) => {
+      const { container } = render(
+        <Form
+          schema={schema}
+          defaultValues={{ resume: null }}
+          onSubmit={() => {}}
+          labelPlacement="start"
+        >
+          <FileField name="resume" label="Resume" dropzone={dropzone} />
+        </Form>,
+      )
+      const root = container.querySelector(`.${fileFieldClasses.root}`)!
+      // The picker is the label: nothing in the box is a `.MuiFormLabel-root`, so the
+      // grid's column-1 rule would match nothing and column 1 would sit empty — a
+      // `labelWidth` gutter beside the button. The class is what opts the box out.
+      expect(root.querySelector('.MuiFormLabel-root')).toBeNull()
+      expect(root).toHaveClass(fieldLayoutClasses.start, fieldLayoutClasses.selfLabelled)
+      // The picker really is a direct-child `<label>` of the box (in dropzone mode the
+      // zone is), which is why the placement CSS guards its plain-`label` column-1 rule
+      // with the self-labelled predicate — and why `& > * { grid-column: auto }` reaches
+      // what would otherwise be placed.
+      const picker = screen.getByText('Resume').closest('label') as HTMLElement
+      const child = dropzone ? dropZone() : picker
+      expect(picker.tagName).toBe('LABEL')
+      expect(child.parentElement).toBe(root)
+      // And the rule keyed on the class is emitted (jsdom evaluates no media queries,
+      // so the assertion is on the rule text, as in #130): the box is inline-flex again
+      // with no column template, and its children carry no column.
+      const css = [...document.querySelectorAll('style')].map((s) => s.textContent ?? '').join('\n')
+      const compound = `.${fieldLayoutClasses.start}.${fieldLayoutClasses.selfLabelled}`
+      const optOut = [...css.matchAll(/([^{}]*)\{([^{}]*)\}/g)]
+        .filter(([, selector]) => selector?.includes(compound))
+        .map(([rule]) => rule)
+        .join('\n')
+      expect(optOut).toContain('display:inline-flex')
+      expect(optOut).toContain('grid-template-columns:none')
+      expect(optOut).toMatch(new RegExp(`${compound}>\\*[^{]*\\{grid-column:auto;\\}`))
+      await expectNoA11yViolations(container)
+    },
+  )
+})
 
 describe('FileField dropzone', () => {
   it('is off by default: no drop zone, just the button', () => {
