@@ -197,10 +197,17 @@ export function usePickerField<
       pendingPasteText.current = null
       if (rawText && !pickerError.current) {
         pickerError.current = 'invalidDate' as TError
-        // The same `null` normalisation the returned `value` makes below, and for
-        // the same reason: `TValue` is `PickerValidDate | null` at every
-        // instantiation, and an unparsable paste leaves the field empty. Re-emitting
-        // the current value is what re-runs the `picker` rule with the code just set.
+        // Re-emitting the current value is what re-runs the `picker` rule with the
+        // code just set.
+        //
+        // The `?? null` is a deliberate **behaviour** change, not just a cast removal
+        // (#28). A field with no `defaultValues` entry has `field.value === undefined`,
+        // and this used to write that `undefined` straight back — the only path in this
+        // hook that ever put one in the form. It is now normalised to `null`: the same
+        // normalisation the returned `value` getter makes below, and the `null` a
+        // consumer already receives for "no date" from MUI X's own clear path. `TValue`
+        // is `PickerValidDate | null` at every instantiation, so `null` is always in it.
+        // Pinned by "re-emits null, not undefined, for a field with no default value".
         f.field.onChange(f.field.value ?? (null as TValue))
       }
     })

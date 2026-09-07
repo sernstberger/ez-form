@@ -72,6 +72,13 @@ type Methods = FormMethods<{ when: Value }, { when: Value }>
 
 interface WrapperOptions {
   defaultValue?: Value
+  /**
+   * Renders the form with **no** `defaultValues` entry for the field at all, so
+   * hookform reports `field.value === undefined` rather than `null`. `defaultValue`
+   * cannot express this: it is read through a `= null` default parameter, which
+   * fires for an explicit `undefined` too, so passing one silently yields `null`.
+   */
+  noDefault?: boolean
   disabled?: boolean
   messages?: Partial<RuleMessages>
   onSubmit?: (values: { when: Value }) => void
@@ -83,7 +90,7 @@ interface WrapperOptions {
  * form is what makes `trigger()` below meaningful.
  */
 function renderPicker(props: Partial<HookProps> = {}, options: WrapperOptions = {}) {
-  const { defaultValue = null, disabled, messages, onSubmit = () => {} } = options
+  const { defaultValue = null, noDefault, disabled, messages, onSubmit = () => {} } = options
   const formRef: { current: Methods | null } = { current: null }
   const utils = renderHook(
     (hookProps: Partial<HookProps>) =>
@@ -98,7 +105,7 @@ function renderPicker(props: Partial<HookProps> = {}, options: WrapperOptions = 
       wrapper: ({ children }) => (
         <Form
           schema={schema}
-          defaultValues={{ when: defaultValue }}
+          defaultValues={noDefault ? {} : { when: defaultValue }}
           onSubmit={onSubmit}
           disabled={disabled}
           messages={messages}
@@ -311,6 +318,34 @@ describe('usePickerField', () => {
       })
       expect(await validateField(formRef)).toBe(false)
       await waitFor(() => expect(textFieldOf(result.current).helperText).toBe('When is invalid.'))
+    })
+
+    /**
+     * #28, and a deliberate behaviour change. The re-emit that re-runs the `picker`
+     * rule used to pass `f.field.value` straight through, so a field with no
+     * `defaultValues` entry — where hookform reports `value === undefined`, not
+     * `null` — handed the consumer's `onChange` an `undefined` no other path in this
+     * hook ever produces. It is now normalised to `null`, the same normalisation the
+     * returned `value` getter has always made, and the `null` the consumer already
+     * receives for "no date" from MUI X's own clear path.
+     *
+     * `defaultValue: undefined` is what reaches that case; the harness otherwise
+     * defaults to `null` and would make this assertion vacuous.
+     */
+    it('re-emits null, not undefined, for a field with no default value', async () => {
+      const { result, formRef } = renderPicker({}, { noDefault: true })
+      // The case the normalisation exists for: nothing stored, so `field.value` is
+      // `undefined`. Without the `?? null` the re-emit below writes that back.
+      expect(formRef.current!.getValues('when')).toBeUndefined()
+      act(() => {
+        textFieldOf(result.current).onPaste(pasteEvent('not a date'))
+      })
+      await act(async () => {
+        await Promise.resolve()
+      })
+      // Read from the form, not `result.current.value`: the returned getter applies its
+      // own `?? null`, so it reports `null` either way and would pin nothing.
+      expect(formRef.current!.getValues('when')).toBeNull()
     })
 
     it('leaves an empty paste alone', async () => {
