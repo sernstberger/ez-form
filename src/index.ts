@@ -22,6 +22,12 @@ export {
 // structurally through `Bound<T>`, which is all the emitted `.d.ts` allows otherwise.
 export type { InputA11y, NameA11y, TypedControllerRenderProps } from './fields/useEzField'
 export { TextField, type TextFieldProps } from './fields/TextField'
+// UPSTREAM SHIM (#142). `EzTextFieldVariants` is what every text field's `variant`
+// is typed as — MUI's `TextFieldVariants` plus whatever augments
+// `TextFieldPropsVariantOverrides`. When upstream ships it becomes an alias of MUI's
+// own and this export can go; `customVariantSlots` / `isBuiltInTextFieldVariant` stay
+// internal, since a consumer reaches the same behaviour through `slots.input`.
+export type { EzTextFieldVariants } from './fields/textFieldVariants'
 export { Select, type SelectProps, type SelectOption } from './fields/Select'
 export type { Option } from './fields/Option'
 export {

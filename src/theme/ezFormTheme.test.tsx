@@ -1,7 +1,9 @@
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { render, screen, waitFor } from '@testing-library/react'
 import CssBaseline from '@mui/material/CssBaseline'
+import MuiTextField from '@mui/material/TextField'
 import { ThemeProvider, createTheme, type Theme } from '@mui/material/styles'
 import { z } from 'zod'
 import { Form } from '../Form'
@@ -109,6 +111,18 @@ const schema = z.object({
   start: z.date().nullable(),
 })
 
+/**
+ * Occurrences of the shim marker in `src/`, excluding test files (which talk *about*
+ * the marker, including this line, and would make the count circular). Counted by the
+ * test below so the deletion when upstream ships is one `git grep`. See the test's own
+ * comment for what to do when this number changes.
+ */
+const MARKER_COUNT = 16
+
+/** Small schemas for the per-variant tests, which render one field, not `<Fields />`. */
+const emailOnly = z.object({ email: z.string() })
+const pickerOnly = z.object({ when: z.date().nullable() })
+
 function Fields() {
   return (
     <Form
@@ -197,22 +211,196 @@ describe('ezFormTheme', () => {
     expect(contrast('black', gray[50])).toBeGreaterThanOrEqual(4.5)
   })
 
-  it('pins the top label static: shrunk, no transform, no notch', () => {
-    expect(light.components?.MuiInputLabel?.defaultProps).toMatchObject({
-      shrink: true,
-      disableAnimation: true,
-    })
-    expect(light.components?.MuiOutlinedInput?.defaultProps).toMatchObject({ notched: false })
-    expect(light.components?.MuiPickersOutlinedInput?.defaultProps).toMatchObject({
-      notched: false,
-    })
+  it("pins the static top label as the 'stacked' variant, not theme-wide props (#142)", () => {
+    // The mechanism, in one assertion each: the variant is the default, and the
+    // fallback input is paired with it (without which a bare `<MuiTextField>` under
+    // this preset renders an element whose `type` is `undefined` — see the bare-MUI
+    // test below).
+    expect(light.components?.MuiTextField?.defaultProps?.variant).toBe('stacked')
+    expect(light.components?.MuiTextField?.defaultProps?.slots?.input).toBeDefined()
+    expect(light.components?.MuiPickersTextField?.defaultProps?.variant).toBe('stacked')
+    expect(light.components?.MuiPickersTextField?.defaultProps?.slots?.input).toBeDefined()
+    // …and the props that used to force it theme-wide are gone, so `variant="outlined"`
+    // on one field really does float again (asserted below).
+    expect(light.components?.MuiInputLabel?.defaultProps?.shrink).toBeUndefined()
+    expect(light.components?.MuiInputLabel?.defaultProps?.disableAnimation).toBeUndefined()
+    // `notched: false` is gone too: no `label` ever reaches the input under a custom
+    // variant, so `NotchedOutline`'s `withLabel` is false and there is nothing to notch.
+    expect(light.components?.MuiOutlinedInput?.defaultProps?.notched).toBeUndefined()
+    expect(light.components?.MuiPickersOutlinedInput?.defaultProps?.notched).toBeUndefined()
+
     renderUnder(light)
-    // MUI marks the label shrunk regardless of focus or value, and the outline's
-    // legend stays collapsed — nothing is left for a label to float into.
     const label = screen.getByText('Email', { selector: 'label' })
-    expect(label).toHaveClass('MuiInputLabel-shrink')
-    const notch = document.querySelector('.MuiOutlinedInput-notchedOutline legend')
-    expect(notch).not.toHaveClass('MuiOutlinedInput-notchedOutline-notched')
+    const style = getComputedStyle(label)
+    expect(style.position).toBe('relative')
+    expect(style.transform).toBe('none')
+    expect(style.transition).toBe('none')
+    // The legend holds only the zero-width placeholder span, never the label text —
+    // which is what "the notch never opens" means, with no `notched` prop involved.
+    const notch = document.querySelector('.MuiOutlinedInput-notchedOutline legend')!
+    expect(notch.textContent).not.toContain('Email')
+    expect(notch.querySelector('span')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('variant="outlined" opts one field back to MUI\'s floating label (#142)', () => {
+    renderUnder(
+      light,
+      <Form schema={emailOnly} defaultValues={{ email: '' }} onSubmit={() => {}}>
+        <TextField name="email" label="Email" variant="outlined" />
+      </Form>,
+    )
+    const label = screen.getByText('Email', { selector: 'label' })
+    const style = getComputedStyle(label)
+    expect(style.position).toBe('absolute')
+    expect(style.transform).not.toBe('none')
+    // The notch opens for it: MUI passes `label` to the input under `'outlined'`.
+    const notch = document.querySelector('.MuiOutlinedInput-notchedOutline legend')!
+    expect(notch.textContent).toContain('Email')
+  })
+
+  it("a bare MUI TextField renders under the preset — the 'stacked' default needs slots.input (#142)", () => {
+    // The regression the theme-level `slots.input` exists to prevent. MUI resolves
+    // `slots.input ?? variantComponent[variant]`; `variantComponent['stacked']` is
+    // `undefined`, so without the pairing `useSlot` renders `<undefined>` and
+    // `FormControl`'s `isMuiElement` child scan throws reading `type.muiName`.
+    // This consumer wrote no ez-form component at all, so nothing but the theme can
+    // supply it.
+    expect(() =>
+      render(
+        <ThemeProvider theme={light}>
+          <MuiTextField label="Bare" />
+        </ThemeProvider>,
+      ),
+    ).not.toThrow()
+    const label = screen.getByText('Bare', { selector: 'label' })
+    expect(getComputedStyle(label).position).toBe('relative')
+  })
+
+  it('a bare built-in variant keeps its own input under the preset (#142)', () => {
+    // The theme's `defaultProps.slots.input` cannot be a constant: `resolveProps`
+    // merges it as a plain object, not keyed on the resolved `variant`, so a constant
+    // `OutlinedInput` would reach `variant="filled"` / `"standard"` too and force them
+    // onto the outlined box. `VariantInput` resolves the input at render from the
+    // variant on `FormControl` context — the only channel, since MUI's `useSlot` does
+    // not forward `variant` into the input slot's props.
+    const filled = render(
+      <ThemeProvider theme={light}>
+        <MuiTextField variant="filled" label="Filled" />
+      </ThemeProvider>,
+    )
+    expect(filled.container.querySelector('.MuiFilledInput-root')).not.toBeNull()
+    expect(filled.container.querySelector('.MuiOutlinedInput-root')).toBeNull()
+    filled.unmount()
+
+    const standard = render(
+      <ThemeProvider theme={light}>
+        <MuiTextField variant="standard" label="Standard" />
+      </ThemeProvider>,
+    )
+    expect(standard.container.querySelector('.MuiInput-root')).not.toBeNull()
+    expect(standard.container.querySelector('.MuiOutlinedInput-root')).toBeNull()
+    standard.unmount()
+
+    // …and the default still lands on the outlined box with the notch closed, which is
+    // what `stacked` means.
+    const stacked = render(
+      <ThemeProvider theme={light}>
+        <MuiTextField label="Stacked" />
+      </ThemeProvider>,
+    )
+    expect(stacked.container.querySelector('.MuiOutlinedInput-root')).not.toBeNull()
+    const legend = stacked.container.querySelector('.MuiOutlinedInput-notchedOutline legend')!
+    expect(legend.textContent).not.toContain('Stacked')
+  })
+
+  it('a bare picker keeps its own input per variant under the preset (#142)', () => {
+    // The pickers' twin of the test above. `PickersTextFieldRoot` is a
+    // `styled(FormControl)` — MUI's own — and `PickersTextField` passes the resolved
+    // variant to it, so `PickersVariantInput` reads it off the same context.
+    const { unmount } = renderUnder(
+      light,
+      <Form schema={pickerOnly} defaultValues={{ when: null }} onSubmit={() => {}}>
+        <DatePicker name="when" label="When" slotProps={{ textField: { variant: 'filled' } }} />
+      </Form>,
+    )
+    expect(document.querySelector('.MuiPickersFilledInput-root')).not.toBeNull()
+    expect(document.querySelector('.MuiPickersOutlinedInput-root')).toBeNull()
+    unmount()
+
+    renderUnder(
+      light,
+      <Form schema={pickerOnly} defaultValues={{ when: null }} onSubmit={() => {}}>
+        <DatePicker name="when" label="When" />
+      </Form>,
+    )
+    // The default is `stacked`, which is not in MUI X's map either, so it falls back
+    // to the outlined input.
+    expect(document.querySelector('.MuiPickersOutlinedInput-root')).not.toBeNull()
+  })
+
+  it('a picker is stacked under the preset and floats under variant="outlined" (#142)', () => {
+    // The pickers reach the variant only through the theme — MUI X's own
+    // `slotProps.textField.variant` type is the closed union and `usePickerField`
+    // deliberately leaves it alone (PHILOSOPHY rule 1). `PickersTextField` resolves
+    // `slots?.input ?? VARIANT_COMPONENT[variant]` the same way, so the pairing above
+    // is what makes this render at all.
+    const { unmount } = renderUnder(
+      light,
+      <Form schema={pickerOnly} defaultValues={{ when: null }} onSubmit={() => {}}>
+        <DatePicker name="when" label="When" />
+      </Form>,
+    )
+    expect(getComputedStyle(screen.getByText('When', { selector: 'label' })).position).toBe(
+      'relative',
+    )
+    unmount()
+    renderUnder(
+      light,
+      <Form schema={pickerOnly} defaultValues={{ when: null }} onSubmit={() => {}}>
+        <DatePicker name="when" label="When" slotProps={{ textField: { variant: 'outlined' } }} />
+      </Form>,
+    )
+    expect(getComputedStyle(screen.getByText('When', { selector: 'label' })).position).toBe(
+      'absolute',
+    )
+  })
+
+  it('pins the UPSTREAM SHIM (#142) marker count so the deletion is one grep', () => {
+    // When `@mui/material` ships `TextFieldPropsVariantOverrides`, every line carrying
+    // this marker is deleted (keeping only the `stacked: true` member); §4 of
+    // `docs/superpowers/specs/2026-09-07-text-field-variant-shim-design.md` is the plan.
+    //
+    // If this number changed: a shim line was added or removed. Confirm the change is
+    // deliberate — `grep -rn 'UPSTREAM SHIM (#142)' src` shows every one — and update
+    // the number here. A *growing* count is the thing to look at: the shim is meant to
+    // stay confined to `textFieldVariants.ts`, the augmentation, the three wrapper
+    // boundaries, the preset and one note in `usePickerField`.
+    const marker = ['UPSTREAM', 'SHIM', '(#142)'].join(' ')
+    const counts = execFileSync(
+      'git',
+      ['grep', '-c', '--fixed-strings', marker, '--', 'src', ':!src/**/*.test.*'],
+      { cwd: join(import.meta.dirname, '..', '..'), encoding: 'utf8' },
+    )
+    const perFile = counts
+      .trim()
+      .split('\n')
+      .map((line) => {
+        const at = line.lastIndexOf(':')
+        return [line.slice(0, at), Number(line.slice(at + 1))] as const
+      })
+    // The file list is pinned too, so a marker appearing somewhere new is a failure
+    // even if another file lost one at the same time.
+    expect(perFile.map(([file]) => file)).toEqual([
+      'src/fields/Autocomplete/Autocomplete.tsx',
+      'src/fields/NumberField/NumberFieldControl.tsx',
+      'src/fields/TextField/TextField.tsx',
+      'src/fields/pickers/usePickerField.ts',
+      'src/fields/textFieldVariants.tsx',
+      'src/index.ts',
+      'src/theme/augmentation.ts',
+      'src/theme/ezFormTheme.ts',
+    ])
+    expect(perFile.reduce((sum, [, n]) => sum + n, 0)).toBe(MARKER_COUNT)
   })
 
   it('sets no labelPlacement default — static labels are the theme’s, not the axis’s (#139)', () => {

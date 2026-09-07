@@ -291,3 +291,36 @@ declare module '@mui/material/styles' {
     }
   }
 }
+
+/**
+ * UPSTREAM SHIM (#142). `TextFieldPropsVariantOverrides` and
+ * `FormControlPropsVariantOverrides` are the names the upstream patch adds to
+ * `@mui/material` (see `docs/superpowers/specs/2026-09-07-upstream-mui-text-field-variant-overrides.md`);
+ * until `@mui/material` exports them, ez-form declares them here so a consumer
+ * augments the *same* interface the MUI docs will name — when upstream ships,
+ * delete the empty `FormControlPropsVariantOverrides` declaration and keep only
+ * the `stacked: true` member, and no consumer changes a character.
+ *
+ * `stacked` is ez-form's own variant: the label sits above the input in normal
+ * flow, with no float and no notch. Under a stock `createTheme()` it renders
+ * MUI's `OutlinedInput` (`customVariantSlots` in `src/fields/textFieldVariants.ts`)
+ * with a permanently closed notch; the *look* is `createEzFormTheme()`'s, which
+ * keys its static-label rules on this variant.
+ */
+declare module '@mui/material/TextField' {
+  interface TextFieldPropsVariantOverrides {
+    stacked: true
+  }
+}
+
+/**
+ * UPSTREAM SHIM (#142). The `FormControl` twin of the interface above — the same
+ * name the upstream patch adds. Empty on purpose: `FormControl`'s `variant` only
+ * reaches context and style lookups, so nothing here needs a member; a consumer
+ * (or upstream) fills it. Delete this whole declaration when `@mui/material`
+ * exports it.
+ */
+declare module '@mui/material/FormControl' {
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  interface FormControlPropsVariantOverrides {}
+}

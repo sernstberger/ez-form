@@ -7,6 +7,7 @@ import MuiAutocomplete, {
   type AutocompleteValue,
 } from '@mui/material/Autocomplete'
 import MuiTextField, { type TextFieldProps as MuiTextFieldProps } from '@mui/material/TextField'
+import { customVariantSlots, type EzTextFieldVariants } from '../textFieldVariants'
 import Chip, { type ChipProps } from '@mui/material/Chip'
 import { mergeSlotProps } from '@mui/material/utils'
 import { ChipDeleteIcon } from '../ChipDeleteIcon'
@@ -62,8 +63,25 @@ export type AutocompleteProps<
     /** Extra props for the MUI TextField that renders the input. */
     textFieldProps?: Omit<
       MuiTextFieldProps,
-      'name' | 'value' | 'error' | 'inputRef' | 'required' | 'label' | 'helperText' | 'slotProps'
-    >
+      | 'name'
+      | 'value'
+      | 'error'
+      | 'inputRef'
+      | 'required'
+      | 'label'
+      | 'helperText'
+      | 'slotProps'
+      | 'variant'
+    > & {
+      /**
+       * UPSTREAM SHIM (#142). MUI's `variant`, reopened — see
+       * `src/fields/textFieldVariants.ts`. `Omit`ted above and re-declared here
+       * because MUI's `TextFieldProps` is a discriminated union over the closed
+       * literal union; a custom variant renders `OutlinedInput` unless
+       * `textFieldProps.slots.input` says otherwise.
+       */
+      variant?: EzTextFieldVariants
+    }
     /**
      * Extra props for the `<input>` itself, merged over the ones MUI's
      * `getInputProps()` supplies. `textFieldProps` cannot reach here — it lands
@@ -256,6 +274,12 @@ export function Autocomplete<
         <MuiTextField
           {...params}
           {...textFieldProps}
+          // UPSTREAM SHIM (#142). The one MUI boundary: the cast widens back to MUI's
+          // closed union, and `customVariantSlots` supplies the `slots.input` its
+          // `variantComponent` map has no entry for. `params` carries no `slots`, so
+          // the consumer's `textFieldProps.slots` is the only other source.
+          variant={textFieldProps?.variant as MuiTextFieldProps['variant']}
+          slots={customVariantSlots(textFieldProps?.variant, textFieldProps?.slots)}
           // On the rendered TextField, not on `MuiAutocomplete`: Autocomplete
           // renders an outer `MuiAutocomplete-root` div around the TextField, and
           // the `FormControl` box the placement rules select is the TextField's.

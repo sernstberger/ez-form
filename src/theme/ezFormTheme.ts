@@ -13,17 +13,22 @@
  *
  * Two things the template does not do, and this preset does:
  *
- * - **Static top labels.** The label sits above the input, in place, with no
- *   floating animation and no notch in the border. This preset is the *one*
- *   mechanism for that (#139): it is MUI's own — `InputLabel`'s `shrink` /
- *   `disableAnimation` plus `OutlinedInput`'s `notched: false` — and `<Form>`'s
- *   `labelPlacement` axis has nothing to say about it. That axis only adds
+ * - **The `stacked` variant.** The label sits above the input, in place, with no
+ *   floating animation and no notch in the border. Since #142 that look is a named
+ *   `variant` — `'stacked'`, declared in `src/theme/augmentation.ts` — which this
+ *   preset makes `MuiTextField`'s and `MuiPickersTextField`'s default and keys its
+ *   label rules on. A consumer opts one field back to MUI's floating label with
+ *   `variant="outlined"`; that is the whole per-field escape hatch. `<Form>`'s
+ *   `labelPlacement` axis (#139) has nothing to say about it: that axis only adds
  *   `'start'`, a label column beside the control; its default `'top'` emits no CSS
- *   at all. See `MuiInputLabel` / `MuiOutlinedInput` / `EzForm` below.
+ *   at all. See `MuiTextField` / `MuiInputLabel` / `EzForm` below.
  * - **Reduced motion (WCAG 2.3.3, #11).** `MuiCssBaseline` collapses every
  *   transition and animation under `prefers-reduced-motion: reduce`.
  */
 import type {} from '@mui/x-date-pickers/themeAugmentation'
+import type { TextFieldVariants } from '@mui/material/TextField'
+// UPSTREAM SHIM (#142): the variant-switching input slots the `stacked` default needs.
+import { PickersVariantInput, VariantInput } from '../fields/textFieldVariants'
 import { chipClasses } from '@mui/material/Chip'
 import { menuItemClasses } from '@mui/material/MenuItem'
 import { outlinedInputClasses } from '@mui/material/OutlinedInput'
@@ -492,10 +497,41 @@ const components: ThemeOptions['components'] = {
       input: { '&::placeholder': { opacity: 0.7, color: gray[500] } },
     },
   },
+  // UPSTREAM SHIM (#142). `'stacked'` is ez-form's own variant (declared in
+  // `src/theme/augmentation.ts`); this is what makes it the preset's default, so a
+  // plain `<TextField>` gets the static label and `variant="outlined"` on one field
+  // opts that one back to MUI's floating label. The cast is needed because MUI's
+  // `TextFieldVariants` alias is still the closed union — `TextFieldPropsVariantOverrides`
+  // widens the *prop* type, not the alias — and goes when upstream ships.
+  //
+  // `slots.input` is the other half of the shim and is **not** optional here.
+  // ez-form's own wrappers fill it in via `customVariantSlots`, but this default
+  // variant also reaches a consumer's own bare `<MuiTextField>` under this preset,
+  // and there nothing else supplies it: MUI resolves the input as
+  // `slots.input ?? variantComponent[variant]`, and `variantComponent['stacked']`
+  // is `undefined`, so `useSlot` renders an element whose `type` is `undefined` and
+  // `FormControl`'s `isMuiElement` child scan throws on it. Verified by
+  // "a bare MUI TextField renders under the preset" in `ezFormTheme.test.tsx`.
+  //
+  // It is `VariantInput`, not a constant `OutlinedInput`: `defaultProps.slots` is a
+  // plain object that `resolveProps` merges wholesale, so a constant here would reach
+  // a bare `<MuiTextField variant="filled">` too and force it onto the outlined box.
+  // `VariantInput` resolves the input from the variant in scope instead, so the three
+  // built-ins keep their own inputs under this preset and only a custom variant falls
+  // back. Pinned by the built-in-variant tests in `ezFormTheme.test.tsx`.
+  MuiTextField: {
+    defaultProps: { variant: 'stacked' as TextFieldVariants, slots: { input: VariantInput } },
+  },
+  // The pickers' twin. `PickersTextField` resolves `slots?.input ?? VARIANT_COMPONENT[variant]`
+  // (PickersTextField.js) exactly like `TextField`, and its root is a `styled(FormControl)`,
+  // so the same context read resolves the variant.
+  MuiPickersTextField: {
+    defaultProps: {
+      variant: 'stacked' as TextFieldVariants,
+      slots: { input: PickersVariantInput },
+    },
+  },
   MuiOutlinedInput: {
-    // Static top labels, part 2: the border never opens a notch for the label,
-    // because the label is no longer over the border.
-    defaultProps: { notched: false },
     styleOverrides: {
       input: { padding: 0 },
       root: ({ theme }) => ({
@@ -516,7 +552,6 @@ const components: ThemeOptions['components'] = {
     },
   },
   MuiPickersOutlinedInput: {
-    defaultProps: { notched: false },
     styleOverrides: {
       root: ({ theme }) => ({
         ...outlinedRoot(theme),
@@ -567,23 +602,37 @@ const components: ThemeOptions['components'] = {
       }),
     },
   },
-  // Static top labels, part 1. MUI has no "static label" variant (#9): `InputLabel`
-  // is always absolutely positioned over the input and translated up on focus/fill.
-  // Rendering it permanently shrunk, in normal flow, with no transform and no
-  // animation puts it above the input for good — the theme lines a vanilla MUI
-  // consumer writes for the same effect (#139). `MuiPickersTextField` renders MUI's
-  // own `InputLabel`, so the pickers follow.
+  // The `stacked` variant's label. MUI has no "static label" variant of its own
+  // (#9): `InputLabel` is always absolutely positioned over the input and translated
+  // up on focus/fill. Putting it in normal flow with no transform and no transition
+  // puts it above the input for good — the theme lines a vanilla MUI consumer writes
+  // for the same effect (#139), now keyed on the variant rather than applied to
+  // every label (#142), so `variant="outlined"` on one field still floats.
+  //
+  // `InputLabel` reads `variant` off `FormControl` context (`useFormControlState`),
+  // so this predicate sees `'stacked'` on the label's own `ownerState` with no prop
+  // plumbing. `transition: 'none'` replaces the old `defaultProps.disableAnimation`,
+  // and normal flow replaces `shrink: true`: both were theme-wide props that no
+  // per-variant rule could undo. `MuiPickersTextField` renders MUI's own
+  // `InputLabel`, so the pickers follow.
   MuiInputLabel: {
-    defaultProps: { shrink: true, disableAnimation: true },
     styleOverrides: {
       root: {
-        position: 'relative',
-        transform: 'none',
-        transformOrigin: 'top left',
-        maxWidth: '100%',
-        padding: 0,
-        pointerEvents: 'auto',
-        whiteSpace: 'normal',
+        variants: [
+          {
+            props: (p: { variant?: string }) => p.variant === 'stacked',
+            style: {
+              position: 'relative',
+              transform: 'none',
+              transformOrigin: 'top left',
+              transition: 'none',
+              maxWidth: '100%',
+              padding: 0,
+              pointerEvents: 'auto',
+              whiteSpace: 'normal',
+            },
+          },
+        ],
       },
     },
   },

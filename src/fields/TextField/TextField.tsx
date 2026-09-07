@@ -1,5 +1,6 @@
 import MuiTextField, { type TextFieldProps as MuiTextFieldProps } from '@mui/material/TextField'
 import { mergeSlotProps, useForkRef } from '@mui/material/utils'
+import { customVariantSlots, type EzTextFieldVariants } from '../textFieldVariants'
 import { useEzField } from '../useEzField'
 import type { LabelPlacementProps } from '../LabelPlacementContext'
 import { mergeDisabled } from '../mergeDisabled'
@@ -19,9 +20,23 @@ import type { FieldRules } from '../../rules'
  */
 export type TextFieldProps = Omit<
   MuiTextFieldProps,
-  'name' | 'value' | 'defaultValue' | 'error' | 'inputRef' | 'required'
+  'name' | 'value' | 'defaultValue' | 'error' | 'inputRef' | 'required' | 'variant'
 > & {
   name: string
+  /**
+   * UPSTREAM SHIM (#142). MUI's own `variant`, reopened: `EzTextFieldVariants` is
+   * `TextFieldVariants` plus whatever augments `TextFieldPropsVariantOverrides`
+   * — ez-form's `'stacked'`, and any variant a consumer declares. A custom
+   * variant renders `OutlinedInput` unless `slots.input` says otherwise; the
+   * *look* comes from the theme's `variants` rules.
+   *
+   * `'variant'` is `Omit`ted above and re-declared here because MUI's
+   * `TextFieldProps` is a discriminated union over the closed literal union,
+   * which this widens. Everything else about the `Omit` is unchanged: it already
+   * collapses that union to its common keys, which is how this file has always
+   * worked.
+   */
+  variant?: EzTextFieldVariants
   /**
    * Internal. A second ref to the `<input>`, forked with hookform's, for the
    * fields built on `TextField` that need the element themselves (`PhoneField`,
@@ -84,6 +99,8 @@ export function TextField({
   onChange,
   onBlur,
   slotProps,
+  slots,
+  variant,
   required,
   min,
   max,
@@ -174,6 +191,12 @@ export function TextField({
       helperText={text}
       type={type}
       autoComplete={autoComplete}
+      // UPSTREAM SHIM (#142). The one MUI boundary: MUI's prop type is the closed
+      // union, so a custom variant is cast through here, and `customVariantSlots`
+      // supplies the `slots.input` MUI's own `variantComponent` map cannot. Both
+      // lines go when upstream ships.
+      variant={variant as MuiTextFieldProps['variant']}
+      slots={customVariantSlots(variant, slots)}
       slotProps={{
         ...slotProps,
         // Not `mergeSlotProps`: that exists to let the consumer's value win, which is

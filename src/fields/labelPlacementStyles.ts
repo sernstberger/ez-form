@@ -36,10 +36,12 @@ import { visuallyHidden } from '../visuallyHidden'
  *
  * Used **only inside `startBox`**, where it is layout rather than taste: a label
  * that has to occupy grid column 1 has to be in flow, whatever the theme thinks
- * about floating. `createEzFormTheme()` reaches the same end state theme-wide
- * through `MuiInputLabel: { shrink: true, disableAnimation: true }` plus overrides
- * (`src/theme/ezFormTheme.ts`); that is the mechanism for a *static top* label, and
- * this is not a second copy of it — it is the grid column's requirement.
+ * about floating. `createEzFormTheme()` reaches the same end state through MUI's own
+ * variant mechanism — `MuiTextField.defaultProps.variant: 'stacked'` plus
+ * `MuiInputLabel` rules keyed on it (`src/theme/ezFormTheme.ts`, #142); that is the
+ * mechanism for a *static top* label, and this is not a second copy of it — it is the
+ * grid column's requirement, which is why it applies under every variant, including a
+ * field the consumer opted back to `variant="outlined"`.
  *
  * `maxWidth: '100%'` because MUI's floating label is sized for the *shrunk* 75%
  * transform (`maxWidth: 'calc(133% - …)'`); with the transform gone that
@@ -79,8 +81,9 @@ const unfloatLabel: CSSObject = {
  * Like `unfloatLabel`, used **only inside `startBox`** (and by `cellBox`): with the
  * label pulled out to column 1 there is nothing on the border to make room for, so
  * a notch left open would be a gap in the outline with no label in it. A *top*
- * label's notch is the theme's business — the preset closes it theme-wide with
- * `MuiOutlinedInput.defaultProps = { notched: false }`.
+ * label's notch is the theme's business — under the preset it never opens, because
+ * the `stacked` variant means MUI passes no `label` to the input at all (#142), so
+ * the preset needs no `notched: false` of its own.
  */
 const closeNotch: CSSObject = {
   [`& .${outlinedInputClasses.notchedOutline} legend, & .${pickersOutlinedInputClasses.notchedOutline} legend`]:
