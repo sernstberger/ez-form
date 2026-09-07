@@ -31,3 +31,22 @@ Gate (six commands, idle main): typecheck ✔ lint ✔ test ✔ (82 files, 2547 
 
 - Upstream posting: Steve decides framing (bug vs feature) and venue (comment on mui/material-ui#37846 vs new issue) and posts from his account. #142 stays open for that.
 - #143 preset notched look for `variant="outlined"`.
+
+## Correction pass (same day)
+
+Steve: "all inputs with an input box like textfield, numberfield, autocomplete, etc should have
+`variant="stacked"` along with the 3 defaults" — and anything made up beyond that deleted, not archived.
+A probe on main showed NumberField (public), MoneyField, PercentField, EmailListField and the four pickers
+did **not** accept it; the Lane S report had claimed NumberField did.
+
+| Lane | Scope | Review | Result |
+| --- | --- | --- | --- |
+| V | top-level `variant` on all 19 box inputs (NumberField, Autocomplete, pickers via `PickerFieldProps` → `slotProps.textField`, one cast at the MUI X boundary); one mechanism (`VariantInput`/`PickersVariantInput`, `muiName = 'Input'`); deleted `customVariantSlots`, `isBuiltInTextFieldVariant`, the marker-count test, the TextField-only story; new page `Fields/Variants` (`AllInputs`, `StockTheme`) | Sonnet, clean | merged `13b179a` |
+| VD | README "Custom variants" cut to 33 lines; prop tables; DECISIONS `## #142` trimmed to 8 real rulings; CHANGELOG collapsed; shim-mechanics prose deleted | — (reconciled against V's list) | merged `9ba48ba` |
+
+Orchestrator re-probe: `variant="stacked"` typechecks on all 19; `filled`/`standard` on TextField and
+DatePicker too. Bug found by Lane V: the slot stand-in lacked `muiName`, so `FormControl`'s child scan
+missed it and a filled field's label rendered unshrunk on first paint; fixed and pinned (SSR test).
+
+Gate (six commands, idle main): typecheck ✔ lint ✔ test ✔ (83 files, 2602 passed, 9 skipped, 2 todo)
+build ✔ build-storybook ✔ check:guardrails ✔.
