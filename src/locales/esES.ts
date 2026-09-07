@@ -76,6 +76,7 @@ export const esES = {
         addLabel: 'Añadir',
         removeLabel: 'Eliminar',
         rowText: 'Fila',
+        actionsHeader: 'Acciones',
         // Spanish plurals end in -es or -s; as naive as the English strip, and
         // `singular` is still the fix when the guess is wrong.
         singularize: (label) => label.replace(/(es|s)$/, ''),

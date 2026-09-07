@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { z } from 'zod'
@@ -7,7 +7,12 @@ import { SubmitButton } from '../SubmitButton'
 import { TextField } from '../fields/TextField'
 import { expectNoA11yViolations } from '../test/axe'
 import { expectTargetSize } from '../test/targetSize'
-import { FieldArray, fieldArrayClasses } from './FieldArray'
+import { FieldArray, fieldArrayClasses, type FieldArrayColumn } from './FieldArray'
+import { NumberField } from '../fields/NumberField'
+import { Select } from '../fields/Select'
+import { DatePicker } from '../fields/DatePicker'
+import { fieldLayoutClasses } from '../fields/LabelPlacementContext'
+import { withPickers } from '../test/pickers'
 import { expectConsole } from '../test/expectConsole'
 
 const schema = z.object({
@@ -566,4 +571,328 @@ describe('FieldArray', () => {
     await screen.findByRole('alert')
     await expectNoA11yViolations(container)
   })
+
+  /**
+   * `layout="table"` (#14). The cell-mode contract itself (hidden label, headers as the
+   * name, helper text as the description) is `useEzField`'s and is pinned in
+   * `labelPlacement.test.tsx`; what is asserted here is the table: its markup, its
+   * naming, its density, its slots, and that Add/Remove/Move behave as in stacked rows.
+   */
+  describe('layout="table"', () => {
+    const lineSchema = z.object({
+      lines: z.array(
+        z.object({
+          sku: z.string().min(1, 'SKU is required'),
+          qty: z.number().min(1, 'Qty must be at least 1'),
+          category: z.string(),
+          due: z.date().nullable(),
+        }),
+      ),
+    })
+    type Line = z.infer<typeof lineSchema>['lines'][number]
+    const line = (sku = '', qty = 1): Line => ({ sku, qty, category: '', due: null })
+
+    const columns: FieldArrayColumn<Line>[] = [
+      {
+        key: 'sku',
+        header: 'SKU',
+        render: (row) => <TextField name={row.name('sku')} label="SKU" />,
+      },
+      {
+        key: 'qty',
+        header: 'Qty',
+        width: '6rem',
+        align: 'right',
+        render: (row) => <NumberField name={row.name('qty')} label="Qty" />,
+      },
+      {
+        key: 'category',
+        header: 'Category',
+        render: (row) => (
+          <Select
+            name={row.name('category')}
+            label="Category"
+            options={[
+              { value: 'a', label: 'A' },
+              { value: 'b', label: 'B' },
+            ]}
+          />
+        ),
+      },
+      {
+        key: 'due',
+        header: 'Due',
+        render: (row) => <DatePicker name={row.name('due')} label="Due" />,
+      },
+    ]
+
+    function Lines({
+      rows = [line()],
+      onSubmit = () => {},
+      ...props
+    }: { rows?: Line[]; onSubmit?: (values: unknown) => void } & Partial<
+      React.ComponentProps<typeof FieldArray<Line>>
+    >) {
+      return withPickers(
+        <Form schema={lineSchema} defaultValues={{ lines: rows }} onSubmit={onSubmit}>
+          <FieldArray<Line>
+            name="lines"
+            label="Line items"
+            layout="table"
+            columns={columns}
+            emptyRow={() => line()}
+            {...props}
+          />
+          <SubmitButton />
+        </Form>,
+      )
+    }
+
+    const cellControl = (row: number, header: string) =>
+      screen.getByRole(
+        header === 'Category' ? 'combobox' : header === 'Due' ? 'group' : 'textbox',
+        {
+          name: `Line item ${row} ${header}`,
+        },
+      )
+
+    it('renders one table named by the legend, headers from columns, a hidden row header per row', () => {
+      render(<Lines rows={[line('A'), line('B')]} />)
+      const table = screen.getByRole('table', { name: 'Line items' })
+      const headers = within(table).getAllByRole('columnheader')
+      expect(headers.map((h) => h.textContent)).toEqual([
+        'Line item',
+        'SKU',
+        'Qty',
+        'Category',
+        'Due',
+        'Actions',
+      ])
+      // The row-name column header and the actions header text are out of sight, not gone.
+      expect(getComputedStyle(headers[0]!).position).toBe('absolute')
+      const actionsText = within(headers[5]!).getByText('Actions')
+      expect(getComputedStyle(actionsText).position).toBe('absolute')
+      // `scope` on both axes, and every data cell points at its column.
+      expect(headers[1]).toHaveAttribute('scope', 'col')
+      const rowHeaders = within(table).getAllByRole('rowheader')
+      expect(rowHeaders.map((h) => h.textContent)).toEqual(['Line item 1', 'Line item 2'])
+      expect(rowHeaders[0]).toHaveAttribute('scope', 'row')
+      expect(getComputedStyle(rowHeaders[0]!).position).toBe('absolute')
+      const skuCell = cellControl(2, 'SKU').closest('td')!
+      expect(skuCell).toHaveAttribute('headers', headers[1]!.id)
+      // Column `width`/`align` land on the cells as props.
+      expect(headers[2]!.style.width).toBe('6rem')
+      expect(headers[2]).toHaveClass('MuiTableCell-alignRight')
+      expect(cellControl(1, 'Qty').closest('td')).toHaveClass('MuiTableCell-alignRight')
+      // No stacked row groups in this layout.
+      expect(screen.queryByRole('group', { name: /^Line item \d+$/ })).toBeNull()
+    })
+
+    it('names every cell control "<row> <header>" across the field families', () => {
+      render(<Lines rows={[line(), line()]} />)
+      for (const row of [1, 2]) {
+        for (const header of ['SKU', 'Qty', 'Category', 'Due']) {
+          expect(cellControl(row, header)).toBeInTheDocument()
+        }
+      }
+      expect(cellControl(2, 'SKU').closest('.MuiFormControl-root')).toHaveClass(
+        fieldLayoutClasses.cell,
+        fieldLayoutClasses.cellHelperHidden,
+      )
+      // `slotProps.rowHeader.visuallyHidden: false` shows the row names as a first column.
+      cleanupAndRender(<Lines slotProps={{ rowHeader: { visuallyHidden: false } }} />)
+      expect(getComputedStyle(screen.getByRole('rowheader')).position).not.toBe('absolute')
+    })
+
+    it('Remove and Move live in the actions column with the same names, Add sits under the table', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(<Lines reorder rows={[line('A'), line('B')]} onSubmit={onSubmit} />)
+      const table = screen.getByRole('table', { name: 'Line items' })
+      const remove = within(table).getByRole('button', { name: 'Remove Line item 2' })
+      expect(remove.closest('td')).toHaveClass(fieldArrayClasses.actionsCell)
+      expect(within(table).getByRole('button', { name: 'Move Line item 2 up' })).toBeInTheDocument()
+      const add = screen.getByRole('button', { name: 'Add' })
+      expect(table.contains(add)).toBe(false)
+      // Move keeps the payload order; Remove drops the row and focuses the previous row's
+      // first control — the stacked rules, unchanged.
+      await user.click(screen.getByRole('button', { name: 'Move Line item 2 up' }))
+      expect(cellControl(1, 'SKU')).toHaveValue('B')
+      await user.click(screen.getByRole('button', { name: 'Remove Line item 2' }))
+      expect(screen.getAllByRole('rowheader')).toHaveLength(1)
+      await waitFor(() => expect(cellControl(1, 'SKU')).toHaveFocus())
+      await user.click(add)
+      expect(screen.getAllByRole('rowheader')).toHaveLength(2)
+      await waitFor(() => expect(cellControl(2, 'SKU')).toHaveFocus())
+      await waitFor(() => expect(statusRegion()).toHaveTextContent('Row 2 added'))
+    })
+
+    it('cells are dense by default; the table size drives it and an explicit field size wins', () => {
+      render(
+        <Lines
+          columns={[
+            ...columns.slice(0, 1),
+            {
+              key: 'qty',
+              header: 'Qty',
+              render: (row) => <NumberField name={row.name('qty')} label="Qty" size="medium" />,
+            },
+          ]}
+        />,
+      )
+      expect(screen.getAllByRole('columnheader')[1]).toHaveClass('MuiTableCell-sizeSmall')
+      expect(cellControl(1, 'SKU').closest('.MuiInputBase-root')).toHaveClass(
+        'MuiInputBase-sizeSmall',
+      )
+      expect(cellControl(1, 'Qty').closest('.MuiInputBase-root')).not.toHaveClass(
+        'MuiInputBase-sizeSmall',
+      )
+      cleanupAndRender(<Lines slotProps={{ table: { size: 'medium' } }} />)
+      expect(screen.getAllByRole('columnheader')[1]).toHaveClass('MuiTableCell-sizeMedium')
+      expect(cellControl(1, 'SKU').closest('.MuiInputBase-root')).not.toHaveClass(
+        'MuiInputBase-sizeSmall',
+      )
+      // A field *outside* the table is untouched by the nested theme.
+      cleanupAndRender(
+        withPickers(
+          <Form schema={lineSchema} defaultValues={{ lines: [line()] }} onSubmit={() => {}}>
+            <TextField name="lines.0.sku" label="Outside" />
+            <FieldArray<Line>
+              name="lines"
+              label="Line items"
+              layout="table"
+              columns={columns}
+              emptyRow={line}
+            />
+          </Form>,
+        ),
+      )
+      expect(
+        screen.getByRole('textbox', { name: 'Outside' }).closest('.MuiInputBase-root'),
+      ).not.toHaveClass('MuiInputBase-sizeSmall')
+    })
+
+    it("a cell error is the control's hidden description under summary and visible under inline", async () => {
+      const user = userEvent.setup()
+      render(<Lines rows={[line('', 0)]} />)
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      await screen.findAllByRole('alert')
+      const sku = cellControl(1, 'SKU')
+      expect(sku).toHaveAttribute('aria-invalid', 'true')
+      expect(sku).toHaveAccessibleDescription('SKU is required')
+      const helper = sku.closest('.MuiFormControl-root')!.querySelector('.MuiFormHelperText-root')!
+      expect(getComputedStyle(helper).position).toBe('absolute')
+
+      cleanupAndRender(<Lines rows={[line('', 0)]} cellErrors="inline" />)
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      await screen.findAllByRole('alert')
+      const inlineSku = cellControl(1, 'SKU')
+      expect(inlineSku).toHaveAccessibleDescription('SKU is required')
+      const shown = inlineSku
+        .closest('.MuiFormControl-root')!
+        .querySelector('.MuiFormHelperText-root')!
+      expect(getComputedStyle(shown).position).not.toBe('absolute')
+      expect(inlineSku.closest('.MuiFormControl-root')).not.toHaveClass(
+        fieldLayoutClasses.cellHelperHidden,
+      )
+    })
+
+    it('an array-level error still renders under Add', async () => {
+      const user = userEvent.setup()
+      const minSchema = lineSchema.extend({
+        lines: lineSchema.shape.lines.min(1, 'Add at least one line'),
+      })
+      render(
+        <Form schema={minSchema} defaultValues={{ lines: [] }} onSubmit={() => {}}>
+          <FieldArray<Line>
+            name="lines"
+            label="Line items"
+            layout="table"
+            columns={columns.slice(0, 1)}
+            emptyRow={line}
+          />
+          <SubmitButton />
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent('Add at least one line')
+      expect(alert).toHaveClass(fieldArrayClasses.errorText)
+    })
+
+    it('theme styleOverrides reach every table slot', () => {
+      const theme = createTheme({
+        components: {
+          EzFieldArray: {
+            styleOverrides: {
+              tableContainer: { letterSpacing: '1px' },
+              table: { letterSpacing: '2px' },
+              tableHead: { letterSpacing: '3px' },
+              tableRow: { letterSpacing: '4px' },
+              cell: { letterSpacing: '5px' },
+              rowHeader: { letterSpacing: '6px' },
+              actionsCell: { letterSpacing: '7px' },
+              actionsHeaderText: { letterSpacing: '8px' },
+            },
+          },
+        },
+      })
+      const { container } = render(
+        <ThemeProvider theme={theme}>
+          <Lines />
+        </ThemeProvider>,
+      )
+      const spacing = (selector: string) =>
+        getComputedStyle(container.querySelector(selector)!).letterSpacing
+      expect(spacing(`.${fieldArrayClasses.tableContainer}`)).toBe('1px')
+      expect(spacing(`.${fieldArrayClasses.table}`)).toBe('2px')
+      expect(spacing(`.${fieldArrayClasses.tableHead}`)).toBe('3px')
+      expect(spacing(`.${fieldArrayClasses.tableRow}`)).toBe('4px')
+      expect(spacing(`.${fieldArrayClasses.cell}`)).toBe('5px')
+      expect(spacing(`.${fieldArrayClasses.rowHeader}`)).toBe('6px')
+      expect(spacing(`.${fieldArrayClasses.actionsCell}`)).toBe('7px')
+      expect(spacing(`.${fieldArrayClasses.actionsHeaderText}`)).toBe('8px')
+    })
+
+    it('actionsHeader is a theme-settable default (a locale string)', () => {
+      const theme = createTheme({
+        components: { EzFieldArray: { defaultProps: { actionsHeader: 'Acciones' } } },
+      })
+      render(
+        <ThemeProvider theme={theme}>
+          <Lines />
+        </ThemeProvider>,
+      )
+      expect(screen.getByRole('columnheader', { name: 'Acciones' })).toBeInTheDocument()
+    })
+
+    it('warns in dev when the render prop does not match the layout', () => {
+      expectConsole('warn', 'renders through `columns`, which is missing')
+      render(
+        <Form schema={lineSchema} defaultValues={{ lines: [] }} onSubmit={() => {}}>
+          <FieldArray<Line> name="lines" label="Line items" layout="table" emptyRow={line} />
+        </Form>,
+      )
+    })
+
+    it.each(['summary', 'inline'] as const)(
+      'has no a11y violations at rest and in error (cellErrors=%s)',
+      async (cellErrors) => {
+        const user = userEvent.setup()
+        const { container } = render(
+          <Lines reorder rows={[line('', 0), line('B')]} cellErrors={cellErrors} />,
+        )
+        await expectNoA11yViolations(container)
+        await user.click(screen.getByRole('button', { name: 'Submit' }))
+        await screen.findAllByRole('alert')
+        await expectNoA11yViolations(container)
+      },
+    )
+  })
 })
+
+/** Unmount whatever is rendered and render the next tree — for cases that compare two setups. */
+function cleanupAndRender(ui: React.ReactElement) {
+  cleanup()
+  return render(ui)
+}
