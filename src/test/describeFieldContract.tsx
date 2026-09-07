@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { expectConsole } from './expectConsole'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import type { DefaultValues, FieldValues } from 'react-hook-form'
@@ -158,21 +158,27 @@ export interface FieldContract<TIn extends FieldValues, TOut> {
     expect: () => void
   }
   /**
-   * Row 4: the element the Enter key is pressed on, when the default resolver is wrong.
+   * Row 4: the element, **or the subtree**, focus is walked into before Enter is pressed.
+   * Defaults to `getControl()`.
    *
-   * The default is **not** `getControl()`. `getControl` returns the element that carries
-   * `aria-describedby` / `aria-invalid` / the accessible name, and for the group-shaped
-   * fields that is a non-focusable `div` — `div[role=radiogroup]` (RadioGroup, Rating),
-   * `div[role=group]` (CheckboxGroup). Implicit submission is a property of the *focused*
-   * element, so pressing Enter on a `div` measures nothing: the key never reaches a
-   * control the form would submit from. That artifact is what produced this ticket's
-   * original "11 fields report zero submits" table; six of those eleven submit correctly
-   * once the focusable control is the one focused.
+   * It is a subtree rather than a single element because `tabTo` presses Tab until the
+   * active element is this one *or inside it* — so `getControl()` works as the default
+   * even for the fields whose `getControl()` is not itself focusable. That is the point:
+   * `getControl` returns the element carrying `aria-describedby` / `aria-invalid` / the
+   * accessible name, which for the group-shaped fields is a non-focusable `div` —
+   * `div[role=radiogroup]` (RadioGroup, Rating), `div[role=group]` (CheckboxGroup).
+   * Implicit submission is a property of the *focused* element, so pressing Enter on such
+   * a `div` measures nothing; letting Tab land wherever the platform puts it inside the
+   * field measures the real thing. Focusing a specific descendant would be worse, not
+   * better — a radio group with a selection focuses the *checked* radio, not the first,
+   * and which member wins is the browser's business.
    *
-   * So the default resolves `getControl()` to itself when it is focusable, and otherwise
-   * to the first focusable element **inside** it — never outside, so a field can never
-   * pass this line by focusing the submit button. A field whose focusable control is not
-   * a descendant of `getControl()` states it here.
+   * Containment also bounds it: Tab stops as soon as focus is inside this element, so a
+   * field can never pass the line by focusing the submit button.
+   *
+   * Set it only when the field's focusable controls are not inside `getControl()` —
+   * `OtpField`, whose `getControl()` is slot 1 (where the ARIA attributes live) while
+   * typing a code advances focus to the last slot, names the enclosing group here.
    */
   enterFrom?: () => HTMLElement
   /**
@@ -262,11 +268,10 @@ export function describeFieldContract<TIn extends FieldValues, TOut>(c: FieldCon
       return screen.getByRole(c.role, { name })
     })
   /*
-   * Row 4's focus target. `getControl()` when it is focusable, else the first focusable
-   * element inside it — see `enterFrom`'s doc for why the distinction is the whole point
-   * of the line. Scoped to `getControl()`'s subtree so no field can pass by focusing the
-   * submit button, and it throws rather than returning the group when there is nothing
-   * focusable inside, so a silent "pressed Enter on a div" cannot recur.
+   * The subtree rows 4 and 5 are about. No resolving happens here — `getControl()` is
+   * handed straight to `tabTo`, which walks focus until it lands on that element or
+   * inside it, and to row 5's assertion, which accepts the same. See `enterFrom`'s doc
+   * for why containment rather than identity is the honest claim.
    */
   const enterFrom = c.enterFrom ?? c.getControl
   const inForm = (
@@ -397,9 +402,11 @@ export function describeFieldContract<TIn extends FieldValues, TOut>(c: FieldCon
     /*
      * Row 4 of #102, via #122. Implicit submission: with the form's focus on a control
      * that is an implicit submission source, Enter submits — exactly once. "Exactly
-     * once" is the half that catches the real bug, so it is asserted twice, a beat
-     * apart: a field whose Enter both submits and *also* clicks a submit button (or
-     * re-submits on the next tick) passes a single synchronous count and fails this.
+     * once" is the half that catches the real bug, so the count is asserted twice with a
+     * macrotask turn genuinely elapsed between them: a field whose Enter both submits and
+     * *also* activates a submit button re-submits on the next tick, which a single
+     * synchronous count — or two `waitFor`s in a row — would miss. See the second
+     * assertion for why the gap has to be real, and why one turn is the right size.
      *
      * The focused element is `enterFrom()` — see its doc for why that is not
      * `getControl()`, and why measuring on `getControl()` is what produced this
@@ -421,8 +428,37 @@ export function describeFieldContract<TIn extends FieldValues, TOut>(c: FieldCon
       await tabTo(user, enterFrom())
       await user.keyboard('{Enter}')
       await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
-      // A beat later, so a *second* submit queued behind the first still fails this.
-      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+      // …and still exactly once after a macrotask turn has genuinely elapsed. This second
+      // count is the one that catches the real bug — a field whose Enter both submits and
+      // *also* activates a submit button — and it only does so if real time passes first.
+      //
+      // Two back-to-back `waitFor`s do not pass time: `waitFor` resolves the instant its
+      // callback first passes, so the second returns on the same tick. Measured against a
+      // form that submits once immediately and once on a timer, old shape (two `waitFor`s)
+      // vs this one:
+      //
+      //     timer    two waitFors        this
+      //     0ms      catches             catches
+      //     1ms      catches             catches
+      //     5ms      MISSES (saw 2)      catches
+      //     20ms+    neither: the duplicate has not fired yet when the test ends
+      //
+      // The 5ms row is the hole this closes, and neither shape false-positives on a form
+      // that submits once. The 20ms+ rows are the honest limit: a duplicate deferred that
+      // long is out of reach of any assertion that does not sit and wait, and nothing on
+      // `<Form>`'s submit path defers like that — it is hookform's `handleSubmit` (async,
+      // so its continuation is a microtask) plus a post-commit `useEffect` for the
+      // focus/announce half, which Form.tsx deliberately uses *instead of* a timer
+      // (#123/#124). A `setTimeout(…, 0)` clears the microtask queue, React's effects and
+      // any 0ms timer ahead of it, which covers everything that path can produce.
+      //
+      // `act` so the re-render a late submit causes is flushed inside the assertion rather
+      // than warning after it; 0ms rather than a real delay because this runs once per
+      // field, 24 fields over.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      expect(onSubmit).toHaveBeenCalledTimes(1)
     })
 
     /*
@@ -455,11 +491,20 @@ export function describeFieldContract<TIn extends FieldValues, TOut>(c: FieldCon
      * stake here — whether the `ref` hookform registered is an element focus can reach.
      *
      * The assertion is on the **visible** control (`expectFocusedWhenInvalid`, defaulting
-     * to the same resolved focusable control row 4 uses — hookform focuses what it
-     * registered a `ref` on, which is the input, not the `div` `getControl()` returns for
-     * the group-shaped fields). jsdom will report focus on an `aria-hidden`, `tabindex="-1"`
-     * proxy input that a real browser redirects away from, so a pass against such a
-     * proxy would be a false one; those fields exempt instead.
+     * to the same subtree row 4 uses — hookform focuses what it registered a `ref` on,
+     * which is the input, not the `div` `getControl()` returns for the group-shaped
+     * fields). jsdom will report focus on an `aria-hidden`, `tabindex="-1"` proxy input
+     * that a real browser redirects away from, so a pass against such a proxy would be a
+     * false one; those fields exempt instead.
+     *
+     * One field, not the two the #122 plan proposed. Two copies would need two schema
+     * keys and two `render`s, which the contract's single-field shape has no room for —
+     * and the claim they would add, "the *first* invalid of several", is not a per-field
+     * property at all: it is hookform's ordering, asserted once rather than 24 times. It
+     * lands in `FieldArray.test.tsx` ("focuses a later row when the earlier rows are
+     * valid"), which is also where the indexed-path risk this line was suspected of
+     * having actually lives. What is per-field, and what this asserts, is whether the
+     * `ref` hookform registered is an element focus can reach at all.
      */
     const focusExemption = c.exempt?.focusesFirstInvalid
     it.skipIf(focusExemption)('focuses the invalid field after a failed submit', async () => {
