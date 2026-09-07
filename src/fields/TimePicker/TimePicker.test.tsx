@@ -222,3 +222,69 @@ describe('TimePicker', () => {
     expectTargetSize(clearButton(screen.getByRole('group', { name: 'At' })))
   })
 })
+
+/**
+ * #127: the picker family joins the #104 contract — the binding owns
+ * `role="alert"` on the helper text and a consumer's own `role` cannot displace
+ * it. The picker's twist is that it takes that ordering *without* the hook's id
+ * pin: MUI X derives this `<p>`'s id from the field id (`${fieldId}-helper-text`),
+ * so pinning `helperTextId` on the slot would give the `<input>` and the `<p>` the
+ * same id. Both halves are asserted here.
+ */
+describe('TimePicker helper-text role cannot be displaced by a consumer (#127)', () => {
+  it('announces the error even when a consumer sets a formHelperText role', async () => {
+    const user = userEvent.setup()
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ at: null }} onSubmit={() => {}}>
+          <TimePicker
+            name="at"
+            label="At"
+            required
+            slotProps={{ textField: { slotProps: { formHelperText: { role: 'note' } } } }}
+          />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('At is required')
+  })
+
+  it('honours a consumer helper-text role while there is no error to announce', () => {
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ at: null }} onSubmit={() => {}}>
+          <TimePicker
+            name="at"
+            label="At"
+            helperText="Any date will do"
+            slotProps={{ textField: { slotProps: { formHelperText: { role: 'note' } } } }}
+          />
+        </Form>,
+      ),
+    )
+    expect(screen.getByText('Any date will do')).toHaveAttribute('role', 'note')
+  })
+
+  it('keeps the input id and the helper-text id distinct', async () => {
+    const user = userEvent.setup()
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ at: null }} onSubmit={() => {}}>
+          <TimePicker name="at" label="At" required />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    const helper = await screen.findByRole('alert')
+    const input = hiddenInput('at')
+    expect(helper.id).toBeTruthy()
+    expect(input.id).toBeTruthy()
+    expect(helper.id).not.toBe(input.id)
+    // MUI X derives the helper id from the field id; the group points at it.
+    expect(helper.id).toBe(`${input.id}-helper-text`)
+    expect(screen.getByRole('group', { name: 'At' })).toHaveAttribute('aria-describedby', helper.id)
+  })
+})
