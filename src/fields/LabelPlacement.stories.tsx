@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
 import Stack from '@mui/material/Stack'
@@ -90,6 +91,32 @@ function PlacementForm({
   )
 }
 
+/**
+ * `floating` shown under a stock `createTheme()`, whatever the Theme toolbar says.
+ *
+ * The preset the toolbar defaults to (`createEzFormTheme()`, see `DESIGN.md`) already
+ * ships `MuiInputLabel: { shrink, disableAnimation }` and `MuiOutlinedInput: { notched:
+ * false }` — it *is* the stacked look, applied theme-wide so it reaches a consumer's own
+ * bare `<MuiTextField>` outside any `<Form>`. Under it a `floating` field has no label to
+ * float and no notch to open, so the `floating` sections rendered identically to the
+ * `stacked` ones and the comparison documented nothing (#131).
+ *
+ * A provider inside the story rather than a `parameters.theme` opt-out in the preview:
+ * the preview picks the theme from the `theme` **toolbar global**, which every other
+ * story in the repo obeys, and a competing story-level parameter would mean the toolbar
+ * silently does not apply to some stories. Wrapping one section is ordinary story
+ * styling, which PHILOSOPHY rule 2 permits (`src/` may not style; stories may).
+ *
+ * The consequence is deliberate: switching the toolbar to "Stock MUI" makes these
+ * sections match their neighbours, because there they genuinely are the same.
+ */
+function StockTheme({ children }: { children: ReactNode }) {
+  return <ThemeProvider theme={stockTheme}>{children}</ThemeProvider>
+}
+
+// Built once: a theme is a large immutable object and a story re-renders.
+const stockTheme = createTheme()
+
 const meta = {
   title: 'Fields/Label placement',
   component: PlacementForm,
@@ -110,9 +137,20 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** MUI's own: the label floats over the input and notches the outline on focus or fill. */
+/**
+ * MUI's own: the label floats over the input and notches the outline on focus or fill.
+ *
+ * Rendered under a stock `createTheme()` so the float is actually visible — the preset
+ * the Theme toolbar defaults to stacks labels theme-wide, which would leave nothing to
+ * float (#131). See `StockTheme`.
+ */
 export const Floating: Story = {
   args: { labelPlacement: 'floating' },
+  render: (args) => (
+    <StockTheme>
+      <PlacementForm {...args} />
+    </StockTheme>
+  ),
 }
 
 /**
@@ -192,16 +230,26 @@ export const ViaThemeDefaultProps: Story = {
  * Every one of these fields is programmatically labelled the same way — the markup
  * is identical and only the CSS differs, which is what keeps `getByLabelText`,
  * `aria-describedby` and the required marker working under all three.
+ *
+ * The `floating` section alone is wrapped in a stock `createTheme()`: the preset the
+ * Theme toolbar defaults to stacks labels theme-wide, so without it all three sections
+ * rendered the same and the comparison showed nothing (#131). The other two are left on
+ * whatever the toolbar selects, which is how they are meant to be judged.
+ *
+ * Three sibling `<form>`s, deliberately — one per placement, none nested inside another.
  */
 export const AllThree: Story = {
   render: () => (
     <Stack spacing={4}>
-      {(['floating', 'stacked', 'start'] as const).map((placement) => (
-        <Stack key={placement} spacing={1}>
-          <Typography variant="h6">{placement}</Typography>
-          <PlacementForm labelPlacement={placement} />
-        </Stack>
-      ))}
+      {(['floating', 'stacked', 'start'] as const).map((placement) => {
+        const form = <PlacementForm labelPlacement={placement} />
+        return (
+          <Stack key={placement} spacing={1}>
+            <Typography variant="h6">{placement}</Typography>
+            {placement === 'floating' ? <StockTheme>{form}</StockTheme> : form}
+          </Stack>
+        )
+      })}
     </Stack>
   ),
 }

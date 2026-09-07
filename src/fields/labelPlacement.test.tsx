@@ -4,7 +4,7 @@ import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { formHelperTextClasses } from '@mui/material/FormHelperText'
 import { formLabelClasses } from '@mui/material/FormLabel'
 import { z } from 'zod'
-import { Form } from '../Form'
+import { Form, formClasses } from '../Form'
 import { SubmitButton } from '../SubmitButton'
 import { TextField } from './TextField'
 import { Select } from './Select'
@@ -243,6 +243,67 @@ describe('labelPlacement', () => {
     const above = startRulesAboveBreakpoint(emittedCss())
     expect(above).toContain('grid-column:2')
     expect(above).not.toContain(`.${formHelperTextClasses.root}{grid-column`)
+  })
+
+  it('start floats a legend so it joins the grid instead of sitting above it', () => {
+    // #131. A `legend` field (`FieldFrame`'s `labelAs="legend"` — RadioGroup,
+    // CheckboxGroup, Rating, Slider, ToggleButtonGroup) renders its box as a
+    // `<fieldset>`, and a `<fieldset>`'s `<legend>` is a *rendered legend*: CSS pulls
+    // it out of the fieldset's formatting context and paints it above the content
+    // box, so `grid-column: 1` computes on it and does nothing. Measured in Chrome
+    // before the fix: the legend sat at its own intrinsic 94px width and the radios
+    // began 31px below it, which with the first option's own 9px padding is the 40px
+    // the issue reported.
+    //
+    // Floating it makes it an ordinary box again — a floated legend is by definition
+    // no longer a rendered legend — so it takes the column like every other label.
+    // After: legend and group both at the same top, legend the full 192px column.
+    renderForm({ labelPlacement: 'start' })
+    const above = startRulesAboveBreakpoint(emittedCss())
+    expect(above).toContain('>legend{')
+    // Logical, not `left`: the rest of this file is direction-neutral so `start`
+    // mirrors under an RTL theme, and the RTL test below pins that.
+    expect(above).toContain('float:inline-start')
+    // A float sizes to its content, so the column width has to be restated on it.
+    expect(above).toContain('width:12rem')
+  })
+
+  it('the legend float is start-only, so a stacked fallback legend is not floated', () => {
+    // Below the breakpoint the box is stacked and the legend belongs above the
+    // control at its natural width, which is what a float would break.
+    renderForm({ labelPlacement: 'start' })
+    expect(startRules(cssOutsideMinWidth(emittedCss()))).not.toContain('float')
+  })
+
+  it('spaces the form description away from the first field under stacked and start', () => {
+    // #131's third observation. Under `floating` the first thing below the
+    // description is the input box, whose label sits inside the outline, so MUI's
+    // own spacing already reads as a gap — 16px measured in Chrome. Under the other
+    // two the next thing is a line of label text flush against the description's
+    // last line: measured at 0px, text touching text.
+    // Asserted on the emitted rule rather than a computed margin because the
+    // selector is `:has()`, which jsdom's CSS engine does not implement — it parses
+    // the rule and then matches nothing, so `getComputedStyle` reports `0px` here
+    // whatever the rule says. Measured in Chrome instead: 0px before, 16px after,
+    // matching the 16px `floating` already had.
+    renderForm({
+      labelPlacement: 'stacked',
+      title: 'Account',
+      description: 'Tell us where to send receipts.',
+    })
+    const css = emittedCss()
+    const rule = css
+      .split('}')
+      .find((r) => r.includes(formClasses.description) && r.includes('margin-bottom'))
+    expect(rule).toBeDefined()
+    expect(rule).toContain('margin-bottom:16px')
+    // Keyed on the form containing a non-floating field. `floating` is left alone: it
+    // does not have the problem, and a rule there would add a second gap on top of
+    // the one MUI already provides — so the selector names the two classes and the
+    // `floating` class appears in no description rule.
+    expect(rule).toContain(fieldLayoutClasses.stacked)
+    expect(rule).toContain(fieldLayoutClasses.start)
+    expect(rule).not.toContain(fieldLayoutClasses.floating)
   })
 
   it('start keeps the label column only above labelPlacementBreakpoint', () => {

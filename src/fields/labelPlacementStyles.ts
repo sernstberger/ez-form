@@ -4,6 +4,7 @@ import { formHelperTextClasses } from '@mui/material/FormHelperText'
 import { formLabelClasses } from '@mui/material/FormLabel'
 import { outlinedInputClasses } from '@mui/material/OutlinedInput'
 import { fieldLayoutClasses } from './LabelPlacementContext'
+import { formClasses } from '../Form/formClasses'
 
 /**
  * The label placement rules (#9, #66), as one style object for `<Form>`'s `EzForm`
@@ -126,6 +127,31 @@ const startBox = (theme: Theme, labelWidth: string | number): CSSObject => ({
     // border box; `theme.spacing(1)` is the outlined input's own vertical padding.
     paddingTop: theme.spacing(1),
   },
+  // A `legend` label (`FieldFrame`'s `labelAs="legend"`: RadioGroup, CheckboxGroup,
+  // Rating, Slider, ToggleButtonGroup) needs one rule more than the others (#131).
+  //
+  // Its box is a `<fieldset>`, and a `<fieldset>`'s `<legend>` is a *rendered
+  // legend*: CSS takes it out of the fieldset's formatting context entirely and
+  // paints it above the anonymous content box. `grid-column: 1` computes on it and
+  // does nothing — the legend sat full-bleed at its own intrinsic width and the
+  // control box began *below* it, so the label named a column it was not in.
+  // Measured in Chrome: the legend's 31px pushed the group down, and the first
+  // option's own 9px `SwitchBase` padding took the total to 40px.
+  //
+  // Floating it is what makes it an ordinary box again — a floated (or absolutely
+  // positioned) legend is by definition no longer a rendered legend — at which
+  // point it takes part in the grid like every other label. `inline-start` rather
+  // than `left` so the rule stays direction-neutral like the rest of this file, and
+  // an explicit column width because a float sizes to its content, not to the grid
+  // track it nominally occupies.
+  //
+  // The existing `paddingTop` needs no adjustment for these: measured against a
+  // RadioGroup's first option the residual is 1.5px, smaller than the offset the
+  // plain text fields already ship with.
+  '& > legend': {
+    float: 'inline-start',
+    width: typeof labelWidth === 'number' ? `${labelWidth}px` : labelWidth,
+  },
   ...closeNotch,
   // Everything that is not the label goes in column 2, stacked in source order —
   // the control, the helper text, and whatever else a field renders.
@@ -194,6 +220,26 @@ export function labelPlacementStyles(
   labelWidth: string | number,
 ): CSSObject {
   return {
+    // A gap between the form's description and the first field, for the two
+    // placements whose label is in normal flow (#131).
+    //
+    // Under `floating` the first thing below the description is the *input box*, and
+    // its label sits inside the outline, so MUI's own spacing already reads as a gap
+    // (16px measured). Under `stacked` and `start` the first thing below it is a
+    // line of label text flush against the description's own last line — measured at
+    // 0px, text touching text.
+    //
+    // Keyed on the form carrying a non-floating field rather than on the description
+    // being that field's sibling: `<Form>` renders its description above three
+    // context providers, and a consumer's children are normally inside their own
+    // `<Stack>`, so a `+` or `~` selector between the two almost never matches. This
+    // is a form-level layout question anyway, which is why it sits in this file with
+    // the rest of the placement CSS rather than on the description slot.
+    //
+    // `theme.spacing(2)` matches the `columnGap` `start` already uses; a theme
+    // changes it through `EzForm.styleOverrides.root` like every other rule here.
+    [`&:has(.${fieldLayoutClasses.stacked}) .${formClasses.description}, &:has(.${fieldLayoutClasses.start}) .${formClasses.description}`]:
+      { marginBottom: theme.spacing(2) },
     [`& .${fieldLayoutClasses.stacked}`]: stackedBox(theme),
     [`& .${fieldLayoutClasses.start}`]: {
       // The fallback, stated once as the base rule rather than as an override:

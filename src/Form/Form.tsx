@@ -26,7 +26,7 @@ import {
   type UseFormReturn,
 } from 'react-hook-form'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
-import generateUtilityClasses from '@mui/material/generateUtilityClasses'
+import { formClasses } from './formClasses'
 import { styled, type Breakpoint } from '@mui/material/styles'
 import Typography, { type TypographyProps } from '@mui/material/Typography'
 import type { z } from 'zod'
@@ -53,12 +53,9 @@ import { shouldBlockUnsavedChanges } from '../useFormGuard'
  */
 export type FormMethods<TIn extends FieldValues, TOut> = UseFormReturn<TIn, unknown, TOut>
 
-export const formClasses = generateUtilityClasses('EzForm', [
-  'root',
-  'title',
-  'description',
-  'status',
-])
+// Re-exported so `import { formClasses } from './Form'` keeps working; it lives in
+// its own module to avoid a cycle with the placement CSS (see `formClasses.ts`).
+export { formClasses }
 
 /** Typography plus `component`, so a slot can pick its element (heading level). */
 export type FormTextSlotProps = TypographyProps & { component?: ElementType }
