@@ -170,6 +170,13 @@ From the [design spec](superpowers/specs/2026-09-07-label-placement-mui-vocabula
 
 ## #131 — placement polish
 
+> Superseded by #139 (2026-09-07): the description-gap ruling below is keyed on
+> `.EzFieldLayout-stacked`, which no longer exists; the same gap is now
+> `.EzFieldLayout-start` under `theme.breakpoints.up(labelPlacementBreakpoint)`, plus
+> `EzForm.styleOverrides.description` in the preset for `top`. The rest of this
+> section (the legend float, the story theme wrapper, `formClasses`, the story guard)
+> is unaffected and still holds.
+
 - A `legend` label under `start` is **floated** (`float: inline-start`, plus the column width), not given a `padding-top`: the 40px offset was not padding but the CSS *rendered legend* rule — a `<fieldset>`'s `<legend>` is pulled out of the fieldset's formatting context and painted above the content box, so `grid-column: 1` computed on it and did nothing, leaving it full-bleed at its intrinsic width with the control box starting below it (measured in Chrome: legend 94px wide, group 31px lower; the first option's own 9px `SwitchBase` padding made up the rest). A floated legend is by definition no longer a rendered legend, so it rejoins the grid — verified level (`deltaTop: 0`) for RadioGroup, CheckboxGroup, Rating, Slider and ToggleButtonGroup — cost if wrong: a browser without logical-float support left-floats under RTL; the width has to be restated because a float sizes to content.
 - No new themeable padding for the legend: with the float alone the residual to centre-match the first option's text is 1.5px, smaller than the offset the plain text fields already ship with, so a knob to correct it would be a literal with no reason to exist — cost if wrong: a theme can already reach the legend through `EzForm.styleOverrides.root`, and a knob can be added later without a break.
 - The floating **story** sections render under a local stock `createTheme()` provider rather than a new `parameters.theme` opt-out in the preview: the preview picks the theme from the `theme` toolbar global that every story obeys, and a competing story-level parameter would mean the toolbar silently does not apply to some stories. Wrapping a section is ordinary story styling (PHILOSOPHY rule 2: `src/` may not style, stories may) — cost if wrong: switching the toolbar to "Stock MUI" makes those sections match their neighbours, which is honest, because there they are the same.
