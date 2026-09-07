@@ -25,7 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
     read under `labelAs="control"` only; that is how `Checkbox`/`Switch` forward the above.
   - `fieldLayoutClasses.floating` and `.stacked` are removed; the keys are `root`, `top`,
     `start`, `selfLabelled`, `cell`, `cellHelperHidden`. `FieldArray`'s
-    `layout="stacked" | "table"` is a different axis and is unchanged.
+    `layout="stacked" | "table"` is a different axis and is unchanged, and so is the new
+    text-field `variant="stacked"` (#142, below) — the same word on three axes.
 
   Migration: replace `labelPlacement="floating"` and `labelPlacement="stacked"` with
   `labelPlacement="top"`, and drop them entirely where they only restated the default. If
@@ -204,6 +205,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   step), and `Agent` (the manual precursor of #65 — `autoComplete="off"`, `confirm`/
   `guard` off, one page). Documentation only, not exported from the package.
 
+- Custom `variant`s on the text-field family. ez-form declares MUI's own (not yet
+  shipped) `TextFieldPropsVariantOverrides` and `FormControlPropsVariantOverrides` by
+  module augmentation, so a consumer adds a variant with the same
+  `declare module '@mui/material/TextField'` line the MUI docs will show, styles it
+  through `theme.components.MuiTextField.variants`, and it typechecks and renders (a
+  custom variant renders `OutlinedInput` with the notch closed; `slots.input` picks
+  another input). `EzTextFieldVariants` — MUI's three plus anything augmented — is the
+  `variant` type on `TextField`, `NumberField`, `Autocomplete`'s `textFieldProps`, and
+  the pickers' `slotProps.textField`. `'stacked'` is the variant ez-form itself
+  declares; `createEzFormTheme()` styles it and defaults to it. Every shim line carries
+  the marker `UPSTREAM SHIM (#142)`, so when upstream ships the deletion is one grep and
+  consumers change nothing — #142.
+
 ### Changed
 
 - `NumberField` / `NumberFieldControl` `className` is now `string` only (Base UI's
@@ -214,6 +228,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `KeyboardArrowUp`/`KeyboardArrowDown`, `UploadFile`/`Close`) instead of hand-rolled
   inline `SvgIcon` paths; `@mui/icons-material` is a new peer and dev dependency.
   `check:guardrails` gained a `no-inline-svg` rule (`<path `/`createSvgIcon(`) — #67.
+- `createEzFormTheme()` sets `MuiTextField.defaultProps.variant` (and
+  `MuiPickersTextField`'s) to `'stacked'` and keys its static-label rules on that
+  variant, rather than applying them to every `MuiInputLabel` unconditionally. Every
+  field under the preset looks the same as before; `variant="outlined"` on one field now
+  opts it back to MUI's floating label. The preset's box rules (root border, focus ring,
+  padding) stay theme-wide in this pass, so an `outlined` field floats its label over a
+  solid border until a follow-up keys those on the variant too — #142.
 
 ### Fixed
 
