@@ -389,6 +389,47 @@ describe('TextField binding cannot be displaced by consumer props (#104)', () =>
     expect(await screen.findByRole('alert')).toHaveTextContent('Email is required')
   })
 
+  /**
+   * #127: the case above ignores its `ownerState` argument, so it cannot see the
+   * binding leaking into it. Routing the function form through MUI's
+   * `mergeSlotProps` would: it calls the consumer's function with
+   * `{ ...ownerState, ...defaultSlotProps }`, and since `TextField`'s ownerState is
+   * its own props, `ownerState.id` came back as the internal helper-text id rather
+   * than the `id` the consumer put on the field. The function must see the
+   * component's real ownerState, so this reads it.
+   */
+  it('hands the consumer function an ownerState the binding has not written into', async () => {
+    const user = userEvent.setup()
+    const seen: Record<string, unknown>[] = []
+    render(
+      <Form schema={schema} defaultValues={{ email: '' }} onSubmit={() => {}}>
+        <TextField
+          name="email"
+          label="Email"
+          id="my-custom-id"
+          slotProps={{
+            formHelperText: (ownerState) => {
+              seen.push(ownerState as unknown as Record<string, unknown>)
+              return { role: 'note' }
+            },
+          }}
+        />
+        <button type="submit">Go</button>
+      </Form>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    // The error still announces — the binding's `role` is applied after the return.
+    expect(await screen.findByRole('alert')).toHaveTextContent('Email is required')
+    // …but it reached the consumer's *return value*, never its argument.
+    expect(seen.length).toBeGreaterThan(0)
+    for (const ownerState of seen) {
+      expect(ownerState.id).toBe('my-custom-id')
+      expect(ownerState).not.toHaveProperty('role')
+      // A real prop is still there, so this is the component's own ownerState.
+      expect(ownerState.label).toBe('Email')
+    }
+  })
+
   it('describes the input with both the consumer aria-describedby and the error', async () => {
     const user = userEvent.setup()
     render(

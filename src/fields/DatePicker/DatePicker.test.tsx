@@ -39,6 +39,20 @@ describeFieldContract({
     ),
   getControl: () => screen.getByRole('group', { name: 'Start' }),
   requiredNotAnnounced: true,
+  exempt: {
+    // The visible assertion is unreachable in jsdom. MUI X registers an `aria-hidden`,
+    // `tabindex="-1"` proxy input as the field's hookform `ref` (its own documented test
+    // seam), so `shouldFocusError` calls `.focus()` on that and jsdom's
+    // `document.activeElement` bookkeeping reports it — while a real browser redirects
+    // real focus to the visible `role="spinbutton"` section instead. Two Playwright
+    // passes confirmed the visible section takes focus, named and with a focus ring:
+    // `docs/superpowers/reviews/2026-09-04-qa-sweep-pickers.md` §2b (#105, #122).
+    // Asserting on the proxy would be a green test over a question jsdom cannot answer.
+    focusesFirstInvalid:
+      "jsdom reports focus on MUI X's aria-hidden proxy input; the real browser puts it " +
+      'on the visible spinbutton section — docs/superpowers/reviews/2026-09-04-qa-sweep-pickers.md ' +
+      '\u00a72b (#105).',
+  },
   expectDisabled: () => expect(hiddenInput('start')).toBeDisabled(),
   expectSubmitted: { start: new Date(2030, 0, 15) },
   interact: async () => {
@@ -406,5 +420,74 @@ describe('DatePicker', () => {
       ),
     )
     expectTargetSize(clearButton(screen.getByRole('group', { name: 'Start' })))
+  })
+})
+
+/**
+ * #127: the picker family joins the #104 contract — the binding owns
+ * `role="alert"` on the helper text and a consumer's own `role` cannot displace
+ * it. The picker's twist is that it takes that ordering *without* the hook's id
+ * pin: MUI X derives this `<p>`'s id from the field id (`${fieldId}-helper-text`),
+ * so pinning `helperTextId` on the slot would give the `<input>` and the `<p>` the
+ * same id. Both halves are asserted here.
+ */
+describe('DatePicker helper-text role cannot be displaced by a consumer (#127)', () => {
+  it('announces the error even when a consumer sets a formHelperText role', async () => {
+    const user = userEvent.setup()
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ start: null }} onSubmit={() => {}}>
+          <DatePicker
+            name="start"
+            label="Start"
+            required
+            slotProps={{ textField: { slotProps: { formHelperText: { role: 'note' } } } }}
+          />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Start is required')
+  })
+
+  it('honours a consumer helper-text role while there is no error to announce', () => {
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ start: null }} onSubmit={() => {}}>
+          <DatePicker
+            name="start"
+            label="Start"
+            helperText="Any date will do"
+            slotProps={{ textField: { slotProps: { formHelperText: { role: 'note' } } } }}
+          />
+        </Form>,
+      ),
+    )
+    expect(screen.getByText('Any date will do')).toHaveAttribute('role', 'note')
+  })
+
+  it('keeps the input id and the helper-text id distinct', async () => {
+    const user = userEvent.setup()
+    render(
+      withPickers(
+        <Form schema={schema} defaultValues={{ start: null }} onSubmit={() => {}}>
+          <DatePicker name="start" label="Start" required />
+          <button type="submit">Go</button>
+        </Form>,
+      ),
+    )
+    await user.click(screen.getByRole('button', { name: 'Go' }))
+    const helper = await screen.findByRole('alert')
+    const input = hiddenInput('start')
+    expect(helper.id).toBeTruthy()
+    expect(input.id).toBeTruthy()
+    expect(helper.id).not.toBe(input.id)
+    // MUI X derives the helper id from the field id; the group points at it.
+    expect(helper.id).toBe(`${input.id}-helper-text`)
+    expect(screen.getByRole('group', { name: 'Start' })).toHaveAttribute(
+      'aria-describedby',
+      helper.id,
+    )
   })
 })

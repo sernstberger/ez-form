@@ -45,6 +45,13 @@ describeFieldContract({
   ),
   getControl: textbox,
   expectSubmitted: { bio: 'a' },
+  exempt: {
+    enterSubmitsOnce:
+      'A `<textarea>` is not an implicit submission source: Enter inserts a newline, which ' +
+      'is the whole point of a multi-line field. Baseline: a bare `<textarea>` in a plain ' +
+      '`<form onSubmit>` in this same jsdom also reports zero submits (#122). Submitting ' +
+      'here would eat the keystroke the user meant.',
+  },
   themeDefault: {
     name: 'EzTextareaField',
     defaultProps: { helperText: 'From the theme' },

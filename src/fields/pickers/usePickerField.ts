@@ -379,9 +379,21 @@ export function usePickerField<
         },
         slotProps: {
           ...consumerTextField?.slotProps,
-          formHelperText: mergeSlotProps(consumerTextField?.slotProps?.formHelperText, {
-            role: f.helperTextA11y.role,
-          }),
+          // `helperTextRole`, not `helperTextSlotProps`: the binding's `role` has to
+          // land *after* the consumer's so a consumer `role` cannot displace
+          // `role="alert"` and leave the error rendered but never announced (#104) —
+          // but the hook's `helperTextId` must **not** be pinned here (#127). MUI X
+          // owns this `<p>`'s id: `PickersTextField` derives it as
+          // `${fieldId}-helper-text`, and `fieldId` above *is* `f.helperTextId`,
+          // pinned so the derivation is knowable. Pinning the same id on the slot
+          // would give the `<input>` and the `<p>` one id and leave the group's
+          // `aria-describedby` pointing at nothing. The hook keeps one copy of the
+          // ordering rule either way — see `helperTextRole` in `useEzField`.
+          //
+          // Every other key the consumer put on this slot — `className`, `style`,
+          // `sx`, handlers — passes through untouched; `role` under error is the only
+          // one the binding takes, and only for as long as there is an error.
+          formHelperText: f.helperTextRole(consumerTextField?.slotProps?.formHelperText),
           // PickersTextField spreads `slotProps.inputLabel` straight onto the real MUI
           // `InputLabel` (see PickersTextField.js), the same shape TextField's own
           // `slotProps.inputLabel` uses; an explicit `required` there wins over the

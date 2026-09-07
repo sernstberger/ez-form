@@ -32,6 +32,11 @@ describeFieldContract({
     <OtpField name="code" label="Code" length={4} aria-describedby={id} {...props} />
   ),
   getControl: () => screen.getByRole('textbox', { name: 'Code' }),
+  // The whole group, not slot 1: `getControl()` is slot 1 because that is where
+  // `aria-describedby`/`aria-invalid` live, but typing a code advances focus slot by
+  // slot, so the Enter under test is pressed on the *last* slot. Every slot is this
+  // field, and Enter from any of them must submit the completed code.
+  enterFrom: () => screen.getByRole('group', { name: 'Code' }),
   // A half-typed code is never valid (the field's built-in `complete` rule), so the
   // payload line types the whole `length={4}` code.
   interactSubmittable: async (user) => {

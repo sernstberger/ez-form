@@ -48,6 +48,14 @@ describeFieldContract({
   requiredNotAnnounced: true,
   expectDisabled: () => expect(screen.getByRole('button', { name: 'Left' })).toBeDisabled(),
   expectSubmitted: { align: 'center' },
+  exempt: {
+    enterSubmitsOnce:
+      'The controls are `button[type=button]`s, which the HTML spec gives no implicit ' +
+      'submission — Enter activates the button, and activating a toggle is what a user ' +
+      'pressing Enter on one means. Baseline: a plain `<MuiToggleButtonGroup>` in a plain ' +
+      '`<form onSubmit>` in this same jsdom also reports zero submits, as does a bare ' +
+      '`<button type="button">` (#122).',
+  },
   interact: (user) => user.click(screen.getByRole('button', { name: 'Center' })),
 })
 

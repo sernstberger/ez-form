@@ -123,28 +123,48 @@ export type UseEzFieldReturn<TValue = unknown> = Omit<UseControllerReturn, 'fiel
   nameA11y: NameA11y
   helperTextA11y: HelperTextA11y
   /**
+   * The `formHelperText` slot props with the binding's `role` applied **after**
+   * the consumer's, so a consumer `role` cannot displace `role="alert"` and leave
+   * the error rendered but never announced (#104). The id is *not* pinned — see
+   * `helperTextSlotProps`, which is this plus the pin, for the usual case.
+   *
+   * This is the smaller of the two rules, named on its own for the one field family
+   * that needs the ordering without the id: the pickers, where MUI X derives the
+   * helper text's id itself (`${fieldId}-helper-text`) and `usePickerField` reuses
+   * `helperTextId` as the *field* id to predict it. Pinning here would give the
+   * `<input>` and the `<p>` the same id and leave the group's `aria-describedby`
+   * pointing at nothing (#127).
+   *
+   * MUI's own `mergeSlotProps` is not used for this: it exists to let the external
+   * value win, which is wrong for the one attribute that makes the error reach a
+   * screen reader — and for the function form it would rewrite the `ownerState` the
+   * consumer's function receives. See `applyOwned`. The consumer's `role` still
+   * applies whenever there is no error to announce, so only the alert case is
+   * owned here.
+   *
+   * Handles the function form MUI accepts for a slot's props.
+   */
+  helperTextRole: <TOwnerState, TProps extends object>(
+    consumer: HelperTextSlotProps<TOwnerState, TProps>,
+  ) => TProps | ((ownerState: TOwnerState) => TProps)
+  /**
    * The `formHelperText` slot props for a field that also lets the consumer set
-   * them. The binding's `role` is applied **after** the consumer's, so a consumer
-   * `role` cannot displace `role="alert"` and leave the error rendered but never
-   * announced (#104).
+   * them: `helperTextRole`'s ordering (the binding's `role` last, #104) **plus**
+   * the hook's `helperTextId` pinned onto the slot.
    *
-   * MUI's own `mergeSlotProps` cannot do this: it exists to let the external value
-   * win, which is right for `className`/`sx`/handlers and wrong for the one
-   * attribute that makes the error reach a screen reader. The consumer's `role`
-   * still applies whenever there is no error to announce, so only the alert case
-   * is owned here.
-   *
-   * The hook's `helperTextId` is always pinned onto the slot, because every field
-   * points its control's `aria-describedby` at that id and the two must agree —
-   * `TextField` and `Autocomplete` through `describedBy` on `slotProps.htmlInput`,
-   * `NumberField` and `OtpField` through `describedBy` on their `inputProps`, the
-   * `FieldFrame` family through `bound.inputA11y`.
+   * The id is pinned because every field using this points its control's
+   * `aria-describedby` at that id and the two must agree — `TextField` and
+   * `Autocomplete` through `describedBy` on `slotProps.htmlInput`, `NumberField`
+   * and `OtpField` through `describedBy` on their `inputProps`, the `FieldFrame`
+   * family through `bound.inputA11y`.
    *
    * `Autocomplete` used to opt out of the pin (a `pinId: false` option) on the
    * grounds that MUI generated its own id and linked the input to that. That was
    * also why a consumer's own `aria-describedby` could never reach the combobox:
    * MUI writes the whole attribute. It owns the attribute itself now, so the
-   * option is gone and the helper has one shape again (#102 row 8).
+   * option is gone and the helper has one shape again (#102 row 8). A field that
+   * genuinely cannot take the pin calls `helperTextRole` instead of passing a
+   * flag, so this keeps one unconditional return shape.
    *
    * Handles the function form MUI accepts for a slot's props.
    *
@@ -173,6 +193,45 @@ export type UseEzFieldReturn<TValue = unknown> = Omit<UseControllerReturn, 'fiel
    */
   labelRequired: false | undefined
 }
+
+/**
+ * Merges the consumer's `formHelperText` slot props with the binding's, then puts
+ * the binding's keys back **on top**.
+ *
+ * A plain spread, deliberately **not** MUI's `mergeSlotProps`, in both branches.
+ *
+ * `mergeSlotProps` would be wrong for the function form: it calls the consumer's
+ * function with `{ ...ownerState, ...defaultSlotProps }` (mergeSlotProps.js), so
+ * the binding's `id`/`role` would be merged into the `ownerState` the consumer
+ * sees. `TextField`'s ownerState is its own props, so a consumer reading
+ * `ownerState.id` would get the internal helper-text id instead of the `id` they
+ * passed to the field. The consumer's function must see the component's real
+ * ownerState, untouched.
+ *
+ * And for the object form it would add nothing: everything `mergeSlotProps`
+ * composes beyond a spread — `className` via clsx, merged `style`, concatenated
+ * `sx`, chained event handlers — is keyed off those keys being present in the
+ * *defaults* argument, and `owned` only ever holds `id`/`role`. So it reduces to
+ * `{ ...owned, ...consumer }`, and since the binding's keys have to win it would
+ * then need `owned` re-applied on top anyway — which is exactly the spread below.
+ * (Verified against `className`/`style`/`sx`/handler consumers: identical output.)
+ *
+ * Nothing is lost by that: `owned` carries no key a consumer could want composed
+ * with, so every other key on the slot passes through untouched either way.
+ *
+ * The function form stays *a function*: resolving it here would hand the consumer
+ * an `ownerState` this hook does not have.
+ *
+ * Shared by `helperTextRole` and `helperTextSlotProps` so "the binding's keys go
+ * last" is written once; the two differ only in what `owned` holds.
+ */
+const applyOwned = <TOwnerState, TProps extends object>(
+  consumer: HelperTextSlotProps<TOwnerState, TProps>,
+  owned: object | null,
+): TProps | ((ownerState: TOwnerState) => TProps) =>
+  typeof consumer === 'function'
+    ? (ownerState: TOwnerState) => ({ ...consumer(ownerState), ...owned })
+    : ({ ...consumer, ...owned } as TProps)
 
 /**
  * Binds a field to the enclosing <Form>. Rules are normalized here (bare value
@@ -219,6 +278,17 @@ export function useEzField<TValue = unknown>(
   )
   const invalid = controller.fieldState.invalid
   const errorMessage = controller.fieldState.error?.message
+  /**
+   * The binding's share of the `formHelperText` slot, applied **last** and
+   * deliberately not merged: while an error shows, the live region is the
+   * binding's (#104). With no error the `role` key is left off entirely, so a
+   * consumer's own `role` survives the spread — `role: undefined` would erase it.
+   *
+   * The one copy of that rule: `helperTextRole` returns it as-is and
+   * `helperTextSlotProps` adds the id to it, so a field taking the ordering
+   * without the pin (the pickers, #127) cannot drift from one taking both.
+   */
+  const ownedRole = invalid ? { role: 'alert' as const } : null
   const required = isRequired(normalized)
   const optional = requiredIndicator === 'optional'
   const displayLabel =
@@ -244,25 +314,20 @@ export function useEzField<TValue = unknown>(
     describedBy: (consumer, text) =>
       [consumer, text ? helperTextId : undefined].filter(Boolean).join(' ') || undefined,
     helperTextA11y: { id: helperTextId, role: invalid ? 'alert' : undefined },
+    helperTextRole: <TOwnerState, TProps extends object>(
+      consumer: HelperTextSlotProps<TOwnerState, TProps>,
+    ) => applyOwned<TOwnerState, TProps>(consumer, ownedRole),
     helperTextSlotProps: <TOwnerState, TProps extends object>(
       consumer?: HelperTextSlotProps<TOwnerState, TProps>,
     ) => {
-      // Last, and deliberately not merged: while an error shows, the live region is
-      // the binding's. With no error the `role` key is left off entirely, so a
-      // consumer's own `role` survives the spread — `role: undefined` would erase it.
-      const owned = {
-        id: helperTextId,
-        ...(invalid ? { role: 'alert' as const } : null),
-      }
+      // The ordering rule plus the id pin. `ownedRole` is the single copy of the
+      // ordering, shared with `helperTextRole` above so the two cannot drift.
+      const owned = { id: helperTextId, ...ownedRole }
       // No consumer channel: the plain object, matching the no-argument overload.
       // `role: undefined` is stated so the shape is always `HelperTextA11y`; `owned`
       // then supplies the id, and `alert` under error.
       if (consumer === undefined) return { role: undefined, ...owned }
-      // The function form stays a function, so MUI still resolves it with the real
-      // ownerState; calling it here would hand the consumer an ownerState we do not have.
-      return typeof consumer === 'function'
-        ? (ownerState: TOwnerState) => ({ ...consumer(ownerState), ...owned }) as TProps
-        : ({ ...consumer, ...owned } as TProps)
+      return applyOwned<TOwnerState, TProps>(consumer, owned)
     },
     nameA11y: {
       ...(ariaLabel === undefined ? null : { 'aria-label': ariaLabel }),

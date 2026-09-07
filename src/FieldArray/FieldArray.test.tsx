@@ -20,6 +20,14 @@ const oneRow: Values = { applicants: [{ name: '', email: '' }] }
 function Applicants({
   onSubmit = () => {},
   defaultValues = oneRow,
+  // Overridable so the focus-after-failed-submit cases can mark the parts `required`
+  // without every other case paying for the errors that produces.
+  children = (row) => (
+    <>
+      <TextField name={row.name('name')} label="Name" />
+      <TextField name={row.name('email')} label="Email" />
+    </>
+  ),
   ...props
 }: {
   onSubmit?: (values: Values) => void
@@ -33,12 +41,7 @@ function Applicants({
         emptyRow={() => ({ name: '', email: '' })}
         {...props}
       >
-        {(row) => (
-          <>
-            <TextField name={row.name('name')} label="Name" />
-            <TextField name={row.name('email')} label="Email" />
-          </>
-        )}
+        {children}
       </FieldArray>
       <SubmitButton />
     </Form>
@@ -122,6 +125,67 @@ describe('FieldArray', () => {
     await user.click(screen.getByRole('button', { name: 'Remove Applicant 1' }))
     expect(screen.queryAllByRole('group', { name: /^Applicant \d+$/ })).toHaveLength(0)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Add' })).toHaveFocus())
+  })
+
+  /*
+   * The FieldArray half of #102 row 5. The rest of that line rides on
+   * `describeFieldContract`, which runs one field at a time and so cannot ask this:
+   * whether hookform's `shouldFocusError` can reach a control registered under an
+   * *indexed* path (`applicants.1.name`) rather than a flat one. #122 named it a
+   * suspected failure; it is not one, and this pins that.
+   *
+   * The second case is the one that would catch a real regression — a row-1-shaped
+   * search, or a `ref` keyed by field name rather than by path, would land on the wrong
+   * row's input while still passing the first case.
+   */
+  const RequiredApplicants = (props: React.ComponentProps<typeof Applicants>) => (
+    <Applicants
+      {...props}
+      children={(row) => (
+        <>
+          <TextField name={row.name('name')} label="Name" required />
+          <TextField name={row.name('email')} label="Email" required />
+        </>
+      )}
+    />
+  )
+
+  it('focuses the first invalid row field after a failed submit', async () => {
+    const user = userEvent.setup()
+    render(
+      <RequiredApplicants
+        defaultValues={{
+          applicants: [
+            { name: '', email: '' },
+            { name: '', email: '' },
+          ],
+        }}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    await screen.findAllByRole('alert')
+    await waitFor(() =>
+      expect(within(rows()[0]!).getByRole('textbox', { name: /^Name/ })).toHaveFocus(),
+    )
+  })
+
+  it('focuses a later row when the earlier rows are valid', async () => {
+    const user = userEvent.setup()
+    render(
+      <RequiredApplicants
+        defaultValues={{
+          applicants: [
+            { name: 'Ada', email: 'ada@example.com' },
+            { name: '', email: '' },
+          ],
+        }}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    await screen.findAllByRole('alert')
+    await waitFor(() =>
+      expect(within(rows()[1]!).getByRole('textbox', { name: /^Name/ })).toHaveFocus(),
+    )
   })
 
   it('reorder moves a row, keeps the new order in the payload, and keeps focus on the Move button', async () => {
