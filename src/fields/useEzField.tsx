@@ -1,16 +1,18 @@
-import { Fragment, useCallback, useId, type ChangeEvent, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useId, type ChangeEvent, type ReactNode } from 'react'
 import {
   useController,
   type ControllerRenderProps,
   type UseControllerReturn,
 } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
-import { useRegisterFocusTarget } from '../Form/FieldFocusContext'
+import { useRegisterCellLabel, useRegisterFocusTarget } from '../Form/FieldFocusContext'
 import {
+  fieldLayoutClasses,
   fieldLayoutClassName,
   useLabelPlacement,
   type LabelPlacement,
 } from './LabelPlacementContext'
+import { useFieldCell } from './FieldCellContext'
 import { useRequiredIndicator } from '../Form/RequiredIndicatorContext'
 import { useRuleMessages } from '../Form/RuleMessagesContext'
 import { isRequired, normalizeRules, type FieldRules } from '../rules'
@@ -292,6 +294,21 @@ export function useEzField<TValue = unknown>(
   const { requiredIndicator, optionalText } = useRequiredIndicator()
   const { labelPlacement: formLabelPlacement } = useLabelPlacement()
   const labelPlacement = labelPlacementProp ?? formLabelPlacement
+  // The table cell this field sits in, if any (#14). Read here, in the one hook every
+  // field calls, for the same reason the placement axis is: it reaches every family
+  // without a new element in the tree or a prop on each field.
+  const cell = useFieldCell()
+  // Tell the form what this field is called in its cell, so `<FormErrorSummary>` can list
+  // "Line item 2 Qty: Qty must be at least 1" rather than the bare message (#14). An effect
+  // with a cleanup: a row that moves or is removed renumbers the fields around it, and each
+  // gets a new `name`/label pair — the cleanup drops the old entry before the new one lands.
+  const registerCellLabel = useRegisterCellLabel()
+  const cellLabel = cell?.label
+  useEffect(() => {
+    if (cellLabel === undefined) return
+    registerCellLabel(name, cellLabel)
+    return () => registerCellLabel(name, undefined)
+  }, [registerCellLabel, name, cellLabel])
   const messages = useRuleMessages()
   const normalized = normalizeRules(rules, typeof label === 'string' ? label : undefined, messages)
   const controller = useController({ name, rules: normalized })
@@ -363,13 +380,35 @@ export function useEzField<TValue = unknown>(
       if (consumer === undefined) return { role: undefined, ...owned }
       return applyOwned<TOwnerState, TProps>(consumer, owned)
     },
+    // In a table cell the control is named by the row header plus the column header
+    // (#14), *unless* the consumer named it themselves — the #99/#100 channels keep
+    // winning, so a cell field with its own `aria-label` says exactly that. The field's
+    // visible `label` still renders (visually hidden by the cell class) and is still the
+    // `<label for>` target, so `getByLabelText` finds it; `aria-labelledby` outranks it
+    // in the accname algorithm, which is what makes the name "Line item 2 Qty".
     nameA11y: {
       ...(ariaLabel === undefined ? null : { 'aria-label': ariaLabel }),
-      ...(ariaLabelledBy === undefined ? null : { 'aria-labelledby': ariaLabelledBy }),
+      ...(ariaLabelledBy === undefined
+        ? cell && ariaLabel === undefined
+          ? { 'aria-labelledby': `${cell.rowHeaderId} ${cell.headerId}` }
+          : null
+        : { 'aria-labelledby': ariaLabelledBy }),
     },
     displayLabel,
     labelRequired: optional && required ? false : undefined,
     labelPlacement,
-    layoutClassName: fieldLayoutClassName(labelPlacement, className),
+    layoutClassName: cellClassName(fieldLayoutClassName(labelPlacement, className), cell),
   }
+}
+
+/**
+ * The placement classes plus, inside a table cell, the cell classes (#14): `cell`
+ * always, `cellHelperHidden` under `cellErrors="summary"`. Appended after the
+ * consumer's `className` — they are layout state, not a placement, so the
+ * always-present placement class stays exactly where it was.
+ */
+function cellClassName(base: string, cell: ReturnType<typeof useFieldCell>): string {
+  if (!cell) return base
+  const hidden = cell.helperTextHidden ? ` ${fieldLayoutClasses.cellHelperHidden}` : ''
+  return `${base} ${fieldLayoutClasses.cell}${hidden}`
 }

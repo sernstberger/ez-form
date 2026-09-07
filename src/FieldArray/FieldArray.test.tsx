@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { z } from 'zod'
@@ -7,7 +7,14 @@ import { SubmitButton } from '../SubmitButton'
 import { TextField } from '../fields/TextField'
 import { expectNoA11yViolations } from '../test/axe'
 import { expectTargetSize } from '../test/targetSize'
-import { FieldArray, fieldArrayClasses } from './FieldArray'
+import { FieldArray, fieldArrayClasses, type FieldArrayColumn } from './FieldArray'
+import { NumberField } from '../fields/NumberField'
+import { Select } from '../fields/Select'
+import { DatePicker } from '../fields/DatePicker'
+import { RadioGroup } from '../fields/RadioGroup'
+import { AddressField, addressSchema } from '../fields/AddressField'
+import { fieldLayoutClasses } from '../fields/LabelPlacementContext'
+import { withPickers } from '../test/pickers'
 import { expectConsole } from '../test/expectConsole'
 
 const schema = z.object({
@@ -566,4 +573,527 @@ describe('FieldArray', () => {
     await screen.findByRole('alert')
     await expectNoA11yViolations(container)
   })
+
+  /**
+   * `layout="table"` (#14). The cell-mode contract itself (hidden label, headers as the
+   * name, helper text as the description) is `useEzField`'s and is pinned in
+   * `labelPlacement.test.tsx`; what is asserted here is the table: its markup, its
+   * naming, its density, its slots, and that Add/Remove/Move behave as in stacked rows.
+   */
+  describe('layout="table"', () => {
+    const lineSchema = z.object({
+      lines: z.array(
+        z.object({
+          sku: z.string().min(1, 'SKU is required'),
+          qty: z.number().min(1, 'Qty must be at least 1'),
+          category: z.string(),
+          due: z.date().nullable(),
+        }),
+      ),
+    })
+    type Line = z.infer<typeof lineSchema>['lines'][number]
+    const line = (sku = '', qty = 1): Line => ({ sku, qty, category: '', due: null })
+
+    const columns: FieldArrayColumn<Line>[] = [
+      {
+        key: 'sku',
+        header: 'SKU',
+        render: (row) => <TextField name={row.name('sku')} label="SKU" />,
+      },
+      {
+        key: 'qty',
+        header: 'Qty',
+        width: '6rem',
+        align: 'right',
+        render: (row) => <NumberField name={row.name('qty')} label="Qty" />,
+      },
+      {
+        key: 'category',
+        header: 'Category',
+        render: (row) => (
+          <Select
+            name={row.name('category')}
+            label="Category"
+            options={[
+              { value: 'a', label: 'A' },
+              { value: 'b', label: 'B' },
+            ]}
+          />
+        ),
+      },
+      {
+        key: 'due',
+        header: 'Due',
+        render: (row) => <DatePicker name={row.name('due')} label="Due" />,
+      },
+    ]
+
+    function Lines({
+      rows = [line()],
+      onSubmit = () => {},
+      ...props
+    }: { rows?: Line[]; onSubmit?: (values: unknown) => void } & Partial<
+      React.ComponentProps<typeof FieldArray<Line>>
+    >) {
+      return withPickers(
+        <Form schema={lineSchema} defaultValues={{ lines: rows }} onSubmit={onSubmit}>
+          <FieldArray<Line>
+            name="lines"
+            label="Line items"
+            layout="table"
+            columns={columns}
+            emptyRow={() => line()}
+            {...props}
+          />
+          <SubmitButton />
+        </Form>,
+      )
+    }
+
+    const cellControl = (row: number, header: string) =>
+      screen.getByRole(
+        header === 'Category' ? 'combobox' : header === 'Due' ? 'group' : 'textbox',
+        {
+          name: `Line item ${row} ${header}`,
+        },
+      )
+
+    it('renders one table named by the legend, headers from columns, a hidden row header per row', () => {
+      render(<Lines rows={[line('A'), line('B')]} />)
+      const table = screen.getByRole('table', { name: 'Line items' })
+      const headers = within(table).getAllByRole('columnheader')
+      expect(headers.map((h) => h.textContent)).toEqual([
+        'Line item',
+        'SKU',
+        'Qty',
+        'Category',
+        'Due',
+        'Actions',
+      ])
+      // The row-name column header and the actions header text are out of sight, not gone.
+      expect(getComputedStyle(headers[0]!).position).toBe('absolute')
+      const actionsText = within(headers[5]!).getByText('Actions')
+      expect(getComputedStyle(actionsText).position).toBe('absolute')
+      // `scope` on both axes, and every data cell points at its column.
+      expect(headers[1]).toHaveAttribute('scope', 'col')
+      const rowHeaders = within(table).getAllByRole('rowheader')
+      expect(rowHeaders.map((h) => h.textContent)).toEqual(['Line item 1', 'Line item 2'])
+      expect(rowHeaders[0]).toHaveAttribute('scope', 'row')
+      expect(getComputedStyle(rowHeaders[0]!).position).toBe('absolute')
+      const skuCell = cellControl(2, 'SKU').closest('td')!
+      expect(skuCell).toHaveAttribute('headers', headers[1]!.id)
+      // Column `width`/`align` land on the cells as props.
+      expect(headers[2]!.style.width).toBe('6rem')
+      expect(headers[2]).toHaveClass('MuiTableCell-alignRight')
+      expect(cellControl(1, 'Qty').closest('td')).toHaveClass('MuiTableCell-alignRight')
+      // No stacked row groups in this layout.
+      expect(screen.queryByRole('group', { name: /^Line item \d+$/ })).toBeNull()
+    })
+
+    it('names every cell control "<row> <header>" across the field families', () => {
+      render(<Lines rows={[line(), line()]} />)
+      for (const row of [1, 2]) {
+        for (const header of ['SKU', 'Qty', 'Category', 'Due']) {
+          expect(cellControl(row, header)).toBeInTheDocument()
+        }
+      }
+      expect(cellControl(2, 'SKU').closest('.MuiFormControl-root')).toHaveClass(
+        fieldLayoutClasses.cell,
+        fieldLayoutClasses.cellHelperHidden,
+      )
+      // `slotProps.rowHeader.visuallyHidden: false` shows the row names as a first column.
+      cleanupAndRender(<Lines slotProps={{ rowHeader: { visuallyHidden: false } }} />)
+      expect(getComputedStyle(screen.getByRole('rowheader')).position).not.toBe('absolute')
+    })
+
+    it('Remove and Move live in the actions column with the same names, Add sits under the table', async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(<Lines reorder rows={[line('A'), line('B')]} onSubmit={onSubmit} />)
+      const table = screen.getByRole('table', { name: 'Line items' })
+      const remove = within(table).getByRole('button', { name: 'Remove Line item 2' })
+      expect(remove.closest('td')).toHaveClass(fieldArrayClasses.actionsCell)
+      expect(within(table).getByRole('button', { name: 'Move Line item 2 up' })).toBeInTheDocument()
+      const add = screen.getByRole('button', { name: 'Add' })
+      expect(table.contains(add)).toBe(false)
+      // Move keeps the payload order; Remove drops the row and focuses the previous row's
+      // first control — the stacked rules, unchanged.
+      await user.click(screen.getByRole('button', { name: 'Move Line item 2 up' }))
+      expect(cellControl(1, 'SKU')).toHaveValue('B')
+      await user.click(screen.getByRole('button', { name: 'Remove Line item 2' }))
+      expect(screen.getAllByRole('rowheader')).toHaveLength(1)
+      await waitFor(() => expect(cellControl(1, 'SKU')).toHaveFocus())
+      await user.click(add)
+      expect(screen.getAllByRole('rowheader')).toHaveLength(2)
+      await waitFor(() => expect(cellControl(2, 'SKU')).toHaveFocus())
+      await waitFor(() => expect(statusRegion()).toHaveTextContent('Row 2 added'))
+    })
+
+    it('cells are dense by default; the table size drives it and an explicit field size wins', () => {
+      render(
+        <Lines
+          columns={[
+            ...columns.slice(0, 1),
+            {
+              key: 'qty',
+              header: 'Qty',
+              render: (row) => <NumberField name={row.name('qty')} label="Qty" size="medium" />,
+            },
+          ]}
+        />,
+      )
+      expect(screen.getAllByRole('columnheader')[1]).toHaveClass('MuiTableCell-sizeSmall')
+      expect(cellControl(1, 'SKU').closest('.MuiInputBase-root')).toHaveClass(
+        'MuiInputBase-sizeSmall',
+      )
+      expect(cellControl(1, 'Qty').closest('.MuiInputBase-root')).not.toHaveClass(
+        'MuiInputBase-sizeSmall',
+      )
+      cleanupAndRender(<Lines slotProps={{ table: { size: 'medium' } }} />)
+      expect(screen.getAllByRole('columnheader')[1]).toHaveClass('MuiTableCell-sizeMedium')
+      expect(cellControl(1, 'SKU').closest('.MuiInputBase-root')).not.toHaveClass(
+        'MuiInputBase-sizeSmall',
+      )
+      // A field *outside* the table is untouched by the nested theme.
+      cleanupAndRender(
+        withPickers(
+          <Form schema={lineSchema} defaultValues={{ lines: [line()] }} onSubmit={() => {}}>
+            <TextField name="lines.0.sku" label="Outside" />
+            <FieldArray<Line>
+              name="lines"
+              label="Line items"
+              layout="table"
+              columns={columns}
+              emptyRow={line}
+            />
+          </Form>,
+        ),
+      )
+      expect(
+        screen.getByRole('textbox', { name: 'Outside' }).closest('.MuiInputBase-root'),
+      ).not.toHaveClass('MuiInputBase-sizeSmall')
+    })
+
+    it("a cell error is the control's hidden description under summary and visible under inline", async () => {
+      const user = userEvent.setup()
+      render(<Lines rows={[line('', 0)]} />)
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      await screen.findAllByRole('alert')
+      const sku = cellControl(1, 'SKU')
+      expect(sku).toHaveAttribute('aria-invalid', 'true')
+      expect(sku).toHaveAccessibleDescription('SKU is required')
+      const helper = sku.closest('.MuiFormControl-root')!.querySelector('.MuiFormHelperText-root')!
+      expect(getComputedStyle(helper).position).toBe('absolute')
+
+      cleanupAndRender(<Lines rows={[line('', 0)]} cellErrors="inline" />)
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      await screen.findAllByRole('alert')
+      const inlineSku = cellControl(1, 'SKU')
+      expect(inlineSku).toHaveAccessibleDescription('SKU is required')
+      const shown = inlineSku
+        .closest('.MuiFormControl-root')!
+        .querySelector('.MuiFormHelperText-root')!
+      expect(getComputedStyle(shown).position).not.toBe('absolute')
+      expect(inlineSku.closest('.MuiFormControl-root')).not.toHaveClass(
+        fieldLayoutClasses.cellHelperHidden,
+      )
+    })
+
+    it('an array-level error still renders under Add', async () => {
+      const user = userEvent.setup()
+      const minSchema = lineSchema.extend({
+        lines: lineSchema.shape.lines.min(1, 'Add at least one line'),
+      })
+      render(
+        <Form schema={minSchema} defaultValues={{ lines: [] }} onSubmit={() => {}}>
+          <FieldArray<Line>
+            name="lines"
+            label="Line items"
+            layout="table"
+            columns={columns.slice(0, 1)}
+            emptyRow={line}
+          />
+          <SubmitButton />
+        </Form>,
+      )
+      await user.click(screen.getByRole('button', { name: 'Submit' }))
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent('Add at least one line')
+      expect(alert).toHaveClass(fieldArrayClasses.errorText)
+    })
+
+    it('theme styleOverrides reach every table slot', () => {
+      const theme = createTheme({
+        components: {
+          EzFieldArray: {
+            styleOverrides: {
+              tableContainer: { letterSpacing: '1px' },
+              table: { letterSpacing: '2px' },
+              tableHead: { letterSpacing: '3px' },
+              tableRow: { letterSpacing: '4px' },
+              cell: { letterSpacing: '5px' },
+              rowHeader: { letterSpacing: '6px' },
+              actionsCell: { letterSpacing: '7px' },
+              actionsHeaderText: { letterSpacing: '8px' },
+            },
+          },
+        },
+      })
+      const { container } = render(
+        <ThemeProvider theme={theme}>
+          <Lines />
+        </ThemeProvider>,
+      )
+      const spacing = (selector: string) =>
+        getComputedStyle(container.querySelector(selector)!).letterSpacing
+      expect(spacing(`.${fieldArrayClasses.tableContainer}`)).toBe('1px')
+      expect(spacing(`.${fieldArrayClasses.table}`)).toBe('2px')
+      expect(spacing(`.${fieldArrayClasses.tableHead}`)).toBe('3px')
+      expect(spacing(`.${fieldArrayClasses.tableRow}`)).toBe('4px')
+      expect(spacing(`.${fieldArrayClasses.cell}`)).toBe('5px')
+      expect(spacing(`.${fieldArrayClasses.rowHeader}`)).toBe('6px')
+      expect(spacing(`.${fieldArrayClasses.actionsCell}`)).toBe('7px')
+      expect(spacing(`.${fieldArrayClasses.actionsHeaderText}`)).toBe('8px')
+    })
+
+    it('actionsHeader is a theme-settable default (a locale string)', () => {
+      const theme = createTheme({
+        components: { EzFieldArray: { defaultProps: { actionsHeader: 'Acciones' } } },
+      })
+      render(
+        <ThemeProvider theme={theme}>
+          <Lines />
+        </ThemeProvider>,
+      )
+      expect(screen.getByRole('columnheader', { name: 'Acciones' })).toBeInTheDocument()
+    })
+
+    it('warns in dev when the render prop does not match the layout', () => {
+      expectConsole('warn', 'renders through `columns`, which is missing')
+      render(
+        <Form schema={lineSchema} defaultValues={{ lines: [] }} onSubmit={() => {}}>
+          <FieldArray<Line> name="lines" label="Line items" layout="table" emptyRow={line} />
+        </Form>,
+      )
+    })
+
+    /*
+     * The keyboard model (spec §4). `onSubmit` is the tell for "Enter submitted": every row
+     * here is valid, so a submit that got through would reach it.
+     */
+    describe('keyboard', () => {
+      it('Enter moves to the same column in the next row and never submits', async () => {
+        const user = userEvent.setup()
+        const onSubmit = vi.fn()
+        render(<Lines rows={[line('A'), line('B')]} onSubmit={onSubmit} />)
+        await user.click(cellControl(1, 'Qty'))
+        await user.keyboard('{Enter}')
+        await waitFor(() => expect(cellControl(2, 'Qty')).toHaveFocus())
+        // Also from a Select cell: Enter on a *closed* Select opens its menu (MUI prevents
+        // it), so the table leaves it alone — no row change, no submit. Focused, not
+        // clicked: a click opens the menu on mousedown already. The open menu is a Modal
+        // that hides the rest of the page from the a11y tree, so the row check waits for it
+        // to close.
+        const category = cellControl(1, 'Category')
+        // `act`: focusing flips `FormControl`'s focused state, a React update.
+        act(() => category.focus())
+        await user.keyboard('{Enter}')
+        expect(await screen.findByRole('listbox')).toBeInTheDocument()
+        await user.keyboard('{Escape}')
+        await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
+        expect(category).toHaveFocus()
+        expect(onSubmit).not.toHaveBeenCalled()
+      })
+
+      it('Enter on the last row appends a row and lands in the same column; at maxRows it stays', async () => {
+        const user = userEvent.setup()
+        const onSubmit = vi.fn()
+        render(<Lines rows={[line('A')]} maxRows={2} onSubmit={onSubmit} />)
+        await user.click(cellControl(1, 'Qty'))
+        await user.keyboard('{Enter}')
+        await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(2))
+        await waitFor(() => expect(cellControl(2, 'Qty')).toHaveFocus())
+        await waitFor(() => expect(statusRegion()).toHaveTextContent('Row 2 added'))
+        // At the cap: nothing appends, focus stays, and still no submit.
+        await user.keyboard('{Enter}')
+        expect(screen.getAllByRole('rowheader')).toHaveLength(2)
+        expect(cellControl(2, 'Qty')).toHaveFocus()
+        expect(onSubmit).not.toHaveBeenCalled()
+      })
+
+      it("Enter in a picker cell does not submit either (MUI X's own requestSubmit is disarmed)", async () => {
+        const user = userEvent.setup()
+        const onSubmit = vi.fn()
+        render(<Lines rows={[line('A'), line('B')]} onSubmit={onSubmit} />)
+        // MUI X's `PickersInputBase` calls `form.requestSubmit(submitButton)` on Enter when
+        // the form has a submit button — this form does — guarded only by
+        // `defaultMuiPrevented` — which it checks *after* the consumer's `onKeyDown`, so
+        // `usePickerField` sets it there (`preventMuiDefault`) when the picker is in a cell.
+        await user.click(cellControl(1, 'Due'))
+        await user.keyboard('{Enter}')
+        await waitFor(() =>
+          expect(cellControl(2, 'Due').contains(document.activeElement)).toBe(true),
+        )
+        expect(onSubmit).not.toHaveBeenCalled()
+      })
+
+      it('ArrowDown / ArrowUp move rows in the same column, without wrapping', async () => {
+        const user = userEvent.setup()
+        render(<Lines rows={[line('A'), line('B')]} />)
+        await user.click(cellControl(1, 'SKU'))
+        // Top row: ArrowUp has nowhere to go and is left to the control.
+        await user.keyboard('{ArrowUp}')
+        expect(cellControl(1, 'SKU')).toHaveFocus()
+        await user.keyboard('{ArrowDown}')
+        await waitFor(() => expect(cellControl(2, 'SKU')).toHaveFocus())
+        // Bottom row: ArrowDown does not wrap.
+        await user.keyboard('{ArrowDown}')
+        expect(cellControl(2, 'SKU')).toHaveFocus()
+        await user.keyboard('{ArrowUp}')
+        await waitFor(() => expect(cellControl(1, 'SKU')).toHaveFocus())
+      })
+
+      it('ArrowDown on a closed Select opens its menu — MUI consumed the key, so the row stays', async () => {
+        const user = userEvent.setup()
+        render(<Lines rows={[line('A'), line('B')]} />)
+        const category = cellControl(1, 'Category')
+        // `act`: focusing flips `FormControl`'s focused state, a React update.
+        act(() => category.focus())
+        await user.keyboard('{ArrowDown}')
+        // Measured: `SelectInput`'s `handleKeyDown` treats ArrowDown as an open key and
+        // `preventDefault`s it, which is exactly the signal `isPlainKey` defers to. This is
+        // the exclusion working, not a gap.
+        expect(await screen.findByRole('listbox')).toBeInTheDocument()
+        await user.keyboard('{Escape}')
+        await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
+        expect(category).toHaveFocus()
+      })
+
+      it('ArrowDown / ArrowUp in a RadioGroup cell stay with the radios (F1)', async () => {
+        const user = userEvent.setup()
+        const radioSchema = z.object({
+          lines: z.array(z.object({ sku: z.string(), size: z.string() })),
+        })
+        render(
+          <Form
+            schema={radioSchema}
+            defaultValues={{
+              lines: [
+                { sku: 'A', size: 's' },
+                { sku: 'B', size: 's' },
+              ],
+            }}
+            onSubmit={() => {}}
+          >
+            <FieldArray
+              name="lines"
+              label="Line items"
+              layout="table"
+              emptyRow={{ sku: '', size: '' }}
+              columns={[
+                {
+                  key: 'sku',
+                  header: 'SKU',
+                  render: (row) => <TextField name={row.name('sku')} label="SKU" />,
+                },
+                {
+                  key: 'size',
+                  header: 'Size',
+                  render: (row) => (
+                    <RadioGroup
+                      name={row.name('size')}
+                      label="Size"
+                      options={[
+                        { value: 's', label: 'S' },
+                        { value: 'm', label: 'M' },
+                      ]}
+                    />
+                  ),
+                },
+              ]}
+            />
+          </Form>,
+        )
+        const rows = screen.getAllByRole('row').slice(1)
+        const firstRadio = within(rows[0]!).getByRole('radio', { name: 'S' })
+        act(() => firstRadio.focus())
+        await user.keyboard('{ArrowDown}')
+        // A radio's arrows are the browser's own (MUI installs no handler, nothing is
+        // prevented), so the table must not treat them as a row move: focus stays in row 1.
+        expect(rows[0]!.contains(document.activeElement)).toBe(true)
+        expect(rows[1]!.contains(document.activeElement)).toBe(false)
+      })
+
+      it("keys in the actions column are the buttons' own", async () => {
+        const user = userEvent.setup()
+        const onSubmit = vi.fn()
+        render(<Lines rows={[line('A'), line('B')]} onSubmit={onSubmit} />)
+        screen.getByRole('button', { name: 'Remove Line item 2' }).focus()
+        await user.keyboard('{Enter}')
+        // Enter on a button is a click: the row is removed, nothing else moves.
+        await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(1))
+        expect(onSubmit).not.toHaveBeenCalled()
+      })
+    })
+
+    it('a composite (AddressField) in a cell keeps its own part labels and takes no cell class (F2)', () => {
+      const schema = z.object({
+        lines: z.array(z.object({ sku: z.string(), ship: addressSchema() })),
+      })
+      const address = { street: '', street2: '', city: '', state: '', zip: '' }
+      const { container } = render(
+        <Form
+          schema={schema}
+          defaultValues={{ lines: [{ sku: 'A', ship: address }] }}
+          onSubmit={() => {}}
+        >
+          <FieldArray
+            name="lines"
+            label="Line items"
+            layout="table"
+            emptyRow={{ sku: '', ship: address }}
+            columns={[
+              {
+                key: 'sku',
+                header: 'SKU',
+                render: (row) => <TextField name={row.name('sku')} label="SKU" />,
+              },
+              {
+                key: 'ship',
+                header: 'Ship to',
+                render: (row) => <AddressField name={row.name('ship')} />,
+              },
+            ]}
+          />
+        </Form>,
+      )
+      // The single-control cell is named by the table; the composite's parts are not.
+      expect(screen.getByRole('textbox', { name: 'Line item 1 SKU' })).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Street address' })).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'City' })).toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: /Line item 1 Ship to/ })).toBeNull()
+      // Exactly the SKU box carries the cell class — none of the address's five.
+      expect(container.querySelectorAll(`.${fieldLayoutClasses.cell}`)).toHaveLength(1)
+    })
+
+    it.each(['summary', 'inline'] as const)(
+      'has no a11y violations at rest and in error (cellErrors=%s)',
+      async (cellErrors) => {
+        const user = userEvent.setup()
+        const { container } = render(
+          <Lines reorder rows={[line('', 0), line('B')]} cellErrors={cellErrors} />,
+        )
+        await expectNoA11yViolations(container)
+        await user.click(screen.getByRole('button', { name: 'Submit' }))
+        await screen.findAllByRole('alert')
+        await expectNoA11yViolations(container)
+      },
+    )
+  })
 })
+
+/** Unmount whatever is rendered and render the next tree — for cases that compare two setups. */
+function cleanupAndRender(ui: React.ReactElement) {
+  cleanup()
+  return render(ui)
+}

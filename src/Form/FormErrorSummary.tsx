@@ -16,7 +16,7 @@ import Typography, { type TypographyProps } from '@mui/material/Typography'
 import { useEzFormContext } from '../useEzFormContext'
 import { useOptionalWizard } from '../Wizard/useWizard'
 import { useFailedConfirmAttempt, useRegisterErrorSummary } from './ErrorSummaryContext'
-import { useFocusTargetIds } from './FieldFocusContext'
+import { useCellLabels, useFocusTargetIds } from './FieldFocusContext'
 import { flattenErrors, type ErrorEntry } from './flattenErrors'
 
 export const formErrorSummaryClasses = generateUtilityClasses('EzFormErrorSummary', [
@@ -142,6 +142,11 @@ export function FormErrorSummary(inProps: FormErrorSummaryProps) {
   // and simply gets no `href` — the same behaviour as before, and the item is still fully
   // usable either way since the click handler's `setFocus`, not the `href`, does the focusing.
   const fieldIds = useFocusTargetIds()
+  // What a field inside a `<FieldArray layout="table">` cell is called there — "Line item 2
+  // Qty" — registered by `useEzField` on the same store (#14). Prefixed to the item's text,
+  // because the cell's own error text is visually hidden by default and the bare message
+  // ("Qty must be at least 1") does not say which row it is about.
+  const cellLabels = useCellLabels()
 
   const register = useRegisterErrorSummary()
   useEffect(() => register(), [register])
@@ -187,7 +192,9 @@ export function FormErrorSummary(inProps: FormErrorSummaryProps) {
                   slotProps?.link?.onClick?.(event)
                 }}
               >
-                {entry.message}
+                {cellLabels[entry.name]
+                  ? `${cellLabels[entry.name]}: ${entry.message}`
+                  : entry.message}
               </FormErrorSummaryLink>
             </FormErrorSummaryItem>
           )

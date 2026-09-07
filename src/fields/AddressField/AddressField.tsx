@@ -15,6 +15,7 @@ import { LiveRegion, type LiveRegionProps } from '../../Form/LiveRegion'
 import { useAssisted } from '../../Form/AssistedContext'
 import { useEzFormContext } from '../../useEzFormContext'
 import { cx } from '../../cx'
+import { FieldCellContext } from '../FieldCellContext'
 import type { AddressLookupProvider, AddressSuggestion } from './addressLookup'
 import { useAddressLookup } from './useAddressLookup'
 
@@ -441,47 +442,54 @@ export function AddressField(inProps: AddressFieldProps) {
     )
   }
 
+  // Ruling (#14): a composite resets the table-cell context for its parts. A
+  // `<FieldArray layout="table">` cell is designed for one control — the cell names *it*
+  // by row + column header and hides its label. An address is five controls with no one
+  // of them to name, so inside a cell each part keeps its own label and none takes the
+  // cell class; the column header names the group, as the legend does elsewhere.
   const parts = (
-    <AddressFieldRoot {...rest} className={cx(addressFieldClasses.root, className)}>
-      {renderStreet()}
-      {street2 && (
-        <AddressFieldStreet2
-          name={`${name}.street2`}
-          label={street2Label}
-          autoComplete={token(autoCompleteSection, 'address-line2', assisted)}
+    <FieldCellContext.Provider value={null}>
+      <AddressFieldRoot {...rest} className={cx(addressFieldClasses.root, className)}>
+        {renderStreet()}
+        {street2 && (
+          <AddressFieldStreet2
+            name={`${name}.street2`}
+            label={street2Label}
+            autoComplete={token(autoCompleteSection, 'address-line2', assisted)}
+            disabled={disabled}
+            {...slotProps?.street2}
+            className={cx(addressFieldClasses.street2, slotProps?.street2?.className)}
+          />
+        )}
+        <AddressFieldCity
+          name={`${name}.city`}
+          label={cityLabel}
+          autoComplete={token(autoCompleteSection, 'address-level2', assisted)}
+          required={required}
           disabled={disabled}
-          {...slotProps?.street2}
-          className={cx(addressFieldClasses.street2, slotProps?.street2?.className)}
+          {...slotProps?.city}
+          className={cx(addressFieldClasses.city, slotProps?.city?.className)}
         />
-      )}
-      <AddressFieldCity
-        name={`${name}.city`}
-        label={cityLabel}
-        autoComplete={token(autoCompleteSection, 'address-level2', assisted)}
-        required={required}
-        disabled={disabled}
-        {...slotProps?.city}
-        className={cx(addressFieldClasses.city, slotProps?.city?.className)}
-      />
-      <AddressFieldState
-        name={`${name}.state`}
-        label={stateLabel}
-        autoComplete={token(autoCompleteSection, 'address-level1', assisted)}
-        required={required}
-        disabled={disabled}
-        {...slotProps?.state}
-        className={cx(addressFieldClasses.state, slotProps?.state?.className)}
-      />
-      <AddressFieldZip
-        name={`${name}.zip`}
-        label={zipLabel}
-        autoComplete={token(autoCompleteSection, 'postal-code', assisted)}
-        required={required}
-        disabled={disabled}
-        {...slotProps?.zip}
-        className={cx(addressFieldClasses.zip, slotProps?.zip?.className)}
-      />
-    </AddressFieldRoot>
+        <AddressFieldState
+          name={`${name}.state`}
+          label={stateLabel}
+          autoComplete={token(autoCompleteSection, 'address-level1', assisted)}
+          required={required}
+          disabled={disabled}
+          {...slotProps?.state}
+          className={cx(addressFieldClasses.state, slotProps?.state?.className)}
+        />
+        <AddressFieldZip
+          name={`${name}.zip`}
+          label={zipLabel}
+          autoComplete={token(autoCompleteSection, 'postal-code', assisted)}
+          required={required}
+          disabled={disabled}
+          {...slotProps?.zip}
+          className={cx(addressFieldClasses.zip, slotProps?.zip?.className)}
+        />
+      </AddressFieldRoot>
+    </FieldCellContext.Provider>
   )
 
   // The status region exists only under `lookup`, so a field without one

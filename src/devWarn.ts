@@ -124,6 +124,33 @@ export function warnDuplicateOptions<TOption extends { value: string | number }>
 }
 
 /**
+ * A `<FieldArray>` whose render prop does not match its `layout` (#14): `layout="table"`
+ * reads `columns` and ignores `children`; the default `stacked` layout reads `children`
+ * and ignores `columns`. Either mismatch renders an empty array with no error, so this is
+ * the only signal. Keyed by array name so two arrays report separately.
+ */
+export function warnFieldArrayLayout(
+  name: string,
+  layout: 'stacked' | 'table',
+  hasChildren: boolean,
+  hasColumns: boolean,
+): void {
+  if (!isDev) return
+  const expected = layout === 'table' ? 'columns' : 'children'
+  const ignored = layout === 'table' ? 'children' : 'columns'
+  const missing = layout === 'table' ? !hasColumns : !hasChildren
+  const stray = layout === 'table' ? hasChildren : hasColumns
+  if (!missing && !stray) return
+  devWarn(
+    `field-array-layout:${name}`,
+    `ez-form: <FieldArray name="${name}" layout="${layout}"> ` +
+      (missing
+        ? `renders through \`${expected}\`, which is missing — the array will be empty.`
+        : `renders through \`${expected}\`; the \`${ignored}\` it also received is ignored.`),
+  )
+}
+
+/**
  * A wizard step whose `fields` names something the form has never heard of — a typo, or a
  * field renamed on one side only. `trigger` on a name hookform does not know resolves to
  * "valid", so Next advances past a control the consumer meant to validate, silently.

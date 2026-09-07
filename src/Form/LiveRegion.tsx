@@ -2,6 +2,7 @@ import { type ComponentProps, type ElementType, type ReactNode } from 'react'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import { styled } from '@mui/material/styles'
+import { visuallyHidden } from '../visuallyHidden'
 
 export const liveRegionClasses = generateUtilityClasses('EzLiveRegion', ['root'])
 
@@ -45,8 +46,8 @@ export interface LiveRegionProps extends Omit<ComponentProps<'span'>, 'children'
   component?: ElementType
 }
 
-// The clip-rect visually-hidden recipe lives on the styled slot's default style
-// block rather than as `sx`, so `theme.components.EzLiveRegion.styleOverrides.root`
+// The clip-rect visually-hidden recipe (`src/visuallyHidden.ts`, shared with the
+// table-cell label rules) lives on the styled slot's default style block rather than as `sx`, so `theme.components.EzLiveRegion.styleOverrides.root`
 // overrides any part of it. `visuallyHidden={false}` drops the whole block instead
 // of fighting it with resets, so a visible caller starts from an unstyled span.
 // No custom `shouldForwardProp`: MUI's default already keeps `ownerState` off the
@@ -56,20 +57,7 @@ const LiveRegionRoot = styled('span', {
   name: 'EzLiveRegion',
   slot: 'Root',
 })<{ ownerState: { visuallyHidden: boolean } }>(({ ownerState }) =>
-  ownerState.visuallyHidden
-    ? {
-        position: 'absolute',
-        width: 1,
-        height: 1,
-        padding: 0,
-        margin: -1,
-        overflow: 'hidden',
-        clip: 'rect(0 0 0 0)',
-        clipPath: 'inset(50%)',
-        whiteSpace: 'nowrap',
-        borderWidth: 0,
-      }
-    : {},
+  ownerState.visuallyHidden ? visuallyHidden : {},
 )
 
 /**

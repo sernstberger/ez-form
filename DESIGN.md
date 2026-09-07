@@ -314,6 +314,19 @@ completed labels at 0.6 opacity.
 
 Label and Edit button share a row with an 8px gap (`spacing.sm`).
 
+### FieldArray table
+
+`layout="table"` is a plain MUI `Table` at `size="small"`: hairline row borders, no
+zebra, no card. The column header is the only visible label — each cell's field
+label is out of sight (still in the tree) and its control fills the cell edge to
+edge, notch closed, so the table reads as a grid of inputs rather than a stack of
+labelled fields squeezed into columns. Controls inside follow the table's `size`
+through a nested theme, so the row height is the small control's 36px. The row's
+name (`Line item 2`) is a hidden row header by default; a theme that wants it visible
+turns it on through `slotProps.rowHeader` rather than restyling. Errors are the
+control's error border only — the text is read from `<FormErrorSummary>` — unless the
+form opts into `cellErrors="inline"`, where the row grows to hold it.
+
 ## Motion
 
 Transitions are short (100–120ms, ease-in) and limited to border and background

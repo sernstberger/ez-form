@@ -82,6 +82,7 @@ export const enUS = {
         addLabel: 'Add',
         removeLabel: 'Remove',
         rowText: 'Row',
+        actionsHeader: 'Actions',
         singularize: (label) => label.replace(/s$/, ''),
         removeRowLabel: (row) => `Remove ${row}`,
         moveUpLabel: (row) => `Move ${row} up`,

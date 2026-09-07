@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
@@ -11,6 +12,10 @@ import { TextField } from './TextField'
 import { Select } from './Select'
 import { Checkbox } from './Checkbox'
 import { RadioGroup } from './RadioGroup'
+import { NumberField } from './NumberField'
+import { DatePicker } from './DatePicker'
+import { FieldCellContext } from './FieldCellContext'
+import { withPickers } from '../test/pickers'
 import { FileField } from './FileField'
 import { createEzFormTheme } from '../theme/ezFormTheme'
 import {
@@ -577,4 +582,225 @@ describe('labelPlacement', () => {
       await expectNoA11yViolations(container)
     },
   )
+})
+
+/**
+ * Cell mode (#14): what `useEzField` does for a field rendered inside a
+ * `<FieldArray layout="table">` cell. Tested here against a bare `FieldCellContext`
+ * rather than the table, because this is the hook's own contract — the table is one
+ * provider of it and is tested in `FieldArray.test.tsx`.
+ */
+describe('labelPlacement inside a table cell (#14)', () => {
+  const cellSchema = z.object({
+    sku: z.string(),
+    qty: z.number().nullable(),
+    role: z.string(),
+    start: z.date().nullable(),
+  })
+  const cellDefaults = { sku: '', qty: 1, role: '', start: null }
+
+  /**
+   * One cell: the column header element a real table would carry, and the context a
+   * real `<FieldArray layout="table">` cell provides. The row header (`#row-2`) is
+   * rendered once by `renderCell`, shared by every cell in the "row".
+   */
+  function Cell({
+    children,
+    helperTextHidden = true,
+    header = 'Qty',
+  }: {
+    children: ReactNode
+    helperTextHidden?: boolean
+    header?: string
+  }) {
+    const headerId = `col-${header.toLowerCase()}`
+    return (
+      <>
+        <span id={headerId}>{header}</span>
+        <FieldCellContext.Provider
+          value={{
+            rowHeaderId: 'row-2',
+            headerId,
+            label: `Line item 2 ${header}`,
+            helperTextHidden,
+          }}
+        >
+          {children}
+        </FieldCellContext.Provider>
+      </>
+    )
+  }
+
+  const renderCell = (children: ReactNode, placement: LabelPlacement = 'floating') =>
+    render(
+      withPickers(
+        <Form
+          schema={cellSchema}
+          defaultValues={cellDefaults}
+          onSubmit={() => {}}
+          labelPlacement={placement}
+        >
+          <span id="row-2">Line item 2</span>
+          {children}
+          <SubmitButton>Save</SubmitButton>
+        </Form>,
+      ),
+    )
+
+  it('applies the cell classes only to the field inside the cell', () => {
+    renderCell(
+      <>
+        <TextField name="sku" label="SKU" />
+        <Cell>
+          <TextField name="qty" label="Qty" />
+        </Cell>
+      </>,
+    )
+    const outside = screen.getByRole('textbox', { name: 'SKU' }).closest('.MuiFormControl-root')!
+    const inside = screen
+      .getByRole('textbox', { name: 'Line item 2 Qty' })
+      .closest('.MuiFormControl-root')!
+    expect(outside).not.toHaveClass(fieldLayoutClasses.cell)
+    expect(inside).toHaveClass(fieldLayoutClasses.root, fieldLayoutClasses.floating)
+    expect(inside).toHaveClass(fieldLayoutClasses.cell, fieldLayoutClasses.cellHelperHidden)
+  })
+
+  it('names the control by row header + column header and keeps its own label as <label for>', () => {
+    renderCell(
+      <Cell>
+        <TextField name="qty" label="Quantity" />
+      </Cell>,
+    )
+    // accname: `aria-labelledby` outranks the `<label for>`, so the name is the two headers.
+    const input = screen.getByRole('textbox', { name: 'Line item 2 Qty' })
+    expect(input).toHaveAttribute('aria-labelledby', 'row-2 col-qty')
+    // The field's own label is still in the DOM and still points at the input — it is
+    // hidden, not removed — so the field is unchanged for everything but its name.
+    const label = input.closest('.MuiFormControl-root')!.querySelector('label')!
+    expect(label).toHaveTextContent('Quantity')
+    expect(label).toHaveAttribute('for', input.id)
+    // jsdom computes `position` from the cascade but not `clip`, so the recipe is
+    // pinned by its positioning here and by its full text in the CSS assertion below.
+    expect(getComputedStyle(label).position).toBe('absolute')
+    // Measured, not assumed: Testing Library follows accname too, so `getByLabelText`
+    // resolves through the headers — by either header's text or both — and *not*
+    // through the field's own hidden label text once `aria-labelledby` is set.
+    expect(screen.getByLabelText('Qty')).toBe(input)
+    expect(screen.getByLabelText('Line item 2 Qty')).toBe(input)
+    expect(screen.queryByLabelText('Quantity')).toBeNull()
+  })
+
+  it("a consumer's aria-label or aria-labelledby beats the cell name (#99, #100)", () => {
+    renderCell(
+      <>
+        <span id="mine">Mine</span>
+        <Cell>
+          <TextField name="sku" label="SKU" aria-label="Custom name" />
+        </Cell>
+        <Cell>
+          <TextField name="qty" label="Qty" aria-labelledby="mine" />
+        </Cell>
+      </>,
+    )
+    expect(screen.getByRole('textbox', { name: 'Custom name' })).not.toHaveAttribute(
+      'aria-labelledby',
+    )
+    expect(screen.getByRole('textbox', { name: 'Mine' })).toHaveAttribute('aria-labelledby', 'mine')
+    expect(screen.queryByRole('textbox', { name: 'Line item 2 Qty' })).toBeNull()
+  })
+
+  it('keeps the helper text as the description; hidden under summary, shown under inline', async () => {
+    const user = userEvent.setup()
+    renderCell(
+      <>
+        <Cell>
+          <TextField name="sku" label="SKU" helperText="Stock code" required />
+        </Cell>
+        <Cell helperTextHidden={false} header="Role">
+          <TextField name="role" label="Role" helperText="Access level" />
+        </Cell>
+      </>,
+    )
+    const sku = screen.getByRole('textbox', { name: 'Line item 2 Qty' })
+    expect(sku).toHaveAccessibleDescription('Stock code')
+    const hiddenHelper = sku
+      .closest('.MuiFormControl-root')!
+      .querySelector(`.${formHelperTextClasses.root}`)!
+    expect(getComputedStyle(hiddenHelper).position).toBe('absolute')
+    const role = screen.getByRole('textbox', { name: 'Line item 2 Role' })
+    expect(role).toHaveAccessibleDescription('Access level')
+    const shownHelper = role
+      .closest('.MuiFormControl-root')!
+      .querySelector(`.${formHelperTextClasses.root}`)!
+    expect(getComputedStyle(shownHelper).position).not.toBe('absolute')
+    // An error replaces the helper text and is announced from the same node, hidden or not.
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('SKU is required.')
+    expect(sku).toHaveAttribute('aria-invalid', 'true')
+    expect(sku).toHaveAccessibleDescription('SKU is required.')
+  })
+
+  it('reaches every family that routes nameA11y: Select, NumberField, DatePicker', () => {
+    renderCell(
+      <>
+        <Cell header="Role">
+          <Select name="role" label="Role" options={[{ value: 'a', label: 'A' }]} />
+        </Cell>
+        <Cell>
+          <NumberField name="qty" label="Qty" />
+        </Cell>
+        <Cell header="Start">
+          <DatePicker name="start" label="Start" />
+        </Cell>
+      </>,
+    )
+    expect(screen.getByRole('combobox', { name: 'Line item 2 Role' })).toBeInTheDocument()
+    // Base UI's visible number input is a `textbox` (the hidden `type="number"` input is
+    // the one carrying `name`).
+    expect(screen.getByRole('textbox', { name: 'Line item 2 Qty' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Line item 2 Start' })).toBeInTheDocument()
+  })
+
+  it.each(['floating', 'stacked', 'start'] as const)(
+    '%s: a cell closes the notch and fills its box regardless of the form placement',
+    (placement) => {
+      const { container } = renderCell(
+        <Cell>
+          <TextField name="qty" label="Qty" />
+        </Cell>,
+        placement,
+      )
+      const cellBox = container.querySelector<HTMLElement>(`.${fieldLayoutClasses.cell}`)!
+      expect(cellBox).toHaveClass(fieldLayoutClasses[placement])
+      const legend = cellBox.querySelector('.MuiOutlinedInput-notchedOutline legend')!
+      expect(getComputedStyle(legend).maxWidth).toBe('0.01px')
+      expect(getComputedStyle(cellBox).width).toBe('100%')
+      // The rules are keyed by two classes so they outrank any single-class placement
+      // rule, `start`'s min-width grid included.
+      expect(emittedCss()).toMatch(
+        new RegExp(
+          `\\.${fieldLayoutClasses.root}\\.${fieldLayoutClasses.cell}\\{[^}]*display:inline-flex;width:100%;`,
+        ),
+      )
+      expect(emittedCss()).toMatch(
+        new RegExp(
+          `\\.${fieldLayoutClasses.root}\\.${fieldLayoutClasses.cell} \\.${formLabelClasses.root}[^{]*\\{position:absolute;width:1px;height:1px;[^}]*clip:rect\\(0 0 0 0\\);`,
+        ),
+      )
+    },
+  )
+
+  it('has no a11y violations with a cell field at rest and in error', async () => {
+    const user = userEvent.setup()
+    const { container } = renderCell(
+      <Cell>
+        <TextField name="sku" label="SKU" required />
+      </Cell>,
+    )
+    await expectNoA11yViolations(container)
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await screen.findByRole('alert')
+    await expectNoA11yViolations(container)
+  })
 })

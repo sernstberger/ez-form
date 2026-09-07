@@ -1,24 +1,34 @@
 import {
   useCallback,
+  useContext,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type ComponentProps,
+  type KeyboardEvent,
   type ReactNode,
 } from 'react'
 import Button, { type ButtonProps } from '@mui/material/Button'
 import FormHelperText, { type FormHelperTextProps } from '@mui/material/FormHelperText'
 import IconButton, { type IconButtonProps } from '@mui/material/IconButton'
+import Table, { type TableProps } from '@mui/material/Table'
+import TableBody from '@mui/material/TableBody'
+import TableCell, { type TableCellProps } from '@mui/material/TableCell'
+import TableContainer, { type TableContainerProps } from '@mui/material/TableContainer'
+import TableHead, { type TableHeadProps } from '@mui/material/TableHead'
+import TableRow, { type TableRowProps } from '@mui/material/TableRow'
 import KeyboardArrowUp from '@mui/icons-material/KeyboardArrowUp'
 import KeyboardArrowDown from '@mui/icons-material/KeyboardArrowDown'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
-import { styled } from '@mui/material/styles'
+import { styled, ThemeProvider, useTheme, type Theme } from '@mui/material/styles'
 import { useFieldArray, useFormState, type UseFieldArrayProps } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
 import { cx } from '../cx'
+import { warnFieldArrayLayout } from '../devWarn'
 import { FormSection, type FormSectionProps } from '../FormSection'
 import { LiveRegion, type LiveRegionProps } from '../Form/LiveRegion'
 import { useRegisterFieldArrayRows } from '../Form/FieldArrayRowsContext'
@@ -32,6 +42,10 @@ import { useRegisterFieldArrayRows } from '../Form/FieldArrayRowsContext'
 import type { FieldArrayRow } from './FieldArrayRow'
 
 export type { FieldArrayRow }
+import { FieldCellContext, type FieldCellContextValue } from '../fields/FieldCellContext'
+import { FieldFocusContext } from '../Form/FieldFocusContext'
+import { isPlainKey } from '../keys'
+import { visuallyHidden } from '../visuallyHidden'
 
 // `errorText`, not `error`: MUI reserves `error` (with `active`, `checked`,
 // `disabled`, `required`, …) as a *global state* class, so
@@ -48,7 +62,49 @@ export const fieldArrayClasses = generateUtilityClasses('EzFieldArray', [
   'move',
   'status',
   'errorText',
+  // `layout="table"` (#14)
+  'tableContainer',
+  'table',
+  'tableHead',
+  'tableRow',
+  'cell',
+  'rowHeader',
+  'actionsCell',
+  'actionsHeaderText',
 ])
+
+/** How the rows render: today's stacked `FormSection` per row, or one table row each (#14). */
+export type FieldArrayLayout = 'stacked' | 'table'
+
+/**
+ * Where a cell's error message is *visible* under `layout="table"` (#14). It is the
+ * control's `aria-describedby` target either way, and `<FormErrorSummary>` lists it as
+ * `<row name> <column header>: <message>` either way.
+ *
+ * - `summary` (default): the cell shows `aria-invalid` + MUI's error outline, the text is
+ *   visually hidden; the summary is where a sighted user reads it.
+ * - `inline`: the text shows under the control and the row grows.
+ */
+export type FieldArrayCellErrors = 'summary' | 'inline'
+
+/** One column of `<FieldArray layout="table">` (#14). */
+export interface FieldArrayColumn<TRow = Record<string, unknown>> {
+  /** Column identity (React `key`, header `id`); doubles as the default `field`. */
+  key: string
+  /** The column header — the visible label of every control in the column. */
+  header: ReactNode
+  /**
+   * The row-relative field name the column's control is bound to, for keyboard
+   * navigation and error-summary links. Defaults to `key`.
+   */
+  field?: Extract<keyof TRow, string>
+  /** Column width, as any CSS length (a number is pixels). Set on the header cell. */
+  width?: string | number
+  /** Cell alignment, `TableCell`'s own. */
+  align?: TableCellProps['align']
+  /** The cell's content — an ordinary ez-form field bound to `row.name(...)`. */
+  render: (row: FieldArrayRow) => ReactNode
+}
 
 export interface FieldArrayProps<TRow = Record<string, unknown>> extends Pick<
   UseFieldArrayProps,
@@ -105,7 +161,23 @@ export interface FieldArrayProps<TRow = Record<string, unknown>> extends Pick<
   emptyRow: TRow | (() => TRow)
   /** Adds Move up / Move down buttons to each row. */
   reorder?: boolean
-  children: (row: FieldArrayRow) => ReactNode
+  /**
+   * `stacked` (default): each row is a nested `FormSection` rendered through `children`.
+   * `table`: one MUI `Table`, each row a `<tr>` rendered through `columns` (#14). Passing
+   * the render prop the layout does not read is a dev-mode warning.
+   */
+  layout?: FieldArrayLayout
+  /** The columns of a `layout="table"` array. Ignored (with a dev warning) under `stacked`. */
+  columns?: FieldArrayColumn<TRow>[]
+  /** Where a table cell's error text is visible; see `FieldArrayCellErrors`. Default `summary`. */
+  cellErrors?: FieldArrayCellErrors
+  /**
+   * The visually hidden header of the table's trailing actions column (Remove, Move).
+   * Default "Actions".
+   */
+  actionsHeader?: ReactNode
+  /** Row contents under `layout="stacked"`. Ignored (with a dev warning) under `table`. */
+  children?: (row: FieldArrayRow) => ReactNode
   slotProps?: {
     row?: Omit<FormSectionProps, 'title'>
     actions?: ComponentProps<'div'>
@@ -114,6 +186,19 @@ export interface FieldArrayProps<TRow = Record<string, unknown>> extends Pick<
     move?: IconButtonProps
     status?: Omit<LiveRegionProps, 'message' | 'announcementKey'>
     error?: FormHelperTextProps
+    /** `layout="table"` (#14). `stickyHeader` and `size` (default `small`) pass through `table`. */
+    tableContainer?: TableContainerProps
+    table?: TableProps
+    tableHead?: TableHeadProps
+    tableRow?: TableRowProps
+    cell?: TableCellProps
+    /**
+     * The row header cell (`<th scope="row">`, the row's name). Visually hidden by default —
+     * it exists so assistive tech has "Line item 2" as row context and so every cell's
+     * `aria-labelledby` has a target; `visuallyHidden: false` shows it as a first column.
+     */
+    rowHeader?: TableCellProps & Pick<LiveRegionProps, 'visuallyHidden'>
+    actionsCell?: TableCellProps
   }
 }
 
@@ -143,13 +228,123 @@ const FieldArrayMove = styled(IconButton, { name: 'EzFieldArray', slot: 'Move' }
 const FieldArrayStatus = styled(LiveRegion, { name: 'EzFieldArray', slot: 'Status' })({})
 const FieldArrayError = styled(FormHelperText, { name: 'EzFieldArray', slot: 'Error' })({})
 
+// `layout="table"` (#14). Plain MUI `Table` parts as slots; the table's own `size`
+// carries the density (see `denseFieldTheme`), so nothing here sets a padding.
+const FieldArrayTableContainer = styled(TableContainer, {
+  name: 'EzFieldArray',
+  slot: 'TableContainer',
+})({})
+const FieldArrayTable = styled(Table, { name: 'EzFieldArray', slot: 'Table' })({})
+const FieldArrayTableHead = styled(TableHead, { name: 'EzFieldArray', slot: 'TableHead' })({})
+const FieldArrayTableRow = styled(TableRow, { name: 'EzFieldArray', slot: 'TableRow' })({})
+const FieldArrayCell = styled(TableCell, { name: 'EzFieldArray', slot: 'Cell' })({})
+// The row's name as a `<th scope="row">`. Out of sight by default — the same clip-rect
+// recipe `LiveRegion` uses, dropped whole under `visuallyHidden: false` rather than
+// fought with resets, so a shown row header starts from MUI's own `TableCell`.
+const FieldArrayRowHeader = styled(TableCell, { name: 'EzFieldArray', slot: 'RowHeader' })<{
+  ownerState: { visuallyHidden: boolean }
+}>(({ ownerState }) => (ownerState.visuallyHidden ? visuallyHidden : {}))
+const FieldArrayActionsCell = styled(TableCell, { name: 'EzFieldArray', slot: 'ActionsCell' })({})
+// The actions column's header text: present for assistive tech (an empty `<th>` is an
+// axe failure and names nothing), hidden for everyone else — the buttons are their own
+// visible labels.
+const FieldArrayActionsHeaderText = styled('span', {
+  name: 'EzFieldArray',
+  slot: 'ActionsHeaderText',
+})(visuallyHidden)
+
+/**
+ * Cell density (#14): the outer theme extended with `defaultProps.size` for the controls
+ * the cells render, memoised on (theme, size) so the nested `ThemeProvider` hands emotion
+ * one stable object. Passed as an *object*, not `ThemeProvider`'s function form: with no
+ * provider above, `useTheme()` falls back to MUI's default theme, while the function form
+ * errors in dev ("no outer theme is present"). A CSS-variables theme
+ * (`createEzFormTheme()`) is fine nested this way — MUI's `CssVarsProvider` detects the
+ * nesting, reuses the outer colour scheme and generates no second stylesheet when the
+ * variable prefix matches (`createCssVarsProvider`, `nested`).
+ */
+function useDenseFieldTheme(size: 'small' | 'medium'): Theme {
+  const outerTheme = useTheme()
+  return useMemo(() => denseFieldTheme(outerTheme, size), [outerTheme, size])
+}
+
+/**
+ * The MUI components ez-form's fields render through, given `defaultProps.size` for the
+ * table's density (#14): `size` on `slotProps.table` (default `small`) sets the cells'
+ * padding through MUI's own `Table` → `TableCell` context, and this carries the same
+ * value to the controls inside them through the same mechanism a theme would use — a
+ * nested theme whose `components` extend the outer one. A field's explicit `size` still
+ * wins, because a prop always beats a theme default.
+ *
+ * `MuiRating` is deliberately *not* in the list, though the design spec named it: its
+ * `small` star is 18×18 px, under the WCAG 2.5.8 minimum (README, the Rating section on
+ * the small size being below the target-size minimum, #111). A Rating cell keeps its 24 px stars and the row grows.
+ *
+ * Pickers get it through `MuiPickersTextField`, the `useThemeProps` name of the text
+ * field MUI X renders — not `slotProps.textField`, whose object a consumer's own
+ * `slotProps.textField` would replace wholesale.
+ */
+function denseFieldTheme(theme: Theme, size: 'small' | 'medium'): Theme {
+  const c = theme.components ?? {}
+  return {
+    ...theme,
+    components: {
+      ...c,
+      MuiTextField: { ...c.MuiTextField, defaultProps: { ...c.MuiTextField?.defaultProps, size } },
+      MuiFormControl: {
+        ...c.MuiFormControl,
+        defaultProps: { ...c.MuiFormControl?.defaultProps, size },
+      },
+      MuiAutocomplete: {
+        ...c.MuiAutocomplete,
+        defaultProps: { ...c.MuiAutocomplete?.defaultProps, size },
+      },
+      MuiCheckbox: { ...c.MuiCheckbox, defaultProps: { ...c.MuiCheckbox?.defaultProps, size } },
+      MuiRadio: { ...c.MuiRadio, defaultProps: { ...c.MuiRadio?.defaultProps, size } },
+      MuiSwitch: { ...c.MuiSwitch, defaultProps: { ...c.MuiSwitch?.defaultProps, size } },
+      MuiSlider: { ...c.MuiSlider, defaultProps: { ...c.MuiSlider?.defaultProps, size } },
+      MuiToggleButtonGroup: {
+        ...c.MuiToggleButtonGroup,
+        defaultProps: { ...c.MuiToggleButtonGroup?.defaultProps, size },
+      },
+      MuiPickersTextField: {
+        ...c.MuiPickersTextField,
+        defaultProps: { ...c.MuiPickersTextField?.defaultProps, size },
+      },
+      EzNumberField: {
+        ...c.EzNumberField,
+        defaultProps: { ...c.EzNumberField?.defaultProps, size },
+      },
+      EzOtpField: { ...c.EzOtpField, defaultProps: { ...c.EzOtpField?.defaultProps, size } },
+    },
+  }
+}
+
 /** Where focus should land once React has rendered the new row list. */
 type PendingFocus =
-  /** The row that was just appended, identified at commit time (see `handleAdd`). */
-  | { kind: 'appended' }
+  /**
+   * The row that was just appended, identified at commit time (see `handleAdd`). With a
+   * `columnKey` (Enter on a table's last row, #14) focus lands in that column's cell rather
+   * than the row's first control.
+   */
+  | { kind: 'appended'; columnKey?: string }
   | { kind: 'row'; index: number }
   | { kind: 'move'; index: number; direction: 'up' | 'down' }
   | { kind: 'add' }
+
+/** The first thing in a row (or cell) that Tab would stop on. */
+const FOCUSABLE =
+  'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+
+/** The data cell for `columnKey` inside a row element. */
+const cellIn = (row: HTMLElement, columnKey: string): HTMLElement | null =>
+  [...row.querySelectorAll<HTMLElement>('td[data-column]')].find(
+    (td) => td.dataset.column === columnKey,
+  ) ?? null
+
+/** The data cell (`<td data-column>`) an event target sits in, if any — never the actions cell. */
+const cellOf = (target: EventTarget | null): HTMLElement | null =>
+  target instanceof Element ? target.closest<HTMLElement>('td[data-column]') : null
 
 /**
  * A repeating group of fields over a hookform `useFieldArray`, with Add,
@@ -194,12 +389,22 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
     movedMessage = (row: number, direction: 'up' | 'down') => `Row ${row} moved ${direction}`,
     emptyRow,
     reorder,
+    layout = 'stacked',
+    columns,
+    cellErrors = 'summary',
+    actionsHeader = 'Actions',
     children,
     slotProps,
   } = useDefaultProps({ props: inProps, name: 'EzFieldArray' })
   // The guard, plus `getValues` for the post-update row count; `useFieldArray`
   // reads `control` from context itself.
-  const { getValues } = useEzFormContext('FieldArray')
+  const { getValues, setFocus } = useEzFormContext('FieldArray')
+  // Read *imperatively* at keydown time (`getIds()`), never subscribed: `useFocusTargetIds()`
+  // would re-render this component — and with it every row's fields — on each cell's
+  // registration, which is the exact re-render FieldFocusContext's ruling exists to prevent.
+  // The keyboard model only needs the map at the moment a key is pressed.
+  const focusStore = useContext(FieldFocusContext)
+  warnFieldArrayLayout(name, layout, children !== undefined, columns !== undefined)
   const { fields, append, remove, move } = useFieldArray({ name, rules, shouldUnregister })
   const { errors } = useFormState()
 
@@ -239,10 +444,12 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
   // identical message (removing row 2 twice) would be silent.
   const [status, setStatus] = useState({ text: '', seq: 0 })
   const [pendingFocus, setPendingFocus] = useState<PendingFocus | null>(null)
-  const rowRefs = useRef(new Map<string, HTMLFieldSetElement>())
+  // A row is a `<fieldset>` under `stacked` and a `<tr>` under `table`; the focus effect
+  // below only ever queries inside it, so the element type does not matter to it.
+  const rowRefs = useRef(new Map<string, HTMLElement>())
   const addRef = useRef<HTMLButtonElement>(null)
 
-  const setRowRef = useCallback((id: string, el: HTMLFieldSetElement | null) => {
+  const setRowRef = useCallback((id: string, el: HTMLElement | null) => {
     if (el) rowRefs.current.set(id, el)
     else rowRefs.current.delete(id)
   }, [])
@@ -290,16 +497,20 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
       opposite?.focus()
       return
     }
-    row
-      .querySelector<HTMLElement>(
-        'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
-      )
-      ?.focus()
+    // Enter on a table's last row appends and lands in the *same column* (#14); the cell is
+    // found in the DOM because the new row's fields register their focus targets in this very
+    // commit, after this effect's closure captured the ids.
+    const cell =
+      pendingFocus.kind === 'appended' && pendingFocus.columnKey !== undefined
+        ? cellIn(row, pendingFocus.columnKey)
+        : null
+    ;(cell ?? row).querySelector<HTMLElement>(FOCUSABLE)?.focus()
   }, [pendingFocus, fields])
 
+  /** What one row is called — `Applicant`, `Line item` — before its number. */
+  const rowNoun = singular ?? (typeof label === 'string' ? singularize(label) : rowText)
   /** The generated `<singular> <n>` name, always a string. */
-  const defaultRowName = (index: number): string =>
-    `${singular ?? (typeof label === 'string' ? singularize(label) : rowText)} ${index + 1}`
+  const defaultRowName = (index: number): string => `${rowNoun} ${index + 1}`
 
   const nameRow = (index: number): ReactNode => (rowLabel ? rowLabel(index) : defaultRowName(index))
 
@@ -322,7 +533,8 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
   /** Rows *now*, read after a hookform mutation has applied rather than from `fields`. */
   const rowCount = () => (getValues(name) as unknown[] | undefined)?.length ?? 0
 
-  const handleAdd = () => {
+  /** Add. `columnKey` is Enter-on-the-last-row's request to land in that column (#14). */
+  const handleAdd = (columnKey?: string) => {
     const row = typeof emptyRow === 'function' ? (emptyRow as () => TRow)() : emptyRow
     // hookform focuses the input it registered for the new row; this component
     // focuses the row's first focusable control itself, in the effect above.
@@ -330,7 +542,7 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
     // Resolve the target at commit time rather than storing `fields.length`
     // from this render's closure: a double invoke would read the same stale
     // length twice and aim at a row that is no longer the appended one.
-    setPendingFocus({ kind: 'appended' })
+    setPendingFocus({ kind: 'appended', columnKey })
     // The count comes from the form's values, which `append` has already
     // written, not from this render's `fields.length`: two Adds (or a Remove
     // then an Add) landing in one batch run against the same stale closure and
@@ -368,77 +580,302 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
     move: moveSlotProps,
     status: statusSlotProps,
     error: errorSlotProps,
+    tableContainer: tableContainerSlotProps,
+    table: tableSlotProps,
+    tableHead: tableHeadSlotProps,
+    tableRow: tableRowSlotProps,
+    cell: cellSlotProps,
+    rowHeader: rowHeaderSlotProps,
+    actionsCell: actionsCellSlotProps,
   } = slotProps ?? {}
+  // Read off the slot props directly (a primitive), not off `tableProps` below, so the
+  // memo's dependency is a plain string the hooks lint can see is never mutated.
+  const tableSize = tableSlotProps?.size ?? 'small'
+  const tableProps = { size: tableSize, ...tableSlotProps } as const
   const addProps = { variant: 'outlined', ...addSlotProps } as const
-  const removeProps = { variant: 'text', ...removeSlotProps } as const
+  // In a table the row buttons follow the table's density; stacked rows keep MUI's default.
+  const removeProps = {
+    variant: 'text',
+    ...(layout === 'table' ? { size: tableSize } : null),
+    ...removeSlotProps,
+  } as const
   const moveProps = { size: 'small', ...moveSlotProps } as const
+  const { visuallyHidden: rowHeaderHidden = true, ...rowHeaderProps } = rowHeaderSlotProps ?? {}
+
+  const denseTheme = useDenseFieldTheme(tableSize)
+
+  // ids for the table's headers: one per column, one per row (by hookform's stable
+  // `field.id`, so a row keeps its id across a reorder). The legend id lets the
+  // table be named by the same element that names the `FormSection`.
+  const tableId = useId()
+  const legendId = `${tableId}-legend`
+  const columnHeaderId = (key: string) => `${tableId}-col-${key}`
+  const rowHeaderId = (id: string) => `${tableId}-row-${id}`
+
+  const renderActions = (index: number, rowAriaName: string) => (
+    <FieldArrayActions
+      {...actionsSlotProps}
+      className={cx(fieldArrayClasses.actions, actionsSlotProps?.className)}
+    >
+      <FieldArrayRemove
+        type="button"
+        {...removeProps}
+        disabled={atMin || removeProps.disabled}
+        aria-label={removeRowLabel(rowAriaName)}
+        className={cx(fieldArrayClasses.remove, removeProps.className)}
+        onClick={() => handleRemove(index)}
+      >
+        {removeLabel}
+      </FieldArrayRemove>
+      {reorder && (
+        <>
+          <FieldArrayMove
+            type="button"
+            {...moveProps}
+            data-direction="up"
+            disabled={index === 0 || moveProps.disabled}
+            aria-label={moveUpLabel(rowAriaName)}
+            className={cx(fieldArrayClasses.move, moveProps.className)}
+            onClick={() => handleMove(index, 'up')}
+          >
+            <KeyboardArrowUp />
+          </FieldArrayMove>
+          <FieldArrayMove
+            type="button"
+            {...moveProps}
+            data-direction="down"
+            disabled={index === fields.length - 1 || moveProps.disabled}
+            aria-label={moveDownLabel(rowAriaName)}
+            className={cx(fieldArrayClasses.move, moveProps.className)}
+            onClick={() => handleMove(index, 'down')}
+          >
+            <KeyboardArrowDown />
+          </FieldArrayMove>
+        </>
+      )}
+    </FieldArrayActions>
+  )
+
+  const renderStacked = () =>
+    rows.map((row) => (
+      <FieldArrayRowRoot
+        key={row.id}
+        {...rowSlotProps}
+        title={nameRow(row.index)}
+        ref={(el: HTMLFieldSetElement | null) => setRowRef(row.id, el)}
+        className={cx(fieldArrayClasses.row, rowSlotProps?.className)}
+      >
+        {children?.(row)}
+        {renderActions(row.index, nameRowForAria(row.index))}
+      </FieldArrayRowRoot>
+    ))
+
+  /**
+   * Moves focus into `column`'s cell on row `index` (#14): hookform's `setFocus` where the
+   * cell's field registered a focus target under the expected name (the #98 registry, read
+   * imperatively), else the first focusable thing in the cell — a column whose control is
+   * bound under a different name than `field ?? key`, or a cell holding no ez-form field.
+   */
+  const focusCell = (index: number, column: FieldArrayColumn<TRow>) => {
+    const target = fields[index]
+    const rowEl = target && rowRefs.current.get(target.id)
+    const cell = rowEl ? cellIn(rowEl, column.key) : null
+    if (!cell) return
+    const fieldName = `${name}.${index}.${column.field ?? column.key}`
+    const id = focusStore?.getIds()[fieldName]
+    const registered = id ? document.getElementById(id) : null
+    if (registered && cell.contains(registered)) {
+      setFocus(fieldName)
+      if (cell.contains(document.activeElement)) return
+    }
+    cell.querySelector<HTMLElement>(FOCUSABLE)?.focus()
+  }
+
+  /**
+   * The table's keyboard model (#4 of the design spec): one handler on `<TableBody>`, the
+   * pattern #116 used on the Wizard step's fieldset, with the same exclusions (`isPlainKey`).
+   *
+   * - Enter, plain, in a data cell: same column, next row; on the last row, append (under
+   *   `maxRows`) and land in that column once the row mounts; at the cap, stay. Always
+   *   `preventDefault`, so Enter **never** submits from a cell — the one documented,
+   *   table-scoped exception to `describeFieldContract`'s "Enter submits once".
+   * - ArrowDown / ArrowUp, plain, when the control did not consume the key: same column, one
+   *   row down / up, no wrap. `Select`, `Autocomplete`, the pickers and `Slider` all
+   *   `preventDefault` the arrows they use, so `isPlainKey` leaves those alone — a closed
+   *   Select opens its menu, as MUI intends, rather than changing rows. A radio (and so a
+   *   `Rating`) is excluded by element, because its arrows are the browser's, unprevented.
+   * - Tab, Left/Right, Escape: untouched. Keys in the actions cell: untouched (`cellOf`).
+   *
+   * The pickers need one thing more: MUI X's `PickersInputBase` submits the form itself on
+   * Enter, before this handler sees the event. `usePickerField` disarms that from inside the
+   * picker when it is in a cell — see the `cell` note there and `preventMuiDefault`.
+   */
+  const handleTableKeyDown = (event: KeyboardEvent<HTMLTableSectionElement>) => {
+    const cell = cellOf(event.target)
+    if (!cell) return
+    const column = columns?.find((c) => c.key === cell.dataset.column)
+    const index = Number(cell.closest('tr')?.dataset.rowIndex)
+    if (!column || Number.isNaN(index)) return
+    if (isPlainKey(event, 'Enter')) {
+      event.preventDefault()
+      if (index < fields.length - 1) focusCell(index + 1, column)
+      else if (!atMax) handleAdd(column.key)
+      return
+    }
+    const down = isPlainKey(event, 'ArrowDown')
+    if (!down && !isPlainKey(event, 'ArrowUp')) return
+    // A radio's arrow keys are the *browser's* default action — MUI's `Radio`/`RadioGroup`
+    // and `Rating` (radios underneath) install no keydown handler, so nothing
+    // `preventDefault`s them and `isPlainKey` alone would let the table steal them. Measured:
+    // focus moved to the next row from a RadioGroup cell. The arrows belong to the group.
+    if (event.target instanceof HTMLInputElement && event.target.type === 'radio') return
+    const to = down ? index + 1 : index - 1
+    if (to < 0 || to >= fields.length) return
+    event.preventDefault()
+    focusCell(to, column)
+  }
+
+  /**
+   * `layout="table"` (#14). Headers name the columns (`scope="col"`), a hidden `<th
+   * scope="row">` names each row, and every data cell points at its column through
+   * `headers`. The controls inside learn the two header ids from `FieldCellContext`,
+   * which `useEzField` turns into `aria-labelledby` and the hidden-label class.
+   */
+  const renderTable = () => (
+    <FieldArrayTableContainer
+      {...tableContainerSlotProps}
+      className={cx(fieldArrayClasses.tableContainer, tableContainerSlotProps?.className)}
+    >
+      <FieldArrayTable
+        aria-labelledby={legendId}
+        {...tableProps}
+        className={cx(fieldArrayClasses.table, tableProps.className)}
+      >
+        <FieldArrayTableHead
+          {...tableHeadSlotProps}
+          className={cx(fieldArrayClasses.tableHead, tableHeadSlotProps?.className)}
+        >
+          <FieldArrayTableRow
+            {...tableRowSlotProps}
+            className={cx(fieldArrayClasses.tableRow, tableRowSlotProps?.className)}
+          >
+            <FieldArrayRowHeader
+              {...rowHeaderProps}
+              scope="col"
+              ownerState={{ visuallyHidden: rowHeaderHidden }}
+              className={cx(fieldArrayClasses.rowHeader, rowHeaderProps.className)}
+            >
+              {rowNoun}
+            </FieldArrayRowHeader>
+            {columns?.map((column) => (
+              <FieldArrayCell
+                key={column.key}
+                align={column.align}
+                {...cellSlotProps}
+                id={columnHeaderId(column.key)}
+                scope="col"
+                style={
+                  column.width === undefined
+                    ? cellSlotProps?.style
+                    : { width: column.width, ...cellSlotProps?.style }
+                }
+                className={cx(fieldArrayClasses.cell, cellSlotProps?.className)}
+              >
+                {column.header}
+              </FieldArrayCell>
+            ))}
+            <FieldArrayActionsCell
+              {...actionsCellSlotProps}
+              className={cx(fieldArrayClasses.actionsCell, actionsCellSlotProps?.className)}
+            >
+              <FieldArrayActionsHeaderText className={fieldArrayClasses.actionsHeaderText}>
+                {actionsHeader}
+              </FieldArrayActionsHeaderText>
+            </FieldArrayActionsCell>
+          </FieldArrayTableRow>
+        </FieldArrayTableHead>
+        <ThemeProvider theme={denseTheme}>
+          <TableBody onKeyDown={handleTableKeyDown}>
+            {rows.map((row) => {
+              const { index, id } = row
+              const rowAriaName = nameRowForAria(index)
+              return (
+                <FieldArrayTableRow
+                  key={id}
+                  {...tableRowSlotProps}
+                  data-row-index={index}
+                  ref={(el: HTMLTableRowElement | null) => setRowRef(id, el)}
+                  className={cx(fieldArrayClasses.tableRow, tableRowSlotProps?.className)}
+                >
+                  <FieldArrayRowHeader
+                    component="th"
+                    scope="row"
+                    {...rowHeaderProps}
+                    id={rowHeaderId(id)}
+                    ownerState={{ visuallyHidden: rowHeaderHidden }}
+                    className={cx(fieldArrayClasses.rowHeader, rowHeaderProps.className)}
+                  >
+                    {nameRow(index)}
+                  </FieldArrayRowHeader>
+                  {columns?.map((column) => {
+                    const cell: FieldCellContextValue = {
+                      rowHeaderId: rowHeaderId(id),
+                      headerId: columnHeaderId(column.key),
+                      label:
+                        typeof column.header === 'string'
+                          ? `${rowAriaName} ${column.header}`
+                          : rowAriaName,
+                      helperTextHidden: cellErrors === 'summary',
+                    }
+                    return (
+                      <FieldArrayCell
+                        key={column.key}
+                        align={column.align}
+                        {...cellSlotProps}
+                        data-column={column.key}
+                        headers={columnHeaderId(column.key)}
+                        className={cx(fieldArrayClasses.cell, cellSlotProps?.className)}
+                      >
+                        <FieldCellContext.Provider value={cell}>
+                          {column.render(row)}
+                        </FieldCellContext.Provider>
+                      </FieldArrayCell>
+                    )
+                  })}
+                  <FieldArrayActionsCell
+                    {...actionsCellSlotProps}
+                    className={cx(fieldArrayClasses.actionsCell, actionsCellSlotProps?.className)}
+                  >
+                    {renderActions(index, rowAriaName)}
+                  </FieldArrayActionsCell>
+                </FieldArrayTableRow>
+              )
+            })}
+          </TableBody>
+        </ThemeProvider>
+      </FieldArrayTable>
+    </FieldArrayTableContainer>
+  )
 
   return (
-    <FieldArrayRoot title={label} className={fieldArrayClasses.root}>
-      {rows.map((row) => {
-        const { index, id } = row
-        const rowName = nameRow(index)
-        const rowAriaName = nameRowForAria(index)
-        return (
-          <FieldArrayRowRoot
-            key={id}
-            {...rowSlotProps}
-            title={rowName}
-            ref={(el: HTMLFieldSetElement | null) => setRowRef(id, el)}
-            className={cx(fieldArrayClasses.row, rowSlotProps?.className)}
-          >
-            {children(row)}
-            <FieldArrayActions
-              {...actionsSlotProps}
-              className={cx(fieldArrayClasses.actions, actionsSlotProps?.className)}
-            >
-              <FieldArrayRemove
-                type="button"
-                {...removeProps}
-                disabled={atMin || removeProps.disabled}
-                aria-label={removeRowLabel(rowAriaName)}
-                className={cx(fieldArrayClasses.remove, removeProps.className)}
-                onClick={() => handleRemove(index)}
-              >
-                {removeLabel}
-              </FieldArrayRemove>
-              {reorder && (
-                <>
-                  <FieldArrayMove
-                    type="button"
-                    {...moveProps}
-                    data-direction="up"
-                    disabled={index === 0 || moveProps.disabled}
-                    aria-label={moveUpLabel(rowAriaName)}
-                    className={cx(fieldArrayClasses.move, moveProps.className)}
-                    onClick={() => handleMove(index, 'up')}
-                  >
-                    <KeyboardArrowUp />
-                  </FieldArrayMove>
-                  <FieldArrayMove
-                    type="button"
-                    {...moveProps}
-                    data-direction="down"
-                    disabled={index === fields.length - 1 || moveProps.disabled}
-                    aria-label={moveDownLabel(rowAriaName)}
-                    className={cx(fieldArrayClasses.move, moveProps.className)}
-                    onClick={() => handleMove(index, 'down')}
-                  >
-                    <KeyboardArrowDown />
-                  </FieldArrayMove>
-                </>
-              )}
-            </FieldArrayActions>
-          </FieldArrayRowRoot>
-        )
-      })}
+    <FieldArrayRoot
+      title={label}
+      className={fieldArrayClasses.root}
+      slotProps={layout === 'table' ? { legend: { id: legendId } } : undefined}
+    >
+      {/* A nested array's own rows are not in the enclosing cell: they reset the cell
+          context so their fields keep their own labels (a table's cells provide theirs
+          afresh below). Composites do the same — see `AddressField`. */}
+      <FieldCellContext.Provider value={null}>
+        {layout === 'table' ? renderTable() : renderStacked()}
+      </FieldCellContext.Provider>
       <FieldArrayAdd
         type="button"
         ref={addRef}
         {...addProps}
         disabled={atMax || addProps.disabled}
         className={cx(fieldArrayClasses.add, addProps.className)}
-        onClick={handleAdd}
+        onClick={() => handleAdd()}
       >
         {addLabel}
       </FieldArrayAdd>
