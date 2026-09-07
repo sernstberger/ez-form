@@ -23,6 +23,19 @@ describeFieldContract({
   getControl: combobox,
   expectDisabled: (control) => expect(control).toHaveAttribute('aria-disabled', 'true'),
   expectSubmitted: { state: 'CA' },
+  exempt: {
+    enterSubmitsOnce:
+      'Wraps `<Select>`, so the same reason: a select-only combobox trigger where Enter ' +
+      'opens the listbox (APG), and a plain `<MuiSelect>` baseline in a plain form in ' +
+      'this same jsdom reports zero submits too (#122).',
+  },
+  enterPicksOption: {
+    pick: async (user) => {
+      await user.click(combobox())
+      await user.keyboard('{Enter}')
+    },
+    expectPicked: () => expect(combobox()).not.toHaveTextContent(''),
+  },
   themeDefault: {
     name: 'EzStateSelect',
     defaultProps: { territories: true },

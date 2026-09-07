@@ -35,6 +35,25 @@ describeFieldContract({
   ),
   getControl: combobox,
   expectSubmitted: { role: 'user' },
+  // Row 4 asserts Enter with the popup **closed**. Autocomplete's control is a real
+  // `input[type=text]`, so it is an implicit submission source like any other text
+  // input — and MUI's own `Autocomplete` in a plain form submits on Enter in this
+  // same jsdom (the #122 baseline). But the contract's `interact` picks an option by
+  // clicking it, which leaves the listbox open; the Escape below is what closes it, so
+  // the Enter under test is the closed-popup one rather than an option pick.
+  interactSubmittable: async (user) => {
+    await pick(user, 'User')
+    await user.keyboard('{Escape}')
+  },
+  // Row 4's second pass: the *open*-popup Enter chooses the highlighted option and must
+  // not also submit a form the user has not finished.
+  enterPicksOption: {
+    pick: async (user) => {
+      await user.click(combobox())
+      await user.keyboard('{ArrowDown}{Enter}')
+    },
+    expectPicked: () => expect(combobox()).toHaveValue('Admin'),
+  },
   interact: (user) => pick(user, 'User'),
 })
 

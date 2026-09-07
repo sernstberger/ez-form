@@ -39,6 +39,20 @@ describeFieldContract({
     ),
   getControl: () => screen.getByRole('group', { name: 'Start' }),
   requiredNotAnnounced: true,
+  exempt: {
+    // The visible assertion is unreachable in jsdom. MUI X registers an `aria-hidden`,
+    // `tabindex="-1"` proxy input as the field's hookform `ref` (its own documented test
+    // seam), so `shouldFocusError` calls `.focus()` on that and jsdom's
+    // `document.activeElement` bookkeeping reports it — while a real browser redirects
+    // real focus to the visible `role="spinbutton"` section instead. Two Playwright
+    // passes confirmed the visible section takes focus, named and with a focus ring:
+    // `docs/superpowers/reviews/2026-09-04-qa-sweep-pickers.md` §2b (#105, #122).
+    // Asserting on the proxy would be a green test over a question jsdom cannot answer.
+    focusesFirstInvalid:
+      "jsdom reports focus on MUI X's aria-hidden proxy input; the real browser puts it " +
+      'on the visible spinbutton section — docs/superpowers/reviews/2026-09-04-qa-sweep-pickers.md ' +
+      '\u00a72b (#105).',
+  },
   expectDisabled: () => expect(hiddenInput('start')).toBeDisabled(),
   expectSubmitted: { start: new Date(2030, 0, 15) },
   interact: async () => {

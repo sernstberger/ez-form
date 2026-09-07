@@ -41,6 +41,14 @@ describeFieldContract({
   ),
   getControl: () => fileInput('Resume'),
   expectSubmitted: { resume: pdf },
+  exempt: {
+    enterSubmitsOnce:
+      'HTML lists the implicit submission sources and `input[type=file]` is not one of ' +
+      'them — Enter opens the file picker instead. Baseline: a bare `<input type="file">` ' +
+      'in a plain `<form onSubmit>` in this same jsdom also reports zero submits (#122). ' +
+      'The visible affordance is a `button[type=button]`, which has no implicit ' +
+      'submission either.',
+  },
   themeDefault: {
     name: 'EzFileField',
     defaultProps: { helperText: 'From the theme' },
