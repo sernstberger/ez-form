@@ -39,7 +39,10 @@ export const Disabled: Story = { args: { disabled: true } }
  * stories' "I accept the terms", which is only recorded once the surrounding form submits.
  */
 export const ImmediateEffect: Story = {
-  parameters: { form: undefined },
+  // Opts out of the preview's Form decorator: this story renders its own `<Form>`, and the
+  // decorator's would nest `<form>` inside `<form>`. `false`, not `undefined` — Storybook's
+  // parameter merge skips `undefined` and leaves the meta's `form` in place (#128).
+  parameters: { form: false } satisfies FormParameters,
   render: () => {
     const [dark, setDark] = useState(false)
     return (

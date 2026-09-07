@@ -98,6 +98,18 @@ function useDocumentDirection(direction: DirectionChoice) {
 }
 
 /**
+ * The `<Form>` the decorator below builds for a story that doesn't render its own.
+ * Both keys are optional because a story states only what differs from its meta; see
+ * `FormParameters` for how the two levels merge.
+ */
+interface FormConfig {
+  /** Required on the meta; a story sets it only to swap the schema (replaced whole). */
+  schema?: z.ZodType
+  /** Deep-merged over the meta's by Storybook: a story states only the keys that differ. */
+  defaultValues?: Record<string, unknown>
+}
+
+/**
  * Story parameters understood by the Form decorator below. Field stories set
  * `parameters.form` at meta level; stories that render their own `<Form>` —
  * `Form.stories.tsx` — leave it unset. Extends Storybook's own `Parameters` (rather than
@@ -105,29 +117,36 @@ function useDocumentDirection(direction: DirectionChoice) {
  * keys — `docs.description.story`, for one — under a single `satisfies FormParameters`,
  * with no per-key narrowing.
  *
+ * **Opting a single story out** — a story under a meta that sets `form`, but which renders its
+ * own `<Form>` (`Switch`'s `ImmediateEffect`, `FormSection`'s `TwoSections`) — is
+ * `parameters: { form: false }`. It **cannot** be `form: undefined`: Storybook's merge
+ * documents that "parameters are merged, so keys are only ever overwritten and never dropped",
+ * and its `combineParameters` implements that by skipping `undefined` values outright, so
+ * `{ form: undefined }` leaves the meta's `form` in place and the decorator wraps the story in a
+ * second `<Form>` — a real `<form>` nested in a `<form>`. That silent no-op shipped twice (#120,
+ * #128); `false` is a value the merge carries through, and the union below makes `undefined`
+ * unable to express an opt-out at all. `src/test/stories.nesting.test.tsx` renders every story in
+ * the repo and fails on a second `<form>`, so the next copy of the broken idiom is caught here
+ * rather than in a browser console.
+ *
  * **Per-story overrides** follow Storybook's parameter inheritance (project → meta → story,
  * plain objects deep-merged, everything else replaced by the more specific level), which is
- * why both keys are optional here — a story states only what differs:
+ * why both `FormConfig` keys are optional — a story states only what differs:
  *
  * - `schema` is a zod instance, not a plain object, so a story's schema **replaces** the
  *   meta's whole. It is still required once the merge is done: a meta that sets `form`
  *   without a `schema` fails the story with an explicit error rather than a blank form.
  * - `defaultValues` is a plain object, so a story's defaults are **deep-merged** over the
  *   meta's: `{ rate: null }` overrides `rate` and keeps every other meta default. A key
- *   cannot be unset from a story (`undefined` is skipped by the merge); a story whose schema
- *   has a different shape inherits the meta's defaults for the old keys, which a non-strict
- *   `z.object` strips on submit. Arrays and class instances (`Date`) replace whole.
+ *   cannot be unset from a story (`undefined` is skipped by the merge, as above); a story whose
+ *   schema has a different shape inherits the meta's defaults for the old keys, which a
+ *   non-strict `z.object` strips on submit. Arrays and class instances (`Date`) replace whole.
  *
  * See `PercentField.stories.tsx` for defaults-only overrides and `Autocomplete.stories.tsx`
  * for schema swaps; `PercentField.stories.test.tsx` pins the merge.
  */
 export interface FormParameters extends Parameters {
-  form?: {
-    /** Required on the meta; a story sets it only to swap the schema (replaced whole). */
-    schema?: z.ZodType
-    /** Deep-merged over the meta's by Storybook: a story states only the keys that differ. */
-    defaultValues?: Record<string, unknown>
-  }
+  form?: FormConfig | false
 }
 
 const onSubmit = fn()
@@ -136,7 +155,12 @@ const preview: Preview = {
   decorators: [
     (Story, { parameters }) => {
       const form = (parameters as FormParameters).form
-      if (!form) return <Story />
+      // Two ways to get no wrapper, spelled out rather than collapsed to `!form`: `false` is a
+      // story's deliberate opt-out (it renders its own `<Form>`), absent means the meta never
+      // asked for one. The comparison is `=== false` so that a future `form: undefined` — which
+      // Storybook's merge silently drops, and which therefore never reaches here as an opt-out —
+      // cannot be mistaken for one (#128).
+      if (form === false || form === undefined) return <Story />
       if (!form.schema) {
         throw new Error(
           '`parameters.form` is set without a `schema`. Set `form.schema` on the meta; a story overrides only what differs (see FormParameters in .storybook/preview.tsx).',
