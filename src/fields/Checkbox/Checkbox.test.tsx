@@ -1,10 +1,12 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { z } from 'zod'
+import { formControlLabelClasses } from '@mui/material/FormControlLabel'
 import { Form } from '../../Form'
-import { Checkbox } from './Checkbox'
+import { Checkbox, type CheckboxProps } from './Checkbox'
 import { describeFieldContract } from '../../test/describeFieldContract'
 import { expectTargetSize } from '../../test/targetSize'
+import { expectNoA11yViolations } from '../../test/axe'
 
 const schema = z.object({
   tos: z.boolean().refine(Boolean, { error: 'You must accept the terms' }),
@@ -151,5 +153,126 @@ describe('Checkbox', () => {
       </Form>,
     )
     expectTargetSize(screen.getByRole('checkbox', { name: 'Accept terms' }))
+  })
+})
+
+/**
+ * `labelPlacement` is MUI's `FormControlLabel.labelPlacement` (#139), not the form-level
+ * `<Form labelPlacement>` axis. Before this it was typed as the ez axis and read by nothing
+ * on these two fields — they are `selfLabelled` and opt out of that axis — so a consumer
+ * could not put a label before a Checkbox at all.
+ *
+ * ### Measured: MUI reorders in CSS, never in markup
+ *
+ * All four placements emit the same DOM — control `<span>` first, label `<span>` second,
+ * inside one `<label>`. `FormControlLabel` sets `flexDirection: 'row-reverse'` for `start`
+ * and `'column-reverse'` for `top` (verified against @mui/material 9.4.0), so a DOM-order
+ * assertion would fail on correct code for `start` and `top` and pass vacuously for the
+ * other two. It is asserted here anyway, as a *constant*: the markup does not move, and if a
+ * future MUI starts reordering it, the a11y-order assumption behind this component changes
+ * and someone should look.
+ *
+ * The visual half therefore has to be read off the **emitted rule text** — jsdom has no
+ * layout engine, so `getComputedStyle` on the root reports nothing useful. Same technique as
+ * `labelPlacement.test.tsx` uses for the form-level axis's media-query rules.
+ */
+describe('Checkbox labelPlacement (MUI FormControlLabel)', () => {
+  const renderPlaced = (labelPlacement?: CheckboxProps['labelPlacement']) =>
+    render(
+      <Form schema={schema} defaultValues={{ tos: false }} onSubmit={() => {}}>
+        <Checkbox name="tos" label="Accept terms" labelPlacement={labelPlacement} />
+      </Form>,
+    )
+
+  const labelRoot = (container: HTMLElement) =>
+    container.querySelector(`.${formControlLabelClasses.root}`)!
+
+  it.each([
+    ['start', formControlLabelClasses.labelPlacementStart],
+    ['top', formControlLabelClasses.labelPlacementTop],
+    ['bottom', formControlLabelClasses.labelPlacementBottom],
+  ] as const)("%s puts MUI's placement class on the FormControlLabel root", (placement, cls) => {
+    const { container } = renderPlaced(placement)
+    expect(labelRoot(container)).toHaveClass(cls)
+  })
+
+  it("unset leaves MUI's own default: no placement class at all", () => {
+    // `'end'` is `FormControlLabel`'s default and MUI emits *no* modifier class for it, so
+    // "unset" and "end" are the same DOM. Asserting the absence of all three is what pins
+    // that the field passes nothing rather than passing `'end'` itself — a
+    // `{ labelPlacement: undefined }` object spread onto `FormControlLabel` would look
+    // identical here today but would stop a theme `defaultProps.labelPlacement` working.
+    const { container } = renderPlaced()
+    const root = labelRoot(container)
+    expect(root).not.toHaveClass(formControlLabelClasses.labelPlacementStart)
+    expect(root).not.toHaveClass(formControlLabelClasses.labelPlacementTop)
+    expect(root).not.toHaveClass(formControlLabelClasses.labelPlacementBottom)
+  })
+
+  /** The declarations of every emitted rule whose selector mentions `needle`. */
+  const rulesFor = (needle: string): string =>
+    [
+      ...[...document.querySelectorAll('style')]
+        .map((s) => s.textContent ?? '')
+        .join('\n')
+        .matchAll(/([^{}]*)\{([^{}]*)\}/g),
+    ]
+      .filter(([, selector]) => selector?.includes(needle))
+      .map(([, , declarations]) => declarations)
+      .join('\n')
+
+  it.each([
+    ['start', formControlLabelClasses.labelPlacementStart, 'row-reverse'],
+    ['top', formControlLabelClasses.labelPlacementTop, 'column-reverse'],
+    ['bottom', formControlLabelClasses.labelPlacementBottom, 'column'],
+  ] as const)(
+    '%s actually moves the label: the class carries its flex direction',
+    (placement, cls, direction) => {
+      // The class alone would pass with MUI's stylesheet gone. This reads the rule the class
+      // is attached to and asserts the declaration that does the moving, which is the closest
+      // jsdom can get to "the label is on the left".
+      const { container } = renderPlaced(placement)
+      const emitted = rulesFor(
+        labelRoot(container)
+          .className.split(' ')
+          .find((c) => c.startsWith('css-'))!,
+      )
+      expect(emitted).toContain(`flex-direction:${direction}`)
+      expect(labelRoot(container)).toHaveClass(cls)
+    },
+  )
+
+  it.each(['end', 'start', 'top', 'bottom'] as const)(
+    '%s leaves the markup order alone: control first, label second',
+    (placement) => {
+      // A constant, not a consequence — see this block's doc. Pinned so a future MUI that
+      // *does* reorder shows up here rather than as a silent change in reading order.
+      renderPlaced(placement)
+      const control = screen.getByRole('checkbox', { name: 'Accept terms' })
+      const text = screen.getByText('Accept terms')
+      expect(control.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      )
+    },
+  )
+
+  it.each([undefined, 'end', 'start', 'top', 'bottom'] as const)(
+    '%s keeps the label associated with the input',
+    (placement) => {
+      // The a11y contract must not move with the visual one: `FormControlLabel` wraps the
+      // input in the `<label>` whatever the placement, so `getByLabelText` finds it — and a
+      // regression to a sibling `<label>` with no `htmlFor` would fail here while every
+      // class assertion above still passed.
+      renderPlaced(placement)
+      expect(screen.getByLabelText('Accept terms')).toHaveAttribute('type', 'checkbox')
+    },
+  )
+
+  it('has no accessibility violations under every placement', async () => {
+    for (const placement of ['end', 'start', 'top', 'bottom'] as const) {
+      const { container, unmount } = renderPlaced(placement)
+      await expectNoA11yViolations(container)
+      unmount()
+    }
   })
 })

@@ -429,3 +429,29 @@ function hasPath(values: unknown, path: string): boolean {
   }
   return node !== undefined
 }
+
+/**
+ * `controlLabelProps` passed to a `<BoundField>` that is not in `labelAs="control"` mode
+ * (#139). Those props are `FormControlLabel`'s — `labelPlacement`, `disableTypography`,
+ * `slotProps.typography` — and only the `'control'` mode renders a `FormControlLabel` for
+ * them to land on. Under `'legend'` or `'none'` they are read by nothing at all: the field
+ * renders exactly as if they had never been passed, so a consumer who reached for
+ * `labelPlacement` on a `labelAs="legend"` field sees no error, no layout change, and no
+ * clue why. This warning is the only signal.
+ *
+ * Keyed by component and field name so two fields with the same mistake both report, while
+ * one field re-rendering reports once.
+ */
+export function warnUnusedControlLabelProps(
+  componentName: string,
+  name: string,
+  labelAs: string,
+): void {
+  if (!isDev) return
+  devWarn(
+    `unused-control-label-props:${componentName}:${name}`,
+    `ez-form: <${componentName} name="${name}" labelAs="${labelAs}"> was given ` +
+      '`controlLabelProps`, which is only read under `labelAs="control"` — the mode that ' +
+      'renders a `FormControlLabel`. Nothing is applied.',
+  )
+}

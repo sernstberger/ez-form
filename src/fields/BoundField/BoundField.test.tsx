@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { expectTypeOf } from 'vitest'
 import type { DefaultValues, FieldValues, RefCallBack } from 'react-hook-form'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
+import { formControlLabelClasses } from '@mui/material/FormControlLabel'
 import { z } from 'zod'
 import { Form } from '../../Form'
 import { fieldLayoutClasses } from '../LabelPlacementContext'
@@ -17,7 +18,8 @@ import { Slider } from '../Slider'
 import { Switch } from '../Switch'
 import { ToggleButtonGroup } from '../ToggleButtonGroup'
 import { expectNoA11yViolations } from '../../test/axe'
-import { expectConsole } from '../../test/expectConsole'
+import { consoleMessages, expectConsole } from '../../test/expectConsole'
+import { resetDevWarnings } from '../../devWarn'
 import { getInnerGroup } from '../../test/getInnerGroup'
 import { ReferenceControl } from '../../test/ReferenceControl'
 import { describeFieldContract } from '../../test/describeFieldContract'
@@ -491,8 +493,8 @@ describe('BoundField render prop', () => {
  * The class half is asserted on the DOM; the CSS half has to be asserted on the
  * *emitted rule text*, because jsdom has no layout engine and evaluates no media
  * queries — every `start`-only declaration lives inside a `@media (min-width…)` block
- * (#130), so `getComputedStyle` on a box reports the stacked fallback and would report
- * a pass whatever the grid said. Same technique as `labelPlacement.test.tsx`.
+ * (#130), so `getComputedStyle` on a box reports the below-the-breakpoint fallback and
+ * would report a pass whatever the grid said. Same technique as `labelPlacement.test.tsx`.
  */
 describe('BoundField under labelPlacement="start"', () => {
   /** Every rule in the document whose selector mentions `needle`. */
@@ -588,8 +590,12 @@ describe('BoundField under labelPlacement="start"', () => {
  * component, a consumer's default for their own wrapped controls leaked into this
  * library's Checkbox. Measured before the split: `defaultProps.helperText = 'Leaked'`
  * rendered helper text under a plain `<Checkbox name="f" label="Visible" />`, and
- * `defaultProps.labelPlacement = 'start'` re-laid-out that Checkbox inside a `floating`
- * form.
+ * `defaultProps.labelPlacement = 'start'` re-laid-out that same Checkbox.
+ *
+ * The placement case is *stronger* since #139, not weaker: `Checkbox` no longer passes a
+ * form-axis `labelPlacement` at all (its own prop is now MUI's `FormControlLabel` one,
+ * forwarded as `controlLabelProps`), so the key reaching the base could only ever come
+ * from the theme. The leak is the whole of what this asserts.
  *
  * The fix is the `BoundField` / `BoundFieldBase` split; these two cases are what pins
  * it. Both halves matter: a split that stopped the leak by never reading the theme at
@@ -618,9 +624,12 @@ describe('EzBoundField.defaultProps scope', () => {
 
   it('does not re-lay-out a <Checkbox> through `labelPlacement`', () => {
     const { container } = withTheme({ labelPlacement: 'start' }, <Checkbox name="f" label="V" />)
-    // The form's own placement (`floating`, the default) still owns the field.
-    expect(container.querySelector(`.${fieldLayoutClasses.start}`)).toBeNull()
-    expect(container.querySelector(`.${fieldLayoutClasses.floating}`)).not.toBeNull()
+    // The form's own placement still owns the field. Asserted as "a placement class, and
+    // not `start`" rather than by naming the default's class: which value is the default is
+    // the form axis's business, and this test is about the theme not reaching here at all.
+    const root = container.querySelector(`.${fieldLayoutClasses.root}`)
+    expect(root).not.toBeNull()
+    expect(root).not.toHaveClass(fieldLayoutClasses.start)
   })
 
   it('does reach the public <BoundField>', () => {
@@ -633,5 +642,234 @@ describe('EzBoundField.defaultProps scope', () => {
       />,
     )
     expect(screen.getByText('From the theme')).toBeInTheDocument()
+  })
+})
+
+/**
+ * `controlLabelProps` (#139): the channel to the `FormControlLabel` that `labelAs="control"`
+ * renders, and the only way anything reaches it. Before this, `labelAs="control"` was a
+ * closed box — no `labelPlacement`, no `disableTypography`, no `slotProps.typography` — which
+ * is why `Checkbox` and `Switch` shadowed MUI's `labelPlacement` with an inert prop of the
+ * library's own.
+ *
+ * The three keys the binding owns are `Omit`ted from the type *and* applied after the spread,
+ * so this file asserts the runtime half too: the compile-time half is invisible to a
+ * consumer who casts, and it is the runtime half that keeps the `optional`-mode asterisk
+ * suppression and the `render` prop's element in place.
+ */
+describe('BoundField controlLabelProps', () => {
+  beforeEach(() => resetDevWarnings())
+
+  const boolSchema = z.object({ f: z.boolean() })
+
+  const renderControl = (props: Partial<Parameters<typeof BoundField<boolean>>[0]> = {}) =>
+    render(
+      <Form schema={boolSchema} defaultValues={{ f: false }} onSubmit={() => {}}>
+        <BoundField<boolean>
+          name="f"
+          label="Terms"
+          labelAs="control"
+          render={(b) => (
+            <input
+              type="checkbox"
+              ref={b.field.ref}
+              checked={b.field.value}
+              readOnly
+              {...b.inputA11y}
+            />
+          )}
+          {...props}
+        />
+      </Form>,
+    )
+
+  const labelRoot = (container: HTMLElement) =>
+    container.querySelector(`.${formControlLabelClasses.root}`)!
+
+  it('forwards labelPlacement and disableTypography to the FormControlLabel', () => {
+    const { container } = renderControl({
+      controlLabelProps: { labelPlacement: 'start', disableTypography: true },
+    })
+    expect(labelRoot(container)).toHaveClass(formControlLabelClasses.labelPlacementStart)
+    // `disableTypography` renders the label as passed, with no wrapping `<Typography>` — so
+    // there is no element carrying MUI's label class at all.
+    expect(container.querySelector(`.${formControlLabelClasses.label}`)).toBeNull()
+    expect(screen.getByText('Terms')).toBeInTheDocument()
+  })
+
+  it('forwards slotProps.typography', () => {
+    const { container } = renderControl({
+      controlLabelProps: { slotProps: { typography: { className: 'consumer-typography' } } },
+    })
+    expect(container.querySelector('.consumer-typography')).toHaveTextContent('Terms')
+  })
+
+  it('cannot override the binding-owned `label`', () => {
+    // Cast: the `Omit` in the type already rejects this at compile time. The cast is what
+    // lets the test assert the *runtime* guarantee behind it — the spread order — which is
+    // what a JS consumer, or one who casts as this does, actually depends on.
+    const { container } = renderControl({
+      controlLabelProps: { label: 'Hijacked' } as never,
+    })
+    expect(labelRoot(container)).toHaveTextContent('Terms')
+    expect(screen.queryByText('Hijacked')).not.toBeInTheDocument()
+  })
+
+  it('cannot override the binding-owned `control`', () => {
+    renderControl({ controlLabelProps: { control: <input type="radio" /> } as never })
+    // The `render` prop's element is still the one inside the label.
+    expect(screen.getByRole('checkbox', { name: 'Terms' })).toBeInTheDocument()
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+  })
+
+  it('cannot override the binding-owned `required`, which owns the asterisk', () => {
+    /*
+     * `requiredIndicator="optional"` is where this bites: the binding resolves the label's
+     * `required` to `false` so no asterisk renders, while the *rule* stays in force. A
+     * `controlLabelProps.required` winning would put the asterisk back.
+     *
+     * The input's own `required` is asserted through `slotProps`-style placement rather than
+     * a plain attribute, because `FormControlLabel` clones its resolved `required` onto its
+     * `control` child — which is the documented reason `Checkbox`/`Switch` set the native
+     * `required` through `slotProps.input` instead. Measured here: a plain
+     * `required={b.required}` on the rendered `<input>` is overwritten to `false` by that
+     * clone, so this asserts `aria-required` (which the clone does not touch) for the rule
+     * and the missing asterisk for the indicator.
+     */
+    const { container } = render(
+      <Form
+        schema={boolSchema}
+        defaultValues={{ f: false }}
+        onSubmit={() => {}}
+        requiredIndicator="optional"
+      >
+        <BoundField<boolean>
+          name="f"
+          label="Terms"
+          labelAs="control"
+          rules={{ required: true }}
+          controlLabelProps={{ required: true } as never}
+          render={(b) => (
+            <input
+              type="checkbox"
+              ref={b.field.ref}
+              aria-required={b.required}
+              checked={b.field.value}
+              readOnly
+              {...b.inputA11y}
+            />
+          )}
+        />
+      </Form>,
+    )
+    expect(screen.getByRole('checkbox', { name: 'Terms' })).toHaveAttribute('aria-required', 'true')
+    expect(container.querySelector('[class*="asterisk"]')).toBeNull()
+  })
+
+  it('warns once under labelAs="legend", where nothing reads it', () => {
+    expectConsole('warn', 'controlLabelProps')
+    const { rerender } = render(
+      <Form schema={boolSchema} defaultValues={{ f: false }} onSubmit={() => {}}>
+        <BoundField<boolean>
+          name="f"
+          label="Terms"
+          labelAs="legend"
+          controlLabelProps={{ labelPlacement: 'start' }}
+          render={(b) => (
+            <input
+              type="checkbox"
+              ref={b.field.ref}
+              checked={b.field.value}
+              readOnly
+              {...b.inputA11y}
+            />
+          )}
+        />
+      </Form>,
+    )
+    const hits = consoleMessages('warn').filter((m) => m.includes('controlLabelProps'))
+    expect(hits).toHaveLength(1)
+    expect(hits[0]).toContain('<BoundField name="f" labelAs="legend">')
+    expect(hits[0]).toContain('only read under `labelAs="control"`')
+    // Re-rendering does not warn again: `devWarn` dedupes by key for the life of the module.
+    rerender(
+      <Form schema={boolSchema} defaultValues={{ f: false }} onSubmit={() => {}}>
+        <BoundField<boolean>
+          name="f"
+          label="Terms"
+          labelAs="legend"
+          controlLabelProps={{ labelPlacement: 'start' }}
+          render={(b) => (
+            <input
+              type="checkbox"
+              ref={b.field.ref}
+              checked={b.field.value}
+              readOnly
+              {...b.inputA11y}
+            />
+          )}
+        />
+      </Form>,
+    )
+    expect(consoleMessages('warn').filter((m) => m.includes('controlLabelProps'))).toHaveLength(1)
+  })
+
+  it('warns under labelAs="none" too', () => {
+    expectConsole('warn', 'controlLabelProps')
+    render(
+      <Form schema={boolSchema} defaultValues={{ f: false }} onSubmit={() => {}}>
+        <BoundField<boolean>
+          name="f"
+          label="Terms"
+          controlLabelProps={{ labelPlacement: 'start' }}
+          render={(b) => (
+            <input
+              type="checkbox"
+              ref={b.field.ref}
+              aria-labelledby={b.labelId}
+              aria-label="Terms"
+              checked={b.field.value}
+              readOnly
+              {...b.inputA11y}
+            />
+          )}
+        />
+      </Form>,
+    )
+    expect(consoleMessages('warn').filter((m) => m.includes('labelAs="none"'))).toHaveLength(1)
+  })
+
+  it('does not warn under labelAs="control"', () => {
+    renderControl({ controlLabelProps: { labelPlacement: 'start' } })
+    expect(consoleMessages('warn')).toEqual([])
+  })
+
+  it('does not warn when controlLabelProps is absent', () => {
+    render(
+      <Form schema={boolSchema} defaultValues={{ f: false }} onSubmit={() => {}}>
+        <BoundField<boolean>
+          name="f"
+          label="Terms"
+          labelAs="legend"
+          render={(b) => (
+            <input
+              type="checkbox"
+              ref={b.field.ref}
+              checked={b.field.value}
+              readOnly
+              {...b.inputA11y}
+            />
+          )}
+        />
+      </Form>,
+    )
+    expect(consoleMessages('warn')).toEqual([])
+  })
+
+  it('has no accessibility violations with controlLabelProps applied', async () => {
+    const { container } = renderControl({
+      controlLabelProps: { labelPlacement: 'start', disableTypography: true },
+    })
+    await expectNoA11yViolations(container)
   })
 })
