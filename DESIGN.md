@@ -238,13 +238,13 @@ Nothing is square, nothing is a circle except the 12px step dot.
   `defaultProps.variant` (#142), so `variant="outlined"` is the per-field opt-out back
   to MUI's floating label. These overrides **are** the mechanism — whether a label
   floats is `InputLabel`'s `shrink`, a theme concern in vanilla MUI, so it is a theme
-  concern here (#139). The runtime axis says only _where_ the label goes
-  (`labelPlacement: 'top' | 'start'`, default `'top'`); the preset sets no
-  `EzForm.defaultProps.labelPlacement`, because it has no opinion about where. It
-  also means these rules reach a consumer's own bare `<MuiTextField>` outside any
-  `<Form>`, which a form-scoped axis never could. The **box** rules (root border,
-  focus ring, padding) stay theme-wide in this pass, so `variant="outlined"` floats
-  its label over a solid border until follow-up #143 keys them on the variant too.
+  concern here (#139), and it reaches a consumer's own bare `<MuiTextField>` outside
+  any `<Form>`, which a form-scoped axis never could. The runtime axis says only
+  _where_ the label goes (`labelPlacement: 'top' | 'start'`, default `'top'`); the
+  preset sets no `EzForm.defaultProps.labelPlacement`, because it has no opinion about
+  where. The **box** rules (root border, focus ring, padding) stay theme-wide in this
+  pass, so `variant="outlined"` floats its label over a solid border until follow-up
+  #143 keys them on the variant too.
 - `'start'` is **a label column above `labelPlacementBreakpoint`**, and the CSS says
   it that way: every `start` declaration lives inside `theme.breakpoints.up(breakpoint)`,
   so below the breakpoint a `start` field applies no CSS at all and is MUI's own box —
