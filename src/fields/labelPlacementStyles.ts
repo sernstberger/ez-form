@@ -4,6 +4,7 @@ import { formHelperTextClasses } from '@mui/material/FormHelperText'
 import { formLabelClasses } from '@mui/material/FormLabel'
 import { outlinedInputClasses } from '@mui/material/OutlinedInput'
 import { fieldLayoutClasses } from './LabelPlacementContext'
+import { formClasses } from '../Form/formClasses'
 
 /**
  * The label placement rules (#9, #66), as one style object for `<Form>`'s `EzForm`
@@ -107,6 +108,10 @@ const stackedBox = (theme: Theme): CSSObject => ({
  * to the control's height or dragged down to a baseline that moves as the control
  * grows. The label's own `paddingTop` is what lines it up with the control's first
  * line of text.
+ *
+ * **Everything here is `start`-only and applies only above the breakpoint** — see
+ * `labelPlacementStyles` for why that scoping is the whole shape of this file, and
+ * what went wrong (#130) when it was not.
  */
 const startBox = (theme: Theme, labelWidth: string | number): CSSObject => ({
   display: 'grid',
@@ -121,6 +126,31 @@ const startBox = (theme: Theme, labelWidth: string | number): CSSObject => ({
     // The label reads against the control's first line rather than the top of its
     // border box; `theme.spacing(1)` is the outlined input's own vertical padding.
     paddingTop: theme.spacing(1),
+  },
+  // A `legend` label (`FieldFrame`'s `labelAs="legend"`: RadioGroup, CheckboxGroup,
+  // Rating, Slider, ToggleButtonGroup) needs one rule more than the others (#131).
+  //
+  // Its box is a `<fieldset>`, and a `<fieldset>`'s `<legend>` is a *rendered
+  // legend*: CSS takes it out of the fieldset's formatting context entirely and
+  // paints it above the anonymous content box. `grid-column: 1` computes on it and
+  // does nothing — the legend sat full-bleed at its own intrinsic width and the
+  // control box began *below* it, so the label named a column it was not in.
+  // Measured in Chrome: the legend's 31px pushed the group down, and the first
+  // option's own 9px `SwitchBase` padding took the total to 40px.
+  //
+  // Floating it is what makes it an ordinary box again — a floated (or absolutely
+  // positioned) legend is by definition no longer a rendered legend — at which
+  // point it takes part in the grid like every other label. `inline-start` rather
+  // than `left` so the rule stays direction-neutral like the rest of this file, and
+  // an explicit column width because a float sizes to its content, not to the grid
+  // track it nominally occupies.
+  //
+  // The existing `paddingTop` needs no adjustment for these: measured against a
+  // RadioGroup's first option the residual is 1.5px, smaller than the offset the
+  // plain text fields already ship with.
+  '& > legend': {
+    float: 'inline-start',
+    width: typeof labelWidth === 'number' ? `${labelWidth}px` : labelWidth,
   },
   ...closeNotch,
   // Everything that is not the label goes in column 2, stacked in source order —
@@ -143,11 +173,15 @@ const startBox = (theme: Theme, labelWidth: string | number): CSSObject => ({
  * or duplicate the label. They take the helper-text alignment and nothing else, so
  * a checkbox row in a `start` form still lines up flush left with its neighbours'
  * label column rather than being indented into column 2.
+ *
+ * Only ever emitted inside the `up(breakpoint)` block, so it undoes `startBox` and
+ * nothing else: below the breakpoint there is no grid for it to opt out of.
  */
 const controlLabelOptOut = (theme: Theme): CSSObject => ({
   [`&:has(> .${formControlLabelClasses.root})`]: {
     display: 'inline-flex',
     gridTemplateColumns: 'none',
+    alignItems: 'normal',
     '& > *': { gridColumn: 'auto' },
     // The grid placement `startBox` set is on this same, more specific selector,
     // so it has to be undone here rather than by the `& > *` reset above.
@@ -166,37 +200,54 @@ const controlLabelOptOut = (theme: Theme): CSSObject => ({
  * `floating` gets no rules at all: it *is* MUI's own layout, and a rule that
  * re-stated it would be a theme-unreachable copy of something upstream ships
  * (PHILOSOPHY rule 1).
+ *
+ * **`start` is `stacked` plus a label column above the breakpoint** — that is the
+ * shape, and it is deliberate (#130). The first version instead applied the grid
+ * unconditionally and undid it under `theme.breakpoints.down(…)`, which meant the
+ * fallback carried a hand-written list of declarations to reset. A list you have to
+ * remember to extend is a list you can forget from, and `alignItems` was forgotten:
+ * in the grid it is row alignment and keeps a tall control's label at the top, but
+ * the fallback re-declared the box as a flex column, where `align-items` is the
+ * *cross* axis — so `start` shrank every control to its intrinsic width on a phone
+ * (a Select measured 46px against `stacked`'s 349px at 380px). Scoping the
+ * `start`-only rules under `up(…)` means the box below the breakpoint simply *is*
+ * `stackedBox`, so there is nothing to reset and a declaration added to `startBox`
+ * tomorrow cannot leak past the breakpoint either.
  */
 export function labelPlacementStyles(
   theme: Theme,
-  labelPlacementBreakpoint: Parameters<Theme['breakpoints']['down']>[0],
+  labelPlacementBreakpoint: Parameters<Theme['breakpoints']['up']>[0],
   labelWidth: string | number,
 ): CSSObject {
   return {
+    // A gap between the form's description and the first field, for the two
+    // placements whose label is in normal flow (#131).
+    //
+    // Under `floating` the first thing below the description is the *input box*, and
+    // its label sits inside the outline, so MUI's own spacing already reads as a gap
+    // (16px measured). Under `stacked` and `start` the first thing below it is a
+    // line of label text flush against the description's own last line — measured at
+    // 0px, text touching text.
+    //
+    // Keyed on the form carrying a non-floating field rather than on the description
+    // being that field's sibling: `<Form>` renders its description above three
+    // context providers, and a consumer's children are normally inside their own
+    // `<Stack>`, so a `+` or `~` selector between the two almost never matches. This
+    // is a form-level layout question anyway, which is why it sits in this file with
+    // the rest of the placement CSS rather than on the description slot.
+    //
+    // `theme.spacing(2)` matches the `columnGap` `start` already uses; a theme
+    // changes it through `EzForm.styleOverrides.root` like every other rule here.
+    [`&:has(.${fieldLayoutClasses.stacked}) .${formClasses.description}, &:has(.${fieldLayoutClasses.start}) .${formClasses.description}`]:
+      { marginBottom: theme.spacing(2) },
     [`& .${fieldLayoutClasses.stacked}`]: stackedBox(theme),
     [`& .${fieldLayoutClasses.start}`]: {
-      ...startBox(theme, labelWidth),
-      ...controlLabelOptOut(theme),
-      // Below the breakpoint the label column is gone and the box is stacked
-      // again. Stated as an override of the grid rather than as a second
-      // `@media` around the grid, so a theme raising the breakpoint through
-      // `styleOverrides` has one place to look.
-      [theme.breakpoints.down(labelPlacementBreakpoint)]: {
-        display: 'inline-flex',
-        gridTemplateColumns: 'none',
-        '& > *': { gridColumn: 'auto' },
-        ...stackedBox(theme),
-        // After `stackedBox`, and re-stating its label rule with the grid
-        // placement undone: `startBox` set `gridColumn`/`gridRow`/`paddingTop` on
-        // this same selector, which is more specific than `& > *`, so clearing
-        // them there is not enough — the label would keep a `grid-column` and the
-        // column's top padding inside what is now a flex box.
-        [`& .${formLabelClasses.root}`]: {
-          ...stackedLabel(theme),
-          gridColumn: 'auto',
-          gridRow: 'auto',
-          paddingTop: 0,
-        },
+      // The fallback, stated once as the base rule rather than as an override:
+      // below the breakpoint a `start` field is a `stacked` field, exactly.
+      ...stackedBox(theme),
+      [theme.breakpoints.up(labelPlacementBreakpoint)]: {
+        ...startBox(theme, labelWidth),
+        ...controlLabelOptOut(theme),
       },
     },
   }

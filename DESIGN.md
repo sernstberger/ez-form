@@ -241,6 +241,24 @@ Nothing is square, nothing is a circle except the 12px step dot.
   (MUI's): components ship unstyled, and this file is where stacked becomes the
   default. Both are set and both are wanted — the theme overrides reach a
   consumer's own bare `<MuiTextField>` outside any `<Form>`, which the axis cannot.
+- `'start'` is **`'stacked'` plus a label column above `labelPlacementBreakpoint`**,
+  and the CSS says it that way: the label-column rules live inside
+  `theme.breakpoints.up(breakpoint)` and the box outside it is the stacked box, so a
+  phone gets full-width controls with nothing to reset (#130). A theme overriding the
+  placement rules through `EzForm.styleOverrides.root` therefore needs a matching
+  `@media (min-width…)` block to beat a `start` rule; the stacked-and-below rules are
+  reachable unconditionally.
+- Under `'start'`, a group field's legend (`RadioGroup`, `CheckboxGroup`, `Rating`,
+  `Slider`, `ToggleButtonGroup`) is **floated** into the label column. A
+  `<fieldset>`'s `<legend>` is a _rendered legend_, which CSS paints above the
+  content box and outside any grid, so without the float it sat over its own control
+  at its intrinsic width instead of beside it (#131). Its top padding is the same
+  `spacing(1)` every other label gets — measured against a group's first option the
+  two are within 1.5px, so there is no separate knob.
+- The form description gets `spacing(2)` beneath it under `'stacked'` and `'start'`,
+  where the next thing down is a line of label text that would otherwise touch it.
+  Not under `'floating'`, whose label is inside the outline and whose input box
+  already carries the same gap from MUI.
 - Box: `canvas` background, 1px `hairline` border, `rounded.md`, 8px 12px padding,
   `minHeight` 40px. Hover: `gray.400` border. Focus: `brand.400` border plus a 3px
   ring of `brand.500` at 0.5 α. Error: `error` border.
