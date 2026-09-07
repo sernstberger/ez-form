@@ -21,7 +21,7 @@ import preview from '../../.storybook/preview'
  *
  * The assertion is on **nesting**, not on a count. Most stories render zero or one `<form>`, but a
  * comparison story legitimately renders several *side by side* — `LabelPlacement.stories.tsx`'s
- * `AllThree` puts one form per placement next to each other, which is the entire point of it.
+ * `Both` puts one form per placement next to each other, which is the entire point of it.
  * A flat `<= 1` count called that a failure while the thing it exists to catch — a `<form>` with a
  * `<form>` ancestor — is exactly what `.closest('form')` answers, for any number of forms.
  *
