@@ -1,6 +1,6 @@
 import { useId, type ReactElement, type ReactNode } from 'react'
 import FormControl from '@mui/material/FormControl'
-import FormControlLabel from '@mui/material/FormControlLabel'
+import FormControlLabel, { type FormControlLabelProps } from '@mui/material/FormControlLabel'
 import FormHelperText from '@mui/material/FormHelperText'
 import FormLabel from '@mui/material/FormLabel'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
@@ -9,7 +9,7 @@ import type { TypedControllerRenderProps } from '../useEzField'
 import { fieldLayoutClasses, type LabelPlacement } from '../LabelPlacementContext'
 import { mergeDisabled } from '../mergeDisabled'
 import type { FieldRules } from '../../rules'
-import { hasLabel } from '../../devWarn'
+import { hasLabel, warnUnusedControlLabelProps } from '../../devWarn'
 
 /**
  * What `<BoundField>` hands its `render` prop: everything the binding knows about
@@ -137,7 +137,9 @@ export interface Bound<TValue = unknown> {
  *   wrapping it) — Checkbox, Switch. Self-labelled, so the root carries
  *   `fieldLayoutClasses.selfLabelled` and opts out of `labelPlacement="start"`'s grid
  *   (#133): the label is already inside the click target, so there is nothing to put in
- *   the label column.
+ *   the label column. The only mode that reads `controlLabelProps` — which is where
+ *   `FormControlLabel`'s own `labelPlacement` (`'end' | 'start' | 'top' | 'bottom'`)
+ *   comes in, and how `Checkbox` and `Switch` forward theirs (#139).
  * - `'legend'`: label above a group of controls (`<fieldset>` + `<legend>`) —
  *   RadioGroup, Rating, Slider, CheckboxGroup, ToggleButtonGroup. A `legend` frame
  *   renders a fieldset whose implicit role is `group` named by the legend; when the
@@ -197,6 +199,29 @@ export interface BoundFieldProps<TValue> {
   'aria-describedby'?: string
   /** This field's own label placement, overriding the form's (#9, #66). */
   labelPlacement?: LabelPlacement
+  /**
+   * Props for the `FormControlLabel` that `labelAs="control"` renders — MUI's own type,
+   * minus the three keys the binding owns (#139).
+   *
+   * This is the channel through which `Checkbox` and `Switch` forward MUI's own
+   * `labelPlacement` (`'end' | 'start' | 'top' | 'bottom'` — where the label sits relative
+   * to the box, MUI's default `'end'`), and it is open to a consumer's own
+   * `labelAs="control"` field for anything else `FormControlLabel` takes:
+   * `disableTypography`, `slotProps.typography`, `classes`, and so on.
+   *
+   * `control`, `label` and `required` are omitted rather than merely overridden because the
+   * binding is what knows them: `control` is the `render` prop's element, `label` is the
+   * resolved `displayLabel` (which carries the `optional` suffix in that mode), and
+   * `required` is the resolved indicator that hides the asterisk while the input keeps
+   * `aria-required`. Spreading this cannot displace any of the three — they are applied
+   * after it — and omitting them from the type says so at compile time rather than leaving
+   * a consumer to discover it.
+   *
+   * Read **only** under `labelAs="control"`; passing it under `'legend'` or `'none'` warns
+   * in development (see `src/devWarn.ts`), because nothing else renders a `FormControlLabel`
+   * for it to land on.
+   */
+  controlLabelProps?: Omit<FormControlLabelProps, 'control' | 'label' | 'required'>
   /** The consumer's `className`, appended after the placement classes. */
   className?: string
   /**
@@ -269,9 +294,16 @@ export function BoundFieldBase<TValue>({
   'aria-labelledby': ariaLabelledBy,
   'aria-describedby': ariaDescribedBy,
   labelPlacement,
+  controlLabelProps,
   className,
   render,
 }: BoundFieldProps<TValue>) {
+  // Only `labelAs="control"` renders a `FormControlLabel`; under the other two modes these
+  // props reach nothing and the field renders exactly as if they had never been passed,
+  // which is the silence this warning breaks.
+  if (controlLabelProps && labelAs !== 'control') {
+    warnUnusedControlLabelProps(componentName, name, labelAs)
+  }
   /*
    * `labelAs="control"` is self-labelled (#133): MUI's `FormControlLabel` puts the label
    * text *inside* the single `<label>` that is also the click target, so there is no
@@ -350,7 +382,15 @@ export function BoundFieldBase<TValue>({
       required={f.required}
     >
       {labelAs === 'control' ? (
-        <FormControlLabel label={f.displayLabel} required={labelRequired} control={render(bound)} />
+        // The consumer's `FormControlLabel` props first, then the three the binding owns —
+        // `label`, `required` and `control` win by position as well as by the `Omit` in the
+        // type, so a cast or a JS caller cannot displace them either.
+        <FormControlLabel
+          {...controlLabelProps}
+          label={f.displayLabel}
+          required={labelRequired}
+          control={render(bound)}
+        />
       ) : labelAs === 'legend' ? (
         <>
           {/* No legend at all without a label: an empty one is markup nothing can use,
