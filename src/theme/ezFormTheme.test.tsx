@@ -215,6 +215,18 @@ describe('ezFormTheme', () => {
     expect(notch).not.toHaveClass('MuiOutlinedInput-notchedOutline-notched')
   })
 
+  it('sets labelPlacement="stacked" as the preset’s Form default (#9)', () => {
+    // "ez-form's default variant" lives here, not in `src/`: the library ships
+    // `floating` (MUI's own) so a consumer on plain `createTheme()` gets no taste
+    // they did not ask for, and opting into this preset is the asking.
+    //
+    // Belt-and-braces with the `MuiInputLabel` / `MuiOutlinedInput` overrides
+    // asserted above, and both are wanted: those are theme-wide and reach a
+    // consumer's own bare `<MuiTextField>` outside any `<Form>`, which the axis —
+    // scoped to ez-form's field boxes — cannot. They agree on the same end state.
+    expect(light.components?.EzForm?.defaultProps).toMatchObject({ labelPlacement: 'stacked' })
+  })
+
   it('collapses transitions under prefers-reduced-motion (WCAG 2.3.3)', () => {
     renderUnder(light)
     const css = Array.from(document.querySelectorAll('style'))

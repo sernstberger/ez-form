@@ -2,13 +2,15 @@ import type { ReactNode } from 'react'
 import MuiCheckbox, { type CheckboxProps as MuiCheckboxProps } from '@mui/material/Checkbox'
 import { mergeSlotProps } from '@mui/material/utils'
 import { FieldFrame } from '../FieldFrame'
+import type { LabelPlacementProps } from '../LabelPlacementContext'
 import type { BooleanFieldRules } from '../../rules'
 
 export type CheckboxProps = Omit<MuiCheckboxProps, 'name' | 'checked' | 'required'> & {
   name: string
   label: ReactNode
   helperText?: ReactNode
-} & BooleanFieldRules
+} & BooleanFieldRules &
+  LabelPlacementProps
 
 /**
  * @remarks When to use
@@ -28,6 +30,7 @@ export function Checkbox({
   onChange,
   onBlur,
   slotProps,
+  labelPlacement,
   ...rest
 }: CheckboxProps) {
   return (
@@ -38,6 +41,7 @@ export function Checkbox({
       helperText={helperText}
       disabled={disabled}
       rules={{ required, validate }}
+      labelPlacement={labelPlacement}
       labelAs="control"
       // For the dev-mode "no accessible name" check only — read, not destructured, so
       // both still reach the control through `rest`.

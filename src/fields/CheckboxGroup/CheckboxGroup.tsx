@@ -3,6 +3,7 @@ import Checkbox from '@mui/material/Checkbox'
 import FormControlLabel from '@mui/material/FormControlLabel'
 import FormGroup, { type FormGroupProps } from '@mui/material/FormGroup'
 import { FieldFrame } from '../FieldFrame'
+import type { LabelPlacementProps } from '../LabelPlacementContext'
 import type { Option } from '../Option'
 import type { FieldRules } from '../../rules'
 import { warnDuplicateOptions } from '../../devWarn'
@@ -20,7 +21,8 @@ export type CheckboxGroupProps = Omit<FormGroupProps, 'children' | 'onChange' | 
   onChange?: (event: ChangeEvent<HTMLInputElement>, value: Value[]) => void
   /** The event's element is Checkbox's root button, not the hidden input. */
   onBlur?: (event: FocusEvent<HTMLElement>) => void
-} & Pick<FieldRules<Value[]>, 'required' | 'validate'>
+} & Pick<FieldRules<Value[]>, 'required' | 'validate'> &
+  LabelPlacementProps
 
 /**
  * N checkboxes, one array. MUI has no component for this; this is its
@@ -38,6 +40,7 @@ export function CheckboxGroup({
   validate,
   onChange,
   onBlur,
+  labelPlacement,
   ...rest
 }: CheckboxGroupProps) {
   warnDuplicateOptions('CheckboxGroup', name, options)
@@ -49,6 +52,7 @@ export function CheckboxGroup({
       helperText={helperText}
       disabled={disabled}
       rules={{ required, validate }}
+      labelPlacement={labelPlacement}
       labelAs="legend"
       // For the dev-mode "no accessible name" check only — read, not destructured, so
       // both still reach the control through `rest`.

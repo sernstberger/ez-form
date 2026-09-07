@@ -142,6 +142,18 @@ declare module '@mui/material/styles' {
       defaultProps?: ComponentsProps['EzNumberField']
       styleOverrides?: ComponentsOverrides<Theme>['EzNumberField']
     }
+    /**
+     * Also the home of the label-placement axis (#9, #66):
+     * `defaultProps.labelPlacement` / `labelPlacementBreakpoint` / `labelWidth`
+     * arrive for free through `Partial<FormProps>`, and the placement *rules* are
+     * registered on this component's `root` slot, so `styleOverrides.root` is what
+     * a theme edits to change how `stacked` or `start` look.
+     *
+     * `EzFieldLayout` is deliberately **not** a component key of its own: it names
+     * only the classes those rules select (`fieldLayoutClasses`), and giving it a
+     * key would promise `defaultProps` and `styleOverrides` for a component that
+     * never renders.
+     */
     EzForm?: {
       defaultProps?: ComponentsProps['EzForm']
       styleOverrides?: ComponentsOverrides<Theme>['EzForm']

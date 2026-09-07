@@ -3,6 +3,7 @@ import type { NumberField as BaseNumberField } from '@base-ui/react/number-field
 import type { ValidationRule } from 'react-hook-form'
 import { NumberFieldControl, type NumberFieldInputProps } from './NumberFieldControl'
 import { useEzField } from '../useEzField'
+import type { LabelPlacementProps } from '../LabelPlacementContext'
 import { mergeDisabled } from '../mergeDisabled'
 import { useRuleMessages } from '../../Form/RuleMessagesContext'
 import type { FieldRules } from '../../rules'
@@ -72,7 +73,8 @@ export type NumberFieldProps = Omit<
    * @internal
    */
   valueScale?: { toDisplay: (stored: number) => number; toStored: (display: number) => number }
-} & Pick<FieldRules<number | null>, 'required' | 'validate'>
+} & Pick<FieldRules<number | null>, 'required' | 'validate'> &
+  LabelPlacementProps
 
 const bound = (rule: ValidationRule<number> | undefined): number | undefined =>
   rule === undefined ? undefined : typeof rule === 'number' ? rule : rule.value
@@ -157,6 +159,11 @@ export function NumberField({
   // is a list — the consumer's extra description and the error are both meant to be
   // read (#102 row 8, the family-wide half of #104).
   'aria-describedby': ariaDescribedBy,
+  labelPlacement,
+  // Routed through the hook, then back onto `NumberFieldControl`'s `className`
+  // (which joins it with `numberFieldClasses.root` on the `TextField` root, the
+  // same `FormControl` box every other family's placement classes land on).
+  className,
   ...rest
 }: NumberFieldProps) {
   // The same label and message set `useEzField` would use for a default rule message.
@@ -177,12 +184,15 @@ export function NumberField({
     },
     'aria-label': ariaLabel,
     'aria-labelledby': ariaLabelledBy,
+    labelPlacement,
+    className,
   })
   const text = f.helperText(helperText)
 
   return (
     <NumberFieldControl
       {...rest}
+      className={f.layoutClassName}
       step={step}
       format={format}
       name={f.field.name}

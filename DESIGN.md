@@ -234,7 +234,13 @@ Nothing is square, nothing is a circle except the 12px step dot.
 
 - Stacked label: `InputLabel` permanently shrunk, in normal flow, no transform, no
   animation; the outline never notches (`notched: false` on `OutlinedInput` and
-  `PickersOutlinedInput`).
+  `PickersOutlinedInput`). The preset also sets
+  `EzForm.defaultProps.labelPlacement: 'stacked'` — the runtime axis (#9, #66) that
+  says the same thing per form and per field, and that a settings-style form flips
+  to `'start'` for a label column. The library's own default stays `'floating'`
+  (MUI's): components ship unstyled, and this file is where stacked becomes the
+  default. Both are set and both are wanted — the theme overrides reach a
+  consumer's own bare `<MuiTextField>` outside any `<Form>`, which the axis cannot.
 - Box: `canvas` background, 1px `hairline` border, `rounded.md`, 8px 12px padding,
   `minHeight` 40px. Hover: `gray.400` border. Focus: `brand.400` border plus a 3px
   ring of `brand.500` at 0.5 α. Error: `error` border.

@@ -4,6 +4,7 @@ import FormControlLabel from '@mui/material/FormControlLabel'
 import FormHelperText from '@mui/material/FormHelperText'
 import FormLabel from '@mui/material/FormLabel'
 import { useEzField, type InputA11y, type TypedControllerRenderProps } from './useEzField'
+import type { LabelPlacement } from './LabelPlacementContext'
 import { mergeDisabled } from './mergeDisabled'
 import type { FieldRules } from '../rules'
 import { hasLabel } from '../devWarn'
@@ -80,6 +81,10 @@ export interface FieldFrameProps<TValue> {
    * all, before *or* after a failed submit.
    */
   'aria-describedby'?: string
+  /** This field's own label placement, overriding the form's (#9, #66). */
+  labelPlacement?: LabelPlacement
+  /** The consumer's `className`, appended after the placement classes. */
+  className?: string
   renderControl: (bound: BoundField<TValue>) => ReactElement
 }
 
@@ -99,6 +104,8 @@ export function FieldFrame<TValue>({
   'aria-label': ariaLabel,
   'aria-labelledby': ariaLabelledBy,
   'aria-describedby': ariaDescribedBy,
+  labelPlacement,
+  className,
   renderControl,
 }: FieldFrameProps<TValue>) {
   const f = useEzField<TValue>(name, componentName, {
@@ -106,6 +113,8 @@ export function FieldFrame<TValue>({
     rules,
     'aria-label': ariaLabel,
     'aria-labelledby': ariaLabelledBy,
+    labelPlacement,
+    className,
   })
   const generatedLabelId = useId()
   const text = f.helperText(helperText)
@@ -137,6 +146,7 @@ export function FieldFrame<TValue>({
   return (
     <FormControl
       component={labelAs === 'legend' ? 'fieldset' : 'div'}
+      className={f.layoutClassName}
       error={f.invalid}
       disabled={mergeDisabled(disabled, f.field.disabled)}
       required={f.required}

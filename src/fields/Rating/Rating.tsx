@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import MuiRating, { type RatingProps as MuiRatingProps } from '@mui/material/Rating'
 import { FieldFrame } from '../FieldFrame'
+import type { LabelPlacementProps } from '../LabelPlacementContext'
 import { mergeDisabled } from '../mergeDisabled'
 import type { FieldRules } from '../../rules'
 
@@ -10,7 +11,8 @@ export type RatingProps = Omit<MuiRatingProps, 'name' | 'value' | 'defaultValue'
   label: ReactNode
   helperText?: ReactNode
   disabled?: boolean
-} & Pick<FieldRules<number | null>, 'required' | 'validate'>
+} & Pick<FieldRules<number | null>, 'required' | 'validate'> &
+  LabelPlacementProps
 
 /**
  * Form value is `number | null`; clicking the selected star clears to `null`.
@@ -51,6 +53,7 @@ export function Rating({
   validate,
   onChange,
   onBlur,
+  labelPlacement,
   ...rest
 }: RatingProps) {
   return (
@@ -61,6 +64,7 @@ export function Rating({
       helperText={helperText}
       disabled={disabled}
       rules={{ required, validate }}
+      labelPlacement={labelPlacement}
       labelAs="legend"
       // For the dev-mode "no accessible name" check only — read, not destructured, so
       // both still reach the control through `rest`.

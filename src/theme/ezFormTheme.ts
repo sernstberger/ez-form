@@ -789,6 +789,28 @@ const components: ThemeOptions['components'] = {
 
   // --- ez-form's own slots --------------------------------------------------------
 
+  /*
+   * #9: stacked labels are this preset's default, and this is where "ez-form's
+   * default variant" lives.
+   *
+   * Not the *library's* default — `<Form>` ships `labelPlacement: 'floating'`,
+   * MUI's own. DESIGN.md's frame is "components ship unstyled; this file is the
+   * taste", and PHILOSOPHY rule 2 says `src/` may not impose a look a consumer on
+   * plain `createTheme()` never asked for. Opting into `createEzFormTheme()` *is*
+   * asking for it, so it is set here, in one line a consumer can flip back.
+   *
+   * This is deliberately belt-and-braces with the `MuiInputLabel` /
+   * `MuiOutlinedInput` / `MuiFormHelperText` overrides above, and both stay: those
+   * are theme-wide and reach a consumer's own bare `<MuiTextField>` outside any
+   * `<Form>`, which the axis — scoped to ez-form's field boxes — cannot. The two
+   * agree on the same end state (shrunk, static, un-notched), so a field inside a
+   * form under this preset gets it from both and looks the same either way; the
+   * axis is what lets one form, or one field, say `start` instead.
+   */
+  EzForm: {
+    defaultProps: { labelPlacement: 'stacked' },
+  },
+
   // #38: the label and the Edit button share a row with no gap by default.
   EzReadOnlyField: {
     styleOverrides: {

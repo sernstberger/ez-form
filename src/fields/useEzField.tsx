@@ -6,6 +6,11 @@ import {
 } from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
 import { useRegisterFocusTarget } from '../Form/FieldFocusContext'
+import {
+  fieldLayoutClassName,
+  useLabelPlacement,
+  type LabelPlacement,
+} from './LabelPlacementContext'
 import { useRequiredIndicator } from '../Form/RequiredIndicatorContext'
 import { useRuleMessages } from '../Form/RuleMessagesContext'
 import { isRequired, normalizeRules, type FieldRules } from '../rules'
@@ -29,6 +34,15 @@ export interface UseEzFieldOptions<TValue = unknown> {
    */
   'aria-label'?: string
   'aria-labelledby'?: string
+  /**
+   * This field's own label placement, overriding the form's. Left `undefined`
+   * (every field, normally) the form's `labelPlacement` applies — it is a
+   * form-wide layout convention, and a per-field value is the escape hatch for
+   * the one row that has to differ.
+   */
+  labelPlacement?: LabelPlacement
+  /** The consumer's `className`, appended after the placement classes. */
+  className?: string
 }
 
 /** For the real `<input>` (or the radiogroup). `aria-invalid` is omitted when valid. */
@@ -192,6 +206,22 @@ export type UseEzFieldReturn<TValue = unknown> = Omit<UseControllerReturn, 'fiel
    * (asterisk mode, today's behavior) or MUI's own default.
    */
   labelRequired: false | undefined
+  /**
+   * The resolved label placement for this field: its own `labelPlacement` prop if
+   * it has one, else the form's.
+   */
+  labelPlacement: LabelPlacement
+  /**
+   * `className` for the field's `FormControl` root: the `EzFieldLayout-*` classes
+   * the placement rules are keyed by, plus whatever `className` the consumer
+   * passed.
+   *
+   * Every family puts this on its root. That is the whole per-field cost of the
+   * axis — the rules themselves live once on `<Form>`'s `EzForm` Root slot, and
+   * the markup is unchanged, so `<label for>` / `aria-labelledby` /
+   * `aria-describedby` are byte-identical under all three placements (#9, #66).
+   */
+  layoutClassName: string
 }
 
 /**
@@ -250,6 +280,8 @@ export function useEzField<TValue = unknown>(
     rules = {},
     'aria-label': ariaLabel,
     'aria-labelledby': ariaLabelledBy,
+    labelPlacement: labelPlacementProp,
+    className,
   }: UseEzFieldOptions<TValue> = {},
 ): UseEzFieldReturn<TValue> {
   // Guard, and — dev only — the one place that can see both the field's `name` and the
@@ -258,6 +290,8 @@ export function useEzField<TValue = unknown>(
   warnMissingLabel(componentName, name, label, ariaLabel, ariaLabelledBy)
   warnUnknownFieldName(componentName, name, control)
   const { requiredIndicator, optionalText } = useRequiredIndicator()
+  const { labelPlacement: formLabelPlacement } = useLabelPlacement()
+  const labelPlacement = labelPlacementProp ?? formLabelPlacement
   const messages = useRuleMessages()
   const normalized = normalizeRules(rules, typeof label === 'string' ? label : undefined, messages)
   const controller = useController({ name, rules: normalized })
@@ -335,5 +369,7 @@ export function useEzField<TValue = unknown>(
     },
     displayLabel,
     labelRequired: optional && required ? false : undefined,
+    labelPlacement,
+    layoutClassName: fieldLayoutClassName(labelPlacement, className),
   }
 }
