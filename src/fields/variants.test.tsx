@@ -1,4 +1,6 @@
+import { renderToString } from 'react-dom/server'
 import { render, screen, within } from '@testing-library/react'
+import MuiTextField from '@mui/material/TextField'
 import { expectTypeOf } from 'vitest'
 import Input from '@mui/material/Input'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
@@ -26,7 +28,7 @@ import { TimePicker } from './TimePicker'
 import { DateTimePicker } from './DateTimePicker'
 import { withPickers } from '../test/pickers'
 import { expectNoA11yViolations } from '../test/axe'
-import type { EzTextFieldVariants } from './textFieldVariants'
+import { PickersVariantInput, VariantInput, type EzTextFieldVariants } from './textFieldVariants'
 
 /**
  * The custom-variant shim (#142), across **every box input**. The claim is one prop:
@@ -218,6 +220,32 @@ describe('variant on every box input (#142)', () => {
         />,
       )
       expect(inputRoot(container)).toHaveClass('MuiPickersFilledInput-root')
+    })
+  })
+
+  describe('the shim’s input stands in for a MUI one', () => {
+    it("carries `muiName = 'Input'` so FormControl’s child scan still finds it", () => {
+      // `FormControl` derives its initial `filled` state by scanning its *children* for
+      // this marker — `if (!isMuiElement(child, ['Input', 'Select'])) return`
+      // (FormControl.js) — and the element in the slot is what the scan sees, not the
+      // component it goes on to render. MUI's three inputs and MUI X's three all set
+      // it; a stand-in that did not would render a filled field's label unshrunk on the
+      // server and on the first client paint (caught by NumberField's SSR test).
+      expect((VariantInput as { muiName?: string }).muiName).toBe('Input')
+      expect((PickersVariantInput as { muiName?: string }).muiName).toBe('Input')
+    })
+
+    it('shrinks a filled field’s label on the server render, through the shim’s slot', () => {
+      // The end of that chain, asserted on the markup a server render produces: no
+      // effects have run, so `data-shrink` can only be true if the child scan saw the
+      // value. Rendered outside `<Form>` and straight on MUI's own TextField, because
+      // the claim is about the slot, not about the binding.
+      const html = renderToString(
+        <ThemeProvider theme={stock}>
+          <MuiTextField label="A" value="5" onChange={() => {}} slots={{ input: VariantInput }} />
+        </ThemeProvider>,
+      )
+      expect(html).toContain('data-shrink="true"')
     })
   })
 

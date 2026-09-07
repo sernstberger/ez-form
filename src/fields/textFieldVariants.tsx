@@ -72,7 +72,8 @@ const builtInInputs: Record<string, ElementType> = {
  * A constant `OutlinedInput` cannot do this job. `defaultProps.slots` is a plain
  * object that MUI's `resolveProps` merges wholesale, and `theme.components.*.variants`
  * only ever contributes `style`, never `slots` — so a constant there would reach a
- * bare `<MuiTextField variant="filled">` too and force it onto the outlined box. The
+ * bare `<MuiTextField>` asking for the filled variant too, and force it onto the
+ * outlined box. The
  * same is true of the per-field route, where the variant may be the theme's default
  * and not a prop this component can see. Resolving at render is what makes one slot
  * value correct for both.
@@ -103,6 +104,18 @@ export const VariantInput = forwardRef<unknown, Record<string, unknown>>(
   },
 )
 VariantInput.displayName = 'EzVariantInput'
+/**
+ * The marker MUI's own `Input` / `FilledInput` / `OutlinedInput` all carry
+ * (`Input.muiName = 'Input'`). `FormControl` scans its *children* for it to derive
+ * the initial `filled` state before any effect runs —
+ * `if (!isMuiElement(child, ['Input', 'Select'])) return` (FormControl.js) — and it
+ * is the element in the slot, not the component it renders, that the scan sees. So
+ * without this a field with a value renders its label unshrunk on the server and on
+ * the first client paint, which is exactly the SSR regression pinned by "shrinks the
+ * label on the server render for a field that already has a value" in
+ * `NumberField.test.tsx`. Standing in for a MUI input means carrying its marker.
+ */
+;(VariantInput as { muiName?: string }).muiName = 'Input'
 
 /**
  * The pickers' twin of `VariantInput`, over MUI X's own `VARIANT_COMPONENT` map
@@ -128,3 +141,5 @@ export const PickersVariantInput = forwardRef<unknown, Record<string, unknown>>(
   },
 )
 PickersVariantInput.displayName = 'EzPickersVariantInput'
+/** Same marker, same reason: MUI X's three picker inputs all set `muiName = 'Input'` too. */
+;(PickersVariantInput as { muiName?: string }).muiName = 'Input'

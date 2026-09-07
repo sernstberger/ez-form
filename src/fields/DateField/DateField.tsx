@@ -20,7 +20,7 @@ export type DateFieldProps = Omit<
   // UPSTREAM SHIM (#142). `DateField` *is* the text field, so MUI X types a flat
   // `variant` on it as its own closed three-arm union. `PickerFieldProps` re-declares
   // it as the widened `EzTextFieldVariants`; without this `Omit` the two intersect to
-  // the closed union again and `variant="stacked"` would not typecheck. The value is
+  // the closed union again and a `stacked` variant would not typecheck. The value is
   // routed through `slotProps.textField` either way (see `usePickerField`), which is
   // the channel MUI X resolves *last* — a flat `variant` here would be overridden by
   // it, so this is also the only spelling that cannot disagree with itself. Goes when
