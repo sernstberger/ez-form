@@ -240,7 +240,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   unconditionally. `slots.input` is paired with the default so a consumer's own bare
   `<MuiTextField>` under the preset still has an input to render — MUI's own
   `variantComponent` map has no `'stacked'` entry. `MuiPickersTextField` gets the same
-  pairing (`slots.input: PickersOutlinedInput`), which is now how the four pickers get
+  pairing (`slots.input: PickersVariantInput`, which picks MUI X's own input by the resolved variant), which is now how the four pickers get
   the static label — they take MUI X's own closed `variant` type on
   `slotProps.textField`, not `EzTextFieldVariants`. Every field under the preset looks
   the same as before; `variant="outlined"` on one field (or
