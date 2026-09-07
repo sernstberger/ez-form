@@ -241,6 +241,13 @@ Nothing is square, nothing is a circle except the 12px step dot.
   (MUI's): components ship unstyled, and this file is where stacked becomes the
   default. Both are set and both are wanted — the theme overrides reach a
   consumer's own bare `<MuiTextField>` outside any `<Form>`, which the axis cannot.
+- `'start'` is **`'stacked'` plus a label column above `labelPlacementBreakpoint`**,
+  and the CSS says it that way: the label-column rules live inside
+  `theme.breakpoints.up(breakpoint)` and the box outside it is the stacked box, so a
+  phone gets full-width controls with nothing to reset (#130). A theme overriding the
+  placement rules through `EzForm.styleOverrides.root` therefore needs a matching
+  `@media (min-width…)` block to beat a `start` rule; the stacked-and-below rules are
+  reachable unconditionally.
 - Box: `canvas` background, 1px `hairline` border, `rounded.md`, 8px 12px padding,
   `minHeight` 40px. Hover: `gray.400` border. Focus: `brand.400` border plus a 3px
   ring of `brand.500` at 0.5 α. Error: `error` border.

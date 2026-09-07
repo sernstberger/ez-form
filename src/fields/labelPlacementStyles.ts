@@ -107,6 +107,10 @@ const stackedBox = (theme: Theme): CSSObject => ({
  * to the control's height or dragged down to a baseline that moves as the control
  * grows. The label's own `paddingTop` is what lines it up with the control's first
  * line of text.
+ *
+ * **Everything here is `start`-only and applies only above the breakpoint** — see
+ * `labelPlacementStyles` for why that scoping is the whole shape of this file, and
+ * what went wrong (#130) when it was not.
  */
 const startBox = (theme: Theme, labelWidth: string | number): CSSObject => ({
   display: 'grid',
@@ -143,11 +147,15 @@ const startBox = (theme: Theme, labelWidth: string | number): CSSObject => ({
  * or duplicate the label. They take the helper-text alignment and nothing else, so
  * a checkbox row in a `start` form still lines up flush left with its neighbours'
  * label column rather than being indented into column 2.
+ *
+ * Only ever emitted inside the `up(breakpoint)` block, so it undoes `startBox` and
+ * nothing else: below the breakpoint there is no grid for it to opt out of.
  */
 const controlLabelOptOut = (theme: Theme): CSSObject => ({
   [`&:has(> .${formControlLabelClasses.root})`]: {
     display: 'inline-flex',
     gridTemplateColumns: 'none',
+    alignItems: 'normal',
     '& > *': { gridColumn: 'auto' },
     // The grid placement `startBox` set is on this same, more specific selector,
     // so it has to be undone here rather than by the `& > *` reset above.
@@ -166,37 +174,34 @@ const controlLabelOptOut = (theme: Theme): CSSObject => ({
  * `floating` gets no rules at all: it *is* MUI's own layout, and a rule that
  * re-stated it would be a theme-unreachable copy of something upstream ships
  * (PHILOSOPHY rule 1).
+ *
+ * **`start` is `stacked` plus a label column above the breakpoint** — that is the
+ * shape, and it is deliberate (#130). The first version instead applied the grid
+ * unconditionally and undid it under `theme.breakpoints.down(…)`, which meant the
+ * fallback carried a hand-written list of declarations to reset. A list you have to
+ * remember to extend is a list you can forget from, and `alignItems` was forgotten:
+ * in the grid it is row alignment and keeps a tall control's label at the top, but
+ * the fallback re-declared the box as a flex column, where `align-items` is the
+ * *cross* axis — so `start` shrank every control to its intrinsic width on a phone
+ * (a Select measured 46px against `stacked`'s 349px at 380px). Scoping the
+ * `start`-only rules under `up(…)` means the box below the breakpoint simply *is*
+ * `stackedBox`, so there is nothing to reset and a declaration added to `startBox`
+ * tomorrow cannot leak past the breakpoint either.
  */
 export function labelPlacementStyles(
   theme: Theme,
-  labelPlacementBreakpoint: Parameters<Theme['breakpoints']['down']>[0],
+  labelPlacementBreakpoint: Parameters<Theme['breakpoints']['up']>[0],
   labelWidth: string | number,
 ): CSSObject {
   return {
     [`& .${fieldLayoutClasses.stacked}`]: stackedBox(theme),
     [`& .${fieldLayoutClasses.start}`]: {
-      ...startBox(theme, labelWidth),
-      ...controlLabelOptOut(theme),
-      // Below the breakpoint the label column is gone and the box is stacked
-      // again. Stated as an override of the grid rather than as a second
-      // `@media` around the grid, so a theme raising the breakpoint through
-      // `styleOverrides` has one place to look.
-      [theme.breakpoints.down(labelPlacementBreakpoint)]: {
-        display: 'inline-flex',
-        gridTemplateColumns: 'none',
-        '& > *': { gridColumn: 'auto' },
-        ...stackedBox(theme),
-        // After `stackedBox`, and re-stating its label rule with the grid
-        // placement undone: `startBox` set `gridColumn`/`gridRow`/`paddingTop` on
-        // this same selector, which is more specific than `& > *`, so clearing
-        // them there is not enough — the label would keep a `grid-column` and the
-        // column's top padding inside what is now a flex box.
-        [`& .${formLabelClasses.root}`]: {
-          ...stackedLabel(theme),
-          gridColumn: 'auto',
-          gridRow: 'auto',
-          paddingTop: 0,
-        },
+      // The fallback, stated once as the base rule rather than as an override:
+      // below the breakpoint a `start` field is a `stacked` field, exactly.
+      ...stackedBox(theme),
+      [theme.breakpoints.up(labelPlacementBreakpoint)]: {
+        ...startBox(theme, labelWidth),
+        ...controlLabelOptOut(theme),
       },
     },
   }

@@ -32,9 +32,13 @@ describe('Label placement stories', () => {
   })
 
   it('Start places the label column at the width the story asks for', () => {
-    const { container } = render(<composed.StartWideLabels />)
-    const box = container.querySelector(`.${fieldLayoutClasses.start}`)!
-    expect(getComputedStyle(box).gridTemplateColumns).toBe('18rem 1fr')
+    render(<composed.StartWideLabels />)
+    // Read off the emitted rule, not the element: the label column lives inside a
+    // `@media (min-width…)` block (#130), and jsdom evaluates no media queries, so
+    // `getComputedStyle` here would report the stacked fallback and never the grid.
+    const css = [...document.querySelectorAll('style')].map((s) => s.textContent ?? '').join('\n')
+    expect(css).toContain('grid-template-columns:18rem 1fr')
+    expect(css).toContain(fieldLayoutClasses.start)
   })
 
   it('PerFieldOverride really shows two different placements in one form', () => {
