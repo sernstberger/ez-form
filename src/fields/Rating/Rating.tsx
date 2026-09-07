@@ -80,7 +80,7 @@ export function Rating({
           aria-labelledby={labelId ?? rest['aria-labelledby']}
           aria-required={isRequired || undefined}
           name={field.name}
-          value={(field.value as number | null | undefined) ?? null}
+          value={field.value ?? null}
           disabled={mergeDisabled(disabled, field.disabled)}
           fieldRef={field.ref}
           onChange={(e, value) => {

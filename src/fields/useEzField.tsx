@@ -1,5 +1,9 @@
-import { Fragment, useCallback, useId, type ReactNode } from 'react'
-import { useController, type UseControllerReturn } from 'react-hook-form'
+import { Fragment, useCallback, useId, type ChangeEvent, type ReactNode } from 'react'
+import {
+  useController,
+  type ControllerRenderProps,
+  type UseControllerReturn,
+} from 'react-hook-form'
 import { useEzFormContext } from '../useEzFormContext'
 import { useRegisterFocusTarget } from '../Form/FieldFocusContext'
 import { useRequiredIndicator } from '../Form/RequiredIndicatorContext'
@@ -59,7 +63,40 @@ export interface HelperTextA11y {
 export type HelperTextSlotProps<TOwnerState = unknown, TProps = object> =
   TProps | ((ownerState: TOwnerState) => TProps) | undefined
 
-export type UseEzFieldReturn = UseControllerReturn & {
+/**
+ * `useController`'s `field`, narrowed to the field's value type.
+ *
+ * Not `ControllerRenderProps<TFieldValues, TName>` with the form's own shape: an
+ * ez-form field takes `name: string`, not `Path<TFieldValues>` — the form's value
+ * type is never threaded through a field's props — so hookform's own path
+ * machinery has nothing to resolve. `Path<Record<string, TValue>>` with `TValue`
+ * still generic does not even evaluate: `string` fails the `PathImpl` constraint.
+ * So `value` and `onChange` are restated over `TValue` and everything else
+ * (`name`, `onBlur`, `disabled`, and the `ref` forked for #98) stays hookform's,
+ * by `Omit`ting exactly the two keys being narrowed.
+ *
+ * `TValue | undefined`, not `TValue`: a form with no `defaultValues` entry for this
+ * field renders it with `value === undefined`, which is why every call site that
+ * casts today casts to `TValue | undefined` and then supplies its own fallback
+ * (`?? null`, `?? ''`, `?? minBound ?? 0`). Typing it as bare `TValue` would erase
+ * exactly the case each of those fallbacks exists for.
+ *
+ * `onChange` takes `TValue` **or** a `ChangeEvent`, because both are hookform's own
+ * runtime contract: `TextField` hands the raw DOM event straight through
+ * (`fieldOnChange(e)`) and hookform reads `target.value` off it, while every other
+ * field passes the value it computed.
+ */
+export type TypedControllerRenderProps<TValue> = Omit<
+  ControllerRenderProps,
+  'value' | 'onChange'
+> & {
+  value: TValue | undefined
+  onChange: (value: TValue | ChangeEvent<Element>) => void
+}
+
+export type UseEzFieldReturn<TValue = unknown> = Omit<UseControllerReturn, 'field'> & {
+  /** `useController`'s own `field`, with `value`/`onChange` narrowed to `TValue` (#28). */
+  field: TypedControllerRenderProps<TValue>
   /** Derived from the `required` rule; drives `required`/`aria-required` on the input. */
   required: boolean
   invalid: boolean
@@ -155,7 +192,7 @@ export function useEzField<TValue = unknown>(
     'aria-label': ariaLabel,
     'aria-labelledby': ariaLabelledBy,
   }: UseEzFieldOptions<TValue> = {},
-): UseEzFieldReturn {
+): UseEzFieldReturn<TValue> {
   // Guard, and — dev only — the one place that can see both the field's `name` and the
   // form's own defaults: `useController` below reads `control` from the same context.
   const { control } = useEzFormContext(componentName)

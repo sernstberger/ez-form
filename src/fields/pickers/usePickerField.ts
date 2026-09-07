@@ -197,7 +197,11 @@ export function usePickerField<
       pendingPasteText.current = null
       if (rawText && !pickerError.current) {
         pickerError.current = 'invalidDate' as TError
-        f.field.onChange(f.field.value as TValue)
+        // The same `null` normalisation the returned `value` makes below, and for
+        // the same reason: `TValue` is `PickerValidDate | null` at every
+        // instantiation, and an unparsable paste leaves the field empty. Re-emitting
+        // the current value is what re-runs the `picker` rule with the code just set.
+        f.field.onChange(f.field.value ?? (null as TValue))
       }
     })
   }
@@ -280,7 +284,7 @@ export function usePickerField<
   return {
     name: f.field.name,
     label: f.displayLabel,
-    value: (f.field.value as TValue | undefined) ?? null,
+    value: f.field.value ?? null,
     inputRef: f.field.ref,
     disabled: mergeDisabled(disabled, f.field.disabled),
     onChange: handleChange,
