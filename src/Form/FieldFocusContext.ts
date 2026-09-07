@@ -34,6 +34,22 @@ export interface FieldFocusStore {
  * locality" test picked the wrong row) and disturbed the Wizard's failed-submit focus race.
  * `useSyncExternalStore` confines the re-render to the one component that reads the ids.
  * Cost if wrong: a hand-rolled store — 20 lines — instead of a hook.
+ *
+ * **This is the canonical statement of that ruling for all three of `<Form>`'s registries** —
+ * this one, `ErrorSummaryContext` (#123), and `FormErrorFocusContext` (#124). They cite it
+ * rather than restate it.
+ *
+ * Ruling: those three stay separate stores rather than sharing a generic `createSyncStore<T>`
+ * (#126) — the only duplication such a helper removes is the seven lines of `Set` +
+ * `subscribe`/unsubscribe boilerplate, and it costs ~25 lines of generic core plus a purity
+ * constraint on its updater that the `element.id` assignment below (a DOM write, which cannot
+ * live in a function React may call more than once per commit) would have to be restructured
+ * around. The three share a *naming convention* — `register` plus a getter — not an
+ * implementation: this one's map grows and shrinks with per-key equality,
+ * `ErrorSummaryContext`'s boolean latches one-way and its `register` returns an unregister
+ * callback, and `FormErrorFocusContext` has no subscription half at all because nothing
+ * renders from it. Cost if wrong: if a fourth registry appears wanting this exact shape, the
+ * boilerplate gets extracted then, against real call sites instead of hypothetical ones.
  */
 export const FieldFocusContext = createContext<FieldFocusStore | null>(null)
 
