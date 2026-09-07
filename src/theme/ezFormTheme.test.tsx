@@ -276,6 +276,35 @@ describe('ezFormTheme', () => {
     expect(getComputedStyle(label).position).toBe('relative')
   })
 
+  it('known limitation (#142 review): a bare built-in variant regresses to OutlinedInput under the preset', () => {
+    // `MuiTextField.defaultProps.slots.input: OutlinedInput` (above) is a plain object,
+    // merged by MUI's `resolveProps` as `{ ...defaultProps.slots, ...consumerSlots }` —
+    // not keyed on the resolved `variant` — so it reaches a bare `<MuiTextField
+    // variant="filled">` / `variant="standard"` too, with nothing to stop it. Neither
+    // `defaultProps` nor `theme.components.MuiTextField.variants` can express "this
+    // slot only for that variant" (`variants` only ever contributes `style`).
+    // ez-form's own wrappers never hit this: `customVariantSlots` fills `slots.input`
+    // only for a *custom* variant and leaves the three built-ins alone. This test pins
+    // the regression so it is caught if it silently changes, not because it is fixed.
+    const filled = render(
+      <ThemeProvider theme={light}>
+        <MuiTextField variant="filled" label="Filled" />
+      </ThemeProvider>,
+    )
+    expect(filled.container.querySelector('.MuiFilledInput-root')).toBeNull()
+    expect(filled.container.querySelector('.MuiOutlinedInput-root')).not.toBeNull()
+    filled.unmount()
+
+    const standard = render(
+      <ThemeProvider theme={light}>
+        <MuiTextField variant="standard" label="Standard" />
+      </ThemeProvider>,
+    )
+    expect(standard.container.querySelector('.MuiInput-root')).toBeNull()
+    expect(standard.container.querySelector('.MuiOutlinedInput-root')).not.toBeNull()
+    standard.unmount()
+  })
+
   it('a picker is stacked under the preset and floats under variant="outlined" (#142)', () => {
     // The pickers reach the variant only through the theme — MUI X's own
     // `slotProps.textField.variant` type is the closed union and `usePickerField`

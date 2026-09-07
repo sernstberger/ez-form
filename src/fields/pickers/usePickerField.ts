@@ -96,12 +96,15 @@ interface ConsumerTextFieldSlotProps {
     formHelperText?: object
     inputLabel?: { required?: boolean }
     /**
-     * UPSTREAM SHIM (#142) — a note, not a shim. The pickers deliberately keep
-     * MUI X's own closed `variant` type on `slotProps.textField`: widening it
-     * would mean re-declaring `PickersTextFieldProps`' three-arm discriminated
-     * union through every picker's generic `slotProps`, which is the
-     * re-implementation PHILOSOPHY rule 1 forbids for a prop that already has a
-     * working channel.
+     * MUI X's `PickersInputBase` — the element that actually carries
+     * `role="group"`. See the `input` merge below for why the name has to go here.
+     *
+     * UPSTREAM SHIM (#142) — a note, not a shim, about why `variant` is absent from
+     * this interface. The pickers deliberately keep MUI X's own closed `variant`
+     * type on `slotProps.textField`: widening it would mean re-declaring
+     * `PickersTextFieldProps`' three-arm discriminated union through every picker's
+     * generic `slotProps`, which is the re-implementation PHILOSOPHY rule 1
+     * forbids for a prop that already has a working channel.
      *
      * That channel is the theme. `PickersTextField` resolves its input as
      * `slots?.input ?? VARIANT_COMPONENT[variant]` (PickersTextField.js) — the
@@ -111,10 +114,6 @@ interface ConsumerTextFieldSlotProps {
      * label with no per-field plumbing. A consumer who wants one picker back on
      * MUI's floating label passes `slotProps={{ textField: { variant: 'outlined' } }}`,
      * which MUI X's own type already accepts.
-     */
-    /**
-     * MUI X's `PickersInputBase` — the element that actually carries
-     * `role="group"`. See the `input` merge below for why the name has to go here.
      */
     input?: object
   }

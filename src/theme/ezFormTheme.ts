@@ -514,6 +514,24 @@ const components: ThemeOptions['components'] = {
   // `FormControl`'s `isMuiElement` child scan throws on it. Verified by
   // "a bare MUI TextField renders under the preset" in `ezFormTheme.test.tsx`.
   // Same fallback as `customVariantSlots`, and it goes the same way.
+  //
+  // Known limitation (#142 review): `defaultProps.slots` is a plain object merged
+  // by `resolveProps` — `{ ...defaultProps.slots, ...consumerSlots }`, not keyed on
+  // the resolved `variant` — so this `slots.input: OutlinedInput` reaches a bare
+  // `<MuiTextField variant="filled">` / `variant="standard"` too, unless the
+  // consumer passes their own `slots.input` to override it. Confirmed: under this
+  // preset, a bare `<MuiTextField variant="filled">` renders `MuiOutlinedInput-root`
+  // instead of `MuiFilledInput-root` (`variant="standard"` regresses the same way).
+  // ez-form's own wrappers never hit this — `customVariantSlots` only fills
+  // `slots.input` for a *custom* variant and leaves the three built-ins alone — so
+  // no ez-form field regresses. There is no clean theme-config-only fix: neither
+  // `defaultProps` nor `theme.components.MuiTextField.variants` can express "this
+  // slot only for that variant" (`variants` only ever contributes `style`, never
+  // `slots`). The real fix is a variant-switching component in place of the static
+  // `OutlinedInput` reference, which is beyond this shim's scope; filed as a
+  // follow-up. Until then: a consumer who drops to bare `<MuiTextField>` under this
+  // preset and wants `'filled'` or `'standard'` must pass their own
+  // `slots={{ input: FilledInput }}` (or `Input`) to override the theme default.
   MuiTextField: {
     defaultProps: { variant: 'stacked' as TextFieldVariants, slots: { input: OutlinedInput } },
   },

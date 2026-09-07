@@ -82,14 +82,31 @@ export const Rules: Story = {
  * entry for the look. A custom variant renders `OutlinedInput` unless
  * `slots.input` says otherwise. (No such augmentation is declared in `src/`: a module
  * augmentation is global, so a demo one would leak into every file in the library.)
+ *
+ * Four distinct names, not `nick` reused: these all bind into the same RHF form, and a
+ * shared name means shared registration — the fields would fight over one value instead
+ * of demonstrating four independent variants.
  */
+const variantsSchema = z.object({
+  stacked: z.string().optional(),
+  outlined: z.string().optional(),
+  standard: z.string().optional(),
+  filled: z.string().optional(),
+})
+
 export const Variants: Story = {
+  parameters: {
+    form: {
+      schema: variantsSchema,
+      defaultValues: { stacked: '', outlined: '', standard: '', filled: '' },
+    },
+  } satisfies FormParameters,
   render: () => (
     <>
-      <TextField name="email" label="Stacked (the preset's default)" />
-      <TextField name="nick" label="Outlined" variant="outlined" />
-      <TextField name="nick" label="Standard" variant="standard" />
-      <TextField name="nick" label="Filled" variant="filled" />
+      <TextField name="stacked" label="Stacked (the preset's default)" />
+      <TextField name="outlined" label="Outlined" variant="outlined" />
+      <TextField name="standard" label="Standard" variant="standard" />
+      <TextField name="filled" label="Filled" variant="filled" />
     </>
   ),
 }
