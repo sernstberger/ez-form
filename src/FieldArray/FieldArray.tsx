@@ -700,9 +700,10 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
    *   `preventDefault`, so Enter **never** submits from a cell — the one documented,
    *   table-scoped exception to `describeFieldContract`'s "Enter submits once".
    * - ArrowDown / ArrowUp, plain, when the control did not consume the key: same column, one
-   *   row down / up, no wrap. `Select`, `Autocomplete`, the pickers, `Slider` and `Radio`
-   *   all `preventDefault` the arrows they use, so `isPlainKey` leaves those alone — a closed
-   *   Select opens its menu, as MUI intends, rather than changing rows.
+   *   row down / up, no wrap. `Select`, `Autocomplete`, the pickers and `Slider` all
+   *   `preventDefault` the arrows they use, so `isPlainKey` leaves those alone — a closed
+   *   Select opens its menu, as MUI intends, rather than changing rows. A radio (and so a
+   *   `Rating`) is excluded by element, because its arrows are the browser's, unprevented.
    * - Tab, Left/Right, Escape: untouched. Keys in the actions cell: untouched (`cellOf`).
    *
    * The pickers need one thing more: MUI X's `PickersInputBase` submits the form itself on
@@ -723,6 +724,11 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
     }
     const down = isPlainKey(event, 'ArrowDown')
     if (!down && !isPlainKey(event, 'ArrowUp')) return
+    // A radio's arrow keys are the *browser's* default action — MUI's `Radio`/`RadioGroup`
+    // and `Rating` (radios underneath) install no keydown handler, so nothing
+    // `preventDefault`s them and `isPlainKey` alone would let the table steal them. Measured:
+    // focus moved to the next row from a RadioGroup cell. The arrows belong to the group.
+    if (event.target instanceof HTMLInputElement && event.target.type === 'radio') return
     const to = down ? index + 1 : index - 1
     if (to < 0 || to >= fields.length) return
     event.preventDefault()
@@ -857,7 +863,12 @@ export function FieldArray<TRow = Record<string, unknown>>(inProps: FieldArrayPr
       className={fieldArrayClasses.root}
       slotProps={layout === 'table' ? { legend: { id: legendId } } : undefined}
     >
-      {layout === 'table' ? renderTable() : renderStacked()}
+      {/* A nested array's own rows are not in the enclosing cell: they reset the cell
+          context so their fields keep their own labels (a table's cells provide theirs
+          afresh below). Composites do the same — see `AddressField`. */}
+      <FieldCellContext.Provider value={null}>
+        {layout === 'table' ? renderTable() : renderStacked()}
+      </FieldCellContext.Provider>
       <FieldArrayAdd
         type="button"
         ref={addRef}

@@ -11,6 +11,8 @@ import { FieldArray, fieldArrayClasses, type FieldArrayColumn } from './FieldArr
 import { NumberField } from '../fields/NumberField'
 import { Select } from '../fields/Select'
 import { DatePicker } from '../fields/DatePicker'
+import { RadioGroup } from '../fields/RadioGroup'
+import { AddressField, addressSchema } from '../fields/AddressField'
 import { fieldLayoutClasses } from '../fields/LabelPlacementContext'
 import { withPickers } from '../test/pickers'
 import { expectConsole } from '../test/expectConsole'
@@ -925,7 +927,8 @@ describe('FieldArray', () => {
         render(<Lines rows={[line('A'), line('B')]} onSubmit={onSubmit} />)
         // MUI X's `PickersInputBase` calls `form.requestSubmit(submitButton)` on Enter when
         // the form has a submit button — this form does — guarded only by
-        // `defaultMuiPrevented`. The table's capture handler sets that flag for picker cells.
+        // `defaultMuiPrevented` — which it checks *after* the consumer's `onKeyDown`, so
+        // `usePickerField` sets it there (`preventMuiDefault`) when the picker is in a cell.
         await user.click(cellControl(1, 'Due'))
         await user.keyboard('{Enter}')
         await waitFor(() =>
@@ -966,6 +969,61 @@ describe('FieldArray', () => {
         expect(category).toHaveFocus()
       })
 
+      it('ArrowDown / ArrowUp in a RadioGroup cell stay with the radios (F1)', async () => {
+        const user = userEvent.setup()
+        const radioSchema = z.object({
+          lines: z.array(z.object({ sku: z.string(), size: z.string() })),
+        })
+        render(
+          <Form
+            schema={radioSchema}
+            defaultValues={{
+              lines: [
+                { sku: 'A', size: 's' },
+                { sku: 'B', size: 's' },
+              ],
+            }}
+            onSubmit={() => {}}
+          >
+            <FieldArray
+              name="lines"
+              label="Line items"
+              layout="table"
+              emptyRow={{ sku: '', size: '' }}
+              columns={[
+                {
+                  key: 'sku',
+                  header: 'SKU',
+                  render: (row) => <TextField name={row.name('sku')} label="SKU" />,
+                },
+                {
+                  key: 'size',
+                  header: 'Size',
+                  render: (row) => (
+                    <RadioGroup
+                      name={row.name('size')}
+                      label="Size"
+                      options={[
+                        { value: 's', label: 'S' },
+                        { value: 'm', label: 'M' },
+                      ]}
+                    />
+                  ),
+                },
+              ]}
+            />
+          </Form>,
+        )
+        const rows = screen.getAllByRole('row').slice(1)
+        const firstRadio = within(rows[0]!).getByRole('radio', { name: 'S' })
+        act(() => firstRadio.focus())
+        await user.keyboard('{ArrowDown}')
+        // A radio's arrows are the browser's own (MUI installs no handler, nothing is
+        // prevented), so the table must not treat them as a row move: focus stays in row 1.
+        expect(rows[0]!.contains(document.activeElement)).toBe(true)
+        expect(rows[1]!.contains(document.activeElement)).toBe(false)
+      })
+
       it("keys in the actions column are the buttons' own", async () => {
         const user = userEvent.setup()
         const onSubmit = vi.fn()
@@ -976,6 +1034,46 @@ describe('FieldArray', () => {
         await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(1))
         expect(onSubmit).not.toHaveBeenCalled()
       })
+    })
+
+    it('a composite (AddressField) in a cell keeps its own part labels and takes no cell class (F2)', () => {
+      const schema = z.object({
+        lines: z.array(z.object({ sku: z.string(), ship: addressSchema() })),
+      })
+      const address = { street: '', street2: '', city: '', state: '', zip: '' }
+      const { container } = render(
+        <Form
+          schema={schema}
+          defaultValues={{ lines: [{ sku: 'A', ship: address }] }}
+          onSubmit={() => {}}
+        >
+          <FieldArray
+            name="lines"
+            label="Line items"
+            layout="table"
+            emptyRow={{ sku: '', ship: address }}
+            columns={[
+              {
+                key: 'sku',
+                header: 'SKU',
+                render: (row) => <TextField name={row.name('sku')} label="SKU" />,
+              },
+              {
+                key: 'ship',
+                header: 'Ship to',
+                render: (row) => <AddressField name={row.name('ship')} />,
+              },
+            ]}
+          />
+        </Form>,
+      )
+      // The single-control cell is named by the table; the composite's parts are not.
+      expect(screen.getByRole('textbox', { name: 'Line item 1 SKU' })).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Street address' })).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'City' })).toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: /Line item 1 Ship to/ })).toBeNull()
+      // Exactly the SKU box carries the cell class — none of the address's five.
+      expect(container.querySelectorAll(`.${fieldLayoutClasses.cell}`)).toHaveLength(1)
     })
 
     it.each(['summary', 'inline'] as const)(

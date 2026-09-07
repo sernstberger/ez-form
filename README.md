@@ -441,7 +441,9 @@ about the field changes but its name. In tests query cells by role and name
 same accname rule and resolves through the header text, not the hidden label.
 `TextField`, `Select`, `Autocomplete`, `NumberField` and the pickers take the cell
 name; the `BoundField` family (`Checkbox`, `Switch`, `RadioGroup`, …) keeps its own
-label as the name for now (#137).
+label as the name for now (#137). A cell is designed for **one** control: a composite
+(`AddressField`, a nested `FieldArray`) resets the cell for its parts, so they keep their
+own labels and the column header names the group.
 
 **Density.** The table body renders its controls under a nested theme whose
 `defaultProps.size` is the table's `size` (`small` by default), so a `TextField`,
@@ -457,13 +459,13 @@ the stacked layout.
 
 **Keyboard.** Tab is the browser's. One handler on the table body adds:
 
-| Key                    | In a cell                                                                                                                                                                                          |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Enter                  | Same column, next row. On the last row: appends a row (under `maxRows`) and lands in that column; at the cap, nothing. **Never submits.**                                                          |
-| ArrowDown / ArrowUp    | Same column, one row down / up, no wrap — when the control did not consume the key. A closed `Select` opens its menu instead; `Autocomplete`, the pickers, `Slider` and `Radio` keep their arrows. |
-| ArrowLeft / ArrowRight | The caret's, untouched.                                                                                                                                                                            |
-| Escape, Tab            | Untouched.                                                                                                                                                                                         |
-| Keys on Remove / Move  | The button's own.                                                                                                                                                                                  |
+| Key                    | In a cell                                                                                                                                                                                                                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Enter                  | Same column, next row. On the last row: appends a row (under `maxRows`) and lands in that column; at the cap, nothing. **Never submits.**                                                                                                                                |
+| ArrowDown / ArrowUp    | Same column, one row down / up, no wrap — when the control did not consume the key. A closed `Select` opens its menu instead; `Autocomplete`, the pickers and `Slider` keep the arrows they consume, and a `RadioGroup` / `Rating` keeps the browser's own radio arrows. |
+| ArrowLeft / ArrowRight | The caret's, untouched.                                                                                                                                                                                                                                                  |
+| Escape, Tab            | Untouched.                                                                                                                                                                                                                                                               |
+| Keys on Remove / Move  | The button's own.                                                                                                                                                                                                                                                        |
 
 The exclusions are the same one-line rule the Wizard's Enter uses (`isPlainKey`): a
 control that handles the key calls `preventDefault()`, and the table defers to it.

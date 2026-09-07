@@ -27,8 +27,9 @@ import type { KeyboardEvent, SyntheticEvent } from 'react'
  * picker no-ops and the step advances, exactly as for a plain text input. On the last step
  * a `SubmitButton` does exist, so the picker submits the form itself; the step handler is
  * not installed there either way, so the two never race. (Where a submit button *is*
- * present and the container still owns Enter — a table cell — the container has to disarm
- * the picker first; see `FieldArray`'s capture-phase handler.)
+ * present and the container still owns Enter — a table cell — the picker has to be
+ * disarmed from *inside*, in `usePickerField`'s own `slotProps.textField.onKeyDown`, via
+ * `preventMuiDefault` below; a container handler runs too late.)
  *
  * The rest are the cases no `preventDefault` is involved in, so nothing else could catch
  * them: a `<textarea>`/`contenteditable`, where Enter is natively a newline and the arrows
