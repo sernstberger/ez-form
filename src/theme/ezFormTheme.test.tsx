@@ -117,7 +117,7 @@ const schema = z.object({
  * test below so the deletion when upstream ships is one `git grep`. See the test's own
  * comment for what to do when this number changes.
  */
-const MARKER_COUNT = 11
+const MARKER_COUNT = 14
 
 /** Small schemas for the per-variant tests, which render one field, not `<Fields />`. */
 const emailOnly = z.object({ email: z.string() })
@@ -333,6 +333,8 @@ describe('ezFormTheme', () => {
       'src/fields/NumberField/NumberFieldControl.tsx',
       'src/fields/TextField/TextField.tsx',
       'src/fields/pickers/usePickerField.ts',
+      'src/fields/textFieldVariants.ts',
+      'src/index.ts',
       'src/theme/augmentation.ts',
       'src/theme/ezFormTheme.ts',
     ])
