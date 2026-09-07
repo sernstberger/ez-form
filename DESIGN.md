@@ -244,7 +244,7 @@ Nothing is square, nothing is a circle except the 12px step dot.
   also means these rules reach a consumer's own bare `<MuiTextField>` outside any
   `<Form>`, which a form-scoped axis never could. The **box** rules (root border,
   focus ring, padding) stay theme-wide in this pass, so `variant="outlined"` floats
-  its label over a solid border until the follow-up keys them on the variant too.
+  its label over a solid border until follow-up #143 keys them on the variant too.
 - `'start'` is **a label column above `labelPlacementBreakpoint`**, and the CSS says
   it that way: every `start` declaration lives inside `theme.breakpoints.up(breakpoint)`,
   so below the breakpoint a `start` field applies no CSS at all and is MUI's own box —
