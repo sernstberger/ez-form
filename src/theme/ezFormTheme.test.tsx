@@ -117,7 +117,7 @@ const schema = z.object({
  * test below so the deletion when upstream ships is one `git grep`. See the test's own
  * comment for what to do when this number changes.
  */
-const MARKER_COUNT = 14
+const MARKER_COUNT = 16
 
 /** Small schemas for the per-variant tests, which render one field, not `<Fields />`. */
 const emailOnly = z.object({ email: z.string() })
@@ -276,23 +276,20 @@ describe('ezFormTheme', () => {
     expect(getComputedStyle(label).position).toBe('relative')
   })
 
-  it('known limitation (#142 review): a bare built-in variant regresses to OutlinedInput under the preset', () => {
-    // `MuiTextField.defaultProps.slots.input: OutlinedInput` (above) is a plain object,
-    // merged by MUI's `resolveProps` as `{ ...defaultProps.slots, ...consumerSlots }` —
-    // not keyed on the resolved `variant` — so it reaches a bare `<MuiTextField
-    // variant="filled">` / `variant="standard"` too, with nothing to stop it. Neither
-    // `defaultProps` nor `theme.components.MuiTextField.variants` can express "this
-    // slot only for that variant" (`variants` only ever contributes `style`).
-    // ez-form's own wrappers never hit this: `customVariantSlots` fills `slots.input`
-    // only for a *custom* variant and leaves the three built-ins alone. This test pins
-    // the regression so it is caught if it silently changes, not because it is fixed.
+  it('a bare built-in variant keeps its own input under the preset (#142)', () => {
+    // The theme's `defaultProps.slots.input` cannot be a constant: `resolveProps`
+    // merges it as a plain object, not keyed on the resolved `variant`, so a constant
+    // `OutlinedInput` would reach `variant="filled"` / `"standard"` too and force them
+    // onto the outlined box. `VariantInput` resolves the input at render from the
+    // variant on `FormControl` context — the only channel, since MUI's `useSlot` does
+    // not forward `variant` into the input slot's props.
     const filled = render(
       <ThemeProvider theme={light}>
         <MuiTextField variant="filled" label="Filled" />
       </ThemeProvider>,
     )
-    expect(filled.container.querySelector('.MuiFilledInput-root')).toBeNull()
-    expect(filled.container.querySelector('.MuiOutlinedInput-root')).not.toBeNull()
+    expect(filled.container.querySelector('.MuiFilledInput-root')).not.toBeNull()
+    expect(filled.container.querySelector('.MuiOutlinedInput-root')).toBeNull()
     filled.unmount()
 
     const standard = render(
@@ -300,9 +297,45 @@ describe('ezFormTheme', () => {
         <MuiTextField variant="standard" label="Standard" />
       </ThemeProvider>,
     )
-    expect(standard.container.querySelector('.MuiInput-root')).toBeNull()
-    expect(standard.container.querySelector('.MuiOutlinedInput-root')).not.toBeNull()
+    expect(standard.container.querySelector('.MuiInput-root')).not.toBeNull()
+    expect(standard.container.querySelector('.MuiOutlinedInput-root')).toBeNull()
     standard.unmount()
+
+    // …and the default still lands on the outlined box with the notch closed, which is
+    // what `stacked` means.
+    const stacked = render(
+      <ThemeProvider theme={light}>
+        <MuiTextField label="Stacked" />
+      </ThemeProvider>,
+    )
+    expect(stacked.container.querySelector('.MuiOutlinedInput-root')).not.toBeNull()
+    const legend = stacked.container.querySelector('.MuiOutlinedInput-notchedOutline legend')!
+    expect(legend.textContent).not.toContain('Stacked')
+  })
+
+  it('a bare picker keeps its own input per variant under the preset (#142)', () => {
+    // The pickers' twin of the test above. `PickersTextFieldRoot` is a
+    // `styled(FormControl)` — MUI's own — and `PickersTextField` passes the resolved
+    // variant to it, so `PickersVariantInput` reads it off the same context.
+    const { unmount } = renderUnder(
+      light,
+      <Form schema={pickerOnly} defaultValues={{ when: null }} onSubmit={() => {}}>
+        <DatePicker name="when" label="When" slotProps={{ textField: { variant: 'filled' } }} />
+      </Form>,
+    )
+    expect(document.querySelector('.MuiPickersFilledInput-root')).not.toBeNull()
+    expect(document.querySelector('.MuiPickersOutlinedInput-root')).toBeNull()
+    unmount()
+
+    renderUnder(
+      light,
+      <Form schema={pickerOnly} defaultValues={{ when: null }} onSubmit={() => {}}>
+        <DatePicker name="when" label="When" />
+      </Form>,
+    )
+    // The default is `stacked`, which is not in MUI X's map either, so it falls back
+    // to the outlined input.
+    expect(document.querySelector('.MuiPickersOutlinedInput-root')).not.toBeNull()
   })
 
   it('a picker is stacked under the preset and floats under variant="outlined" (#142)', () => {
@@ -362,7 +395,7 @@ describe('ezFormTheme', () => {
       'src/fields/NumberField/NumberFieldControl.tsx',
       'src/fields/TextField/TextField.tsx',
       'src/fields/pickers/usePickerField.ts',
-      'src/fields/textFieldVariants.ts',
+      'src/fields/textFieldVariants.tsx',
       'src/index.ts',
       'src/theme/augmentation.ts',
       'src/theme/ezFormTheme.ts',

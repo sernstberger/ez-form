@@ -27,9 +27,8 @@
  */
 import type {} from '@mui/x-date-pickers/themeAugmentation'
 import type { TextFieldVariants } from '@mui/material/TextField'
-// UPSTREAM SHIM (#142): the fallback inputs the `stacked` variant renders through.
-import OutlinedInput from '@mui/material/OutlinedInput'
-import { PickersOutlinedInput } from '@mui/x-date-pickers/PickersTextField'
+// UPSTREAM SHIM (#142): the variant-switching input slots the `stacked` default needs.
+import { PickersVariantInput, VariantInput } from '../fields/textFieldVariants'
 import { chipClasses } from '@mui/material/Chip'
 import { menuItemClasses } from '@mui/material/MenuItem'
 import { outlinedInputClasses } from '@mui/material/OutlinedInput'
@@ -513,35 +512,23 @@ const components: ThemeOptions['components'] = {
   // is `undefined`, so `useSlot` renders an element whose `type` is `undefined` and
   // `FormControl`'s `isMuiElement` child scan throws on it. Verified by
   // "a bare MUI TextField renders under the preset" in `ezFormTheme.test.tsx`.
-  // Same fallback as `customVariantSlots`, and it goes the same way.
   //
-  // Known limitation (#142 review): `defaultProps.slots` is a plain object merged
-  // by `resolveProps` — `{ ...defaultProps.slots, ...consumerSlots }`, not keyed on
-  // the resolved `variant` — so this `slots.input: OutlinedInput` reaches a bare
-  // `<MuiTextField variant="filled">` / `variant="standard"` too, unless the
-  // consumer passes their own `slots.input` to override it. Confirmed: under this
-  // preset, a bare `<MuiTextField variant="filled">` renders `MuiOutlinedInput-root`
-  // instead of `MuiFilledInput-root` (`variant="standard"` regresses the same way).
-  // ez-form's own wrappers never hit this — `customVariantSlots` only fills
-  // `slots.input` for a *custom* variant and leaves the three built-ins alone — so
-  // no ez-form field regresses. There is no clean theme-config-only fix: neither
-  // `defaultProps` nor `theme.components.MuiTextField.variants` can express "this
-  // slot only for that variant" (`variants` only ever contributes `style`, never
-  // `slots`). The real fix is a variant-switching component in place of the static
-  // `OutlinedInput` reference, which is beyond this shim's scope; filed as a
-  // follow-up. Until then: a consumer who drops to bare `<MuiTextField>` under this
-  // preset and wants `'filled'` or `'standard'` must pass their own
-  // `slots={{ input: FilledInput }}` (or `Input`) to override the theme default.
+  // It is `VariantInput`, not a constant `OutlinedInput`: `defaultProps.slots` is a
+  // plain object that `resolveProps` merges wholesale, so a constant here would reach
+  // a bare `<MuiTextField variant="filled">` too and force it onto the outlined box.
+  // `VariantInput` resolves the input from the variant in scope instead, so the three
+  // built-ins keep their own inputs under this preset and only a custom variant falls
+  // back. Pinned by the built-in-variant tests in `ezFormTheme.test.tsx`.
   MuiTextField: {
-    defaultProps: { variant: 'stacked' as TextFieldVariants, slots: { input: OutlinedInput } },
+    defaultProps: { variant: 'stacked' as TextFieldVariants, slots: { input: VariantInput } },
   },
   // The pickers' twin. `PickersTextField` resolves `slots?.input ?? VARIANT_COMPONENT[variant]`
-  // (PickersTextField.js) exactly like `TextField`, so it needs the same pairing with
-  // MUI X's own outlined input.
+  // (PickersTextField.js) exactly like `TextField`, and its root is a `styled(FormControl)`,
+  // so the same context read resolves the variant.
   MuiPickersTextField: {
     defaultProps: {
       variant: 'stacked' as TextFieldVariants,
-      slots: { input: PickersOutlinedInput },
+      slots: { input: PickersVariantInput },
     },
   },
   MuiOutlinedInput: {
