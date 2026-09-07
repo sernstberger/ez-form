@@ -40,6 +40,7 @@ export {
   useAddressLookup,
   type UseAddressLookupOptions,
   type AddressLookupState,
+  type AddressResolveResult,
 } from './fields/AddressField'
 // Address lookup providers for `<AddressField lookup>`. `googlePlaces` is a stateless REST
 // adapter with no dependencies; the consumer passes its own key.
