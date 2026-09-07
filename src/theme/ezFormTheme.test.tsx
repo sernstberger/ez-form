@@ -197,7 +197,7 @@ describe('ezFormTheme', () => {
     expect(contrast('black', gray[50])).toBeGreaterThanOrEqual(4.5)
   })
 
-  it('stacks the label above the input: shrunk, static, no notch', () => {
+  it('pins the top label static: shrunk, no transform, no notch', () => {
     expect(light.components?.MuiInputLabel?.defaultProps).toMatchObject({
       shrink: true,
       disableAnimation: true,
@@ -215,16 +215,28 @@ describe('ezFormTheme', () => {
     expect(notch).not.toHaveClass('MuiOutlinedInput-notchedOutline-notched')
   })
 
-  it('sets labelPlacement="stacked" as the preset’s Form default (#9)', () => {
-    // "ez-form's default variant" lives here, not in `src/`: the library ships
-    // `floating` (MUI's own) so a consumer on plain `createTheme()` gets no taste
-    // they did not ask for, and opting into this preset is the asking.
-    //
-    // Belt-and-braces with the `MuiInputLabel` / `MuiOutlinedInput` overrides
-    // asserted above, and both are wanted: those are theme-wide and reach a
-    // consumer's own bare `<MuiTextField>` outside any `<Form>`, which the axis —
-    // scoped to ez-form's field boxes — cannot. They agree on the same end state.
-    expect(light.components?.EzForm?.defaultProps).toMatchObject({ labelPlacement: 'stacked' })
+  it('sets no labelPlacement default — static labels are the theme’s, not the axis’s (#139)', () => {
+    // The preset's opinion is "labels are static", and that is entirely the
+    // `MuiInputLabel` / `MuiOutlinedInput` overrides asserted above: theme-wide, so
+    // they reach a consumer's own bare `<MuiTextField>` outside any `<Form>` too,
+    // which a form-scoped default never could. The old
+    // `EzForm.defaultProps.labelPlacement: 'stacked'` was the belt to their braces
+    // and is gone; `<Form>` keeps its own `'top'` default, which emits no CSS.
+    expect(light.components?.EzForm?.defaultProps?.labelPlacement).toBeUndefined()
+  })
+
+  it('carries the description gap on EzForm.styleOverrides.description (#139)', () => {
+    // With every label static, the first thing below the form's description is a
+    // line of label text flush against the description's own last line — 0px
+    // measured, text touching text. Under a floating-label theme the input's outline
+    // already reads as a gap, which is why this belongs to the preset rather than to
+    // `src/`, where it used to ride along with the deleted `stacked` rule.
+    expect(light.components?.EzForm?.styleOverrides?.description).toMatchObject({
+      marginBottom: ezFormTokens.spacing.lg,
+    })
+    // …and the token really is the 16px the `start` placement's `columnGap` uses, so
+    // a rename of the token cannot quietly change the gap.
+    expect(ezFormTokens.spacing.lg).toBe('16px')
   })
 
   it('collapses transitions under prefers-reduced-motion (WCAG 2.3.3)', () => {

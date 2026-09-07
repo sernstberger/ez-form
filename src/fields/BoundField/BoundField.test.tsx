@@ -624,12 +624,9 @@ describe('EzBoundField.defaultProps scope', () => {
 
   it('does not re-lay-out a <Checkbox> through `labelPlacement`', () => {
     const { container } = withTheme({ labelPlacement: 'start' }, <Checkbox name="f" label="V" />)
-    // The form's own placement still owns the field. Asserted as "a placement class, and
-    // not `start`" rather than by naming the default's class: which value is the default is
-    // the form axis's business, and this test is about the theme not reaching here at all.
-    const root = container.querySelector(`.${fieldLayoutClasses.root}`)
-    expect(root).not.toBeNull()
-    expect(root).not.toHaveClass(fieldLayoutClasses.start)
+    // The form's own placement (`top`, the default) still owns the field.
+    expect(container.querySelector(`.${fieldLayoutClasses.start}`)).toBeNull()
+    expect(container.querySelector(`.${fieldLayoutClasses.top}`)).not.toBeNull()
   })
 
   it('does reach the public <BoundField>', () => {

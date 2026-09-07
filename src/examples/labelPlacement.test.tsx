@@ -13,7 +13,7 @@ import { fieldLayoutClasses, type LabelPlacement } from '../fields/LabelPlacemen
 import { expectNoA11yViolations } from '../test/axe'
 
 /**
- * #66's headline acceptance line, against the six real forms: a single
+ * #66's headline acceptance line (#139's vocabulary), against the six real forms: a single
  * `theme.components.EzForm.defaultProps.labelPlacement` flips a whole app, with
  * no per-form and no per-field props — and every field in every example still
  * renders, still names its control, and is still axe-clean afterwards.
@@ -48,7 +48,7 @@ const examples: [name: string, element: ReactElement, settle?: () => Promise<voi
 const themed = (placement: LabelPlacement) =>
   createTheme({ components: { EzForm: { defaultProps: { labelPlacement: placement } } } })
 
-describe.each(['floating', 'stacked', 'start'] as const)(
+describe.each(['top', 'start'] as const)(
   'examples under a theme labelPlacement=%s',
   (placement) => {
     it.each(examples)(

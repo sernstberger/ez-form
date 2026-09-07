@@ -13,9 +13,13 @@
  *
  * Two things the template does not do, and this preset does:
  *
- * - **Stacked labels.** The label sits above the input, in place, with no floating
- *   animation and no notch in the border. See `MuiInputLabel` / `MuiOutlinedInput`
- *   below and the "#9" note on what a real stacked variant still needs.
+ * - **Static top labels.** The label sits above the input, in place, with no
+ *   floating animation and no notch in the border. This preset is the *one*
+ *   mechanism for that (#139): it is MUI's own — `InputLabel`'s `shrink` /
+ *   `disableAnimation` plus `OutlinedInput`'s `notched: false` — and `<Form>`'s
+ *   `labelPlacement` axis has nothing to say about it. That axis only adds
+ *   `'start'`, a label column beside the control; its default `'top'` emits no CSS
+ *   at all. See `MuiInputLabel` / `MuiOutlinedInput` / `EzForm` below.
  * - **Reduced motion (WCAG 2.3.3, #11).** `MuiCssBaseline` collapses every
  *   transition and animation under `prefers-reduced-motion: reduce`.
  */
@@ -489,8 +493,8 @@ const components: ThemeOptions['components'] = {
     },
   },
   MuiOutlinedInput: {
-    // Stacked labels, part 2: the border never opens a notch for the label, because
-    // the label is no longer over the border.
+    // Static top labels, part 2: the border never opens a notch for the label,
+    // because the label is no longer over the border.
     defaultProps: { notched: false },
     styleOverrides: {
       input: { padding: 0 },
@@ -563,11 +567,12 @@ const components: ThemeOptions['components'] = {
       }),
     },
   },
-  // Stacked labels, part 1. MUI has no stacked variant (#9): `InputLabel` is always
-  // absolutely positioned over the input and translated up on focus/fill. Rendering
-  // it permanently shrunk, in normal flow, with no transform and no animation puts it
-  // above the input for good. `MuiPickersTextField` renders MUI's own `InputLabel`,
-  // so the pickers follow.
+  // Static top labels, part 1. MUI has no "static label" variant (#9): `InputLabel`
+  // is always absolutely positioned over the input and translated up on focus/fill.
+  // Rendering it permanently shrunk, in normal flow, with no transform and no
+  // animation puts it above the input for good — the theme lines a vanilla MUI
+  // consumer writes for the same effect (#139). `MuiPickersTextField` renders MUI's
+  // own `InputLabel`, so the pickers follow.
   MuiInputLabel: {
     defaultProps: { shrink: true, disableAnimation: true },
     styleOverrides: {
@@ -790,25 +795,24 @@ const components: ThemeOptions['components'] = {
   // --- ez-form's own slots --------------------------------------------------------
 
   /*
-   * #9: stacked labels are this preset's default, and this is where "ez-form's
-   * default variant" lives.
+   * #139: this preset sets no `labelPlacement`. The static label *is* the
+   * `MuiInputLabel` / `MuiOutlinedInput` / `MuiFormHelperText` overrides above, and
+   * those are the whole mechanism — theme-wide, so they also reach a consumer's own
+   * bare `<MuiTextField>` outside any `<Form>`, which a form-scoped default never
+   * could. `<Form>`'s own default stays `'top'`, and `top` emits no CSS: the axis
+   * only exists to say `start` instead.
    *
-   * Not the *library's* default — `<Form>` ships `labelPlacement: 'floating'`,
-   * MUI's own. DESIGN.md's frame is "components ship unstyled; this file is the
-   * taste", and PHILOSOPHY rule 2 says `src/` may not impose a look a consumer on
-   * plain `createTheme()` never asked for. Opting into `createEzFormTheme()` *is*
-   * asking for it, so it is set here, in one line a consumer can flip back.
-   *
-   * This is deliberately belt-and-braces with the `MuiInputLabel` /
-   * `MuiOutlinedInput` / `MuiFormHelperText` overrides above, and both stay: those
-   * are theme-wide and reach a consumer's own bare `<MuiTextField>` outside any
-   * `<Form>`, which the axis — scoped to ez-form's field boxes — cannot. The two
-   * agree on the same end state (shrunk, static, un-notched), so a field inside a
-   * form under this preset gets it from both and looks the same either way; the
-   * axis is what lets one form, or one field, say `start` instead.
+   * What the theme still owes is the gap under the form's description. With every
+   * label static, the first thing below the description is a line of label text
+   * flush against the description's own last line (measured at 0px, text touching
+   * text); under a floating-label theme the input's outline already reads as a gap,
+   * which is why this belongs to the preset and not to `src/`. 16px matches the
+   * `columnGap` the `start` placement uses.
    */
   EzForm: {
-    defaultProps: { labelPlacement: 'stacked' },
+    styleOverrides: {
+      description: { marginBottom: ezFormTokens.spacing.lg },
+    },
   },
 
   // #38: the label and the Edit button share a row with no gap by default.

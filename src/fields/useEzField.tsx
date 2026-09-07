@@ -221,7 +221,7 @@ export type UseEzFieldReturn<TValue = unknown> = Omit<UseControllerReturn, 'fiel
    * Every family puts this on its root. That is the whole per-field cost of the
    * axis — the rules themselves live once on `<Form>`'s `EzForm` Root slot, and
    * the markup is unchanged, so `<label for>` / `aria-labelledby` /
-   * `aria-describedby` are byte-identical under all three placements (#9, #66).
+   * `aria-describedby` are byte-identical under either placement (#9, #66, #139).
    */
   layoutClassName: string
 }

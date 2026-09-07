@@ -407,7 +407,7 @@ describe('FileField under labelPlacement="start" (#133)', () => {
     ['button', false],
     ['dropzone', true],
   ])(
-    '%s mode: declares itself self-labelled, so start keeps the stacked box',
+    "%s mode: declares itself self-labelled, so start keeps MUI's own box",
     async (_mode, dropzone) => {
       const { container } = render(
         <Form

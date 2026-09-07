@@ -454,7 +454,7 @@ export function FileField(inProps: FileFieldProps) {
       required={f.required}
       // `selfLabelled` (#133): the picker Button *is* this field's label — there is no
       // separate label element — so `start`'s label column would sit empty beside it.
-      // The class tells the placement rules to keep the stacked box instead; it holds
+      // The class tells the placement rules to keep MUI's own box instead; it holds
       // in both button and dropzone modes, with or without a visible `label`.
       className={`${fileFieldClasses.root} ${fieldLayoutClasses.selfLabelled} ${f.layoutClassName}`}
     >

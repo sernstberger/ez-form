@@ -5,7 +5,7 @@ import { fieldLayoutClasses } from './LabelPlacementContext'
 import { expectNoA11yViolations } from '../test/axe'
 
 /**
- * The stories are the only place a human sees the three placements side by side,
+ * The stories are the only place a human sees the two placements side by side,
  * so they need the same guarantee the fields have: every one renders, every field
  * is placed, every control is still found by its label, and axe is clean.
  *
@@ -19,8 +19,8 @@ describe('Label placement stories', () => {
     const { container } = render(<S />)
     // Every field box carries a placement class; a family that missed the wiring
     // would leave a `root` with no placement.
-    const placed = ['floating', 'stacked', 'start'].reduce(
-      (n, p) => n + container.querySelectorAll(`.${fieldLayoutClasses[p as 'floating']}`).length,
+    const placed = (['top', 'start'] as const).reduce(
+      (n, p) => n + container.querySelectorAll(`.${fieldLayoutClasses[p]}`).length,
       0,
     )
     expect(placed).toBe(container.querySelectorAll(`.${fieldLayoutClasses.root}`).length)
@@ -35,7 +35,7 @@ describe('Label placement stories', () => {
     render(<composed.StartWideLabels />)
     // Read off the emitted rule, not the element: the label column lives inside a
     // `@media (min-width…)` block (#130), and jsdom evaluates no media queries, so
-    // `getComputedStyle` here would report the stacked fallback and never the grid.
+    // `getComputedStyle` here would report MUI's own box and never the grid.
     const css = [...document.querySelectorAll('style')].map((s) => s.textContent ?? '').join('\n')
     expect(css).toContain('grid-template-columns:18rem 1fr')
     expect(css).toContain(fieldLayoutClasses.start)
@@ -44,7 +44,7 @@ describe('Label placement stories', () => {
   it('PerFieldOverride really shows two different placements in one form', () => {
     const { container } = render(<composed.PerFieldOverride />)
     expect(container.querySelectorAll(`.${fieldLayoutClasses.start}`)).toHaveLength(1)
-    expect(container.querySelectorAll(`.${fieldLayoutClasses.stacked}`)).toHaveLength(1)
+    expect(container.querySelectorAll(`.${fieldLayoutClasses.top}`)).toHaveLength(1)
   })
 
   it('ViaThemeDefaultProps sets the placement with no props at all', () => {
