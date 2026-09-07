@@ -19,6 +19,7 @@ import { styled } from '@mui/material/styles'
 import UploadFile from '@mui/icons-material/UploadFile'
 import { ChipDeleteIcon } from '../ChipDeleteIcon'
 import { hasLabel } from '../../devWarn'
+import type { LabelPlacementProps } from '../LabelPlacementContext'
 import { useEzField } from '../useEzField'
 import { useEzFormContext } from '../../useEzFormContext'
 import { mergeDisabled } from '../mergeDisabled'
@@ -179,7 +180,7 @@ export type FileFieldProps = Omit<
    * one file (a cancelled dialog changes nothing), or a chip's delete click.
    */
   onChange?: (event: SyntheticEvent, value: FileFieldValue) => void
-} & Pick<FieldRules<FileFieldValue>, 'required' | 'validate'>
+} & Pick<FieldRules<FileFieldValue>, 'required' | 'validate'> & LabelPlacementProps
 
 /**
  * "This effect has not run yet" marker for the rejection-revalidation effect below. A distinct
@@ -270,6 +271,11 @@ export function FileField(inProps: FileFieldProps) {
     'aria-label': ariaLabel,
     'aria-labelledby': ariaLabelledBy,
     'aria-describedby': ariaDescribedBy,
+    labelPlacement,
+    // Routed through the hook and back onto the root below, where `FileFieldRoot`
+    // already joined it with `fileFieldClasses.root`: the root is a `FormControl`,
+    // the same box every family's placement classes land on (#9, #66).
+    className,
     ...rest
   } = useDefaultProps({ props: inProps, name: 'EzFileField' })
   // The reason the last pick/drop rejected a file. Held here rather than pushed
@@ -279,6 +285,8 @@ export function FileField(inProps: FileFieldProps) {
   const limited = maxSize !== undefined || maxFiles !== undefined || accept !== undefined
   const f = useEzField<FileFieldValue>(name, 'FileField', {
     label,
+    labelPlacement,
+    className,
     rules: {
       required,
       // Without a limit prop there is nothing to reject, so `validate` stays
@@ -443,7 +451,7 @@ export function FileField(inProps: FileFieldProps) {
       error={f.invalid}
       disabled={isDisabled}
       required={f.required}
-      className={`${fileFieldClasses.root}${rest.className ? ` ${rest.className}` : ''}`}
+      className={`${fileFieldClasses.root} ${f.layoutClassName}`}
     >
       {dropzone ? (
         // Not focusable and given no role on purpose: the Button inside is the

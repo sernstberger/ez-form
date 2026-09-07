@@ -6,6 +6,7 @@ import FormHelperText from '@mui/material/FormHelperText'
 import FormLabel from '@mui/material/FormLabel'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
 import { styled } from '@mui/material/styles'
+import { cx } from '../../cx'
 
 export interface OtpFieldInputProps {
   'aria-invalid'?: true
@@ -13,7 +14,17 @@ export interface OtpFieldInputProps {
   onBlur?: () => void
 }
 
-export interface OtpFieldControlProps extends Omit<OTPField.Root.Props, 'render' | 'children'> {
+export interface OtpFieldControlProps extends Omit<
+  OTPField.Root.Props,
+  'render' | 'children' | 'className'
+> {
+  /**
+   * On the `FormControl` root, alongside `otpFieldClasses.root`. Base UI's Root
+   * takes a `(state) => string` form too, but Root renders no element here —
+   * `FormControl` is the root — so this is the plain `string` MUI takes. It is
+   * also where `OtpField` puts the label-placement classes (#9, #66).
+   */
+  className?: string
   label?: ReactNode
   size?: 'small' | 'medium'
   error?: boolean
@@ -146,6 +157,7 @@ export function OtpFieldControl(inProps: OtpFieldControlProps) {
     labelRequired,
     labelled: labelledProp,
     characterLabel = (index: number, count: number) => `Character ${index} of ${count}`,
+    className,
     ...rootProps
   } = props
   const generatedId = useId()
@@ -179,7 +191,7 @@ export function OtpFieldControl(inProps: OtpFieldControlProps) {
       error={error}
       disabled={disabled}
       required={required}
-      className={otpFieldClasses.root}
+      className={cx(otpFieldClasses.root, className)}
     >
       {/* No label element at all without a real name: in `optional` mode `label`
           is already `displayLabel`, which wraps a missing label with the

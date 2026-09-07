@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { OTPField } from '@base-ui/react/otp-field'
 import { OtpFieldControl, type OtpFieldControlProps } from './OtpFieldControl'
 import { useEzField } from '../useEzField'
+import type { LabelPlacementProps } from '../LabelPlacementContext'
 import { mergeDisabled } from '../mergeDisabled'
 import { hasLabel } from '../../devWarn'
 import { useRuleMessages } from '../../Form/RuleMessagesContext'
@@ -18,8 +19,13 @@ export type OtpFieldProps = Omit<
   | 'render'
   | 'children'
   | 'length'
+  // Base UI's Root takes a `(state) => string` form; Root renders no element here
+  // (`FormControl` is the root), so this is the plain `string` MUI takes — the same
+  // narrowing `NumberField` makes, and the channel the placement classes use.
+  | 'className'
 > & {
   name: string
+  className?: string
   label?: ReactNode
   helperText?: ReactNode
   size?: 'small' | 'medium'
@@ -32,7 +38,7 @@ export type OtpFieldProps = Omit<
   onBlur?: () => void
   /** See `OtpFieldControlProps['characterLabel']`; theme-defaultable via `EzOtpField`. */
   characterLabel?: OtpFieldControlProps['characterLabel']
-} & Pick<FieldRules<string>, 'required' | 'validate'>
+} & Pick<FieldRules<string>, 'required' | 'validate'> & LabelPlacementProps
 
 /**
  * One-time-code input whose form value is the joined string (`''` when
@@ -50,6 +56,11 @@ export function OtpField({
   length = 6,
   onValueChange,
   onBlur,
+  labelPlacement,
+  // Routed through the hook, then onto `OtpFieldControl`'s `className`, which
+  // joins it with `otpFieldClasses.root` on the `FormControl` root — the same box
+  // every other family's placement classes land on (#9, #66).
+  className,
   ...rest
 }: OtpFieldProps) {
   const messages = useRuleMessages()
@@ -70,12 +81,15 @@ export function OtpField({
     // Read, not destructured: both still reach the control through `rest`.
     'aria-label': rest['aria-label'],
     'aria-labelledby': rest['aria-labelledby'],
+    labelPlacement,
+    className,
   })
   const text = f.helperText(helperText)
 
   return (
     <OtpFieldControl
       {...rest}
+      className={f.layoutClassName}
       name={f.field.name}
       label={f.displayLabel}
       // `label`, not `displayLabel`: in `optional` mode `displayLabel` wraps a

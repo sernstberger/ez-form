@@ -27,7 +27,7 @@ import {
 } from 'react-hook-form'
 import { useDefaultProps } from '@mui/material/DefaultPropsProvider'
 import generateUtilityClasses from '@mui/material/generateUtilityClasses'
-import { styled } from '@mui/material/styles'
+import { styled, type Breakpoint } from '@mui/material/styles'
 import Typography, { type TypographyProps } from '@mui/material/Typography'
 import type { z } from 'zod'
 import { ezResolver } from './ezResolver'
@@ -38,6 +38,11 @@ import { createFieldFocusStore, FieldFocusContext } from './FieldFocusContext'
 import { createFormErrorFocusStore, FormErrorFocusContext } from './FormErrorFocusContext'
 import { flattenErrors } from './flattenErrors'
 import { LiveRegion, type LiveRegionProps } from './LiveRegion'
+import {
+  LabelPlacementContext,
+  type LabelPlacement,
+} from '../fields/LabelPlacementContext'
+import { labelPlacementStyles } from '../fields/labelPlacementStyles'
 import { RequiredIndicatorContext } from './RequiredIndicatorContext'
 import { RuleMessagesContext } from './RuleMessagesContext'
 import { defaultMessages, type RuleMessages } from '../rules'
@@ -88,7 +93,27 @@ const defaultRequiredIndicatorText = (requiredIndicator: 'asterisk' | 'optional'
     ? 'All fields are required unless marked optional.'
     : 'Required fields are marked with an asterisk (*).'
 
-const FormRoot = styled('form', { name: 'EzForm', slot: 'Root' })({})
+/**
+ * The `<form>` element, and the one place the label-placement rules are
+ * registered (#9, #66).
+ *
+ * They belong here rather than on each field because every ez-form field's root
+ * is the same `.MuiFormControl-root` box — label, control, helper text, in that
+ * order — so the placements are a layout change on that box and no markup moves.
+ * Scoping them to the form is exactly right: a field is inside a `<Form>` by
+ * construction (every field throws "must be rendered inside <Form>" otherwise),
+ * and it keeps `TextField`, `Select` and `Autocomplete` the pure pass-throughs
+ * they are meant to be. `theme.components.EzForm.styleOverrides.root` reaches
+ * every rule.
+ *
+ * `labelPlacementBreakpoint` and `labelWidth` arrive as `ownerState` because they
+ * are runtime values a `styled` callback cannot read from context.
+ */
+const FormRoot = styled('form', { name: 'EzForm', slot: 'Root' })<{
+  ownerState: { labelPlacementBreakpoint: Breakpoint; labelWidth: string | number }
+}>(({ theme, ownerState }) =>
+  labelPlacementStyles(theme, ownerState.labelPlacementBreakpoint, ownerState.labelWidth),
+)
 const FormTitle = styled(Typography, { name: 'EzForm', slot: 'Title' })({})
 const FormDescription = styled(Typography, { name: 'EzForm', slot: 'Description' })({})
 // The submit-status region gets its own EzForm slot rather than rendering a bare
@@ -212,6 +237,33 @@ export interface FormProps<TIn extends FieldValues, TOut> extends Omit<
   requiredIndicatorText?:
     ReactNode | false | ((requiredIndicator: 'asterisk' | 'optional') => ReactNode)
   /**
+   * Where every field's label sits relative to its control (#9, #66). Its own
+   * axis, orthogonal to MUI's `variant` — `<TextField variant="filled">` under
+   * `labelPlacement="start"` is a filled box with its label in a left column.
+   *
+   * - `'floating'` (default) — MUI's own: the label floats over the input and
+   *   translates up on focus/fill, notching the outline.
+   * - `'stacked'` — the label sits above the control in normal flow, with no
+   *   motion and no notch. `createEzFormTheme()` sets this as its default; the
+   *   library's own default stays MUI's, because `src/` ships unstyled.
+   * - `'start'` — the label sits in a column beside the control, collapsing back
+   *   to `'stacked'` below `labelPlacementBreakpoint`.
+   *
+   * Form-wide, because it is a layout convention rather than a per-field choice;
+   * a single row that has to differ passes its own `labelPlacement`. Theme-
+   * defaultable via `theme.components.EzForm.defaultProps`, which is how one line
+   * flips a whole app.
+   */
+  labelPlacement?: LabelPlacement
+  /**
+   * The breakpoint below which `labelPlacement="start"` collapses to `'stacked'`
+   * — a two-column settings form has no room for a label column on a phone.
+   * Names the *smallest* size that still gets columns; default `'sm'`.
+   */
+  labelPlacementBreakpoint?: Breakpoint
+  /** The label column's width under `labelPlacement="start"`. Default `'12rem'`. */
+  labelWidth?: string | number
+  /**
    * Announced when a submit starts. `false` suppresses just this one.
    * Default "Submitting…".
    */
@@ -297,6 +349,9 @@ function FormImpl<TIn extends FieldValues, TOut>(
     requiredIndicator = 'asterisk',
     optionalText = '(optional)',
     requiredIndicatorText = defaultRequiredIndicatorText,
+    labelPlacement = 'floating',
+    labelPlacementBreakpoint = 'sm',
+    labelWidth = '12rem',
     submitPendingText = 'Submitting…',
     submitSuccessText = 'Submitted.',
     submitErrorText = 'Submit failed.',
@@ -345,6 +400,12 @@ function FormImpl<TIn extends FieldValues, TOut>(
   const ruleMessages = useMemo<RuleMessages>(
     () => (messages ? { ...defaultMessages, ...messages } : defaultMessages),
     [messages],
+  )
+  // Memoised for the same reason: every bound field in the form subscribes to this
+  // context, so an object rebuilt each render would re-render all of them.
+  const labelPlacementContext = useMemo(
+    () => ({ labelPlacement, labelPlacementBreakpoint, labelWidth }),
+    [labelPlacement, labelPlacementBreakpoint, labelWidth],
   )
   const showRequiredIndicatorText = resolvedRequiredIndicatorText !== false
   const effectiveDescription = showRequiredIndicatorText ? (
@@ -813,6 +874,7 @@ function FormImpl<TIn extends FieldValues, TOut>(
             <FormRoot
               noValidate
               {...formProps}
+              ownerState={{ labelPlacementBreakpoint, labelWidth }}
               autoComplete={autoComplete}
               className={`${formClasses.root}${className ? ` ${className}` : ''}`}
               aria-labelledby={ariaLabelledBy ?? (title != null ? titleProps.id : undefined)}
@@ -839,9 +901,11 @@ function FormImpl<TIn extends FieldValues, TOut>(
               )}
               <AssistedContext.Provider value={assisted}>
                 <RequiredIndicatorContext.Provider value={{ requiredIndicator, optionalText }}>
-                  <RuleMessagesContext.Provider value={ruleMessages}>
-                    {children}
-                  </RuleMessagesContext.Provider>
+                  <LabelPlacementContext.Provider value={labelPlacementContext}>
+                    <RuleMessagesContext.Provider value={ruleMessages}>
+                      {children}
+                    </RuleMessagesContext.Provider>
+                  </LabelPlacementContext.Provider>
                 </RequiredIndicatorContext.Provider>
               </AssistedContext.Provider>
               {/*

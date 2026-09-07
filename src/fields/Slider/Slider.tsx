@@ -3,6 +3,7 @@ import MuiSlider, { type SliderProps as MuiSliderProps } from '@mui/material/Sli
 import { mergeSlotProps } from '@mui/material/utils'
 import type { FieldValues, Validate, ValidationRule } from 'react-hook-form'
 import { FieldFrame } from '../FieldFrame'
+import type { LabelPlacementProps } from '../LabelPlacementContext'
 import { mergeDisabled } from '../mergeDisabled'
 import { useRuleMessages } from '../../Form/RuleMessagesContext'
 import type { FieldRules } from '../../rules'
@@ -21,7 +22,7 @@ export type SliderProps = Omit<
   /** One prop for both: the slider's bound and the validation message. */
   min?: ValidationRule<number>
   max?: ValidationRule<number>
-} & Pick<FieldRules<SliderValue>, 'validate'>
+} & Pick<FieldRules<SliderValue>, 'validate'> & LabelPlacementProps
 
 const bound = (rule: ValidationRule<number> | undefined): number | undefined =>
   rule === undefined ? undefined : typeof rule === 'number' ? rule : rule.value
@@ -71,6 +72,7 @@ export function Slider({
   onChange,
   onBlur,
   slotProps,
+  labelPlacement,
   ...rest
 }: SliderProps) {
   const minBound = bound(min)
@@ -103,6 +105,7 @@ export function Slider({
           ),
         },
       }}
+      labelPlacement={labelPlacement}
       labelAs="legend"
       // For the dev-mode "no accessible name" check only — read, not destructured, so it
       // still reaches MuiSlider through `rest`. No `aria-labelledby`: SliderProps omits

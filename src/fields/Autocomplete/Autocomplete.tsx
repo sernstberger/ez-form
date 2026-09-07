@@ -11,6 +11,7 @@ import Chip, { type ChipProps } from '@mui/material/Chip'
 import { mergeSlotProps } from '@mui/material/utils'
 import { ChipDeleteIcon } from '../ChipDeleteIcon'
 import { useEzField } from '../useEzField'
+import type { LabelPlacementProps } from '../LabelPlacementContext'
 import { mergeDisabled } from '../mergeDisabled'
 import type { Option } from '../Option'
 import type { FieldRules } from '../../rules'
@@ -75,7 +76,7 @@ export type AutocompleteProps<
      * override the keys it owns (Enter, Backspace, the arrows).
      */
     inputProps?: NonNullable<MuiTextFieldProps['slotProps']>['htmlInput']
-  }
+  } & LabelPlacementProps
 
 const isOptionShaped = (v: unknown): v is Option =>
   typeof v === 'object' && v !== null && 'label' in v && 'value' in v
@@ -123,6 +124,12 @@ export function Autocomplete<
   // (#102 row 8). It is merged with that id onto `slotProps.htmlInput` below,
   // because an accessible description is a list.
   'aria-describedby': ariaDescribedBy,
+  labelPlacement,
+  // Out of `rest`, which lands on the outer `MuiAutocomplete-root` div. The box
+  // the placement rules select is the `FormControl` *inside* it — the `TextField`
+  // from `renderInput` — so the hook joins the consumer's class with the placement
+  // classes and both go there instead (#9, #66).
+  className,
   ...rest
 }: AutocompleteProps<TOption, TValue, Multiple, FreeSolo>) {
   // `getOptionValue` decides what this field stores, so that — not `option.value` — is the
@@ -140,6 +147,8 @@ export function Autocomplete<
     // and re-emitted onto the `<input>` through `f.nameA11y`.
     'aria-label': ariaLabel ?? textFieldProps?.['aria-label'],
     'aria-labelledby': ariaLabelledBy ?? textFieldProps?.['aria-labelledby'],
+    labelPlacement,
+    className,
   })
 
   // form → MUI: find the option for a stored value. When it is not in the
@@ -247,6 +256,11 @@ export function Autocomplete<
         <MuiTextField
           {...params}
           {...textFieldProps}
+          // On the rendered TextField, not on `MuiAutocomplete`: Autocomplete
+          // renders an outer `MuiAutocomplete-root` div around the TextField, and
+          // the `FormControl` box the placement rules select is the TextField's.
+          // The hook has already joined the consumer's own `className` into it.
+          className={f.layoutClassName}
           // `textFieldProps` may carry them; on the TextField root they would name and
           // describe the `FormControl` wrapper. `f.nameA11y` and `f.describedBy`
           // re-emit them on the `<input>` through `slotProps.htmlInput` below.

@@ -2,13 +2,14 @@ import type { ReactNode } from 'react'
 import MuiSwitch, { type SwitchProps as MuiSwitchProps } from '@mui/material/Switch'
 import { mergeSlotProps } from '@mui/material/utils'
 import { FieldFrame } from '../FieldFrame'
+import type { LabelPlacementProps } from '../LabelPlacementContext'
 import type { BooleanFieldRules } from '../../rules'
 
 export type SwitchProps = Omit<MuiSwitchProps, 'name' | 'checked' | 'required'> & {
   name: string
   label: ReactNode
   helperText?: ReactNode
-} & BooleanFieldRules
+} & BooleanFieldRules & LabelPlacementProps
 
 /**
  * @remarks When to use
@@ -30,6 +31,7 @@ export function Switch({
   onChange,
   onBlur,
   slotProps,
+  labelPlacement,
   ...rest
 }: SwitchProps) {
   return (
@@ -40,6 +42,7 @@ export function Switch({
       helperText={helperText}
       disabled={disabled}
       rules={{ required, validate }}
+      labelPlacement={labelPlacement}
       labelAs="control"
       // For the dev-mode "no accessible name" check only — read, not destructured, so
       // both still reach the control through `rest`.

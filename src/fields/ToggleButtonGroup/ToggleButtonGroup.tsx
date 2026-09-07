@@ -4,6 +4,7 @@ import MuiToggleButtonGroup, {
   type ToggleButtonGroupProps as MuiToggleButtonGroupProps,
 } from '@mui/material/ToggleButtonGroup'
 import { FieldFrame } from '../FieldFrame'
+import type { LabelPlacementProps } from '../LabelPlacementContext'
 import { mergeDisabled } from '../mergeDisabled'
 import type { Option } from '../Option'
 import type { FieldRules } from '../../rules'
@@ -21,7 +22,7 @@ export type ToggleButtonGroupProps = Omit<
   options: readonly Option[]
   helperText?: ReactNode
   disabled?: boolean
-} & Pick<FieldRules<Value | null | Value[]>, 'required' | 'validate'>
+} & Pick<FieldRules<Value | null | Value[]>, 'required' | 'validate'> & LabelPlacementProps
 
 /**
  * Form value is `Option['value'] | null` under `exclusive`, else
@@ -39,6 +40,7 @@ export function ToggleButtonGroup({
   exclusive,
   onChange,
   onBlur,
+  labelPlacement,
   ...rest
 }: ToggleButtonGroupProps) {
   warnDuplicateOptions('ToggleButtonGroup', name, options)
@@ -50,6 +52,7 @@ export function ToggleButtonGroup({
       helperText={helperText}
       disabled={disabled}
       rules={{ required, validate }}
+      labelPlacement={labelPlacement}
       labelAs="legend"
       // For the dev-mode "no accessible name" check only — read, not destructured, so
       // both still reach the control through `rest`.

@@ -3,6 +3,7 @@ import FormControlLabel from '@mui/material/FormControlLabel'
 import Radio from '@mui/material/Radio'
 import MuiRadioGroup, { type RadioGroupProps as MuiRadioGroupProps } from '@mui/material/RadioGroup'
 import { FieldFrame } from '../FieldFrame'
+import type { LabelPlacementProps } from '../LabelPlacementContext'
 import type { Option } from '../Option'
 import type { FieldRules } from '../../rules'
 import { warnDuplicateOptions } from '../../devWarn'
@@ -17,7 +18,7 @@ export type RadioGroupProps = Omit<
   options: readonly Option[]
   helperText?: ReactNode
   disabled?: boolean
-} & Pick<FieldRules<Option['value']>, 'required' | 'validate'>
+} & Pick<FieldRules<Option['value']>, 'required' | 'validate'> & LabelPlacementProps
 
 /**
  * One value across N radios. MUI radios emit strings, so the change handler
@@ -34,6 +35,7 @@ export function RadioGroup({
   validate,
   onChange,
   onBlur,
+  labelPlacement,
   ...rest
 }: RadioGroupProps) {
   warnDuplicateOptions('RadioGroup', name, options)
@@ -45,6 +47,7 @@ export function RadioGroup({
       helperText={helperText}
       disabled={disabled}
       rules={{ required, validate }}
+      labelPlacement={labelPlacement}
       labelAs="legend"
       // For the dev-mode "no accessible name" check only — read, not destructured, so
       // both still reach the control through `rest`.

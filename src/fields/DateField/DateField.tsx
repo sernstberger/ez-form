@@ -76,6 +76,11 @@ export function DateField({
   onError,
   onClear,
   slotProps,
+  // Out of `rest`, which reaches the picker root: the box the placement rules
+  // select is the text field's `FormControl`, so the hook routes both there
+  // through `slotProps.textField` (#9, #66).
+  labelPlacement,
+  className,
   ...rest
 }: DateFieldProps) {
   const bound = usePickerField<
@@ -95,6 +100,8 @@ export function DateField({
     onError,
     onClear,
     slotProps,
+    labelPlacement,
+    className,
   })
   return <MuiDateField {...rest} {...bound} />
 }

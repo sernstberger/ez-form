@@ -1,6 +1,7 @@
 import MuiTextField, { type TextFieldProps as MuiTextFieldProps } from '@mui/material/TextField'
 import { mergeSlotProps, useForkRef } from '@mui/material/utils'
 import { useEzField } from '../useEzField'
+import type { LabelPlacementProps } from '../LabelPlacementContext'
 import { mergeDisabled } from '../mergeDisabled'
 import { resolveAutoComplete } from '../resolveAutoComplete'
 import { useAssisted } from '../../Form/AssistedContext'
@@ -58,7 +59,8 @@ export type TextFieldProps = Omit<
    * value is displayed as-is.
    */
   displayValue?: string
-} & FieldRules<string>
+} & FieldRules<string> &
+  LabelPlacementProps
 
 // `type` → mobile keyboard (`inputMode`) and autofill (`autoComplete`) token. Only types
 // with one unambiguous token are covered; a wrong guess is worse than none (#6, #7).
@@ -94,6 +96,12 @@ export function TextField({
   autoComplete: autoCompleteProp,
   componentName = 'TextField',
   inputRef: inputRefProp,
+  labelPlacement,
+  // Routed through the hook rather than left in `rest`: MUI already puts a
+  // TextField's `className` on the `FormControl` root, which is exactly the box
+  // the placement classes go on, so the hook joins the two and the result lands
+  // in one place (#9, #66).
+  className,
   // Destructured out of `rest` on purpose. Left in it they reach MUI's root, which
   // puts a root `aria-label` on the `FormControl` **wrapper** — naming a `<div>`
   // while the `<input>` stays anonymous (#99). They go to `slotProps.htmlInput`
@@ -118,6 +126,8 @@ export function TextField({
     rules: { required, min, max, minLength, maxLength, pattern, validate },
     'aria-label': ariaLabel,
     'aria-labelledby': ariaLabelledBy,
+    labelPlacement,
+    className,
   })
   const {
     ref,
@@ -146,6 +156,7 @@ export function TextField({
     <MuiTextField
       {...rest}
       {...fieldProps}
+      className={f.layoutClassName}
       label={f.displayLabel}
       value={displayValue ?? value ?? ''}
       onChange={(e) => {

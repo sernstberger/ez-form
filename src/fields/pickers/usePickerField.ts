@@ -9,6 +9,7 @@ import { mergeSlotProps } from '@mui/material/utils'
 import type { PickerChangeHandlerContext } from '@mui/x-date-pickers/models'
 import type { FieldValues, Validate } from 'react-hook-form'
 import { useEzField } from '../useEzField'
+import type { LabelPlacement } from '../LabelPlacementContext'
 import { mergeDisabled } from '../mergeDisabled'
 import { useRuleMessages } from '../../Form/RuleMessagesContext'
 import type { FieldRules } from '../../rules'
@@ -24,6 +25,15 @@ export interface PickerFieldProps<TValue, TError extends string | null> {
   errorMessages?: PickerErrorMessages<TError>
   required?: FieldRules<TValue>['required']
   validate?: FieldRules<TValue>['validate']
+  /**
+   * This picker's own label placement, overriding the form's (#9, #66). The
+   * classes go on `slotProps.textField` rather than the picker root, because the
+   * `FormControl` box the placement rules select is `MuiPickersTextField-root` —
+   * the picker itself renders no box of its own.
+   */
+  labelPlacement?: LabelPlacement
+  /** The consumer's `className`, appended after the placement classes. */
+  className?: string
 }
 
 /**
@@ -70,6 +80,8 @@ interface ConsumerFieldSlotProps {
  * `TSlotProps` only guarantees `textField?: object`, so read them through this.
  */
 interface ConsumerTextFieldSlotProps {
+  /** Joined after the placement classes, not replaced by them (#9, #66). */
+  className?: string
   /** A label-less picker is named here, not on the picker itself. */
   'aria-label'?: string
   'aria-labelledby'?: string
@@ -132,6 +144,8 @@ export function usePickerField<
     onError,
     onClear,
     slotProps,
+    labelPlacement,
+    className,
   }: PickerFieldProps<TValue, TError> & PickerHandlers<TValue, TError, TSlotProps, TContext>,
 ) {
   const pickerError = useRef<TError | null>(null)
@@ -206,6 +220,11 @@ export function usePickerField<
   const ruleMessages = useRuleMessages()
   const f = useEzField<TValue>(name, componentName, {
     label,
+    labelPlacement,
+    // Both consumer channels, in the order the rest of this hook uses them: the
+    // flat `className` first, then the text field slot's own — a picker takes
+    // either, and neither may be dropped by the placement classes.
+    className: [className, consumerTextField?.className].filter(Boolean).join(' ') || undefined,
     rules: {
       required,
       validate: {
@@ -300,6 +319,10 @@ export function usePickerField<
         // Before the consumer's spread, so a consumer `id` still wins; see `fieldId`.
         id: fieldId,
         ...consumerTextField,
+        // After the spread, because the placement classes are binding-owned: the
+        // hook has already joined the consumer's own `className` (the flat prop
+        // and this slot's, in that order) into it, so nothing is dropped (#9, #66).
+        className: f.layoutClassName,
         // Same wrapper bug as #99, one component over. On the `textField` root these
         // land on `MuiPickersTextField-root`, which is a `FormControl` **div** with no
         // role at all — so the name describes a `<div>` nothing reads while the
