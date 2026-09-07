@@ -266,11 +266,7 @@ export function BoundField<TValue>(inProps: BoundFieldProps<TValue>) {
       required={f.required}
     >
       {labelAs === 'control' ? (
-        <FormControlLabel
-          label={f.displayLabel}
-          required={labelRequired}
-          control={render(bound)}
-        />
+        <FormControlLabel label={f.displayLabel} required={labelRequired} control={render(bound)} />
       ) : labelAs === 'legend' ? (
         <>
           {/* No legend at all without a label: an empty one is markup nothing can use,

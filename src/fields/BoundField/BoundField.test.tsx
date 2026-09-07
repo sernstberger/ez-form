@@ -423,7 +423,7 @@ describe('BoundField render prop', () => {
     )
   })
 
-  it('throws outside <Form> under the consumer\'s own `componentName`', () => {
+  it("throws outside <Form> under the consumer's own `componentName`", () => {
     expectConsole('error', 'must be rendered inside <Form>')
     expectConsole('error', 'The above error occurred')
     expect(() =>

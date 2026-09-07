@@ -84,7 +84,7 @@ export function ReferenceControl({
           {bound.displayLabel ? (
             <label id={bound.labelId} htmlFor={bound.controlId}>
               {bound.displayLabel}
-              {bound.labelRequired ?? bound.required ? ' *' : null}
+              {(bound.labelRequired ?? bound.required) ? ' *' : null}
             </label>
           ) : null}
           <input

@@ -17,6 +17,10 @@ export {
   type BoundFieldLabelAs,
   type Bound,
 } from './fields/BoundField'
+// The three member types of `Bound`. Exported so a consumer can name them when they
+// split `render` into helpers — `(a11y: InputA11y) => …` — rather than only reach them
+// structurally through `Bound<T>`, which is all the emitted `.d.ts` allows otherwise.
+export type { InputA11y, NameA11y, TypedControllerRenderProps } from './fields/useEzField'
 export { TextField, type TextFieldProps } from './fields/TextField'
 export { Select, type SelectProps, type SelectOption } from './fields/Select'
 export type { Option } from './fields/Option'
