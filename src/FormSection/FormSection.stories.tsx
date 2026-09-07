@@ -56,10 +56,11 @@ export const Disabled: Story = {
 // set a Form-level title, and this story is specifically about two sections
 // living inside a titled form.
 export const TwoSections: Story = {
-  // Opt out of the FormParameters decorator: this story renders its own <Form>,
-  // and the decorator's would nest <form> inside <form> (#120). Same pattern as
-  // Switch.stories.tsx ImmediateEffect.
-  parameters: { form: undefined },
+  // Opts out of the preview's Form decorator: this story renders its own `<Form>`, and the
+  // decorator's would nest `<form>` inside `<form>` (#120). `false`, not `undefined` —
+  // Storybook's parameter merge skips `undefined`, so the original opt-out here never took
+  // effect and the nesting persisted (#128).
+  parameters: { form: false } satisfies FormParameters,
   render: () => (
     <Form
       schema={schema}
