@@ -365,4 +365,75 @@ describe('Loan', () => {
     await screen.findByLabelText(/upload documents for grace hopper/i)
     await expectNoA11yViolations(container)
   })
+
+  it('keeps a document attached to its own co-applicant after an earlier row is removed (#79)', async () => {
+    const user = userEvent.setup({ delay: null })
+    render(<Loan />)
+    await fillLoanStep(user)
+    await next(user)
+    await fillApplicantStep(user)
+    await next(user) // co-applicants
+
+    await addCoApplicant(user, 1, 'Grace Hopper')
+    await addCoApplicant(user, 2, 'Katherine Johnson')
+
+    await next(user) // employment
+    await fillEmploymentStep(user)
+    await next(user) // debts
+    await next(user) // documents
+
+    // A different document for each co-applicant, so "whose file is this" has an observable
+    // answer on the screen.
+    await user.upload(
+      screen.getByLabelText(/upload documents for grace hopper/i),
+      new File(['g'], 'grace.pdf', { type: 'application/pdf' }),
+    )
+    await user.upload(
+      screen.getByLabelText(/upload documents for katherine johnson/i),
+      new File(['k'], 'katherine.pdf', { type: 'application/pdf' }),
+    )
+    await screen.findByText('grace.pdf')
+    await screen.findByText('katherine.pdf')
+
+    // Now go back and delete the *first* co-applicant — the case #79 was filed for.
+    await user.click(screen.getByRole('tab', { name: /co-applicants/i }))
+    const first = await screen.findByRole('group', { name: 'Co-applicant 1' })
+    await user.click(within(first).getByRole('button', { name: /remove co-applicant 1/i }))
+    await waitFor(() =>
+      expect(screen.queryByRole('group', { name: 'Co-applicant 2' })).not.toBeInTheDocument(),
+    )
+
+    await user.click(screen.getByRole('tab', { name: /documents/i }))
+
+    // Katherine is the only co-applicant left, her field now addresses her row's new path, and
+    // the document shown against it is hers — Grace and Grace's file are both gone.
+    const katherineField = await screen.findByLabelText(/upload documents for katherine johnson/i)
+    expect(katherineField).toHaveAttribute('name', 'coApplicants.0.documents')
+    expect(screen.getByText('katherine.pdf')).toBeInTheDocument()
+    expect(screen.queryByText('grace.pdf')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/upload documents for grace hopper/i)).not.toBeInTheDocument()
+
+    // Worth being precise about what this test does and does not prove, because it is the
+    // motivating scenario for #79 and the temptation is to read more into it. Every field here
+    // is *controlled* — its value comes from form state — so the assertions above also hold
+    // for the index-keyed `useWatch` map this step used to be: React re-renders the reused
+    // instance with the survivor's value and the visible result is the same. What the id
+    // keying additionally buys is component *identity*, which is not observable across a
+    // wizard step change (the step unmounts either way); `FieldArrayRowsContext.test.tsx`
+    // pins that separately, on rows that stay mounted.
+  })
 })
+
+/** Adds one co-applicant row and fills it, so a Documents-step field can be named after them. */
+async function addCoApplicant(
+  user: ReturnType<typeof userEvent.setup>,
+  index: number,
+  name: string,
+) {
+  await user.click(screen.getByRole('button', { name: 'Add' }))
+  const row = await screen.findByRole('group', { name: `Co-applicant ${index}` })
+  setValue(within(row).getByLabelText(/^name/i), name)
+  await user.click(within(row).getByRole('combobox', { name: /relationship/i }))
+  await user.click(await screen.findByRole('option', { name: 'Spouse' }))
+  setValue(within(row).getByLabelText(/monthly income/i), '2000')
+}

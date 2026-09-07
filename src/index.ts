@@ -160,6 +160,7 @@ export {
   type FieldArrayProps,
   type FieldArrayRow,
 } from './FieldArray'
+export { useFieldArrayRows } from './Form/FieldArrayRowsContext'
 export {
   PasswordStrength,
   passwordStrengthClasses,
